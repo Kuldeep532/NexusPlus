@@ -9,9 +9,11 @@ import { Stack } from 'expo-router';
 import { setBaseUrl } from '@workspace/api-client-react';
 import * as SplashScreen from 'expo-splash-screen';
 import { useColors } from '@/hooks/useColors';
+import { firebaseEnv } from '@/features/firebase/firebaseConfig';
 
 SplashScreen.preventAutoHideAsync();
 if (process.env.EXPO_PUBLIC_DOMAIN) setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
+if (!firebaseEnv && __DEV__) console.warn('[NexusPlus] Firebase environment is not configured. Define the EXPO_PUBLIC_FIREBASE_* variables.');
 
 const queryClient = new QueryClient();
 
