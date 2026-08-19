@@ -62,6 +62,28 @@ export default function HomeScreen() {
         <Feather name="arrow-right" size={20} color={colors.primaryForeground} />
       </Pressable>
 
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Open Nexus Biometric Vault"
+        accessibilityHint="Open your encrypted passwords, secure notes, debit cards, credit cards and private documents"
+        testID="home-open-biometric-vault"
+        onPress={() => router.push('/biometric-vault')}
+        style={({ pressed }) => [
+          styles.vaultCard,
+          { backgroundColor: colors.card, borderColor: colors.border },
+          pressed && styles.pressed,
+        ]}
+      >
+        <View style={[styles.vaultIcon, { backgroundColor: colors.secondary }]}>
+          <MaterialCommunityIcons name="shield-lock" size={25} color={colors.primary} />
+        </View>
+        <View style={styles.vaultCopy}>
+          <Text style={[styles.vaultTitle, { color: colors.foreground }]}>Biometric Vault</Text>
+          <Text style={[styles.vaultDetail, { color: colors.mutedForeground }]}>Passwords, cards, notes and documents protected by device authentication</Text>
+        </View>
+        <Feather name="chevron-right" size={19} color={colors.mutedForeground} />
+      </Pressable>
+
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent books</Text>
         <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>{books.length} files</Text>
@@ -112,11 +134,16 @@ const styles = StyleSheet.create({
   titleBlock: { paddingHorizontal: 20, marginBottom: 22 },
   title: { fontSize: 31, fontFamily: 'Inter_700Bold', letterSpacing: -0.6, marginBottom: 7 },
   subtitle: { fontSize: 14, fontFamily: 'Inter_400Regular' },
-  openReader: { marginHorizontal: 20, minHeight: 78, borderRadius: 16, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', marginBottom: 34 },
+  openReader: { marginHorizontal: 20, minHeight: 78, borderRadius: 16, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   openReaderIcon: { width: 44, height: 44, borderRadius: 13, backgroundColor: '#08131B25', alignItems: 'center', justifyContent: 'center' },
   openReaderCopy: { flex: 1, marginLeft: 12, marginRight: 8 },
   openReaderTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', marginBottom: 5 },
   openReaderDetail: { fontSize: 11, fontFamily: 'Inter_500Medium', opacity: 0.8 },
+  vaultCard: { marginHorizontal: 20, minHeight: 86, borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 30 },
+  vaultIcon: { width: 50, height: 50, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  vaultCopy: { flex: 1, marginHorizontal: 12 },
+  vaultTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', marginBottom: 5 },
+  vaultDetail: { fontSize: 10.5, lineHeight: 16, fontFamily: 'Inter_400Regular' },
   sectionHeader: { paddingHorizontal: 20, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 },
   sectionTitle: { fontSize: 17, fontFamily: 'Inter_700Bold' },
   sectionCount: { fontSize: 11, fontFamily: 'Inter_400Regular' },
