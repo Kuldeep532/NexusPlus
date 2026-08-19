@@ -15,60 +15,60 @@
 const colors = {
   light: {
     // Legacy aliases (kept for backward compatibility)
-    text: '#F4F7FA',
-    tint: '#55E6C1',
+    text: '#F2F6F7',
+    tint: '#8FE3C1',
 
     // Core surfaces
-    background: '#08131B',
-    foreground: '#F4F7FA',
+    background: '#0D151C',
+    foreground: '#F2F6F7',
 
     // Cards / elevated surfaces
-    card: '#10232C',
-    cardForeground: '#F4F7FA',
+    card: '#17242C',
+    cardForeground: '#F2F6F7',
 
     // Primary action color (buttons, links, active states)
-    primary: '#55E6C1',
-    primaryForeground: '#08131B',
+    primary: '#8FE3C1',
+    primaryForeground: '#0D151C',
 
     // Secondary / less-emphasis interactive surfaces
-    secondary: '#17333C',
-    secondaryForeground: '#D8F6EE',
+    secondary: '#20343D',
+    secondaryForeground: '#D9ECE7',
 
     // Muted / subdued elements (dividers, timestamps, placeholders)
-    muted: '#142A33',
-    mutedForeground: '#8CA7AF',
+    muted: '#132129',
+    mutedForeground: '#9FB1B8',
 
     // Accent highlights (badges, selected items, focus rings)
-    accent: '#5B5DE6',
-    accentForeground: '#F4F7FA',
+    accent: '#F1C75B',
+    accentForeground: '#1A1B16',
 
     // Destructive actions (delete, error states)
-    destructive: '#F07A6A',
-    destructiveForeground: '#ffffff',
+    destructive: '#EF887B',
+    destructiveForeground: '#0D151C',
 
     // Borders and input outlines
-    border: '#20424B',
-    input: '#20424B',
+    border: '#2D444E',
+    input: '#2D444E',
   },
   dark: {
-    text: '#F4F7FA',
-    tint: '#55E6C1',
-    background: '#08131B',
-    foreground: '#F4F7FA',
-    card: '#10232C',
-    cardForeground: '#F4F7FA',
-    primary: '#55E6C1',
-    primaryForeground: '#08131B',
-    secondary: '#17333C',
-    secondaryForeground: '#D8F6EE',
-    muted: '#142A33',
-    mutedForeground: '#8CA7AF',
-    accent: '#5B5DE6',
-    accentForeground: '#F4F7FA',
-    destructive: '#F07A6A',
-    destructiveForeground: '#FFFFFF',
-    border: '#20424B',
-    input: '#20424B',
+    text: '#F2F6F7',
+    tint: '#8FE3C1',
+    background: '#0D151C',
+    foreground: '#F2F6F7',
+    card: '#17242C',
+    cardForeground: '#F2F6F7',
+    primary: '#8FE3C1',
+    primaryForeground: '#0D151C',
+    secondary: '#20343D',
+    secondaryForeground: '#D9ECE7',
+    muted: '#132129',
+    mutedForeground: '#9FB1B8',
+    accent: '#F1C75B',
+    accentForeground: '#1A1B16',
+    destructive: '#EF887B',
+    destructiveForeground: '#0D151C',
+    border: '#2D444E',
+    input: '#2D444E',
   },
 
   // Border radius (in px). Sync from the sibling web artifact's --radius

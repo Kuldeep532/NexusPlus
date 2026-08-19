@@ -69,6 +69,8 @@ function ClassicTabLayout() {
         name="index"
         options={{
           title: 'Home',
+          tabBarAccessibilityLabel: 'Home tab',
+          tabBarButtonTestID: 'tab-home',
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="house" tintColor={color} size={24} />
@@ -77,7 +79,7 @@ function ClassicTabLayout() {
             ),
         }}
       />
-      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: ({ color }) => isIOS ? <SymbolView name="gearshape" tintColor={color} size={24} /> : <Feather name="settings" size={22} color={color} /> }} />
+      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarAccessibilityLabel: 'Settings tab', tabBarButtonTestID: 'tab-settings', tabBarIcon: ({ color }) => isIOS ? <SymbolView name="gearshape" tintColor={color} size={24} /> : <Feather name="settings" size={22} color={color} /> }} />
     </Tabs>
   );
 }

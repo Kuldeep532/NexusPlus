@@ -14,6 +14,7 @@ import {
 import { Stack } from 'expo-router';
 import { setBaseUrl } from '@workspace/api-client-react';
 import * as SplashScreen from 'expo-splash-screen';
+import { useColors } from '@/hooks/useColors';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -24,12 +25,13 @@ if (process.env.EXPO_PUBLIC_DOMAIN) {
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
+  const colors = useColors();
   return (
-    <Stack screenOptions={{ headerBackTitle: 'Back', headerTintColor: '#55E6C1', headerStyle: { backgroundColor: '#08131B' }, headerTitleStyle: { color: '#F4F7FA', fontFamily: 'Inter_600SemiBold' } }}>
+    <Stack screenOptions={{ headerBackTitle: 'Back', headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.background }, headerTitleStyle: { color: colors.foreground, fontFamily: 'Inter_600SemiBold' }, headerShadowVisible: false }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="reader" options={{ title: 'Now reading' }} />
-      <Stack.Screen name="voices" options={{ title: 'Voice library' }} />
-      <Stack.Screen name="utilities" options={{ title: 'Smart utilities' }} />
+      <Stack.Screen name="reader" options={{ title: 'PDF Reader' }} />
+      <Stack.Screen name="voices" options={{ title: 'Voice Library' }} />
+      <Stack.Screen name="utilities" options={{ title: 'Utilities' }} />
       <Stack.Screen name="about" options={{ title: 'About Nexus Plus' }} />
     </Stack>
   );

@@ -41,7 +41,7 @@ Nexus Plus helps people read and listen to local documents with large, TalkBack-
 
 ## User preferences
 
-The user wants a lightweight, strictly accessible Android app with zero data collection and support contact `kuldeepky538@gmail.com`.
+The user wants a lightweight, strictly accessible Android app with zero data collection and support contact `kuldeepky538@gmail.com`. The product UI should feel like a professional utility app rather than an AI-generated interface: exactly two tabs (Home and Settings), with Home acting as a focused tool hub.
 
 ## Gotchas
 
