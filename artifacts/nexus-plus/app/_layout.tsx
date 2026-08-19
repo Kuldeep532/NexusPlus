@@ -30,7 +30,6 @@ function RootLayoutNav() {
       <Stack.Screen name="reader" options={{ title: 'Now reading' }} />
       <Stack.Screen name="voices" options={{ title: 'Voice library' }} />
       <Stack.Screen name="utilities" options={{ title: 'Smart utilities' }} />
-      <Stack.Screen name="settings" options={{ title: 'Settings' }} />
       <Stack.Screen name="about" options={{ title: 'About Nexus Plus' }} />
     </Stack>
   );

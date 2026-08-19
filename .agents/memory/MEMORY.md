@@ -1,0 +1,1 @@
+- [Nexus Plus product direction](nexus-plus.md) — offline-first accessibility app; preserve the no-account, zero-data-collection stance.

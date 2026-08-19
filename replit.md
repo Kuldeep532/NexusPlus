@@ -1,6 +1,6 @@
-# [Project name]
+# Nexus Plus
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+An accessible, offline-first Android reading companion with eBook/PDF playback, voice discovery, auto-TTS controls, and document utilities.
 
 ## Run & Operate
 
@@ -22,23 +22,30 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/nexus-plus` — Expo Router mobile app and its local theme.
+- `artifacts/nexus-plus/app/(tabs)/index.tsx` — home library and utility hub.
+- `artifacts/nexus-plus/app/reader.tsx` — accessible playback screen.
+- `artifacts/nexus-plus/app/voices.tsx` — offline voice library surface.
+- `artifacts/nexus-plus/app/utilities.tsx` — document and audio utility surface.
+- `artifacts/nexus-plus/app/(tabs)/settings.tsx` — voice and privacy settings.
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- The first build is frontend-only and offline-first; AsyncStorage/native device APIs are preferred for local persistence and processing.
+- The package identifier is `com.nexuswavetech.nexusplus` and should not be changed without an explicit request.
+- Dark, high-contrast teal/navy tokens are the product identity and are shared through the Expo local theme.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Nexus Plus helps people read and listen to local documents with large, TalkBack-friendly controls. The current app includes a home hub, playback controls, offline voice library UI, smart utility hub, settings, privacy messaging, and support contact.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+The user wants a lightweight, strictly accessible Android app with zero data collection and support contact `kuldeepky538@gmail.com`.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Run `pnpm --filter @workspace/nexus-plus run typecheck` after Expo changes.
 
 ## Pointers
 
