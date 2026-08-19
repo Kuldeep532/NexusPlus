@@ -15,7 +15,7 @@ const features: Feature[] = [
   { key: 'vault', title: 'Biometric Vault', icon: 'shield-lock', route: '/biometric-vault' },
   { key: 'selfie', title: 'Selfie', icon: 'camera-front', route: '/selfie' },
   { key: 'time-assisted', title: 'Time Assisted', icon: 'clock-time-eight-outline', route: '/time-assisted' },
-  { key: 'cleaner', title: 'Storage Cleaner', icon: 'broom', route: '/storage-cleaner' },
+  { key: 'utilities', title: 'Utilities', icon: 'tools', route: '/utilities' },
   { key: 'pdf-tools', title: 'PDF Tools', icon: 'file-pdf-box', route: '/pdf-tools' },
 ];
 
