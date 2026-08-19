@@ -1,0 +1,25 @@
+Create a lightweight, 100% accessible Android app named "Nexus Plus" with package name "com.nexuswavetech.nexusplus". The app is built on three core pillars: an Offline eBook/PDF Reader, a System-Wide Auto-TTS Engine, and Unique High-Value Smart Utilities (excluding generic phone tools).
+
+### Core Architecture & Features:
+
+1. Dynamic Online Voice Discovery & Integration:
+   - Automated Voice Fetcher: Connects to open-source repositories (Hugging Face, GitHub, Piper TTS directory APIs) to discover and list all available open-source voice models (.onnx / Piper voices).
+   - One-Tap Offline Download: Enables easy downloading and local storage of voice models for complete offline playback.
+
+2. System-Wide Auto-TTS Engine:
+   - Android TextToSpeech API Integration: Functions as a native System TTS Engine for TalkBack and screen readers, eliminating the need for paid or cracked TTS apps.
+   - Dynamic Auto-Language Switching: Uses lightweight Unicode script recognition (e.g., Devanagari vs. Latin) to switch seamlessly between Hindi and English voices without reading punctuation marks aloud.
+
+3. Accessible Offline Reader:
+   - Lightweight PDF/eBook parser with reading position auto-resume.
+   - Complete Playback Controls: Play, Pause, Rewind/Forward (10s), Speed adjustment (0.5x–3.0x), Pitch, Sleep Timer, Volume, and Chapter Navigation.
+
+4. Unique & Essential Smart Utilities (Non-Standard Tools):
+   - PDF ⇄ Image Converter: Quick offline conversion between Image to PDF and PDF to Images.
+   - OCR Text Extractor: Extracts readable text from images or scanned PDFs and feeds it directly into the TTS engine for instant listening.
+   - Quick Audio Trimmer / Joiner: Simple tool to clip or merge voice notes and TTS audio exports.
+   - Text Formatting & Speech Sanitizer: Cleans up copied text by removing unneeded URLs, messy symbols, or special characters before sending it to the TTS engine.
+
+5. Accessible UI & App Info:
+   - Built to strict accessibility standards (large touch targets, fully labeled elements, TalkBack optimized).
+   - Core Screens: Home (Library & Utility Hub), Voice Downloader, Settings, About Us, Privacy Policy (Zero data collection), Terms, and Support Contact (kuldeepky538@gmail.com).
