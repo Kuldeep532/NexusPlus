@@ -1,13 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import {
-  DOCUMENT_TYPES,
-  VAULT_CATEGORY_META,
-  VaultCategory,
-  VaultItem,
-} from '../biometricVaultTypes';
+import { DOCUMENT_TYPES, VAULT_CATEGORY_META, VaultCategory, VaultItem } from '../biometricVaultTypes';
 
 interface Props {
   category: VaultCategory;
@@ -20,7 +15,7 @@ export function VaultItemForm({ category, initialItem, onSave, onCancel }: Props
   const colors = useColors();
   const isEdit = Boolean(initialItem);
   const [title, setTitle] = useState(initialItem?.title ?? '');
-  const [reveal, setReveal] = useState(false);
+  const [visibleFields, setVisibleFields] = useState<Record<string, boolean>>({});
   const [values, setValues] = useState<Record<string, string>>(() => {
     if (!initialItem) return {};
     return Object.fromEntries(
@@ -30,8 +25,12 @@ export function VaultItemForm({ category, initialItem, onSave, onCancel }: Props
 
   const meta = VAULT_CATEGORY_META[category];
 
-  const field = (key: string, label: string, options?: { secure?: boolean; keyboardType?: any; multiline?: boolean; placeholder?: string }) => {
-    const secure = options?.secure && !reveal;
+  const field = (
+    key: string,
+    label: string,
+    options?: { secure?: boolean; keyboardType?: any; multiline?: boolean; placeholder?: string },
+  ) => {
+    const isVisible = visibleFields[key] === true;
     return (
       <View style={styles.field} key={key}>
         <Text style={[styles.label, { color: colors.foreground }]}>{label}</Text>
@@ -41,10 +40,10 @@ export function VaultItemForm({ category, initialItem, onSave, onCancel }: Props
             accessibilityLabel={label}
             placeholder={options?.placeholder}
             placeholderTextColor={colors.mutedForeground}
-            value={values[key] ?? ''}
-            onChangeText={(value) => setValues((prev) => ({ ...prev, [key]: value }))}
+            value={key === 'title' ? title : values[key] ?? ''}
+            onChangeText={(value) => key === 'title' ? setTitle(value) : setValues((prev) => ({ ...prev, [key]: value }))}
             style={[styles.input, { color: colors.foreground }, options?.multiline && styles.multiline]}
-            secureTextEntry={secure}
+            secureTextEntry={Boolean(options?.secure) && !isVisible}
             keyboardType={options?.keyboardType}
             multiline={options?.multiline}
             autoCorrect={false}
@@ -55,11 +54,11 @@ export function VaultItemForm({ category, initialItem, onSave, onCancel }: Props
           {options?.secure ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={reveal ? `Hide ${label}` : `Reveal ${label}`}
-              onPress={() => setReveal((value) => !value)}
+              accessibilityLabel={isVisible ? `Hide ${label}` : `Reveal ${label}`}
+              onPress={() => setVisibleFields((prev) => ({ ...prev, [key]: !isVisible }))}
               style={styles.eye}
             >
-              <MaterialCommunityIcons name={reveal ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.mutedForeground} />
+              <MaterialCommunityIcons name={isVisible ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.mutedForeground} />
             </Pressable>
           ) : null}
         </View>
@@ -67,72 +66,33 @@ export function VaultItemForm({ category, initialItem, onSave, onCancel }: Props
     );
   };
 
-  const fields = useMemo(() => {
-    switch (category) {
-      case 'PASSWORD':
-        return [
-          field('username', 'Username / Email'),
-          field('password', 'Password', { secure: true }),
-          field('website', 'Website', { placeholder: 'https://example.com' }),
-          field('notes', 'Notes', { multiline: true }),
-        ];
-      case 'SECURE_NOTE':
-        return [field('content', 'Secure note', { multiline: true })];
-      case 'DEBIT_CARD':
-        return [
-          field('cardHolder', 'Card holder'),
-          field('cardNumber', 'Card number', { keyboardType: 'number-pad' }),
-          field('expiryMonth', 'Expiry month', { keyboardType: 'number-pad' }),
-          field('expiryYear', 'Expiry year', { keyboardType: 'number-pad' }),
-          field('cvv', 'CVV', { secure: true, keyboardType: 'number-pad' }),
-          field('pin', 'ATM PIN', { secure: true, keyboardType: 'number-pad' }),
-          field('bankName', 'Bank name'),
-          field('notes', 'Notes', { multiline: true }),
-        ];
-      case 'CREDIT_CARD':
-        return [
-          field('cardHolder', 'Card holder'),
-          field('cardNumber', 'Card number', { keyboardType: 'number-pad' }),
-          field('expiryMonth', 'Expiry month', { keyboardType: 'number-pad' }),
-          field('expiryYear', 'Expiry year', { keyboardType: 'number-pad' }),
-          field('cvv', 'CVV', { secure: true, keyboardType: 'number-pad' }),
-          field('creditLimit', 'Credit limit', { keyboardType: 'decimal-pad' }),
-          field('bankName', 'Bank name'),
-          field('notes', 'Notes', { multiline: true }),
-        ];
-      case 'IDENTITY_DOCUMENT':
-        return [
-          field('documentType', 'Document type'),
-          field('documentNumber', 'Document number', { secure: true }),
-          field('expiryDate', 'Expiry date'),
-          field('issuingAuthority', 'Issuing authority'),
-          field('fileUri', 'Encrypted file reference'),
-          field('notes', 'Notes', { multiline: true }),
-        ];
-      case 'BANK_ACCOUNT':
-        return [
-          field('bankName', 'Bank name'),
-          field('accountHolder', 'Account holder'),
-          field('accountNumber', 'Account number', { secure: true, keyboardType: 'number-pad' }),
-          field('ifsc', 'IFSC'),
-          field('branch', 'Branch'),
-          field('accountType', 'Account type'),
-          field('notes', 'Notes', { multiline: true }),
-        ];
-      case 'WIFI':
-        return [
-          field('networkName', 'Network name'),
-          field('password', 'Wi-Fi password', { secure: true }),
-          field('securityType', 'Security type'),
-          field('notes', 'Notes', { multiline: true }),
-        ];
-      case 'SECRET':
-        return [
-          field('secret', 'Secret', { secure: true, multiline: true }),
-          field('notes', 'Notes', { multiline: true }),
-        ];
-    }
-  }, [category, colors.card, colors.foreground, colors.border, colors.mutedForeground, reveal, values]);
+  let fields: React.ReactNode[];
+  switch (category) {
+    case 'PASSWORD':
+      fields = [field('username', 'Username / Email'), field('password', 'Password', { secure: true }), field('website', 'Website', { placeholder: 'https://example.com' }), field('notes', 'Notes', { multiline: true })];
+      break;
+    case 'SECURE_NOTE':
+      fields = [field('content', 'Secure note', { multiline: true })];
+      break;
+    case 'DEBIT_CARD':
+      fields = [field('cardHolder', 'Card holder'), field('cardNumber', 'Card number', { keyboardType: 'number-pad' }), field('expiryMonth', 'Expiry month', { keyboardType: 'number-pad' }), field('expiryYear', 'Expiry year', { keyboardType: 'number-pad' }), field('cvv', 'CVV', { secure: true, keyboardType: 'number-pad' }), field('pin', 'ATM PIN', { secure: true, keyboardType: 'number-pad' }), field('bankName', 'Bank name'), field('notes', 'Notes', { multiline: true })];
+      break;
+    case 'CREDIT_CARD':
+      fields = [field('cardHolder', 'Card holder'), field('cardNumber', 'Card number', { keyboardType: 'number-pad' }), field('expiryMonth', 'Expiry month', { keyboardType: 'number-pad' }), field('expiryYear', 'Expiry year', { keyboardType: 'number-pad' }), field('cvv', 'CVV', { secure: true, keyboardType: 'number-pad' }), field('creditLimit', 'Credit limit', { keyboardType: 'decimal-pad' }), field('bankName', 'Bank name'), field('notes', 'Notes', { multiline: true })];
+      break;
+    case 'IDENTITY_DOCUMENT':
+      fields = [field('documentType', 'Document type'), field('documentNumber', 'Document number', { secure: true }), field('expiryDate', 'Expiry date'), field('issuingAuthority', 'Issuing authority'), field('fileUri', 'Encrypted file reference'), field('notes', 'Notes', { multiline: true })];
+      break;
+    case 'BANK_ACCOUNT':
+      fields = [field('bankName', 'Bank name'), field('accountHolder', 'Account holder'), field('accountNumber', 'Account number', { secure: true, keyboardType: 'number-pad' }), field('ifsc', 'IFSC'), field('branch', 'Branch'), field('accountType', 'Account type'), field('notes', 'Notes', { multiline: true })];
+      break;
+    case 'WIFI':
+      fields = [field('networkName', 'Network name'), field('password', 'Wi-Fi password', { secure: true }), field('securityType', 'Security type'), field('notes', 'Notes', { multiline: true })];
+      break;
+    case 'SECRET':
+      fields = [field('secret', 'Secret', { secure: true, multiline: true }), field('notes', 'Notes', { multiline: true })];
+      break;
+  }
 
   const submit = () => {
     const base = {
@@ -143,7 +103,6 @@ export function VaultItemForm({ category, initialItem, onSave, onCancel }: Props
       favorite: initialItem?.favorite ?? false,
       tags: initialItem?.tags ?? [],
     } as VaultItem;
-
     if (!base.title.trim()) return;
     onSave(base);
   };
@@ -151,7 +110,7 @@ export function VaultItemForm({ category, initialItem, onSave, onCancel }: Props
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <View style={styles.iconWrap}>
+        <View style={[styles.iconWrap, { backgroundColor: colors.secondary }]}>
           <MaterialCommunityIcons name={meta.icon as any} size={23} color={colors.primary} />
         </View>
         <View style={styles.headerCopy}>
@@ -164,14 +123,14 @@ export function VaultItemForm({ category, initialItem, onSave, onCancel }: Props
         {field('title', 'Title', { placeholder: `Example: ${meta.label}` })}
         {fields}
         {category === 'IDENTITY_DOCUMENT' ? (
-          <View style={styles.typeHint}>
-            <Text style={[styles.typeHintTitle, { color: colors.foreground }]}>Recommended document types</Text>
-            <Text style={[styles.typeHintText, { color: colors.mutedForeground }]}>{DOCUMENT_TYPES.slice(0, 6).join(' • ')}</Text>
+          <View style={[styles.typeHint, { backgroundColor: colors.secondary }]}>
+            <Text style={[styles.typeHintTitle, { color: colors.foreground }]}>Document types</Text>
+            <Text style={[styles.typeHintText, { color: colors.mutedForeground }]}>{DOCUMENT_TYPES.join(' • ')}</Text>
           </View>
         ) : null}
       </ScrollView>
 
-      <View style={styles.actions}>
+      <View style={[styles.actions, { backgroundColor: colors.background }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Cancel" onPress={onCancel} style={[styles.secondaryButton, { borderColor: colors.border, backgroundColor: colors.card }]}>
           <Text style={[styles.secondaryText, { color: colors.foreground }]}>Cancel</Text>
         </Pressable>
@@ -186,7 +145,7 @@ export function VaultItemForm({ category, initialItem, onSave, onCancel }: Props
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 6, flexDirection: 'row', alignItems: 'center' },
-  iconWrap: { width: 48, height: 48, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.06)' },
+  iconWrap: { width: 48, height: 48, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   headerCopy: { flex: 1, marginLeft: 12 },
   title: { fontSize: 19, fontFamily: 'Inter_700Bold', marginBottom: 3 },
   subtitle: { fontSize: 11, fontFamily: 'Inter_400Regular' },
@@ -197,7 +156,7 @@ const styles = StyleSheet.create({
   input: { flex: 1, minHeight: 48, paddingHorizontal: 14, paddingVertical: 10, fontSize: 13, fontFamily: 'Inter_400Regular' },
   multiline: { minHeight: 110, textAlignVertical: 'top' },
   eye: { width: 48, alignItems: 'center', justifyContent: 'center' },
-  typeHint: { borderRadius: 15, padding: 13, marginTop: 2, backgroundColor: 'rgba(0,0,0,0.04)' },
+  typeHint: { borderRadius: 15, padding: 13, marginTop: 2 },
   typeHintTitle: { fontSize: 11, fontFamily: 'Inter_700Bold', marginBottom: 5 },
   typeHintText: { fontSize: 10, lineHeight: 16, fontFamily: 'Inter_400Regular' },
   actions: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 15, paddingBottom: 20, flexDirection: 'row', gap: 10 },
