@@ -14,9 +14,7 @@ const features: Feature[] = [
   { key: 'media', title: 'Media Player', icon: 'play-box-multiple', route: '/media-player' },
   { key: 'vault', title: 'Biometric Vault', icon: 'shield-lock', route: '/biometric-vault' },
   { key: 'selfie', title: 'Selfie', icon: 'camera-front', route: '/selfie' },
-  { key: 'time-announcer', title: 'Time Announcer', icon: 'clock-time-eight-outline', route: '/time-announcer' },
-  { key: 'battery-announcer', title: 'Battery Announcer', icon: 'battery-charging', route: '/battery-announcer' },
-  { key: 'cleaner', title: 'Storage Cleaner', icon: 'broom', route: '/storage-cleaner' },
+  { key: 'utilities', title: 'Utilities', icon: 'tools', route: '/utilities' },
   { key: 'pdf-tools', title: 'PDF Tools', icon: 'file-pdf-box', route: '/pdf-tools' },
 ];
 
