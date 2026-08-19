@@ -31,7 +31,10 @@ function RootLayoutNav() {
       <Stack.Screen name="media-player" options={{ title: 'Media Player' }} />
       <Stack.Screen name="biometric-vault" options={{ title: 'Biometric Vault' }} />
       <Stack.Screen name="voices" options={{ title: 'Voice Library' }} />
-      <Stack.Screen name="about" options={{ title: 'About Nexus Plus' }} />
+      <Stack.Screen name="pdf-to-images" options={{ title: 'PDF to Images' }} />
+      <Stack.Screen name="privacy-policy" options={{ title: 'Privacy Policy' }} />
+      <Stack.Screen name="terms-and-conditions" options={{ title: 'Terms and Conditions' }} />
+      <Stack.Screen name="about-us" options={{ title: 'About Us' }} />
     </Stack>
   );
 }
