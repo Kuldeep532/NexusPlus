@@ -6,8 +6,9 @@ import { useColors } from '@/hooks/useColors';
 
 type Utility = { key: string; title: string; detail: string; icon: React.ComponentProps<typeof MaterialCommunityIcons>['name']; route: string };
 const utilities: Utility[] = [
-  { key: 'qr', title: 'QR Code Generator', detail: 'Create Text/URL, WiFi, UPI and WhatsApp QR codes', icon: 'qrcode', route: '/utilities/qr-generator' },
+  { key: 'time', title: 'Time Assisted', detail: 'World clock, time announcement, intervals, stopwatch and alarms', icon: 'clock-time-eight-outline', route: '/time-assisted' },
   { key: 'battery', title: 'Battery Announcer', detail: 'Hear battery level and charging state', icon: 'battery-charging', route: '/battery-announcer' },
+  { key: 'qr', title: 'QR Code Generator', detail: 'Create Text/URL, WiFi, UPI and WhatsApp QR codes', icon: 'qrcode', route: '/utilities/qr-generator' },
 ];
 
 export default function UtilitiesScreen() {
