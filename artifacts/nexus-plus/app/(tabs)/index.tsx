@@ -13,6 +13,7 @@ const features: Feature[] = [
   { key: 'reader', title: 'Book Reader', icon: 'book-open-page-variant', route: '/reader' },
   { key: 'media', title: 'Media Player', icon: 'play-box-multiple', route: '/media-player' },
   { key: 'vault', title: 'Biometric Vault', icon: 'shield-lock', route: '/biometric-vault' },
+  { key: 'selfie', title: 'Selfie', icon: 'camera-front', route: '/selfie' },
   { key: 'cleaner', title: 'Storage Cleaner', icon: 'broom', route: '/storage-cleaner' },
   { key: 'pdf-tools', title: 'PDF Tools', icon: 'file-pdf-box', route: '/pdf-tools' },
 ];
