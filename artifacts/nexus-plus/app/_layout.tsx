@@ -46,7 +46,7 @@ function RootLayoutNav() {
       <Stack.Screen name="battery-announcer" options={{ title: 'Battery Announcer' }} />
       <Stack.Screen name="language-and-preference" options={{ title: 'Language and Preference' }} />
       <Stack.Screen name="utilities" options={{ title: 'Utilities' }} />
-      <Stack.Screen name="utilities/qr-generator" options={{ title: 'QR Code Generator' }} />
+      <Stack.Screen name="online-radio" options={{ title: 'Online Radio' }} />
       <Stack.Screen name="voices" options={{ title: 'Voice Library' }} />
       <Stack.Screen name="pdf-tools" options={{ title: 'PDF Tools' }} />
       <Stack.Screen name="pdf-to-images" options={{ title: 'PDF to Images' }} />
@@ -64,20 +64,6 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontsLoaded || fontError) SplashScreen.hideAsync();
   }, [fontsLoaded, fontError]);
-
   if (!fontsLoaded && !fontError) return null;
-
-  return (
-    <SafeAreaProvider>
-      <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <KeyboardProvider>
-              <RootLayoutNav />
-            </KeyboardProvider>
-          </GestureHandlerRootView>
-        </QueryClientProvider>
-      </ErrorBoundary>
-    </SafeAreaProvider>
-  );
+  return <SafeAreaProvider><ErrorBoundary><QueryClientProvider client={queryClient}><GestureHandlerRootView style={{ flex: 1 }}><KeyboardProvider><RootLayoutNav /></KeyboardProvider></GestureHandlerRootView></QueryClientProvider></ErrorBoundary></SafeAreaProvider>;
 }
