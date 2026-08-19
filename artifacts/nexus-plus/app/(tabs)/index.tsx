@@ -17,7 +17,7 @@ const features: Feature[] = [
   { key: 'media', title: 'Media Player', detail: 'Play audio and video with accessible controls', icon: 'play-box-multiple', route: '/media-player' },
   { key: 'vault', title: 'Biometric Vault', detail: 'Protect passwords, cards, notes and documents', icon: 'shield-lock', route: '/biometric-vault' },
   { key: 'voices', title: 'Voice Library', detail: 'Manage downloaded reading voices', icon: 'account-voice', route: '/voices' },
-  { key: 'cleaner', title: 'Storage Cleaner', detail: 'Find large files and reclaim device storage safely', icon: 'broom', route: '/storage-cleaner' },
+  { key: 'cleaner', title: 'Storage Cleaner', detail: 'Find temporary cache files and reclaim space safely', icon: 'broom', route: '/storage-cleaner' },
   { key: 'about', title: 'About Nexus Plus', detail: 'Version, privacy and support information', icon: 'information-outline', route: '/about' },
 ];
 
@@ -55,6 +55,17 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
+      <View style={[styles.vaultFeatured, { backgroundColor: colors.secondary, borderColor: colors.border }]}> 
+        <View style={[styles.vaultIcon, { backgroundColor: colors.card }]}><MaterialCommunityIcons name="shield-lock" size={28} color={colors.primary} /></View>
+        <View style={styles.vaultCopy}>
+          <Text style={[styles.vaultTitle, { color: colors.foreground }]}>Biometric Vault</Text>
+          <Text style={[styles.vaultDetail, { color: colors.mutedForeground }]}>Open the encrypted vault using device biometric authentication.</Text>
+        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open Biometric Vault" onPress={() => router.push('/biometric-vault')} style={({ pressed }) => [styles.vaultButton, { backgroundColor: colors.primary }, pressed && styles.pressed]}>
+          <Text style={[styles.vaultButtonText, { color: colors.primaryForeground }]}>Open</Text>
+        </Pressable>
+      </View>
+
       <View style={styles.sectionHeader}>
         <View><Text style={[styles.sectionTitle, { color: colors.foreground }]}>All Features</Text><Text style={[styles.sectionDetail, { color: colors.mutedForeground }]}>Everything available in Nexus Plus.</Text></View>
       </View>
@@ -85,11 +96,18 @@ const styles = StyleSheet.create({
   subtitle: { maxWidth: 285, fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular' },
   logo: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   logoText: { fontSize: 21, fontFamily: 'Inter_700Bold' },
-  heroActions: { paddingHorizontal: 20, gap: 10, marginBottom: 24 },
+  heroActions: { paddingHorizontal: 20, gap: 10, marginBottom: 14 },
   heroAction: { minHeight: 76, borderRadius: 18, borderWidth: 1, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center' },
   heroCopy: { flex: 1, marginHorizontal: 12 },
   heroTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', marginBottom: 4 },
   heroDetail: { fontSize: 11, lineHeight: 16, fontFamily: 'Inter_400Regular' },
+  vaultFeatured: { marginHorizontal: 20, minHeight: 88, borderRadius: 18, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
+  vaultIcon: { width: 50, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  vaultCopy: { flex: 1, marginHorizontal: 11 },
+  vaultTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', marginBottom: 4 },
+  vaultDetail: { fontSize: 10.5, lineHeight: 15, fontFamily: 'Inter_400Regular' },
+  vaultButton: { minWidth: 58, minHeight: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  vaultButtonText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
   sectionHeader: { paddingHorizontal: 20, marginBottom: 12 },
   sectionTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', marginBottom: 4 },
   sectionDetail: { fontSize: 12, fontFamily: 'Inter_400Regular' },
