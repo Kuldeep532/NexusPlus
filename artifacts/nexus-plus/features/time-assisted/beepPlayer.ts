@@ -1,29 +1,18 @@
-import { Audio } from 'expo-av';
+import { useAudioPlayer } from 'expo-audio';
 
-const beepSource = require('../../assets/audio/time_assisted_beep.mp3');
+export const TIME_ANNOUNCEMENT_BEEP_ASSET = require('../../assets/audio/time_assisted_beep.mp3');
 
-let sound: Audio.Sound | null = null;
+let player: ReturnType<typeof useAudioPlayer> | null = null;
 
-export async function playTimeAnnouncementBeep(): Promise<void> {
-  try {
-    if (sound) {
-      await sound.unloadAsync().catch(() => undefined);
-      sound = null;
-    }
-
-    const created = await Audio.Sound.createAsync(beepSource, {
-      shouldPlay: true,
-      volume: 0.9,
-      isLooping: false,
-    });
-    sound = created.sound;
-  } catch {
-    // Announcement should continue even when the optional cue cannot play.
-  }
+export function registerTimeAnnouncementBeepPlayer(nextPlayer: ReturnType<typeof useAudioPlayer>): void {
+  player = nextPlayer;
 }
 
-export async function disposeTimeAnnouncementBeep(): Promise<void> {
-  if (!sound) return;
-  await sound.unloadAsync().catch(() => undefined);
-  sound = null;
+export function playTimeAnnouncementBeep(): void {
+  try {
+    player?.seekTo(0);
+    player?.play();
+  } catch {
+    // The spoken announcement should still proceed when the optional cue cannot play.
+  }
 }
