@@ -1,13 +1,18 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 
 const ONBOARDING_KEY = 'nexusplus.welcome.completed.v1';
-const GOOGLE_CONFIGURED = true;
+
+async function signInWithGoogle(): Promise<{ success: true } | { success: false; reason: string }> {
+  // Credential Manager + Firebase Auth must return success only after the
+  // Google ID token has been accepted by Firebase Authentication.
+  return { success: false, reason: 'Google Credential Manager is not configured in this development build yet.' };
+}
 
 export default function WelcomeScreen() {
   const colors = useColors();
@@ -15,28 +20,13 @@ export default function WelcomeScreen() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
 
-  useEffect(() => {
-    void (async () => {
-      const completed = await SecureStore.getItemAsync(ONBOARDING_KEY);
-      if (completed === '1') router.replace('/(tabs)' as never);
-    })();
-  }, []);
-
   async function loginWithGoogle() {
+    if (busy) return;
     setBusy(true);
     setStatus('Opening Google sign-in…');
-
     try {
-      if (!GOOGLE_CONFIGURED) throw new Error('Google sign-in configuration is incomplete.');
-
-      // Credential Manager + Firebase Authentication native integration is wired
-      // through the auth adapter. Keep the UI isolated from provider details.
-      // Replace this placeholder call once the Android development build includes
-      // the Credential Manager native module.
-      const authenticated = false;
-      if (!authenticated) {
-        throw new Error('Google sign-in is not configured in the current development build.');
-      }
+      const result = await signInWithGoogle();
+      if (!result.success) throw new Error(result.reason);
 
       await SecureStore.setItemAsync(ONBOARDING_KEY, '1', {
         keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
