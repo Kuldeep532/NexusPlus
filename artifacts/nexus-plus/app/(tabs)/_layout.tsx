@@ -5,7 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { Tabs } from 'expo-router';
 
-function ClassicTabLayout() {
+export default function TabLayout() {
   const colors = useColors();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -34,29 +34,9 @@ function ClassicTabLayout() {
           ) : null,
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarAccessibilityLabel: 'Home tab',
-          tabBarButtonTestID: 'tab-home',
-          tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="features"
-        options={{
-          title: 'Features',
-          tabBarAccessibilityLabel: 'Features tab. Opens the complete app feature list',
-          tabBarButtonTestID: 'tab-features',
-          tabBarIcon: ({ color }) => <Feather name="grid" size={22} color={color} />,
-        }}
-      />
-      <Tabs.Screen name="settings" options={{ href: null }} />
+      <Tabs.Screen name="index" options={{ title: 'Home', tabBarAccessibilityLabel: 'Home tab. Books, media and all app features', tabBarButtonTestID: 'tab-home', tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} /> }} />
+      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarAccessibilityLabel: 'Settings tab', tabBarButtonTestID: 'tab-settings', tabBarIcon: ({ color }) => <Feather name="settings" size={22} color={color} /> }} />
+      <Tabs.Screen name="features" options={{ href: null }} />
     </Tabs>
   );
-}
-
-export default function TabLayout() {
-  return <ClassicTabLayout />;
 }
