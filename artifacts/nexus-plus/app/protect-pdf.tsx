@@ -7,18 +7,8 @@ import { Alert, ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, Text
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { savePdfPasswordToVault } from '@/features/protect-pdf/protectPdfVault';
+import { protectPdfWithEngine } from '@/features/protect-pdf/protectPdfEngine';
 import type { ProtectPdfInput, ProtectPdfState, ProtectPdfResult } from '@/features/protect-pdf/protectPdfTypes';
-
-/**
- * The actual PDF encryption adapter is intentionally isolated from this screen.
- * It must be implemented with a native-compatible PDF security engine before
- * shipping this workflow. The current project dependency set has no PDF
- * password-encryption engine, so this screen never pretends to create a
- * password-protected PDF when encryption is unavailable.
- */
-async function protectPdfWithEngine(_input: ProtectPdfInput, _password: string): Promise<ProtectPdfResult> {
-  throw new Error('PDF encryption engine is not configured yet. Add a native-compatible PDF security module before enabling protection.');
-}
 
 export default function ProtectPdfScreen() {
   const colors = useColors();
@@ -30,26 +20,14 @@ export default function ProtectPdfScreen() {
   const [result, setResult] = useState<ProtectPdfResult | null>(null);
   const [status, setStatus] = useState('');
 
-  useEffect(() => {
-    return () => {
-      setPassword('');
-      setConfirmPassword('');
-    };
-  }, []);
+  useEffect(() => () => { setPassword(''); setConfirmPassword(''); }, []);
 
-  const filenameWithoutExtension = useMemo(
-    () => pdf?.name.replace(/\.pdf$/i, '') || 'Protected PDF',
-    [pdf],
-  );
+  const filenameWithoutExtension = useMemo(() => pdf?.name.replace(/\.pdf$/i, '') || 'Protected PDF', [pdf]);
 
   const pickPdf = async () => {
     setStatus('');
     setResult(null);
-    const picked = await DocumentPicker.getDocumentAsync({
-      type: 'application/pdf',
-      multiple: false,
-      copyToCacheDirectory: true,
-    });
+    const picked = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', multiple: false, copyToCacheDirectory: true });
     if (picked.canceled || !picked.assets?.[0]) return;
     setPdf({ uri: picked.assets[0].uri, name: picked.assets[0].name || 'document.pdf' });
     setPassword('');
@@ -58,24 +36,14 @@ export default function ProtectPdfScreen() {
     setStatus('PDF selected. Enter a password to protect it.');
   };
 
-  const validatePassword = () => {
-    if (password.length < 8) return 'Use at least 8 characters.';
-    if (password !== confirmPassword) return 'Passwords do not match.';
-    return null;
-  };
-
   const protect = async () => {
     if (!pdf) return;
-    const validationError = validatePassword();
-    if (validationError) {
-      setStatus(validationError);
-      return;
-    }
+    if (password.length < 8) return setStatus('Use at least 8 characters.');
+    if (password !== confirmPassword) return setStatus('Passwords do not match.');
 
     setState('processing');
     setStatus('Protecting PDF…');
     setResult(null);
-
     try {
       const protectedPdf = await protectPdfWithEngine(pdf, password);
       setResult(protectedPdf);
@@ -99,7 +67,6 @@ export default function ProtectPdfScreen() {
       Alert.alert('Password unavailable', 'For your security, the password is no longer retained after processing failed or the screen was reset.');
       return;
     }
-
     try {
       await savePdfPasswordToVault(filenameWithoutExtension, password);
       Alert.alert('Saved to Nexus Vault', `${filenameWithoutExtension} password was saved securely in the Nexus Vault.`);
@@ -170,39 +137,11 @@ export default function ProtectPdfScreen() {
           {pdf && state !== 'completed' && state !== 'error' && (
             <>
               <Text style={[styles.label, { color: colors.foreground }]}>Password</Text>
-              <TextInput
-                accessibilityLabel="PDF password"
-                accessibilityHint="Enter at least 8 characters"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                textContentType="newPassword"
-                style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
-              />
-
+              <TextInput accessibilityLabel="PDF password" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} textContentType="newPassword" style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
               <Text style={[styles.label, { color: colors.foreground }]}>Confirm password</Text>
-              <TextInput
-                accessibilityLabel="Confirm PDF password"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                textContentType="newPassword"
-                style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
-              />
-
+              <TextInput accessibilityLabel="Confirm PDF password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} textContentType="newPassword" style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
               <Text style={[styles.hint, { color: colors.mutedForeground }]}>The password is kept only in memory for this workflow. It is not written to logs or ordinary app storage.</Text>
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Protect PDF"
-                onPress={protect}
-                disabled={!password || !confirmPassword}
-                style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.primary }, (pressed || !password || !confirmPassword) && styles.disabled]}
-              >
+              <Pressable accessibilityRole="button" accessibilityLabel="Protect PDF" onPress={protect} disabled={!password || !confirmPassword} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.primary }, (pressed || !password || !confirmPassword) && styles.disabled]}>
                 <MaterialCommunityIcons name="shield-lock" size={19} color={colors.primaryForeground} />
                 <Text style={[styles.primaryText, { color: colors.primaryForeground }]}>Protect PDF</Text>
               </Pressable>
@@ -241,31 +180,5 @@ export default function ProtectPdfScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  scroll: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginBottom: 22 },
-  icon: { width: 54, height: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  headerCopy: { flex: 1, marginLeft: 13 },
-  title: { fontSize: 28, lineHeight: 34, fontFamily: 'Inter_700Bold', marginBottom: 5 },
-  subtitle: { fontSize: 12, lineHeight: 18, fontFamily: 'Inter_400Regular' },
-  pick: { marginHorizontal: 20, minHeight: 72, borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 22 },
-  pickCopy: { flex: 1, marginHorizontal: 12 },
-  pickTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  pickDetail: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  label: { marginHorizontal: 20, fontSize: 12, fontFamily: 'Inter_700Bold', marginBottom: 8, marginTop: 8 },
-  input: { marginHorizontal: 20, minHeight: 48, borderRadius: 13, borderWidth: 1, paddingHorizontal: 13, fontSize: 14, fontFamily: 'Inter_500Medium', marginBottom: 8 },
-  hint: { marginHorizontal: 20, fontSize: 11, lineHeight: 17, marginBottom: 15, fontFamily: 'Inter_400Regular' },
-  primaryButton: { marginHorizontal: 20, minHeight: 52, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, marginTop: 8 },
-  primaryText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  status: { marginHorizontal: 20, marginTop: 15, fontSize: 11, lineHeight: 17, fontFamily: 'Inter_400Regular' },
-  actions: { marginTop: 15, gap: 10, paddingHorizontal: 20 },
-  actionButton: { minHeight: 52, borderRadius: 15, borderWidth: 1, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
-  actionText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
-  secondaryButton: { marginHorizontal: 20, minHeight: 50, borderRadius: 14, borderWidth: 1, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
-  processing: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 },
-  processingIcon: { width: 92, height: 92, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 22 },
-  processingTitle: { fontSize: 22, fontFamily: 'Inter_700Bold', marginBottom: 8 },
-  processingText: { fontSize: 13, lineHeight: 19, textAlign: 'center', fontFamily: 'Inter_400Regular' },
-  pressed: { opacity: 0.75 },
-  disabled: { opacity: 0.5 },
+  root: { flex: 1 }, scroll: { flex: 1 }, header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginBottom: 22 }, icon: { width: 54, height: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, headerCopy: { flex: 1, marginLeft: 13 }, title: { fontSize: 28, lineHeight: 34, fontFamily: 'Inter_700Bold', marginBottom: 5 }, subtitle: { fontSize: 12, lineHeight: 18, fontFamily: 'Inter_400Regular' }, pick: { marginHorizontal: 20, minHeight: 72, borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 22 }, pickCopy: { flex: 1, marginHorizontal: 12 }, pickTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', marginBottom: 4 }, pickDetail: { fontSize: 11, fontFamily: 'Inter_400Regular' }, label: { marginHorizontal: 20, fontSize: 12, fontFamily: 'Inter_700Bold', marginBottom: 8, marginTop: 8 }, input: { marginHorizontal: 20, minHeight: 48, borderRadius: 13, borderWidth: 1, paddingHorizontal: 13, fontSize: 14, fontFamily: 'Inter_500Medium', marginBottom: 8 }, hint: { marginHorizontal: 20, fontSize: 11, lineHeight: 17, marginBottom: 15, fontFamily: 'Inter_400Regular' }, primaryButton: { marginHorizontal: 20, minHeight: 52, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, marginTop: 8 }, primaryText: { fontSize: 14, fontFamily: 'Inter_700Bold' }, status: { marginHorizontal: 20, marginTop: 15, fontSize: 11, lineHeight: 17, fontFamily: 'Inter_400Regular' }, actions: { marginTop: 15, gap: 10, paddingHorizontal: 20 }, actionButton: { minHeight: 52, borderRadius: 15, borderWidth: 1, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }, actionText: { fontSize: 13, fontFamily: 'Inter_700Bold' }, secondaryButton: { marginHorizontal: 20, minHeight: 50, borderRadius: 14, borderWidth: 1, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }, processing: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 }, processingIcon: { width: 92, height: 92, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 22 }, processingTitle: { fontSize: 22, fontFamily: 'Inter_700Bold', marginBottom: 8 }, processingText: { fontSize: 13, lineHeight: 19, textAlign: 'center', fontFamily: 'Inter_400Regular' }, pressed: { opacity: 0.75 }, disabled: { opacity: 0.5 },
 });
