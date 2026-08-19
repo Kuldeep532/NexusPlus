@@ -1,0 +1,81 @@
+name: Manual Android Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'EAS build profile'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - production
+
+permissions:
+  contents: read
+
+env:
+  APP_DIR: artifacts/nexus-plus
+
+jobs:
+  build-android:
+    name: Build Android APK/AAB
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: artifacts/nexus-plus/package.json
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install pnpm
+        run: corepack prepare pnpm@9.15.4 --activate
+
+      - name: Install dependencies
+        working-directory: ${{ env.APP_DIR }}
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Materialize Firebase google-services.json
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          GOOGLE_SERVICES_JSON_CONTENT: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          test -n "$GOOGLE_SERVICES_JSON_CONTENT"
+          printf '%s' "$GOOGLE_SERVICES_JSON_CONTENT" > google-services.json
+          test -s google-services.json
+
+      - name: Validate TypeScript
+        working-directory: ${{ env.APP_DIR }}
+        run: pnpm typecheck
+
+      - name: Install EAS CLI
+        run: npm install --global eas-cli
+
+      - name: Build with EAS
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          GOOGLE_SERVICES_JSON: ${{ github.workspace }}/${{ env.APP_DIR }}/google-services.json
+          EAS_PROJECT_ID: ${{ secrets.EAS_PROJECT_ID }}
+        run: |
+          test -n "$EXPO_TOKEN"
+          test -n "$EAS_PROJECT_ID"
+          if [ "${{ inputs.profile }}" = "production" ]; then
+            eas build --platform android --profile production --non-interactive
+          else
+            eas build --platform android --profile preview --non-interactive
+          fi
+
+      - name: Remove Firebase file
+        if: always()
+        working-directory: ${{ env.APP_DIR }}
+        run: rm -f google-services.json
