@@ -11,12 +11,10 @@ type Feature = { key: string; title: string; icon: React.ComponentProps<typeof M
 
 const features: Feature[] = [
   { key: 'reader', title: 'Book Reader', icon: 'book-open-page-variant', route: '/reader' },
-  { key: 'media', title: 'Media Player', icon: 'play-box-multiple', route: '/media-player' },
   { key: 'vault', title: 'Biometric Vault', icon: 'shield-lock', route: '/biometric-vault' },
-  { key: 'selfie', title: 'Selfie', icon: 'camera-front', route: '/selfie' },
-  { key: 'time-assisted', title: 'Time Assisted', icon: 'clock-time-eight-outline', route: '/time-assisted' },
-  { key: 'cleaner', title: 'Storage Cleaner', icon: 'broom', route: '/storage-cleaner' },
+  { key: 'utilities', title: 'Utilities', icon: 'tools', route: '/utilities' },
   { key: 'pdf-tools', title: 'PDF Tools', icon: 'file-pdf-box', route: '/pdf-tools' },
+  { key: 'online-radio', title: 'Online Radio', icon: 'radio-tower', route: '/online-radio' },
 ];
 
 export default function HomeScreen() {
