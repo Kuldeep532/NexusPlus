@@ -48,7 +48,7 @@
     "expo-router": "~6.0.17",
     "expo-screen-capture": "~8.0.8",
     "expo-secure-store": "~15.0.8",
-    "expo-sharing": "11.10.0",
+    "expo-sharing": "~14.0.8",
     "expo-splash-screen": "~31.0.12",
     "expo-status-bar": "~3.0.9",
     "expo-symbols": "~1.0.8",
