@@ -13,6 +13,13 @@ function decodeUtf8(value: Uint8Array): string {
   return new TextDecoder().decode(value);
 }
 
+function encodeAdditionalData(value: string): string {
+  const bytes = encodeUtf8(value);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
 export async function generateVaultKey(): Promise<Crypto.AESEncryptionKey> {
   return Crypto.AESEncryptionKey.generate(Crypto.AESKeySize.AES256);
 }
@@ -32,7 +39,7 @@ export async function encryptVaultPayload(
 ): Promise<{ ciphertext: string; iv: string; tag: string }> {
   const sealed = await Crypto.aesEncryptAsync(encodeUtf8(plaintext), key, {
     nonce: { length: VAULT_IV_BYTES },
-    additionalData: btoa(aad),
+    additionalData: encodeAdditionalData(aad),
     tagLength: VAULT_TAG_BYTES,
   });
 
@@ -52,7 +59,7 @@ export async function decryptVaultPayload(
 ): Promise<string> {
   const sealed = Crypto.AESSealedData.fromParts(iv, ciphertext, tag);
   const plaintext = await Crypto.aesDecryptAsync(sealed, key, {
-    additionalData: btoa(aad),
+    additionalData: encodeAdditionalData(aad),
     output: 'bytes',
   });
   return decodeUtf8(plaintext as Uint8Array);
