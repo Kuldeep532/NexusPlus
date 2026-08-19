@@ -9,7 +9,11 @@ import {
 import {
   authenticateVault,
   enableVaultScreenProtection,
+  enrollStrongBiometric,
   getBiometricCapability,
+  loadVaultCredentialMode,
+  saveVaultCredentialMode,
+  type VaultCredentialMode,
 } from './biometricVaultSecurity';
 import { initializeVault, readVault, writeVault } from './biometricVaultRepository';
 
@@ -26,6 +30,8 @@ export function useBiometricVault(
   const [authError, setAuthError] = useState<string | null>(null);
   const [sessionExpiresAt, setSessionExpiresAt] = useState<number | null>(null);
   const [biometricStrong, setBiometricStrong] = useState(false);
+  const [biometricEnrolled, setBiometricEnrolled] = useState(false);
+  const [credentialMode, setCredentialMode] = useState<VaultCredentialMode>('biometric-only');
   const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearTimer = useCallback(() => {
@@ -45,9 +51,14 @@ export function useBiometricVault(
     (async () => {
       try {
         await initializeVault();
-        const capability = await getBiometricCapability();
+        const [capability, mode] = await Promise.all([
+          getBiometricCapability(),
+          loadVaultCredentialMode(),
+        ]);
         if (!cancelled) {
           setBiometricStrong(capability.securityLevel === 'strong');
+          setBiometricEnrolled(capability.enrolled && capability.securityLevel === 'strong');
+          setCredentialMode(mode);
           setIsReady(true);
         }
       } catch {
@@ -69,21 +80,53 @@ export function useBiometricVault(
     lockTimer.current = setTimeout(lock, security.autoLockSeconds * 1000);
   }, [clearTimer, lock, security.autoLockSeconds]);
 
+  const enrollBiometric = useCallback(async () => {
+    setAuthError(null);
+    try {
+      const success = await enrollStrongBiometric();
+      if (!success) {
+        setAuthError('Biometric registration was cancelled.');
+        return false;
+      }
+      const capability = await getBiometricCapability();
+      setBiometricStrong(capability.securityLevel === 'strong');
+      setBiometricEnrolled(capability.enrolled && capability.securityLevel === 'strong');
+      await saveVaultCredentialMode('biometric-only');
+      setCredentialMode('biometric-only');
+      AccessibilityInfo.announceForAccessibility?.('Vault biometric registered successfully');
+      return true;
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Biometric registration failed.');
+      return false;
+    }
+  }, []);
+
+  const setDeviceAuthMode = useCallback(async () => {
+    setAuthError(null);
+    try {
+      await saveVaultCredentialMode('device-auth');
+      setCredentialMode('device-auth');
+      AccessibilityInfo.announceForAccessibility?.('Vault device authentication mode selected');
+      return true;
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Could not change Vault credential mode.');
+      return false;
+    }
+  }, []);
+
   const unlock = useCallback(async () => {
     setAuthError(null);
     await Haptics.selectionAsync();
 
     try {
-      const result = await authenticateVault();
+      const result = await authenticateVault('Unlock Nexus Biometric Vault', credentialMode);
       if (!result.success) {
         const message =
           result.error === 'user_cancel'
             ? 'Authentication cancelled.'
-            : result.error === 'not_enrolled'
-              ? 'Set up a biometric credential on this device first.'
-              : result.error === 'lockout'
-                ? 'Biometric authentication is temporarily locked.'
-                : 'Vault authentication failed.';
+            : result.error === 'lockout'
+              ? 'Biometric authentication is temporarily locked.'
+              : 'Vault authentication failed.';
         setAuthError(message);
         return false;
       }
@@ -100,7 +143,7 @@ export function useBiometricVault(
       lock();
       return false;
     }
-  }, [lock, scheduleLock]);
+  }, [credentialMode, lock, scheduleLock]);
 
   const persist = useCallback(async (nextItems: VaultItem[]) => {
     await writeVault(nextItems);
@@ -140,6 +183,10 @@ export function useBiometricVault(
     authError,
     sessionExpiresAt,
     biometricStrong,
+    biometricEnrolled,
+    credentialMode,
+    enrollBiometric,
+    setDeviceAuthMode,
     unlock,
     lock,
     addItem,
