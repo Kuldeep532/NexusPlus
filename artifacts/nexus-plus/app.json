@@ -13,9 +13,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#08131B"
     },
-    "ios": {
-      "supportsTablet": false
-    },
+    "ios": { "supportsTablet": false },
     "android": {
       "package": "com.nexuswavetech.nexusplus",
       "adaptiveIcon": {
@@ -23,25 +21,16 @@
         "backgroundColor": "#08131B"
       }
     },
-    "web": {
-      "favicon": "./assets/images/icon.png"
-    },
+    "web": { "favicon": "./assets/images/icon.png" },
     "plugins": [
-      [
-        "expo-router",
-        {
-          "origin": "https://replit.com/"
-        }
-      ],
+      ["expo-router", { "origin": "https://replit.com/" }],
       "expo-font",
+      "expo-document-picker",
       "expo-web-browser",
       "expo-local-authentication",
       "expo-secure-store",
       "expo-screen-capture"
     ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    }
+    "experiments": { "typedRoutes": true, "reactCompiler": true }
   }
 }
