@@ -60,8 +60,8 @@ export default function SettingsScreen() {
       <View style={[styles.groupBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <SettingRow
           icon="volume-2"
-          title="Voice library"
-          detail="2 offline voices ready"
+          title="Voice Library"
+          detail="Manage reading voices"
           testID="settings-voice-library"
           onPress={() => router.push('/voices')}
         />
@@ -120,7 +120,6 @@ export default function SettingsScreen() {
 
       <Text style={[styles.group, { color: colors.mutedForeground }]}>APP INFORMATION</Text>
       <View style={[styles.groupBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <SettingRow icon="volume-2" title="Voice Library" detail="Manage reading voices" testID="settings-voice-library" onPress={() => router.push('/voices')} />
         <SettingRow icon="shield" title="Privacy Policy" detail="Read how Nexus Plus handles information" testID="settings-privacy-policy" onPress={() => router.push('/privacy-policy')} />
         <SettingRow icon="file-text" title="Terms and Conditions" detail="Review the terms for using Nexus Plus" testID="settings-terms" onPress={() => router.push('/terms-and-conditions')} />
         <SettingRow icon="info" title="About Us" detail="Learn about Nexus Plus and its developer" testID="settings-about-us" onPress={() => router.push('/about-us')} />
