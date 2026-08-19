@@ -34,7 +34,10 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-local-authentication",
+      "expo-secure-store",
+      "expo-screen-capture"
     ],
     "experiments": {
       "typedRoutes": true,
