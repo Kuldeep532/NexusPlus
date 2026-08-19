@@ -16,8 +16,7 @@ const features: Feature[] = [
   { key: 'media', title: 'Media Player', icon: 'play-box-multiple', route: '/media-player' },
   { key: 'vault', title: 'Biometric Vault', icon: 'shield-lock', route: '/biometric-vault' },
   { key: 'cleaner', title: 'Storage Cleaner', icon: 'broom', route: '/storage-cleaner' },
-  { key: 'pdf-images', title: 'PDF to Images', icon: 'file-pdf-box', route: '/pdf-to-images' },
-  { key: 'protect-pdf', title: 'Protect PDF', icon: 'shield-key', route: '/protect-pdf' },
+  { key: 'pdf-tools', title: 'PDF Tools', icon: 'file-pdf-box', route: '/pdf-tools' },
 ];
 
 export default function HomeScreen() {
