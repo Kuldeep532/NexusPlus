@@ -60,8 +60,8 @@ export default function SettingsScreen() {
       <View style={[styles.groupBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <SettingRow
           icon="volume-2"
-          title="Voice library"
-          detail="2 offline voices ready"
+          title="Voice Library"
+          detail="Manage reading voices"
           testID="settings-voice-library"
           onPress={() => router.push('/voices')}
         />
@@ -118,11 +118,11 @@ export default function SettingsScreen() {
         />
       </View>
 
-      <Text style={[styles.group, { color: colors.mutedForeground }]}>APP</Text>
+      <Text style={[styles.group, { color: colors.mutedForeground }]}>APP INFORMATION</Text>
       <View style={[styles.groupBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <SettingRow icon="info" title="About Nexus Plus" detail="Version 1.0.0" testID="settings-about" onPress={() => router.push('/about')} />
-        <SettingRow icon="mail" title="Support" detail="kuldeepky538@gmail.com" testID="settings-support" onPress={() => router.push('/about')} />
-        <SettingRow icon="shield" title="Privacy" detail="Files stay on this device" testID="settings-privacy" onPress={() => router.push('/about')} />
+        <SettingRow icon="shield" title="Privacy Policy" detail="Read how Nexus Plus handles information" testID="settings-privacy-policy" onPress={() => router.push('/privacy-policy')} />
+        <SettingRow icon="file-text" title="Terms and Conditions" detail="Review the terms for using Nexus Plus" testID="settings-terms" onPress={() => router.push('/terms-and-conditions')} />
+        <SettingRow icon="info" title="About Us" detail="Learn about Nexus Plus and its developer" testID="settings-about-us" onPress={() => router.push('/about-us')} />
       </View>
 
       <View style={[styles.footer, { borderColor: colors.border }]}>
@@ -131,7 +131,7 @@ export default function SettingsScreen() {
         </View>
         <View style={styles.footerCopy}>
           <Text style={[styles.footerTitle, { color: colors.foreground }]}>Nexus Plus</Text>
-          <Text style={[styles.footerText, { color: colors.mutedForeground }]}>A focused toolkit for reading and listening.</Text>
+          <Text style={[styles.footerText, { color: colors.mutedForeground }]}>Developed by Kuldeep Kumar Yadav.</Text>
         </View>
         <Text style={[styles.version, { color: colors.mutedForeground }]}>1.0.0</Text>
       </View>
