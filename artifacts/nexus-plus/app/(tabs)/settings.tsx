@@ -59,6 +59,13 @@ export default function SettingsScreen() {
       <Text style={[styles.group, { color: colors.mutedForeground }]}>READING & SPEECH</Text>
       <View style={[styles.groupBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <SettingRow
+          icon="globe"
+          title="Language and Preference"
+          detail="Choose languages separately for feature TTS and Book Reader"
+          testID="settings-language-preference"
+          onPress={() => router.push('/language-and-preference')}
+        />
+        <SettingRow
           icon="volume-2"
           title="Voice Library"
           detail="Manage reading voices"
