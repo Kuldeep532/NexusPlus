@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VaultLockedView } from '@/features/biometric-vault/components/VaultLockedView';
 import { VaultHome } from '@/features/biometric-vault/components/VaultHome';
@@ -45,7 +45,19 @@ export default function BiometricVaultRoute() {
     <VaultLockedView
       authError={vault.authError}
       strongBiometric={vault.biometricStrong}
+      isEnrolled={vault.biometricEnrolled}
       onUnlock={vault.unlock}
+      onEnroll={async () => {
+        const success = await vault.enrollBiometric();
+        if (!success) return;
+        Alert.alert('Vault biometric ready', 'The Android biometric is now verified for this Vault. Nexus Plus does not store your fingerprint or face template.');
+      }}
+      onCredentialSetup={async () => {
+        const success = await vault.setDeviceAuthMode();
+        if (success) {
+          Alert.alert('Credential mode', 'Device authentication mode is selected. A separate Vault password must only be implemented with a vetted password KDF before it can protect vault data.');
+        }
+      }}
     />
   ) : formCategory ? (
     <VaultItemForm
