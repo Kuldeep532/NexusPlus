@@ -34,8 +34,24 @@ export default function TabLayout() {
           ) : null,
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Home', tabBarAccessibilityLabel: 'Home tab. Books, media and all app features', tabBarButtonTestID: 'tab-home', tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} /> }} />
-      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarAccessibilityLabel: 'Settings tab', tabBarButtonTestID: 'tab-settings', tabBarIcon: ({ color }) => <Feather name="settings" size={22} color={color} /> }} />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarAccessibilityLabel: 'Home tab. Books, media, biometric vault and all app features',
+          tabBarButtonTestID: 'tab-home',
+          tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarAccessibilityLabel: 'Settings tab',
+          tabBarButtonTestID: 'tab-settings',
+          tabBarIcon: ({ color }) => <Feather name="settings" size={22} color={color} />,
+        }}
+      />
       <Tabs.Screen name="features" options={{ href: null }} />
     </Tabs>
   );
