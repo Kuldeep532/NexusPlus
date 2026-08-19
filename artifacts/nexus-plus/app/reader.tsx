@@ -1,168 +1,233 @@
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { getDownloadedVoices, type DownloadedVoice } from './voices';
 
-const totalSeconds = 42 * 60;
+const BOOKS_KEY = 'nexus-plus.reader.books';
+type Book = { id: string; title: string; uri?: string; type: string; progress: number };
+const starterBooks: Book[] = [
+  { id: 'demo-stillness', title: 'The Art of Stillness', type: 'PDF', progress: 68 },
+  { id: 'demo-hindi', title: 'Hindi Vyakaran Guide', type: 'PDF', progress: 31 },
+];
 
-function formatTime(seconds: number) {
-  const minutes = Math.floor(seconds / 60);
-  const remainder = Math.floor(seconds % 60).toString().padStart(2, '0');
-  return `${minutes}:${remainder}`;
+async function loadBooks(): Promise<Book[]> {
+  const value = await AsyncStorage.getItem(BOOKS_KEY);
+  if (!value) return starterBooks;
+  try {
+    const parsed = JSON.parse(value) as Book[];
+    return Array.isArray(parsed) && parsed.length ? parsed : starterBooks;
+  } catch { return starterBooks; }
 }
+async function saveBooks(books: Book[]) { await AsyncStorage.setItem(BOOKS_KEY, JSON.stringify(books)); }
 
 export default function ReaderScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const [books, setBooks] = useState<Book[]>([]);
+  const [selectedId, setSelectedId] = useState('demo-stillness');
+  const [voices, setVoices] = useState<DownloadedVoice[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState('');
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
-  const [position, setPosition] = useState(12 * 60 + 18);
   const [ocrComplete, setOcrComplete] = useState(false);
-  const [sleepTimer, setSleepTimer] = useState(false);
-  const [chapter, setChapter] = useState(4);
 
-  const shiftPosition = (amount: number) => {
-    setPosition((current) => Math.min(totalSeconds, Math.max(0, current + amount)));
+  const selectedBook = useMemo(() => books.find((book) => book.id === selectedId) ?? books[0], [books, selectedId]);
+  const selectedVoiceName = voices.find((voice) => voice.id === selectedVoice)?.name ?? 'Select downloaded voice';
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([loadBooks(), getDownloadedVoices()]).then(([loadedBooks, loadedVoices]) => {
+      if (!active) return;
+      setBooks(loadedBooks);
+      setVoices(loadedVoices);
+      setSelectedId(loadedBooks[0]?.id ?? '');
+      setSelectedVoice(loadedVoices[0]?.id ?? '');
+    });
+    return () => { active = false; };
+  }, []);
+
+  const importBook = async () => {
+    const result = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'text/plain'], copyToCacheDirectory: true, multiple: false });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    const nextBook: Book = {
+      id: `${Date.now()}`,
+      title: asset.name.replace(/\.[^.]+$/, ''),
+      uri: asset.uri,
+      type: asset.mimeType?.includes('pdf') ? 'PDF' : 'TXT',
+      progress: 0,
+    };
+    const nextBooks = [nextBook, ...books];
+    setBooks(nextBooks);
+    setSelectedId(nextBook.id);
+    await saveBooks(nextBooks);
+  };
+
+  const removeSelectedBook = async () => {
+    if (!selectedBook) return;
+    if (selectedBook.id.startsWith('demo-')) {
+      Alert.alert('Demo book', 'Starter books are part of the Reader demo and cannot be removed.');
+      return;
+    }
+    const nextBooks = books.filter((book) => book.id !== selectedBook.id);
+    setBooks(nextBooks);
+    setSelectedId(nextBooks[0]?.id ?? '');
+    await saveBooks(nextBooks);
   };
 
   return (
-    <ScrollView
-      style={{ backgroundColor: colors.background }}
-      contentContainerStyle={{ paddingTop: insets.top + 18, paddingBottom: insets.bottom + 32 }}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.header}>
-        <View style={styles.headerCopy}>
-          <Text style={[styles.kicker, { color: colors.primary }]}>PDF READER</Text>
-          <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>The Art of{'\n'}Stillness</Text>
-          <Text style={[styles.meta, { color: colors.mutedForeground }]}>Chapter {chapter} · The quiet mind</Text>
+    <ScrollView style={[styles.screen, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
+      <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.heroCopy}>
+          <Text style={[styles.kicker, { color: colors.primary }]}>BOOK READER</Text>
+          <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>{selectedBook?.title ?? 'Library'}</Text>
+          <Text style={[styles.meta, { color: colors.mutedForeground }]}>{selectedBook ? `${selectedBook.type} · ${selectedBook.progress}% complete` : 'No book selected'}</Text>
         </View>
-        <View style={[styles.cover, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-          <MaterialCommunityIcons name="book-open-page-variant" size={38} color={colors.primary} />
-          <Text style={[styles.coverLabel, { color: colors.primary }]}>PDF</Text>
+        <View style={[styles.cover, { backgroundColor: colors.secondary }]}>
+          <MaterialCommunityIcons name="book-open-page-variant" size={36} color={colors.primary} />
+          <Text style={[styles.coverLabel, { color: colors.primary }]}>{selectedBook?.type ?? 'BOOK'}</Text>
         </View>
       </View>
 
-      <View style={[styles.ocrBanner, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-        <View style={[styles.ocrIcon, { backgroundColor: colors.muted }]}>
-          <Feather name="search" size={17} color={colors.accent} />
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Library</Text>
+          <Text style={[styles.sectionDetail, { color: colors.mutedForeground }]}>{books.length} books available</Text>
         </View>
-        <View style={styles.ocrCopy}>
-          <Text style={[styles.ocrTitle, { color: colors.foreground }]}>OCR in the reading flow</Text>
-          <Text style={[styles.ocrDetail, { color: colors.mutedForeground }]}>{ocrComplete ? 'Page text is ready for speech.' : 'Scanned pages are recognized automatically.'}</Text>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={ocrComplete ? 'OCR complete for this page' : 'Run OCR on this page'}
-          testID="reader-run-ocr"
-          onPress={() => setOcrComplete(true)}
-          disabled={ocrComplete}
-          style={[styles.ocrAction, { borderColor: colors.accent }, ocrComplete && { borderColor: colors.primary }]}
-        >
-          <Text style={[styles.ocrActionText, { color: ocrComplete ? colors.primary : colors.accent }]}>{ocrComplete ? 'Ready' : 'Run OCR'}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Import new book" onPress={importBook} style={({ pressed }) => [styles.importButton, { backgroundColor: colors.primary }, pressed && styles.pressed]}>
+          <Feather name="plus" size={17} color={colors.primaryForeground} />
+          <Text style={[styles.importText, { color: colors.primaryForeground }]}>Import New Book</Text>
         </Pressable>
       </View>
 
-      <LinearGradient colors={[colors.secondary, colors.card]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.player, { borderColor: colors.border }]}>
-        <View style={styles.playerHeader}>
-          <Text style={[styles.playerLabel, { color: colors.secondaryForeground }]}>AUDIO READING</Text>
-          <View style={[styles.liveTag, { backgroundColor: colors.muted }]}>
-            <View style={[styles.liveDot, { backgroundColor: playing ? colors.primary : colors.mutedForeground }]} />
-            <Text style={[styles.liveText, { color: playing ? colors.primary : colors.mutedForeground }]}>{playing ? 'PLAYING' : 'PAUSED'}</Text>
+      <View style={styles.bookList}>
+        {books.map((book) => (
+          <Pressable key={book.id} accessibilityRole="button" accessibilityState={{ selected: selectedId === book.id }} accessibilityLabel={`${book.title}, ${book.type}, ${book.progress} percent complete`} onPress={() => setSelectedId(book.id)} style={({ pressed }) => [styles.bookRow, { backgroundColor: colors.card, borderColor: selectedId === book.id ? colors.primary : colors.border }, pressed && styles.pressed]}>
+            <View style={[styles.bookIcon, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="book-open-variant" size={22} color={colors.primary} /></View>
+            <View style={styles.bookCopy}>
+              <Text style={[styles.bookTitle, { color: colors.foreground }]} numberOfLines={1}>{book.title}</Text>
+              <Text style={[styles.bookMeta, { color: colors.mutedForeground }]}>{book.type} · {book.progress}% complete</Text>
+              <View style={[styles.track, { backgroundColor: colors.muted }]}><View style={[styles.fill, { backgroundColor: colors.primary, width: `${book.progress}%` }]} /></View>
+            </View>
+            <Feather name={selectedId === book.id ? 'check-circle' : 'chevron-right'} size={19} color={selectedId === book.id ? colors.primary : colors.mutedForeground} />
+          </Pressable>
+        ))}
+      </View>
+
+      <View style={[styles.readerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.cardTop}>
+          <View>
+            <Text style={[styles.cardKicker, { color: colors.mutedForeground }]}>AUDIO READING</Text>
+            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Ready to listen</Text>
           </View>
-        </View>
-        <View style={styles.wave}>
-          {Array.from({ length: 24 }).map((_, index) => (
-            <View key={index} style={[styles.bar, { height: 10 + ((index * 17) % 27), backgroundColor: index < 10 && playing ? colors.primary : colors.border }]} />
-          ))}
-        </View>
-        <View style={[styles.track, { backgroundColor: colors.muted }]}>
-          <View style={[styles.trackFill, { backgroundColor: colors.primary, width: `${(position / totalSeconds) * 100}%` }]} />
-        </View>
-        <View style={styles.timeRow}>
-          <Text style={[styles.time, { color: colors.secondaryForeground }]}>{formatTime(position)}</Text>
-          <Text style={[styles.time, { color: colors.mutedForeground }]}>{formatTime(totalSeconds)}</Text>
-        </View>
-        <View style={styles.controls}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Rewind 10 seconds" testID="reader-rewind" onPress={() => shiftPosition(-10)} style={styles.control}>
-            <Feather name="rotate-ccw" size={20} color={colors.secondaryForeground} />
-          </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel={playing ? 'Pause reading' : 'Play reading'} testID="reader-play-pause" onPress={() => setPlaying((value) => !value)} style={({ pressed }) => [styles.mainPlay, { backgroundColor: colors.primary }, pressed && styles.pressed]}>
-            <Feather name={playing ? 'pause' : 'play'} size={24} color={colors.primaryForeground} />
-          </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Forward 10 seconds" testID="reader-forward" onPress={() => shiftPosition(10)} style={styles.control}>
-            <Feather name="rotate-cw" size={20} color={colors.secondaryForeground} />
+          <Pressable accessibilityRole="button" accessibilityLabel="Change voice. Only downloaded voices are shown" onPress={() => setVoiceOpen((value) => !value)} style={styles.iconButton}>
+            <MaterialCommunityIcons name="account-voice" size={20} color={colors.primary} />
           </Pressable>
         </View>
-      </LinearGradient>
 
-      <View style={styles.options}>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Change playback speed. Current speed ${speed.toFixed(1)} times`} testID="reader-speed" onPress={() => setSpeed((value) => value >= 2 ? 0.75 : value + 0.25)} style={({ pressed }) => [styles.option, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]}>
-          <Feather name="zap" size={18} color={colors.primary} />
-          <Text style={[styles.optionLabel, { color: colors.foreground }]}>Speed</Text>
-          <Text style={[styles.optionValue, { color: colors.primary }]}>{speed.toFixed(2)}×</Text>
-          <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel={sleepTimer ? 'Turn off sleep timer' : 'Set a 30 minute sleep timer'} testID="reader-sleep-timer" onPress={() => setSleepTimer((value) => !value)} style={({ pressed }) => [styles.option, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]}>
-          <Feather name="moon" size={18} color={colors.accent} />
-          <Text style={[styles.optionLabel, { color: colors.foreground }]}>Sleep timer</Text>
-          <Text style={[styles.optionValue, { color: sleepTimer ? colors.accent : colors.mutedForeground }]}>{sleepTimer ? '30 min' : 'Off'}</Text>
-          <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Change chapter. Current chapter ${chapter} of 12`} testID="reader-chapters" onPress={() => setChapter((value) => value >= 12 ? 1 : value + 1)} style={({ pressed }) => [styles.option, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]}>
-          <Feather name="list" size={18} color={colors.secondaryForeground} />
-          <Text style={[styles.optionLabel, { color: colors.foreground }]}>Chapters</Text>
-          <Text style={[styles.optionValue, { color: colors.mutedForeground }]}>{chapter} of 12</Text>
-          <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
-        </Pressable>
-      </View>
+        {voiceOpen && (
+          <View style={[styles.voicePanel, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+            <Text style={[styles.voiceHeading, { color: colors.foreground }]}>Change Voice</Text>
+            <Text style={[styles.voiceHint, { color: colors.mutedForeground }]}>Only downloaded Settings voices are available.</Text>
+            {voices.map((voice) => (
+              <Pressable key={voice.id} accessibilityRole="radio" accessibilityState={{ selected: selectedVoice === voice.id }} onPress={() => { setSelectedVoice(voice.id); setVoiceOpen(false); }} style={styles.voiceRow}>
+                <Feather name="volume-2" size={17} color={colors.primary} />
+                <View style={styles.voiceCopy}><Text style={[styles.voiceName, { color: colors.foreground }]}>{voice.name}</Text><Text style={[styles.voiceLanguage, { color: colors.mutedForeground }]}>{voice.language} · Downloaded</Text></View>
+                <Feather name={selectedVoice === voice.id ? 'check-circle' : 'circle'} size={19} color={selectedVoice === voice.id ? colors.primary : colors.mutedForeground} />
+              </Pressable>
+            ))}
+            {voices.length === 0 && <Text style={[styles.voiceHint, { color: colors.mutedForeground }]}>No downloaded voices. Download one in Settings.</Text>}
+            <Pressable accessibilityRole="button" accessibilityLabel="Open downloaded voice library" onPress={() => router.push('/voices')} style={styles.manageVoiceButton}>
+              <Text style={[styles.manageVoiceText, { color: colors.primary }]}>Manage downloaded voices</Text>
+              <Feather name="arrow-right" size={16} color={colors.primary} />
+            </Pressable>
+          </View>
+        )}
 
-      <View style={[styles.quote, { borderColor: colors.border }]}>
-        <Text style={[styles.quoteMark, { color: colors.primary }]}>“</Text>
-        <Text style={[styles.quoteText, { color: colors.foreground }]}>Stillness is not an escape from the world. It is a way of meeting it with your whole attention.</Text>
+        <View style={styles.playerLine}>
+          <Pressable accessibilityRole="button" accessibilityLabel={playing ? 'Pause reading' : 'Play reading'} onPress={() => setPlaying((value) => !value)} style={[styles.playButton, { backgroundColor: colors.primary }]}>
+            <Feather name={playing ? 'pause' : 'play'} size={22} color={colors.primaryForeground} />
+          </Pressable>
+          <View style={styles.playerCopy}>
+            <Text style={[styles.currentVoice, { color: colors.foreground }]}>{selectedVoiceName}</Text>
+            <Text style={[styles.currentText, { color: colors.mutedForeground }]}>{playing ? 'Reading now' : 'Press play to read aloud'}</Text>
+          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Change reading speed. Current ${speed} times`} onPress={() => setSpeed((value) => value >= 2 ? 0.75 : Number((value + 0.25).toFixed(2)))} style={[styles.speedButton, { borderColor: colors.border }]}>
+            <Text style={[styles.speedText, { color: colors.primary }]}>{speed}×</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.optionList}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Other Books Control" onPress={() => Alert.alert('Other Books Control', `${books.length} books are currently in your Reader library.`)} style={[styles.optionRow, { borderColor: colors.border }]}>
+            <Feather name="list" size={18} color={colors.primary} /><Text style={[styles.optionLabel, { color: colors.foreground }]}>Other Books Control</Text><Feather name="chevron-right" size={17} color={colors.mutedForeground} />
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={ocrComplete ? 'OCR is ready' : 'Run OCR on the selected book'} onPress={() => setOcrComplete(true)} style={[styles.optionRow, { borderColor: colors.border }]}>
+            <Feather name="search" size={18} color={colors.accent} /><Text style={[styles.optionLabel, { color: colors.foreground }]}>OCR</Text><Text style={[styles.optionValue, { color: ocrComplete ? colors.primary : colors.mutedForeground }]}>{ocrComplete ? 'Ready' : 'Run now'}</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Open downloaded voice library" onPress={() => router.push('/voices')} style={[styles.optionRow, { borderColor: colors.border }]}>
+            <MaterialCommunityIcons name="account-voice" size={18} color={colors.primary} /><Text style={[styles.optionLabel, { color: colors.foreground }]}>Change Voice</Text><Text style={[styles.optionValue, { color: colors.mutedForeground }]}>{selectedVoiceName}</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Delete selected imported book" onPress={removeSelectedBook} style={[styles.optionRow, { borderColor: colors.border }]}>
+            <Feather name="trash-2" size={18} color={colors.destructive} /><Text style={[styles.optionLabel, { color: colors.foreground }]}>Remove Selected Book</Text><Feather name="chevron-right" size={17} color={colors.mutedForeground} />
+          </Pressable>
+        </View>
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 19 },
-  headerCopy: { flex: 1, marginRight: 14 },
-  kicker: { fontSize: 10, letterSpacing: 1.8, fontFamily: 'Inter_700Bold', marginBottom: 9 },
-  title: { fontSize: 29, lineHeight: 33, fontFamily: 'Inter_700Bold', marginBottom: 8 },
-  meta: { fontSize: 12, fontFamily: 'Inter_400Regular' },
-  cover: { width: 96, height: 119, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
-  coverLabel: { fontSize: 10, letterSpacing: 1.5, fontFamily: 'Inter_700Bold' },
-  ocrBanner: { marginHorizontal: 20, padding: 12, borderRadius: 15, borderWidth: 1, flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
-  ocrIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  ocrCopy: { flex: 1, marginLeft: 10, marginRight: 8 },
-  ocrTitle: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 3 },
-  ocrDetail: { fontSize: 10, lineHeight: 14, fontFamily: 'Inter_400Regular' },
-  ocrAction: { borderWidth: 1, borderRadius: 9, paddingHorizontal: 9, paddingVertical: 8 },
-  ocrActionText: { fontSize: 10, fontFamily: 'Inter_700Bold' },
-  player: { marginHorizontal: 20, borderRadius: 20, borderWidth: 1, padding: 17 },
-  playerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  playerLabel: { fontSize: 10, letterSpacing: 1.3, fontFamily: 'Inter_700Bold' },
-  liveTag: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 7 },
-  liveDot: { width: 6, height: 6, borderRadius: 3 },
-  liveText: { fontSize: 9, letterSpacing: 1, fontFamily: 'Inter_700Bold' },
-  wave: { height: 53, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 17 },
-  bar: { width: 4, borderRadius: 2 },
-  track: { height: 4, borderRadius: 2, overflow: 'hidden', marginTop: 15 },
-  trackFill: { height: 4, borderRadius: 2 },
-  timeRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  time: { fontSize: 11, fontFamily: 'Inter_500Medium' },
-  controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 33, marginTop: 16 },
-  control: { padding: 12 },
-  mainPlay: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', paddingLeft: 3 },
-  options: { marginHorizontal: 20, marginTop: 16, gap: 8 },
-  option: { minHeight: 56, borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  optionLabel: { flex: 1, fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  optionValue: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  quote: { marginHorizontal: 20, marginTop: 22, padding: 16, borderLeftWidth: 2, flexDirection: 'row', gap: 8 },
-  quoteMark: { fontSize: 27, lineHeight: 24, fontFamily: 'Inter_700Bold' },
-  quoteText: { flex: 1, fontSize: 14, lineHeight: 21, fontFamily: 'Inter_400Regular' },
-  pressed: { opacity: 0.76, transform: [{ scale: 0.985 }] },
+  screen: { flex: 1, paddingTop: 14 },
+  hero: { marginHorizontal: 20, borderRadius: 20, borderWidth: 1, padding: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
+  heroCopy: { flex: 1, marginRight: 14 },
+  kicker: { fontSize: 10, letterSpacing: 1.7, fontFamily: 'Inter_700Bold', marginBottom: 7 },
+  title: { fontSize: 25, lineHeight: 30, fontFamily: 'Inter_700Bold', marginBottom: 5 },
+  meta: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  cover: { width: 84, height: 104, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 7 },
+  coverLabel: { fontSize: 9, letterSpacing: 1.2, fontFamily: 'Inter_700Bold' },
+  sectionHeader: { paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sectionTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', marginBottom: 3 },
+  sectionDetail: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  importButton: { minHeight: 42, paddingHorizontal: 12, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  importText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
+  bookList: { paddingHorizontal: 20, gap: 8 },
+  bookRow: { minHeight: 72, borderRadius: 15, borderWidth: 1, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center' },
+  bookIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  bookCopy: { flex: 1, marginHorizontal: 10 },
+  bookTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', marginBottom: 4 },
+  bookMeta: { fontSize: 10, fontFamily: 'Inter_400Regular', marginBottom: 7 },
+  track: { height: 4, borderRadius: 2, overflow: 'hidden' },
+  fill: { height: 4, borderRadius: 2 },
+  readerCard: { marginHorizontal: 20, marginTop: 18, borderRadius: 18, borderWidth: 1, padding: 14 },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cardKicker: { fontSize: 9, letterSpacing: 1.5, fontFamily: 'Inter_700Bold', marginBottom: 4 },
+  cardTitle: { fontSize: 15, fontFamily: 'Inter_700Bold' },
+  iconButton: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  voicePanel: { marginTop: 12, borderRadius: 14, borderWidth: 1, padding: 11 },
+  voiceHeading: { fontSize: 13, fontFamily: 'Inter_700Bold', marginBottom: 3 },
+  voiceHint: { fontSize: 10, lineHeight: 15, fontFamily: 'Inter_400Regular', marginBottom: 8 },
+  voiceRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  voiceCopy: { flex: 1 },
+  voiceName: { fontSize: 11, fontFamily: 'Inter_600SemiBold', marginBottom: 2 },
+  voiceLanguage: { fontSize: 9.5, fontFamily: 'Inter_400Regular' },
+  manageVoiceButton: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, marginTop: 6, paddingTop: 8 },
+  manageVoiceText: { fontSize: 10.5, fontFamily: 'Inter_700Bold' },
+  playerLine: { flexDirection: 'row', alignItems: 'center', marginTop: 15 },
+  playButton: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', paddingLeft: 2 },
+  playerCopy: { flex: 1, marginHorizontal: 11 },
+  currentVoice: { fontSize: 12, fontFamily: 'Inter_700Bold', marginBottom: 3 },
+  currentText: { fontSize: 10, fontFamily: 'Inter_400Regular' },
+  speedButton: { minWidth: 48, minHeight: 38, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  speedText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
+  optionList: { marginTop: 14, gap: 7 },
+  optionRow: { minHeight: 48, borderRadius: 12, borderWidth: 1, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  optionLabel: { flex: 1, fontSize: 11.5, fontFamily: 'Inter_600SemiBold' },
+  optionValue: { maxWidth: 145, fontSize: 10, fontFamily: 'Inter_500Medium' },
+  pressed: { opacity: 0.75, transform: [{ scale: 0.985 }] },
 });
