@@ -4,48 +4,42 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-  useFonts,
-} from '@expo-google-fonts/inter';
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, useFonts } from '@expo-google-fonts/inter';
 import { Stack } from 'expo-router';
 import { setBaseUrl } from '@workspace/api-client-react';
 import * as SplashScreen from 'expo-splash-screen';
 import { useColors } from '@/hooks/useColors';
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
-if (process.env.EXPO_PUBLIC_DOMAIN) {
-  setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
-}
+if (process.env.EXPO_PUBLIC_DOMAIN) setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
 
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   const colors = useColors();
   return (
-    <Stack screenOptions={{ headerBackTitle: 'Back', headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.background }, headerTitleStyle: { color: colors.foreground, fontFamily: 'Inter_600SemiBold' }, headerShadowVisible: false }}>
+    <Stack screenOptions={{
+      headerBackTitle: 'Back',
+      headerTintColor: colors.primary,
+      headerStyle: { backgroundColor: colors.background },
+      headerTitleStyle: { color: colors.foreground, fontFamily: 'Inter_600SemiBold' },
+      headerShadowVisible: false,
+      contentStyle: { backgroundColor: colors.background },
+    }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="reader" options={{ title: 'Book Reader' }} />
+      <Stack.Screen name="media-player" options={{ title: 'Media Player' }} />
+      <Stack.Screen name="biometric-vault" options={{ title: 'Biometric Vault' }} />
+      <Stack.Screen name="voices" options={{ title: 'Voice Library' }} />
+      <Stack.Screen name="about" options={{ title: 'About Nexus Plus' }} />
     </Stack>
   );
 }
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-  });
-
+  const [fontsLoaded, fontError] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold });
   useEffect(() => {
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
-    }
+    if (fontsLoaded || fontError) SplashScreen.hideAsync();
   }, [fontsLoaded, fontError]);
 
   if (!fontsLoaded && !fontError) return null;
@@ -54,7 +48,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <GestureHandlerRootView>
+          <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
               <RootLayoutNav />
             </KeyboardProvider>
