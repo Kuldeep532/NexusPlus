@@ -27,6 +27,8 @@
       "expo-font",
       "expo-document-picker",
       "expo-web-browser",
+      ["expo-camera", { "cameraPermission": "Allow Nexus Plus to use your camera for automatic selfies." }],
+      "expo-font",
       "expo-local-authentication",
       "expo-secure-store",
       "expo-screen-capture"
