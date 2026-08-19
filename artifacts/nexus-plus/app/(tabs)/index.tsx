@@ -14,6 +14,7 @@ const features: Feature[] = [
   { key: 'media', title: 'Media Player', icon: 'play-box-multiple', route: '/media-player' },
   { key: 'vault', title: 'Biometric Vault', icon: 'shield-lock', route: '/biometric-vault' },
   { key: 'selfie', title: 'Selfie', icon: 'camera-front', route: '/selfie' },
+  { key: 'time-announcer', title: 'Time Announcer', icon: 'clock-time-eight-outline', route: '/time-announcer' },
   { key: 'cleaner', title: 'Storage Cleaner', icon: 'broom', route: '/storage-cleaner' },
   { key: 'pdf-tools', title: 'PDF Tools', icon: 'file-pdf-box', route: '/pdf-tools' },
 ];
@@ -62,20 +63,5 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  header: { paddingHorizontal: 20, marginBottom: 22, gap: 12 },
-  headerCopy: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
-  kicker: { fontSize: 10, letterSpacing: 2, fontFamily: 'Inter_700Bold' },
-  title: { fontSize: 32, fontFamily: 'Inter_700Bold' },
-  accountButton: { minHeight: 58, borderRadius: 17, borderWidth: 1, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
-  accountTextWrap: { flex: 1 },
-  signedInLabel: { fontSize: 10, fontFamily: 'Inter_400Regular', marginBottom: 2 },
-  accountName: { fontSize: 13, fontFamily: 'Inter_700Bold' },
-  list: { paddingHorizontal: 20, gap: 10 },
-  row: { minHeight: 70, borderRadius: 16, borderWidth: 1, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center' },
-  icon: { width: 46, height: 46, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  rowTitle: { flex: 1, marginHorizontal: 13, fontSize: 14, fontFamily: 'Inter_700Bold' },
-  pressed: { opacity: 0.76, transform: [{ scale: 0.985 }] },
+  screen: { flex: 1 }, header: { paddingHorizontal: 20, marginBottom: 22, gap: 12 }, headerCopy: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }, kicker: { fontSize: 10, letterSpacing: 2, fontFamily: 'Inter_700Bold' }, title: { fontSize: 32, fontFamily: 'Inter_700Bold' }, accountButton: { minHeight: 58, borderRadius: 17, borderWidth: 1, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 10 }, avatar: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, avatarText: { fontSize: 13, fontFamily: 'Inter_700Bold' }, accountTextWrap: { flex: 1 }, signedInLabel: { fontSize: 10, fontFamily: 'Inter_400Regular', marginBottom: 2 }, accountName: { fontSize: 13, fontFamily: 'Inter_700Bold' }, list: { paddingHorizontal: 20, gap: 10 }, row: { minHeight: 70, borderRadius: 16, borderWidth: 1, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center' }, icon: { width: 46, height: 46, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, rowTitle: { flex: 1, marginHorizontal: 13, fontSize: 14, fontFamily: 'Inter_700Bold' }, pressed: { opacity: 0.76, transform: [{ scale: 0.985 }] },
 });
