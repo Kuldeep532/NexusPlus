@@ -1,0 +1,108 @@
+name: Manual Secure Android Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'EAS build profile'
+        required: true
+        default: production
+        type: choice
+        options:
+          - preview
+          - production
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: artifacts/nexus-plus/package.json
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: artifacts/nexus-plus/package.json
+
+      - name: Install dependencies
+        working-directory: artifacts/nexus-plus
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Materialize Firebase config
+        working-directory: artifacts/nexus-plus
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          test -n "$GOOGLE_SERVICES_JSON"
+          printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.json
+          test -s google-services.json
+
+      - name: Materialize Android signing keystore
+        working-directory: artifacts/nexus-plus
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android-release.keystore
+          test -s android-release.keystore
+
+      - name: Export EAS environment
+        working-directory: artifacts/nexus-plus
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_PROJECT_ID: ${{ secrets.EAS_PROJECT_ID }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "EXPO_TOKEN=${EXPO_TOKEN}" >> "$GITHUB_ENV"
+          echo "EAS_PROJECT_ID=${EAS_PROJECT_ID}" >> "$GITHUB_ENV"
+          echo "ANDROID_KEYSTORE_PASSWORD=${ANDROID_KEYSTORE_PASSWORD}" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_ALIAS=${ANDROID_KEY_ALIAS}" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_PASSWORD=${ANDROID_KEY_PASSWORD}" >> "$GITHUB_ENV"
+
+      - name: Configure local signing properties
+        working-directory: artifacts/nexus-plus
+        run: |
+          cat > signing.env <<EOF
+          ANDROID_KEYSTORE_FILE=$PWD/android-release.keystore
+          ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD
+          ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS
+          ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD
+          EOF
+
+      - name: Verify Expo config
+        working-directory: artifacts/nexus-plus
+        run: pnpm exec expo config --type public >/tmp/expo-config.json
+
+      - name: Build with EAS
+        working-directory: artifacts/nexus-plus
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: pnpm exec eas build --platform android --profile "${{ inputs.profile }}" --non-interactive
+
+      - name: Cleanup credentials and temporary files
+        if: always()
+        working-directory: artifacts/nexus-plus
+        run: |
+          rm -f google-services.json android-release.keystore signing.env
