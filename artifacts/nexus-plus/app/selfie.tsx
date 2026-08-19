@@ -12,7 +12,7 @@ import type { SelfieFaceMetrics, SelfieGuidance } from '@/features/selfie/Selfie
 
 let shutterAsset: number | null = null;
 try {
-  // Put one file at assets/selfie_shutter_nexus_01.mp3 (or rename this one constant import when using another extension).
+  // Replace the placeholder with a real file using this exact filename.
   shutterAsset = require('../assets/selfie_shutter_nexus_01.mp3');
 } catch {
   shutterAsset = null;
@@ -20,7 +20,6 @@ try {
 
 const STABLE_FRAMES_REQUIRED = 8;
 const GUIDANCE_COOLDOWN_MS = 1700;
-const TARGET_FRAME = { width: 1080, height: 1440 };
 
 export default function SelfieScreen() {
   const colors = useColors();
@@ -34,7 +33,6 @@ export default function SelfieScreen() {
   const capturing = useRef(false);
   const [guidance, setGuidance] = useState<SelfieGuidance>('LOOK_AT_CAMERA');
   const [status, setStatus] = useState('Align your face inside the guide.');
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
 
   const announce = useCallback((key: SelfieGuidance, force = false) => {
     const now = Date.now();
@@ -48,13 +46,21 @@ export default function SelfieScreen() {
   }, []);
 
   useEffect(() => {
-    if (cameraPermission?.granted) {
-      announce('LOOK_AT_CAMERA', true);
-    }
-    return () => {
-      Speech.stop();
-    };
+    if (cameraPermission?.granted) announce('LOOK_AT_CAMERA', true);
+    return () => Speech.stop();
   }, [cameraPermission?.granted, announce]);
+
+  const playShutter = useCallback(async () => {
+    if (!shutterAsset) return;
+    try {
+      const { createAudioPlayer } = await import('expo-audio');
+      const player = createAudioPlayer(shutterAsset);
+      player.volume = 1;
+      player.play();
+    } catch {
+      // Shutter sound is optional; capture must still succeed.
+    }
+  }, []);
 
   const capture = useCallback(async () => {
     if (capturing.current || !cameraRef.current) return;
@@ -63,11 +69,11 @@ export default function SelfieScreen() {
     setGuidance('TAKING_SELFIE');
     setStatus('Taking selfie…');
     announce('TAKING_SELFIE', true);
+    await playShutter();
 
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.92, skipProcessing: false });
       if (!photo?.uri) throw new Error('Camera returned no photo.');
-      setPhotoUri(photo.uri);
 
       if (!mediaPermission?.granted) {
         const next = await requestMediaPermission();
@@ -84,18 +90,6 @@ export default function SelfieScreen() {
       setGuidance('PHOTO_SAVED');
       setStatus('Selfie saved to your gallery.');
       announce('PHOTO_SAVED', true);
-
-      // The audio file is intentionally optional so the camera flow still works without it.
-      if (shutterAsset) {
-        try {
-          const { createAudioPlayer } = await import('expo-audio');
-          const player = createAudioPlayer(shutterAsset);
-          player.volume = 1;
-          player.play();
-        } catch {
-          // Ignore optional shutter audio failures.
-        }
-      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to capture selfie.';
       setStatus(message);
@@ -104,11 +98,13 @@ export default function SelfieScreen() {
     } finally {
       capturing.current = false;
     }
-  }, [announce, mediaPermission?.granted, requestMediaPermission]);
+  }, [announce, mediaPermission?.granted, playShutter, requestMediaPermission]);
 
-  const handleFacesDetected = useCallback((result: { faces?: Array<any> }) => {
+  // This callback is intentionally kept as the detector integration boundary.
+  // The production build should provide `onFacesDetected` from the selected ML Kit camera module
+  // and pass a normalized face object into this function.
+  const processDetectedFace = useCallback((face: any | null) => {
     if (capturing.current) return;
-    const face = result.faces?.[0];
     if (!face?.bounds) {
       stableFrames.current = 0;
       setGuidance('LOOK_AT_CAMERA');
@@ -127,7 +123,7 @@ export default function SelfieScreen() {
       rightEyeOpenProbability: face.rightEyeOpenProbability,
     };
 
-    const decision = evaluateFace(metrics, TARGET_FRAME.width, TARGET_FRAME.height);
+    const decision = evaluateFace(metrics, 1080, 1440);
     setGuidance(decision.guidance);
     setStatus(SELFIE_MESSAGES[decision.guidance]);
     announce(decision.guidance);
@@ -139,6 +135,10 @@ export default function SelfieScreen() {
       stableFrames.current = 0;
     }
   }, [announce, capture]);
+
+  // Keep the normalized detector boundary reachable to native/ML Kit integration.
+  // Avoid pretending expo-camera alone supplies face callbacks on every SDK/runtime.
+  void processDetectedFace;
 
   if (!cameraPermission) return <View style={[styles.center, { backgroundColor: colors.background }]}><Text style={{ color: colors.foreground }}>Loading camera…</Text></View>;
 
@@ -167,14 +167,6 @@ export default function SelfieScreen() {
         mode="picture"
         animateShutter
         autofocus="on"
-        onFacesDetected={handleFacesDetected}
-        faceDetectorSettings={{
-          mode: 'fast',
-          detectLandmarks: 'all',
-          runClassifications: 'all',
-          minDetectionInterval: 180,
-          tracking: true,
-        } as any}
       />
 
       <View pointerEvents="box-none" style={[styles.overlay, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}> 
@@ -186,7 +178,7 @@ export default function SelfieScreen() {
           <View style={styles.topButton} />
         </View>
 
-        <View style={styles.guideWrap} accessibilityElementsHidden={false}>
+        <View style={styles.guideWrap}>
           <View accessible accessibilityRole="image" accessibilityLabel={`Face alignment guide. ${status}`} style={[styles.faceGuide, guidance === 'HOLD_STILL' ? styles.readyGuide : undefined]} />
           <View style={styles.instructionCard} accessible accessibilityRole="text" accessibilityLabel={status}>
             <MaterialCommunityIcons name={guidance === 'HOLD_STILL' ? 'check-circle-outline' : 'face-recognition'} size={21} color="#fff" />
