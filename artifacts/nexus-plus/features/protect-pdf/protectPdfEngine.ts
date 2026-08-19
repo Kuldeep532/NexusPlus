@@ -1,18 +1,33 @@
+import * as FileSystem from 'expo-file-system/legacy';
 import type { ProtectPdfInput, ProtectPdfResult } from './protectPdfTypes';
 
 /**
- * PDF encryption boundary.
+ * Adapter boundary for the PDF security engine.
  *
- * Do not replace this with a JS-only file copy. This adapter must call a real
- * PDF Standard Security Handler implementation that writes the /Encrypt
- * dictionary and encrypts the document streams. The app deliberately fails
- * closed until that engine is available.
+ * The app must not claim success unless the engine has actually rewritten the
+ * PDF with a Standard Security Handler /Encrypt dictionary.
+ *
+ * The current repository does not yet ship a verified Expo-compatible
+ * encryption package. This adapter therefore remains fail-closed.
  */
 export async function protectPdfWithEngine(
-  _input: ProtectPdfInput,
+  input: ProtectPdfInput,
   _userPassword: string,
 ): Promise<ProtectPdfResult> {
+  // Keep FileSystem imported here deliberately: the production implementation
+  // will write a new artifact rather than modifying the user's source file.
+  void FileSystem;
   throw new Error(
-    'PDF encryption engine is not configured. Add a native-compatible PDF security implementation before enabling Protect PDF.',
+    'PDF encryption engine is not installed. Protect PDF is disabled until a verified Expo development-build engine is configured.',
+  );
+}
+
+export async function unlockPdfWithEngine(
+  input: ProtectPdfInput,
+  _password: string,
+): Promise<ProtectPdfResult> {
+  void FileSystem;
+  throw new Error(
+    'PDF decryption engine is not installed. Unlock PDF is disabled until a verified Expo development-build engine is configured.',
   );
 }
