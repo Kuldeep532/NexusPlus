@@ -2,11 +2,11 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import * as ScreenCapture from 'expo-screen-capture';
 
-export const VAULT_KEY_ALIAS = 'nexusplus.biometric-vault.master-key.v2';
-export const VAULT_META_KEY = 'nexusplus.biometric-vault.meta.v2';
+export const VAULT_KEY_ALIAS = 'nexusplus.biometric-vault.master-key.v1';
+export const VAULT_META_KEY = 'nexusplus.biometric-vault.meta.v1';
 export const VAULT_CREDENTIAL_MODE_KEY = 'nexusplus.biometric-vault.credential-mode.v1';
 
-type VaultCredentialMode = 'biometric-only' | 'device-auth';
+export type VaultCredentialMode = 'biometric-only' | 'device-auth';
 
 export async function getBiometricCapability(): Promise<{
   hardware: boolean;
@@ -22,8 +22,7 @@ export async function getBiometricCapability(): Promise<{
   return {
     hardware,
     enrolled,
-    securityLevel:
-      level === LocalAuthentication.SecurityLevel.BIOMETRIC_STRONG ? 'strong' : 'weak',
+    securityLevel: level === LocalAuthentication.SecurityLevel.BIOMETRIC_STRONG ? 'strong' : 'weak',
   };
 }
 
@@ -35,9 +34,7 @@ export async function authenticateVault(
 
   if (!capability.hardware) throw new Error('Biometric hardware is not available on this device.');
   if (!capability.enrolled) throw new Error('No biometric credential is enrolled on this device.');
-  if (capability.securityLevel !== 'strong') {
-    throw new Error('A strong biometric credential is required for the vault.');
-  }
+  if (capability.securityLevel !== 'strong') throw new Error('A strong biometric credential is required for the vault.');
 
   return LocalAuthentication.authenticateAsync({
     promptMessage,
@@ -51,7 +48,7 @@ export async function authenticateVault(
 export async function enrollStrongBiometric(): Promise<boolean> {
   const capability = await getBiometricCapability();
   if (!capability.hardware) throw new Error('This device has no supported biometric hardware.');
-  if (!capability.enrolled) throw new Error('No fingerprint or face credential is enrolled in Android.');
+  if (!capability.enrolled) throw new Error('Enroll a fingerprint or face credential in Android Settings first.');
   if (capability.securityLevel !== 'strong') throw new Error('The enrolled biometric is not strong enough for the vault.');
 
   const result = await LocalAuthentication.authenticateAsync({
@@ -111,8 +108,6 @@ export async function saveVaultCredentialMode(mode: VaultCredentialMode): Promis
 }
 
 export async function loadVaultCredentialMode(): Promise<VaultCredentialMode> {
-  const mode = await SecureStore.getItemAsync(VAULT_CREDENTIAL_MODE_KEY, {
-    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-  });
+  const mode = await SecureStore.getItemAsync(VAULT_CREDENTIAL_MODE_KEY);
   return mode === 'device-auth' ? 'device-auth' : 'biometric-only';
 }
