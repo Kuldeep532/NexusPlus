@@ -34,6 +34,8 @@ function RootLayoutNav() {
       <Stack.Screen name="biometric-vault" options={{ title: 'Biometric Vault' }} />
       <Stack.Screen name="selfie" options={{ title: 'Selfie' }} />
       <Stack.Screen name="time-announcer" options={{ title: 'Time Announcer' }} />
+      <Stack.Screen name="battery-announcer" options={{ title: 'Battery Announcer' }} />
+      <Stack.Screen name="language-and-preference" options={{ title: 'Language and Preference' }} />
       <Stack.Screen name="voices" options={{ title: 'Voice Library' }} />
       <Stack.Screen name="pdf-tools" options={{ title: 'PDF Tools' }} />
       <Stack.Screen name="pdf-to-images" options={{ title: 'PDF to Images' }} />
