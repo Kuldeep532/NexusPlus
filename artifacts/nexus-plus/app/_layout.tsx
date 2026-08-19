@@ -26,12 +26,17 @@ function RootLayoutNav() {
       headerShadowVisible: false,
       contentStyle: { backgroundColor: colors.background },
     }}>
+      <Stack.Screen name="welcome" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="profile" options={{ title: 'Profile' }} />
       <Stack.Screen name="reader" options={{ title: 'Book Reader' }} />
       <Stack.Screen name="media-player" options={{ title: 'Media Player' }} />
       <Stack.Screen name="biometric-vault" options={{ title: 'Biometric Vault' }} />
       <Stack.Screen name="voices" options={{ title: 'Voice Library' }} />
+      <Stack.Screen name="pdf-tools" options={{ title: 'PDF Tools' }} />
       <Stack.Screen name="pdf-to-images" options={{ title: 'PDF to Images' }} />
+      <Stack.Screen name="protect-pdf" options={{ title: 'Protect PDF' }} />
+      <Stack.Screen name="unlock-pdf" options={{ title: 'Unlock PDF' }} />
       <Stack.Screen name="privacy-policy" options={{ title: 'Privacy Policy' }} />
       <Stack.Screen name="terms-and-conditions" options={{ title: 'Terms and Conditions' }} />
       <Stack.Screen name="about-us" options={{ title: 'About Us' }} />
