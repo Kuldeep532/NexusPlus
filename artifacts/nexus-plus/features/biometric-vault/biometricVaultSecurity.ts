@@ -32,20 +32,12 @@ export async function authenticateVault(
 ): Promise<LocalAuthentication.LocalAuthenticationResult> {
   const capability = await getBiometricCapability();
 
-  if (!capability.hardware && !capability.enrolled) {
-    return {
-      success: false,
-      error: 'not_available',
-      warning: 'Biometric hardware is not available on this device.',
-    } as LocalAuthentication.LocalAuthenticationResult;
+  if (!capability.hardware) {
+    throw new Error('Biometric hardware is not available on this device.');
   }
 
   if (!capability.enrolled) {
-    return {
-      success: false,
-      error: 'not_enrolled',
-      warning: 'No biometric credential is enrolled on this device.',
-    } as LocalAuthentication.LocalAuthenticationResult;
+    throw new Error('No biometric credential is enrolled on this device.');
   }
 
   return LocalAuthentication.authenticateAsync({
