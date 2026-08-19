@@ -26,10 +26,13 @@ function serializeEnvelope(envelope: VaultEnvelope): string {
 }
 
 function parseEnvelope(raw: string): VaultEnvelope {
-  const value = JSON.parse(raw) as VaultEnvelope;
+  const value = JSON.parse(raw) as Partial<VaultEnvelope>;
   if (
     value.version !== VAULT_FORMAT_VERSION ||
     value.algorithm !== VAULT_ALGORITHM ||
+    typeof value.keyVersion !== 'number' ||
+    typeof value.createdAt !== 'number' ||
+    typeof value.updatedAt !== 'number' ||
     typeof value.ciphertext !== 'string' ||
     typeof value.iv !== 'string' ||
     typeof value.tag !== 'string' ||
@@ -37,7 +40,7 @@ function parseEnvelope(raw: string): VaultEnvelope {
   ) {
     throw new Error('Unsupported or corrupted Nexus Vault format.');
   }
-  return value;
+  return value as VaultEnvelope;
 }
 
 export interface VaultRepositorySnapshot {
@@ -47,7 +50,8 @@ export interface VaultRepositorySnapshot {
 
 export async function initializeVault(): Promise<void> {
   const existingKey = await loadVaultMasterKey();
-  if (existingKey) return;
+  const existingMeta = await loadVaultMeta();
+  if (existingKey && existingMeta) return;
 
   const key = await generateVaultKey();
   const keyBase64 = await keyToBase64(key);
@@ -100,13 +104,13 @@ export async function readVault(): Promise<VaultRepositorySnapshot> {
     envelope.aad,
   );
 
-  const items = JSON.parse(plaintext) as VaultItem[];
+  const items = JSON.parse(plaintext) as unknown;
   if (!Array.isArray(items)) {
     throw new Error('Vault payload is invalid.');
   }
 
   return {
-    items,
+    items: items as VaultItem[],
     keyVersion: envelope.keyVersion,
   };
 }
