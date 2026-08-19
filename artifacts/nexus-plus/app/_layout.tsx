@@ -29,10 +29,7 @@ function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerBackTitle: 'Back', headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.background }, headerTitleStyle: { color: colors.foreground, fontFamily: 'Inter_600SemiBold' }, headerShadowVisible: false }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="reader" options={{ title: 'PDF Reader' }} />
-      <Stack.Screen name="voices" options={{ title: 'Voice Library' }} />
-      <Stack.Screen name="utilities" options={{ title: 'Utilities' }} />
-      <Stack.Screen name="about" options={{ title: 'About Nexus Plus' }} />
+      <Stack.Screen name="reader" options={{ title: 'Book Reader' }} />
     </Stack>
   );
 }
