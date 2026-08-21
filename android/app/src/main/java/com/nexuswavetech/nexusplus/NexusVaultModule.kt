@@ -36,9 +36,19 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
             val strong = manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)
             val device = manager.canAuthenticate(BiometricManager.Authenticators.DEVICE_CREDENTIAL)
             val hardware = strong != BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE
-            val enrolled = strong == BiometricManager.BIOMETRIC_SUCCESS || device == BiometricManager.BIOMETRIC_SUCCESS
-            val securityLevel = if (strong == BiometricManager.BIOMETRIC_SUCCESS) "strong" else if (hardware) "weak" else "none"
-            promise.resolve(mapOf("hardware" to hardware, "enrolled" to enrolled, "securityLevel" to securityLevel))
+            val strongEnrolled = strong == BiometricManager.BIOMETRIC_SUCCESS
+            val deviceCredentialAvailable = device == BiometricManager.BIOMETRIC_SUCCESS
+            val securityLevel = when {
+                strongEnrolled -> "strong"
+                hardware -> "weak"
+                else -> "none"
+            }
+            promise.resolve(mapOf(
+                "hardware" to hardware,
+                "enrolled" to strongEnrolled,
+                "deviceCredentialAvailable" to deviceCredentialAvailable,
+                "securityLevel" to securityLevel,
+            ))
         } catch (error: Throwable) {
             promise.reject("VAULT_CAPABILITY", error)
         }
@@ -48,19 +58,28 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
     fun authenticate(reason: String, mode: String, promise: Promise) {
         val activity = currentActivity
         if (activity == null) {
-            promise.reject("VAULT_ACTIVITY", "Vault authentication requires an active Android activity.")
+            promise.resolve(mapOf("success" to false, "error" to "activity_unavailable"))
             return
         }
 
         val manager = BiometricManager.from(activity)
-        val hasStrong = manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
-        if (!hasStrong) {
-            promise.resolve(mapOf("success" to false, "error" to "biometric_unavailable"))
+        val strongResult = manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+        val deviceResult = manager.canAuthenticate(BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+        val hasStrong = strongResult == BiometricManager.BIOMETRIC_SUCCESS
+        val hasDeviceCredential = deviceResult == BiometricManager.BIOMETRIC_SUCCESS
+        val allowDevice = mode == "device-auth"
+
+        if (!hasStrong && (!allowDevice || !hasDeviceCredential)) {
+            val error = when {
+                allowDevice && !hasDeviceCredential -> "credential_unavailable"
+                !hasStrong -> "biometric_unavailable"
+                else -> "unknown"
+            }
+            promise.resolve(mapOf("success" to false, "error" to error))
             return
         }
 
         val executor = ContextCompat.getMainExecutor(activity)
-        val allowDevice = mode == "device-auth"
         val authenticators = if (allowDevice) {
             BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
         } else {
@@ -79,7 +98,18 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
             }
 
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                promise.resolve(mapOf("success" to false, "error" to errorCode.toString()))
+                val normalized = when (errorCode) {
+                    BiometricPrompt.ERROR_USER_CANCELED,
+                    BiometricPrompt.ERROR_NEGATIVE_BUTTON,
+                    BiometricPrompt.ERROR_CANCELED -> "user_cancel"
+                    BiometricPrompt.ERROR_LOCKOUT,
+                    BiometricPrompt.ERROR_LOCKOUT_PERMANENT -> "lockout"
+                    BiometricPrompt.ERROR_NO_BIOMETRICS,
+                    BiometricPrompt.ERROR_HW_NOT_PRESENT,
+                    BiometricPrompt.ERROR_HW_UNAVAILABLE -> "biometric_unavailable"
+                    else -> "unknown"
+                }
+                promise.resolve(mapOf("success" to false, "error" to normalized))
             }
 
             override fun onAuthenticationFailed() {
