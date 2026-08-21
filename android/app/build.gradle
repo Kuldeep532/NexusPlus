@@ -30,6 +30,7 @@ android {
     }
 
     buildTypes {
+        debug { minifyEnabled false }
         release {
             minifyEnabled true
             shrinkResources true
@@ -38,10 +39,15 @@ android {
     }
 }
 
+// Direct Gradle APK builds use the React Native/Expo Android project when
+// available. EAS prebuild remains the supported fallback for generated native files.
+def reactNativeVersion = '0.81.5'
+
 dependencies {
     implementation 'androidx.core:core-ktx:1.15.0'
     implementation 'androidx.activity:activity-ktx:1.10.1'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.biometric:biometric:1.1.0'
     implementation 'com.tom-roush:pdfbox-android:2.0.27.0'
+    implementation "com.facebook.react:react-android:${reactNativeVersion}"
 }
