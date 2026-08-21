@@ -1,5 +1,6 @@
 import { buildAnnouncementText, parsePaymentEvent, type PaymentEvent } from './paymentEvent';
-import { dequeuePaymentEvent, enqueuePaymentEvent } from './paymentEventQueue';
+import { dequeuePaymentEvent } from './paymentEventQueue';
+import { unavailablePaymentEventVerifier, type PaymentEventVerifier } from './paymentEventVerifier';
 import { resolvePaymentTtsProvider, speakPaymentAnnouncement } from './paymentAnnouncerTts';
 import type { PaymentAnnouncementTtsProvider } from './paymentAnnouncerTypes';
 
@@ -9,11 +10,22 @@ export interface PaymentAnnouncementSession {
   preferredTtsProvider: PaymentAnnouncementTtsProvider;
   speechRate: number;
   speechPitch: number;
+  verifier?: PaymentEventVerifier;
 }
 
-export function acceptIncomingPaymentEvent(input: unknown): boolean {
+/**
+ * Events must pass cryptographic verification before entering the protected
+ * announcement queue. The default verifier fails closed until a real trusted
+ * payment provider integration is supplied.
+ */
+export async function acceptIncomingPaymentEvent(
+  input: unknown,
+  verifier: PaymentEventVerifier = unavailablePaymentEventVerifier,
+): Promise<boolean> {
   try {
     const event = parsePaymentEvent(input);
+    if (!(await verifier.verify(event))) return false;
+    const { enqueuePaymentEvent } = await import('./paymentEventQueue');
     return enqueuePaymentEvent(event);
   } catch {
     return false;
