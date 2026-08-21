@@ -16,8 +16,8 @@ export type EncryptionResult = {
  */
 export type NativeFileEncryptionBridge = {
   isAvailable(): boolean;
-  lockFile(inputUri: string, outputUri: string, password: string, iterations: number): Promise<void>;
-  unlockFile(inputUri: string, outputUri: string, password: string): Promise<void>;
+  lockFile(inputUri: string, outputUri: string, password: string): Promise<string>;
+  unlockFile(inputUri: string, outputUri: string, password: string): Promise<string>;
 };
 
 export function getNativeFileEncryptionBridge(): NativeFileEncryptionBridge {
