@@ -11,6 +11,7 @@ type Alarm = PersistedAlarm;
 
 type NativeAlarmBridge = {
   canScheduleExactAlarms: () => Promise<boolean>;
+  persistDefinitions: (json: string) => Promise<boolean>;
   schedule: (id: string, hour: number, minute: number) => Promise<{ scheduled: boolean; reason?: string }>;
   cancel: (id: string) => Promise<boolean>;
 };
@@ -32,9 +33,12 @@ export default function AlarmsScreen() {
   const [loading, setLoading] = useState(true);
 
   const persist = useCallback(async (next: Alarm[]) => {
-    setAlarms(next);
     try {
       await savePersistedAlarms(next);
+      if (nativeAlarm) {
+        await nativeAlarm.persistDefinitions(JSON.stringify(next));
+      }
+      setAlarms(next);
     } catch {
       AccessibilityInfo.announceForAccessibility('Alarm settings could not be saved.');
     }
@@ -68,6 +72,7 @@ export default function AlarmsScreen() {
       setLoading(false);
       const enabled = saved.filter((alarm) => alarm.enabled);
       for (const alarm of enabled) await schedule(alarm);
+      if (nativeAlarm) await nativeAlarm.persistDefinitions(JSON.stringify(saved));
     }).catch(() => {
       if (mounted) setLoading(false);
     });
@@ -106,13 +111,19 @@ export default function AlarmsScreen() {
     await persist(alarms.filter((alarm) => alarm.id !== id));
   };
 
-  const cycleSound = (id: string) => persist(alarms.map((alarm) => {
-    if (alarm.id !== id) return alarm;
-    const index = ALARM_SOUNDS.findIndex((item) => item.id === alarm.soundId);
+  const cycleSound = async (id: string) => {
+    const current = alarms.find((alarm) => alarm.id === id);
+    if (!current) return;
+    const index = ALARM_SOUNDS.findIndex((item) => item.id === current.soundId);
     const nextSound = ALARM_SOUNDS[(index + 1) % ALARM_SOUNDS.length];
+    const next = alarms.map((alarm) => alarm.id === id ? { ...alarm, soundId: nextSound.id } : alarm);
+    if (current.enabled && nativeAlarm) {
+      try { await nativeAlarm.cancel(id); } catch { /* best-effort cancellation */ }
+      if (!(await schedule({ ...current, soundId: nextSound.id }))) return;
+    }
+    await persist(next);
     void AccessibilityInfo.announceForAccessibility(`Alarm sound changed to ${nextSound.displayName}.`);
-    return { ...alarm, soundId: nextSound.id };
-  }));
+  };
 
   return <ScrollView style={[styles.screen, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 40 }}>
     <View style={styles.header}><View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Alarms</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Create and manage reminders that survive app restarts.</Text></View><Pressable disabled={loading} accessibilityRole="button" onPress={() => void addAlarm()} style={[styles.add, { backgroundColor: colors.primary }, loading && styles.disabled]}><Feather name="plus" size={17} color={colors.primaryForeground} /><Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_700Bold' }}>Add</Text></Pressable></View>
