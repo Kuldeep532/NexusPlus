@@ -53,19 +53,20 @@ Java_com_nexuswavetech_nexusplus_vocal_VocalRemoverNative_nativeSeparate(
     return nullptr;
   }
 
+  const std::string inputPathCopy(inputChars);
+  const std::string outputPathCopy(outputChars);
+  env->ReleaseStringUTFChars(inputPath, inputChars);
+  env->ReleaseStringUTFChars(outputPath, outputChars);
+
   std::lock_guard<std::mutex> lock(gMutex);
   delete gEngine;
   gEngine = new nexus::vocal::VocalRemover();
 
   std::string error;
   const auto options = parseOptions(quality, preserveBass, preserveStereo);
-  const bool ok = gEngine->separate(inputChars, outputChars, options, nullptr, &error);
-
-  env->ReleaseStringUTFChars(inputPath, inputChars);
-  env->ReleaseStringUTFChars(outputPath, outputChars);
-
+  const bool ok = gEngine->separate(inputPathCopy, outputPathCopy, options, nullptr, &error);
   if (!ok) return makeString(env, std::string("ERROR:") + error);
-  return makeString(env, outputChars);
+  return makeString(env, outputPathCopy);
 }
 
 extern "C" JNIEXPORT void JNICALL
