@@ -16,6 +16,29 @@ android {
     }
 
     buildFeatures { buildConfig true }
+
+    // Keep release footprint small while retaining native Android compatibility.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+        resources {
+            excludes += [
+                'META-INF/DEPENDENCIES',
+                'META-INF/LICENSE*',
+                'META-INF/NOTICE*',
+                'META-INF/*.version'
+            ]
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
 }
 
 dependencies {
@@ -23,4 +46,5 @@ dependencies {
     implementation 'androidx.activity:activity-ktx:1.10.1'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.biometric:biometric:1.1.0'
+    implementation 'com.tom-roush:pdfbox-android:2.0.27.0'
 }
