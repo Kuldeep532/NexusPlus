@@ -4,8 +4,6 @@ import {
   decryptVaultPayload,
   encryptVaultPayload,
   generateVaultKey,
-  keyFromBase64,
-  keyToBase64,
   VAULT_ALGORITHM,
   VAULT_FORMAT_VERSION,
 } from './secureVaultCrypto';
@@ -53,14 +51,11 @@ export async function initializeVault(): Promise<void> {
   const existingMeta = await loadVaultMeta();
   if (existingKey && existingMeta) return;
 
-  const key = await generateVaultKey();
-  const keyBase64 = await keyToBase64(key);
-  await saveVaultMasterKey(keyBase64);
-
+  await generateVaultKey();
   const aad = buildVaultAad(DEFAULT_KEY_VERSION);
   const encrypted = await encryptVaultPayload(
     JSON.stringify(EMPTY_ITEMS),
-    key,
+    undefined,
     aad,
   );
 
@@ -77,21 +72,20 @@ export async function initializeVault(): Promise<void> {
     aad,
   };
 
+  await saveVaultMasterKey();
   await saveVaultMeta(serializeEnvelope(envelope));
 }
 
 export async function readVault(): Promise<VaultRepositorySnapshot> {
-  const keyBase64 = await loadVaultMasterKey();
+  const keyAvailable = await loadVaultMasterKey();
   const rawEnvelope = await loadVaultMeta();
 
-  if (!keyBase64 || !rawEnvelope) {
+  if (!keyAvailable || !rawEnvelope) {
     await initializeVault();
     return readVault();
   }
 
   const envelope = parseEnvelope(rawEnvelope);
-  const key = await keyFromBase64(keyBase64);
-
   if (envelope.aad !== buildVaultAad(envelope.keyVersion)) {
     throw new Error('Vault integrity check failed.');
   }
@@ -100,7 +94,7 @@ export async function readVault(): Promise<VaultRepositorySnapshot> {
     envelope.ciphertext,
     envelope.iv,
     envelope.tag,
-    key,
+    undefined,
     envelope.aad,
   );
 
@@ -119,16 +113,15 @@ export async function writeVault(
   items: VaultItem[],
   keyVersion = DEFAULT_KEY_VERSION,
 ): Promise<void> {
-  const keyBase64 = await loadVaultMasterKey();
-  if (!keyBase64) throw new Error('Vault master key is unavailable.');
+  const keyAvailable = await loadVaultMasterKey();
+  if (!keyAvailable) throw new Error('Vault master key is unavailable.');
 
-  const key = await keyFromBase64(keyBase64);
   const previousRaw = await loadVaultMeta();
   const previous = previousRaw ? parseEnvelope(previousRaw) : null;
   const aad = buildVaultAad(keyVersion);
   const encrypted = await encryptVaultPayload(
     JSON.stringify(items),
-    key,
+    undefined,
     aad,
   );
 
