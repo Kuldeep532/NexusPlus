@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, BackHandler, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { playDocumentProcessingSound } from '@/features/audio/audioPlayback';
 
 type Format = 'png' | 'jpeg';
 
@@ -96,6 +97,7 @@ export default function PdfToImagesScreen() {
     setImageUris([]);
 
     try {
+      await playDocumentProcessingSound();
       const outputDirectory = `${FileSystem.cacheDirectory}pdf-images/`;
       await FileSystem.makeDirectoryAsync(outputDirectory, { intermediates: true });
 
