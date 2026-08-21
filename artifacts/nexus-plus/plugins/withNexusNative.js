@@ -2,10 +2,8 @@ const { withProjectBuildGradle, withMainApplication, createRunOncePlugin } = req
 
 /**
  * Native Android integration kept behind the Expo config layer so EAS can
- * regenerate the Android project without losing the security module.
- *
- * iOS remains intentionally untouched; the shared JS contract has an iOS
- * extension point for a future Keychain/LocalAuthentication implementation.
+ * regenerate the Android project without losing the security or PDF modules.
+ * iOS remains intentionally untouched; shared JS contracts provide extension points.
  */
 function withNexusNative(config) {
   config = withProjectBuildGradle(config, (mod) => {
@@ -18,23 +16,29 @@ function withNexusNative(config) {
 
   return withMainApplication(config, (mod) => {
     const marker = 'Nexus Plus native package registration';
-    if (mod.modResults.contents.includes(marker)) return mod;
+    const importLines = [
+      'import com.nexuswavetech.nexusplus.NexusVaultPackage;',
+      'import com.nexuswavetech.nexusplus.NexusPdfNativePackage;',
+    ];
 
-    const importLine = 'import com.nexuswavetech.nexusplus.NexusVaultPackage;';
-    if (!mod.modResults.contents.includes(importLine)) {
-      mod.modResults.contents = `${importLine}\n${mod.modResults.contents}`;
+    for (const importLine of importLines) {
+      if (!mod.modResults.contents.includes(importLine)) {
+        mod.modResults.contents = `${importLine}\n${mod.modResults.contents}`;
+      }
     }
 
-    const registration = `\n        // ${marker}\n        packages.add(new NexusVaultPackage());`;
+    if (mod.modResults.contents.includes(marker)) return mod;
+
+    const registrations = `\n        // ${marker}\n        packages.add(new NexusVaultPackage());\n        packages.add(new NexusPdfNativePackage());`;
     const needle = 'PackageList(this).packages';
-    if (mod.modResults.contents.includes(needle) && !mod.modResults.contents.includes('packages.add(new NexusVaultPackage())')) {
+    if (mod.modResults.contents.includes(needle)) {
       mod.modResults.contents = mod.modResults.contents.replace(
         /PackageList\(this\)\.packages/g,
-        `PackageList(this).packages.apply { ${registration.trim()} }`,
+        `PackageList(this).packages.apply { ${registrations.trim()} }`,
       );
     }
     return mod;
   });
 }
 
-module.exports = createRunOncePlugin(withNexusNative, 'with-nexus-native', '1.1.0');
+module.exports = createRunOncePlugin(withNexusNative, 'with-nexus-native', '1.2.0');
