@@ -1,6 +1,5 @@
 package com.nexuswavetech.nexusplus
 
-import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -8,6 +7,7 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableArray
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.multipdf.PDFMergerUtility
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
@@ -23,7 +23,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
     override fun getName(): String = "NexusPdfNative"
 
     init {
-        runCatching { PDFBoxResourceLoader.init(reactContext) }
+        PDFBoxResourceLoader.init(reactContext)
     }
 
     @ReactMethod
@@ -34,32 +34,25 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
     @ReactMethod
     fun merge(inputPaths: ReadableArray, outputPath: String, promise: Promise) {
         runCatching {
+            require(inputPaths.size() > 0) { "At least one PDF input is required." }
             val output = File(outputPath)
             output.parentFile?.mkdirs()
-            val merged = PDDocument()
-            try {
-                for (index in 0 until inputPaths.size()) {
-                    val input = requireReadablePath(inputPaths.getString(index))
-                    PDDocument.load(input).use { source ->
-                        for (page in source.pages) {
-                            val imported = PDPage(page.mediaBox)
-                            imported.rotation = page.rotation
-                            merged.addPage(imported)
-                        }
-                    }
-                }
-                FileOutputStream(output).use { merged.save(it) }
-            } finally {
-                merged.close()
+            val merger = PDFMergerUtility().apply {
+                destinationFileName = output.absolutePath
             }
+            for (index in 0 until inputPaths.size()) {
+                merger.addSource(requireReadablePath(inputPaths.getString(index)))
+            }
+            merger.mergeDocuments(null)
             output.absolutePath
         }.onSuccess { promise.resolve(it) }
-         .onFailure { promise.reject("PDF_MERGE", it.message, it) }
+            .onFailure { promise.reject("PDF_MERGE", it.message, it) }
     }
 
     @ReactMethod
     fun imageToPdf(inputPaths: ReadableArray, outputPath: String, quality: Int, promise: Promise) {
         runCatching {
+            require(inputPaths.size() > 0) { "At least one image input is required." }
             val output = File(outputPath)
             output.parentFile?.mkdirs()
             val document = PDDocument()
@@ -68,15 +61,18 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
                     val imageFile = File(requireReadablePath(inputPaths.getString(index)))
                     val bitmap = BitmapFactory.decodeFile(imageFile.absolutePath)
                         ?: throw IOException("Unable to decode image: ${imageFile.name}")
-                    val width = bitmap.width.toFloat().coerceAtLeast(1f)
-                    val height = bitmap.height.toFloat().coerceAtLeast(1f)
-                    val page = PDPage(PDRectangle(width, height))
-                    document.addPage(page)
-                    val image = LosslessFactory.createFromImage(document, bitmap)
-                    val content = com.tom_roush.pdfbox.pdmodel.PDPageContentStream(document, page)
-                    content.drawImage(image, 0f, 0f, width, height)
-                    content.close()
-                    bitmap.recycle()
+                    try {
+                        val width = bitmap.width.toFloat().coerceAtLeast(1f)
+                        val height = bitmap.height.toFloat().coerceAtLeast(1f)
+                        val page = PDPage(PDRectangle(width, height))
+                        document.addPage(page)
+                        val image = LosslessFactory.createFromImage(document, bitmap)
+                        com.tom_roush.pdfbox.pdmodel.PDPageContentStream(document, page).use { content ->
+                            content.drawImage(image, 0f, 0f, width, height)
+                        }
+                    } finally {
+                        bitmap.recycle()
+                    }
                 }
                 FileOutputStream(output).use { document.save(it) }
             } finally {
@@ -84,7 +80,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
             }
             output.absolutePath
         }.onSuccess { promise.resolve(it) }
-         .onFailure { promise.reject("PDF_IMAGE", it.message, it) }
+            .onFailure { promise.reject("PDF_IMAGE", it.message, it) }
     }
 
     @ReactMethod
@@ -95,20 +91,20 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
             output.parentFile?.mkdirs()
             PDDocument.load(requireReadablePath(inputPath)).use { document ->
                 val permissions = AccessPermission().apply {
-                    canPrint = true
-                    canExtractContent = false
-                    canModify = false
+                    isCanPrint = true
+                    isCanExtractContent = false
+                    isCanModify = false
                 }
                 val policy = StandardProtectionPolicy(password, password, permissions).apply {
                     encryptionKeyLength = 256
-                    permissions = permissions
+                    this.permissions = permissions
                 }
                 document.protect(policy)
                 FileOutputStream(output).use { document.save(it) }
             }
             output.absolutePath
         }.onSuccess { promise.resolve(it) }
-         .onFailure { promise.reject("PDF_PROTECT", it.message, it) }
+            .onFailure { promise.reject("PDF_PROTECT", it.message, it) }
     }
 
     @ReactMethod
@@ -123,7 +119,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
             }
             output.absolutePath
         }.onSuccess { promise.resolve(it) }
-         .onFailure { promise.reject("PDF_UNLOCK", it.message, it) }
+            .onFailure { promise.reject("PDF_UNLOCK", it.message, it) }
     }
 
     @ReactMethod
@@ -136,7 +132,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
             }
             output.absolutePath
         }.onSuccess { promise.resolve(it) }
-         .onFailure { promise.reject("PDF_COMPRESS", it.message, it) }
+            .onFailure { promise.reject("PDF_COMPRESS", it.message, it) }
     }
 
     private fun requireReadablePath(path: String): String {
