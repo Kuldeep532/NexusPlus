@@ -2,8 +2,10 @@ const { withProjectBuildGradle, withMainApplication, createRunOncePlugin } = req
 
 /**
  * Native Android integration kept behind the Expo config layer so EAS can
- * regenerate the Android project without losing the security or PDF modules.
- * iOS remains intentionally untouched; shared JS contracts provide extension points.
+ * regenerate the Android project without losing the security/PDF/file modules.
+ *
+ * iOS remains intentionally untouched; shared TypeScript contracts keep the
+ * platform boundary ready for future Keychain/LocalAuthentication/PDF adapters.
  */
 function withNexusNative(config) {
   config = withProjectBuildGradle(config, (mod) => {
@@ -16,25 +18,32 @@ function withNexusNative(config) {
 
   return withMainApplication(config, (mod) => {
     const marker = 'Nexus Plus native package registration';
-    const importLines = [
+    if (mod.modResults.contents.includes(marker)) return mod;
+
+    const imports = [
       'import com.nexuswavetech.nexusplus.NexusVaultPackage;',
       'import com.nexuswavetech.nexusplus.NexusPdfNativePackage;',
+      'import com.nexuswavetech.nexusplus.NexusFileUriPackage;',
     ];
 
-    for (const importLine of importLines) {
+    for (const importLine of imports) {
       if (!mod.modResults.contents.includes(importLine)) {
         mod.modResults.contents = `${importLine}\n${mod.modResults.contents}`;
       }
     }
 
-    if (mod.modResults.contents.includes(marker)) return mod;
+    const registration = [
+      `        // ${marker}`,
+      '        packages.add(new NexusVaultPackage());',
+      '        packages.add(new NexusPdfNativePackage());',
+      '        packages.add(new NexusFileUriPackage());',
+    ].join('\n');
 
-    const registrations = `\n        // ${marker}\n        packages.add(new NexusVaultPackage());\n        packages.add(new NexusPdfNativePackage());`;
     const needle = 'PackageList(this).packages';
     if (mod.modResults.contents.includes(needle)) {
       mod.modResults.contents = mod.modResults.contents.replace(
         /PackageList\(this\)\.packages/g,
-        `PackageList(this).packages.apply { ${registrations.trim()} }`,
+        `PackageList(this).packages.apply { ${registration.trim()} }`,
       );
     }
     return mod;
