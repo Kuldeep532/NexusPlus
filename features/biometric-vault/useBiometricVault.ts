@@ -62,7 +62,10 @@ export function useBiometricVault(
           setIsReady(true);
         }
       } catch {
-        if (!cancelled) setAuthError('Vault initialization failed.');
+        if (!cancelled) {
+          setAuthError('Vault initialization failed.');
+          setIsReady(true);
+        }
       }
     })();
     return () => {
@@ -83,20 +86,31 @@ export function useBiometricVault(
   const enrollBiometric = useCallback(async () => {
     setAuthError(null);
     try {
-      const success = await enrollStrongBiometric();
-      if (!success) {
-        setAuthError('Biometric registration was cancelled.');
+      const capability = await getBiometricCapability();
+      if (!capability.hardware || capability.securityLevel !== 'strong') {
+        setAuthError('A strong biometric is not available on this device.');
         return false;
       }
-      const capability = await getBiometricCapability();
-      setBiometricStrong(capability.securityLevel === 'strong');
-      setBiometricEnrolled(capability.enrolled && capability.securityLevel === 'strong');
+
+      if (!capability.enrolled) {
+        setAuthError('No supported biometric is enrolled on this device.');
+        return false;
+      }
+
+      const success = await enrollStrongBiometric();
+      if (!success) {
+        setAuthError('Biometric registration was cancelled or unavailable.');
+        return false;
+      }
+      const refreshed = await getBiometricCapability();
+      setBiometricStrong(refreshed.securityLevel === 'strong');
+      setBiometricEnrolled(refreshed.enrolled && refreshed.securityLevel === 'strong');
       await saveVaultCredentialMode('biometric-only');
       setCredentialMode('biometric-only');
       AccessibilityInfo.announceForAccessibility?.('Vault biometric registered successfully');
       return true;
-    } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Biometric registration failed.');
+    } catch {
+      setAuthError('Biometric registration failed.');
       return false;
     }
   }, []);
@@ -104,21 +118,42 @@ export function useBiometricVault(
   const setDeviceAuthMode = useCallback(async () => {
     setAuthError(null);
     try {
+      const capability = await getBiometricCapability();
+      if (!capability.deviceCredentialAvailable) {
+        setAuthError('A device PIN, pattern, or password is not available.');
+        return false;
+      }
       await saveVaultCredentialMode('device-auth');
       setCredentialMode('device-auth');
       AccessibilityInfo.announceForAccessibility?.('Vault device authentication mode selected');
       return true;
-    } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Could not change Vault credential mode.');
+    } catch {
+      setAuthError('Could not change Vault credential mode.');
       return false;
     }
   }, []);
 
   const unlock = useCallback(async () => {
     setAuthError(null);
-    await Haptics.selectionAsync();
+    try {
+      await Haptics.selectionAsync();
+    } catch {
+      // Haptics are optional and must never block authentication.
+    }
 
     try {
+      const capability = await getBiometricCapability();
+      if (credentialMode === 'biometric-only' &&
+          (!capability.hardware || capability.securityLevel !== 'strong' || !capability.enrolled)) {
+        setAuthError('A strong enrolled biometric is required to unlock the Vault.');
+        return false;
+      }
+      if (credentialMode === 'device-auth' && !capability.deviceCredentialAvailable &&
+          (!capability.hardware || capability.securityLevel !== 'strong' || !capability.enrolled)) {
+        setAuthError('No supported device authentication is available.');
+        return false;
+      }
+
       const result = await authenticateVault('Unlock Nexus Biometric Vault', credentialMode);
       if (!result.success) {
         const message =
@@ -126,21 +161,23 @@ export function useBiometricVault(
             ? 'Authentication cancelled.'
             : result.error === 'lockout'
               ? 'Biometric authentication is temporarily locked.'
-              : 'Vault authentication failed.';
+              : result.error === 'credential_unavailable' || result.error === 'biometric_unavailable'
+                ? 'The required device authentication is not available.'
+                : 'Vault authentication failed.';
         setAuthError(message);
         return false;
       }
 
       const snapshot = await readVault();
+      await enableVaultScreenProtection();
       setItems(snapshot.items);
       setIsUnlocked(true);
       scheduleLock();
-      await enableVaultScreenProtection();
       AccessibilityInfo.announceForAccessibility?.('Vault unlocked successfully');
       return true;
-    } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Vault unlock failed.');
+    } catch {
       lock();
+      setAuthError('Vault unlock failed. Your vault remains locked.');
       return false;
     }
   }, [credentialMode, lock, scheduleLock]);
