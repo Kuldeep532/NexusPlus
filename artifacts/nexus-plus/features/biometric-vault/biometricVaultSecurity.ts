@@ -1,5 +1,4 @@
-import * as LocalAuthentication from 'expo-local-authentication';
-import * as SecureStore from 'expo-secure-store';
+import { NativeModules, Platform } from 'react-native';
 import * as ScreenCapture from 'expo-screen-capture';
 
 export const VAULT_KEY_ALIAS = 'nexusplus.biometric-vault.master-key.v1';
@@ -8,57 +7,40 @@ export const VAULT_CREDENTIAL_MODE_KEY = 'nexusplus.biometric-vault.credential-m
 
 export type VaultCredentialMode = 'biometric-only' | 'device-auth';
 
+type NativeVaultSecurity = {
+  getBiometricCapability: () => Promise<{ hardware: boolean; enrolled: boolean; securityLevel: 'strong' | 'weak' | 'none' }>;
+  authenticate: (promptMessage: string, mode: VaultCredentialMode) => Promise<{ success: boolean; error?: string }>;
+  ensureKey: () => Promise<void>;
+  deleteKey: () => Promise<void>;
+  isKeyAvailable: () => Promise<boolean>;
+};
+
+const { NexusVault } = NativeModules;
+
+function nativeSecurity(): NativeVaultSecurity {
+  if (Platform.OS === 'android' && NexusVault) return NexusVault as NativeVaultSecurity;
+  throw new Error('Native Nexus Vault security module is unavailable.');
+}
+
 export async function getBiometricCapability(): Promise<{
   hardware: boolean;
   enrolled: boolean;
   securityLevel: 'strong' | 'weak' | 'none';
 }> {
-  const hardware = await LocalAuthentication.hasHardwareAsync();
-  const enrolled = await LocalAuthentication.isEnrolledAsync();
-
-  if (!hardware || !enrolled) return { hardware, enrolled, securityLevel: 'none' };
-
-  const level = await LocalAuthentication.getEnrolledLevelAsync();
-  return {
-    hardware,
-    enrolled,
-    securityLevel: level === LocalAuthentication.SecurityLevel.BIOMETRIC_STRONG ? 'strong' : 'weak',
-  };
+  if (Platform.OS === 'android') return nativeSecurity().getBiometricCapability();
+  return { hardware: false, enrolled: false, securityLevel: 'none' };
 }
 
 export async function authenticateVault(
   promptMessage = 'Unlock Nexus Biometric Vault',
   mode: VaultCredentialMode = 'biometric-only',
-): Promise<LocalAuthentication.LocalAuthenticationResult> {
-  const capability = await getBiometricCapability();
-
-  if (!capability.hardware) throw new Error('Biometric hardware is not available on this device.');
-  if (!capability.enrolled) throw new Error('No biometric credential is enrolled on this device.');
-  if (capability.securityLevel !== 'strong') throw new Error('A strong biometric credential is required for the vault.');
-
-  return LocalAuthentication.authenticateAsync({
-    promptMessage,
-    fallbackLabel: mode === 'device-auth' ? 'Use device passcode' : '',
-    cancelLabel: 'Cancel',
-    disableDeviceFallback: mode === 'biometric-only',
-    biometricsSecurityLevel: 'strong',
-  });
+): Promise<{ success: boolean; error?: string }> {
+  if (Platform.OS === 'android') return nativeSecurity().authenticate(promptMessage, mode);
+  throw new Error('A platform-native Vault authentication provider is required.');
 }
 
 export async function enrollStrongBiometric(): Promise<boolean> {
-  const capability = await getBiometricCapability();
-  if (!capability.hardware) throw new Error('This device has no supported biometric hardware.');
-  if (!capability.enrolled) throw new Error('Enroll a fingerprint or face credential in Android Settings first.');
-  if (capability.securityLevel !== 'strong') throw new Error('The enrolled biometric is not strong enough for the vault.');
-
-  const result = await LocalAuthentication.authenticateAsync({
-    promptMessage: 'Register this biometric for Nexus Biometric Vault',
-    fallbackLabel: '',
-    cancelLabel: 'Cancel',
-    disableDeviceFallback: true,
-    biometricsSecurityLevel: 'strong',
-  });
-
+  const result = await authenticateVault('Register this biometric for Nexus Biometric Vault', 'biometric-only');
   return result.success;
 }
 
@@ -72,42 +54,49 @@ export async function disableVaultScreenProtection(): Promise<void> {
   await ScreenCapture.disableAppSwitcherProtectionAsync();
 }
 
-export async function saveVaultMasterKey(keyBase64: string): Promise<void> {
-  await SecureStore.setItemAsync(VAULT_KEY_ALIAS, keyBase64, {
-    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-    requireAuthentication: true,
-  });
+export async function saveVaultMasterKey(_keyBase64?: string): Promise<void> {
+  if (Platform.OS === 'android') return nativeSecurity().ensureKey();
+  throw new Error('A platform-native Vault key provider is required.');
 }
 
 export async function loadVaultMasterKey(): Promise<string | null> {
-  return SecureStore.getItemAsync(VAULT_KEY_ALIAS, { requireAuthentication: true });
+  if (Platform.OS === 'android') return (await nativeSecurity().isKeyAvailable()) ? '__native_keystore_key__' : null;
+  return null;
 }
 
 export async function deleteVaultMasterKey(): Promise<void> {
-  await SecureStore.deleteItemAsync(VAULT_KEY_ALIAS);
+  if (Platform.OS === 'android') return nativeSecurity().deleteKey();
+  throw new Error('A platform-native Vault key provider is required.');
 }
 
 export async function saveVaultMeta(meta: string): Promise<void> {
-  await SecureStore.setItemAsync(VAULT_META_KEY, meta, {
-    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-  });
+  if (Platform.OS !== 'android') throw new Error('A platform-native Vault storage provider is required.');
+  // Metadata persistence remains in the existing platform storage layer during migration.
+  const storage = require('@react-native-async-storage/async-storage');
+  await storage.default.setItem(VAULT_META_KEY, meta);
 }
 
 export async function loadVaultMeta(): Promise<string | null> {
-  return SecureStore.getItemAsync(VAULT_META_KEY);
+  if (Platform.OS !== 'android') return null;
+  const storage = require('@react-native-async-storage/async-storage');
+  return storage.default.getItem(VAULT_META_KEY);
 }
 
 export async function deleteVaultMeta(): Promise<void> {
-  await SecureStore.deleteItemAsync(VAULT_META_KEY);
+  if (Platform.OS !== 'android') return;
+  const storage = require('@react-native-async-storage/async-storage');
+  await storage.default.removeItem(VAULT_META_KEY);
 }
 
 export async function saveVaultCredentialMode(mode: VaultCredentialMode): Promise<void> {
-  await SecureStore.setItemAsync(VAULT_CREDENTIAL_MODE_KEY, mode, {
-    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-  });
+  if (Platform.OS !== 'android') throw new Error('A platform-native Vault storage provider is required.');
+  const storage = require('@react-native-async-storage/async-storage');
+  await storage.default.setItem(VAULT_CREDENTIAL_MODE_KEY, mode);
 }
 
 export async function loadVaultCredentialMode(): Promise<VaultCredentialMode> {
-  const mode = await SecureStore.getItemAsync(VAULT_CREDENTIAL_MODE_KEY);
+  if (Platform.OS !== 'android') return 'biometric-only';
+  const storage = require('@react-native-async-storage/async-storage');
+  const mode = await storage.default.getItem(VAULT_CREDENTIAL_MODE_KEY);
   return mode === 'device-auth' ? 'device-auth' : 'biometric-only';
 }
