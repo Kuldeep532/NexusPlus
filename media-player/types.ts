@@ -1,4 +1,5 @@
 export type MediaKind = 'audio' | 'video';
+export type MediaSource = 'local' | 'radio' | 'youtube-music';
 export type RepeatMode = 'off' | 'one' | 'all';
 
 export interface SubtitleCue {
@@ -20,6 +21,7 @@ export interface MediaItemModel {
   id: string;
   uri: string;
   kind: MediaKind;
+  source?: MediaSource;
   title: string;
   artist?: string;
   album?: string;
@@ -54,6 +56,19 @@ export interface MediaLibraryState {
   audio: MediaItemModel[];
   video: MediaItemModel[];
   error?: string;
+}
+
+export interface MediaPlaylist {
+  id: string;
+  name: string;
+  itemIds: string[];
+  isDevicePlaylist?: boolean;
+}
+
+export interface MediaCollections {
+  tracks: MediaItemModel[];
+  albums: Array<{ id: string; title: string; artist?: string; artworkUri?: string; trackIds: string[] }>;
+  playlists: MediaPlaylist[];
 }
 
 export interface LocalMediaAi {
