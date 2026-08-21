@@ -9,7 +9,6 @@ export interface PaymentAnnouncementSession {
   preferredTtsProvider: PaymentAnnouncementTtsProvider;
   speechRate: number;
   speechPitch: number;
-  verifier?: PaymentEventVerifier;
 }
 
 export async function acceptIncomingPaymentEvent(
@@ -27,8 +26,8 @@ export async function acceptIncomingPaymentEvent(
 }
 
 /**
- * Background announcements intentionally do not require the UI biometric session.
- * The upstream event verifier remains the security boundary for financial events.
+ * Background announcements intentionally do not require UI biometric access.
+ * Financial trust is enforced before queuing by the provider-specific verifier.
  */
 export async function announceNextPayment(session: PaymentAnnouncementSession): Promise<PaymentEvent | null> {
   if (!session.enabled) return null;
