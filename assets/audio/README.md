@@ -1,15 +1,12 @@
-# Nexus Plus Audio Assets
+# Audio assets
 
-Place the bundled app audio files in this directory using these exact filenames:
+Audio assets are organized by feature so each feature owns its sounds:
 
-- `document_processing.mp3` — document/PDF processing feedback
-- `notification.mp3` — generic app notification sound
-- `low_battery.mp3` — low-battery announcement cue
-- `time_assisted_beep.mp3` — Time Assisted announcement cue
-- `pageflip.mp3` — Book Reader page-turn cue
-- `selfie_shutter_nexus_01.mp3` — Selfie camera shutter cue
-- `full_charge.mp3` — fully-charged battery cue
+- `time-announcer/` — time announcement and alarm sounds
+- `selfie/` — selfie shutter sounds
+- `media-player/` — local media/player UI sounds
+- `online-radio/` — radio-related audio cues
+- `battery-announcer/` — battery announcement cues
+- `shared/` — only for an asset intentionally shared by multiple features
 
-These are intentionally named with lowercase, underscore-separated filenames so Android and Metro/Expo asset resolution stay predictable.
-
-The actual binary audio files are not committed by this change; upload the seven files from the supplied sound ZIP manually into this directory.
+This repository currently has no binary audio assets checked in. Add future audio directly to the appropriate feature directory instead of restoring a flat asset layout.
