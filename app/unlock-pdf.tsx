@@ -1,8 +1,9 @@
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import { Stack } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -18,8 +19,16 @@ export default function UnlockPdfScreen() {
   const [result, setResult] = useState<ProtectPdfResult | null>(null);
   const [status, setStatus] = useState('');
 
+  const cleanupResult = async (uri?: string) => {
+    if (!uri || !uri.startsWith(FileSystem.cacheDirectory ?? '___never___')) return;
+    try { await FileSystem.deleteAsync(uri, { idempotent: true }); } catch { /* best effort */ }
+  };
+
+  useEffect(() => () => { void cleanupResult(result?.uri); setPassword(''); }, [result?.uri]);
+
   async function pickPdf() {
     setStatus('');
+    await cleanupResult(result?.uri);
     setResult(null);
     const picked = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', multiple: false, copyToCacheDirectory: true });
     if (picked.canceled || !picked.assets?.[0]) return;
@@ -34,6 +43,7 @@ export default function UnlockPdfScreen() {
       return;
     }
     setBusy(true);
+    await cleanupResult(result?.uri);
     setResult(null);
     setStatus('Removing PDF password protection…');
     try {
@@ -41,20 +51,26 @@ export default function UnlockPdfScreen() {
       setResult(unlocked);
       setPassword('');
       setStatus('PDF unlocked successfully.');
-    } catch (error) {
+    } catch {
       setPassword('');
-      setStatus(error instanceof Error ? error.message : 'Could not unlock this PDF.');
+      setStatus('Could not unlock this PDF.');
     } finally {
       setBusy(false);
     }
   }
 
   async function share() {
-    if (!result || !(await Sharing.isAvailableAsync())) return;
-    await Sharing.shareAsync(result.uri, { mimeType: 'application/pdf', dialogTitle: 'Share unlocked PDF' });
+    if (!result) return;
+    try {
+      if (!(await Sharing.isAvailableAsync())) return;
+      await Sharing.shareAsync(result.uri, { mimeType: 'application/pdf', dialogTitle: 'Share unlocked PDF' });
+    } catch {
+      Alert.alert('Share unavailable', 'The unlocked PDF could not be shared.');
+    }
   }
 
-  function reset() {
+  async function reset() {
+    await cleanupResult(result?.uri);
     setPdf(null);
     setPassword('');
     setResult(null);
@@ -62,7 +78,7 @@ export default function UnlockPdfScreen() {
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View style={[styles.root, { backgroundColor: colors.background }]}> 
       <Stack.Screen options={{ title: 'Unlock PDF' }} />
       {busy ? (
         <View style={styles.loading}>
@@ -77,7 +93,7 @@ export default function UnlockPdfScreen() {
             <View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Unlock PDF</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Remove password protection after entering the correct password.</Text></View>
           </View>
 
-          <Pressable accessibilityRole="button" accessibilityLabel={pdf ? `Selected PDF ${pdf.name}` : 'Choose PDF'} onPress={pickPdf} style={({ pressed }) => [styles.pick, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={pdf ? `Selected PDF ${pdf.name}` : 'Choose PDF'} onPress={() => void pickPdf()} style={({ pressed }) => [styles.pick, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]}>
             <Feather name="file-plus" size={20} color={colors.primary} />
             <View style={styles.pickText}><Text style={[styles.pickTitle, { color: colors.foreground }]}>{pdf ? pdf.name : 'Choose password-protected PDF'}</Text><Text style={[styles.pickDetail, { color: colors.mutedForeground }]}>{pdf ? 'Ready to unlock' : 'Select a local PDF file'}</Text></View>
             <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
@@ -88,7 +104,7 @@ export default function UnlockPdfScreen() {
               <Text style={[styles.label, { color: colors.foreground }]}>Current password</Text>
               <TextInput accessibilityLabel="Current PDF password" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} textContentType="password" style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
               <Text style={[styles.hint, { color: colors.mutedForeground }]}>The password is only held in memory for this operation and is not written to logs or ordinary storage.</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="Unlock PDF" onPress={unlock} disabled={!password} style={({ pressed }) => [styles.primary, { backgroundColor: colors.primary }, (pressed || !password) && styles.disabled]}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Unlock PDF" onPress={() => void unlock()} disabled={!password} style={({ pressed }) => [styles.primary, { backgroundColor: colors.primary }, (pressed || !password) && styles.disabled]}>
                 <MaterialCommunityIcons name="lock-open-outline" size={19} color={colors.primaryForeground} /><Text style={[styles.primaryText, { color: colors.primaryForeground }]}>Unlock PDF</Text>
               </Pressable>
             </>
@@ -98,9 +114,9 @@ export default function UnlockPdfScreen() {
 
           {result && (
             <View style={styles.actions}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Share unlocked PDF" onPress={share} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="share-2" size={18} color={colors.primary} /><Text style={[styles.actionText, { color: colors.foreground }]}>Share</Text></Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Unlock another PDF" onPress={reset} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="refresh-cw" size={18} color={colors.primary} /><Text style={[styles.actionText, { color: colors.foreground }]}>Unlock Another</Text></Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Done" onPress={reset} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="check" size={18} color={colors.primary} /><Text style={[styles.actionText, { color: colors.foreground }]}>Done</Text></Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Share unlocked PDF" onPress={() => void share()} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="share-2" size={18} color={colors.primary} /><Text style={[styles.actionText, { color: colors.foreground }]}>Share</Text></Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Unlock another PDF" onPress={() => void reset()} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="refresh-cw" size={18} color={colors.primary} /><Text style={[styles.actionText, { color: colors.foreground }]}>Unlock Another</Text></Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Done" onPress={() => void reset()} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="check" size={18} color={colors.primary} /><Text style={[styles.actionText, { color: colors.foreground }]}>Done</Text></Pressable>
             </View>
           )}
         </ScrollView>
