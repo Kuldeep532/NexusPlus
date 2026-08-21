@@ -1,16 +1,9 @@
-import 'pdfnative';
-
 /**
- * pdfnative expects TextEncoder/TextDecoder in React Native.
- * The project already carries @stardazed/streams-text-encoding; this module
- * installs the standards-compatible implementations once when available.
+ * Legacy pdfnative runtime marker.
+ *
+ * Android Stage 2 now uses the shared NexusPdfNative React Native module
+ * backed by PDFBox-Android. This file intentionally keeps the legacy
+ * runtime import isolated so iOS or a future alternate PDF backend can be
+ * restored without changing Protect-PDF business logic.
  */
-import { TextEncoder, TextDecoder } from '@stardazed/streams-text-encoding';
-
-const globalObject = globalThis as typeof globalThis & {
-  TextEncoder?: typeof TextEncoder;
-  TextDecoder?: typeof TextDecoder;
-};
-
-if (!globalObject.TextEncoder) globalObject.TextEncoder = TextEncoder;
-if (!globalObject.TextDecoder) globalObject.TextDecoder = TextDecoder;
+export {};
