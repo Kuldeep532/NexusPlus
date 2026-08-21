@@ -18,11 +18,11 @@ async function getPyttsAdapter(): Promise<PaymentAnnouncerTtsAdapter | null> {
   if (!installed) return null;
 
   // The downloaded voice sheet is the supported local voice source. The actual
-  // inference bridge is wired in the voice-engine implementation in the next stage.
+  // inference bridge must remain inside the app's verified voice engine adapter.
   return {
     isAvailable: async () => Boolean(installed.modelPath && installed.configPath),
     speak: async () => {
-      throw new Error('Local voice engine is not wired yet.');
+      throw new Error('Verified local voice engine adapter is required.');
     },
     stop: async () => undefined,
   };
@@ -31,12 +31,10 @@ async function getPyttsAdapter(): Promise<PaymentAnnouncerTtsAdapter | null> {
 async function getAndroidDefaultAdapter(): Promise<PaymentAnnouncerTtsAdapter | null> {
   if (Platform.OS !== 'android') return null;
 
-  // Android TTS bridge is intentionally deferred until the app's existing native
-  // speech integration is verified. This avoids shipping an unverified engine.
   return {
     isAvailable: async () => false,
     speak: async () => {
-      throw new Error('Android default TTS bridge is not wired yet.');
+      throw new Error('Verified Android TTS adapter is required.');
     },
     stop: async () => undefined,
   };
