@@ -20,6 +20,8 @@ android {
         targetSdk 35
         versionCode 1
         versionName '1.0.0'
+        def integrityProject = project.findProperty('PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER') ?: '0'
+        buildConfigField 'long', 'PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER', integrityProject
         externalNativeBuild {
             cmake {
                 cppFlags "-std=c++20"
