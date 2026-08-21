@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import type { Alarm } from './timeAnnouncerTypes';
 
 export const ALARM_CHANNEL_ID = 'nexus-alarm';
+export const ALARM_NOTIFICATION_SOUND = 'notification';
 
 export async function configureAlarmNotifications(): Promise<void> {
   await Notifications.setNotificationHandler({
@@ -16,7 +17,7 @@ export async function configureAlarmNotifications(): Promise<void> {
   await Notifications.setNotificationChannelAsync(ALARM_CHANNEL_ID, {
     name: 'Alarms',
     importance: Notifications.AndroidImportance.MAX,
-    sound: 'default',
+    sound: ALARM_NOTIFICATION_SOUND,
     vibrationPattern: [0, 250, 200, 250],
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
   });
@@ -35,15 +36,16 @@ export async function scheduleAlarm(alarm: Alarm): Promise<string> {
 
   const weekdays = alarm.weekdays.length ? [...new Set(alarm.weekdays)] : [];
   const ids: string[] = [];
+  const content = {
+    title: alarm.label || 'Alarm',
+    body: 'Alarm is ringing.',
+    sound: ALARM_NOTIFICATION_SOUND,
+    data: { type: 'nexus-alarm', alarmId: alarm.id },
+  };
 
   if (weekdays.length === 0) {
     const id = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: alarm.label || 'Alarm',
-        body: 'Alarm is ringing.',
-        sound: 'default',
-        data: { type: 'nexus-alarm', alarmId: alarm.id },
-      },
+      content,
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour: alarm.hour,
@@ -55,12 +57,7 @@ export async function scheduleAlarm(alarm: Alarm): Promise<string> {
   } else {
     for (const weekday of weekdays) {
       const id = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: alarm.label || 'Alarm',
-          body: 'Alarm is ringing.',
-          sound: 'default',
-          data: { type: 'nexus-alarm', alarmId: alarm.id, weekday },
-        },
+        content: { ...content, data: { ...content.data, weekday } },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
           weekday,
