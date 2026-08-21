@@ -1,38 +1,43 @@
-# Payment Announcer — Stage 1
+# Payment Announcer — Phase 2
 
-Stage 1 establishes the security and architecture boundary for Payment Announcer.
+Phase 2 adds the protected UI/session layer and connects Payment Announcer to the existing Biometric Vault backend.
 
-## Security requirements
+## Biometric model
 
-- Payment Announcer requires an enrolled Android `BIOMETRIC_STRONG` authenticator.
-- Device PIN/pattern/password fallback is intentionally not accepted for this feature.
-- The feature must not expose payment content before successful authentication.
-- Screen capture and recent-apps preview protection are enabled while the protected feature is active.
-- Payment transaction/network logic is not included in Stage 1.
+Payment Announcer does not create, store, or enroll a second biometric. It calls the existing Android Vault backend and uses the same Android `BiometricPrompt` enrollment already managed by Biometric Vault.
 
-## TTS architecture
+- Existing strong biometric in Vault: Payment Announcer can use it immediately.
+- No strong biometric available: setup remains blocked until the user enrolls one through Biometric Vault.
+- Payment Announcer never accepts device credentials as a fallback.
+- There is no fingerprint/face template duplication between features.
 
-The feature uses a provider abstraction with this priority:
+## First-run setup
 
-1. `pytts-voice-sheet` when the supported in-app voice sheet is actually available.
-2. Android default TTS as fallback.
+The first Payment Announcer open requires biometric verification. Successful verification marks the feature as set up and opens a short-lived protected session.
 
-No provider is treated as available until its adapter reports availability.
+## Session security
+
+- Locks on backgrounding.
+- Auto-locks after the configured timeout.
+- Screenshot/recent-app preview protection is enabled while unlocked.
+- Payment controls are hidden while locked.
+
+## UI
+
+The new route provides:
+
+- First-run secure setup.
+- Locked/unlocked state.
+- Biometric protection status.
+- Announcement enable/disable control.
+- Preferred voice strategy display.
+- Voice availability check.
+- Explicit lock action.
 
 ## Settings
 
-Payment Announcer settings belong to the normal app settings surface. They are not designed as a separate Tools-specific settings page.
+Payment Announcer settings remain feature settings and are intended to be surfaced inside the app's normal Settings surface. They are stored locally with validation and bounded values.
 
-Stage 1 defines the persisted settings model but does not yet wire a new UI screen or persistence implementation.
+## Payment data boundary
 
-## Not included yet
-
-- Real incoming-payment data model.
-- Notification receiver/service.
-- Sender/recipient identity handling.
-- Transaction verification or anti-spoofing protocol.
-- TTS engine implementation.
-- Dedicated settings UI.
-- Background announcement scheduling.
-
-These are reserved for later stages after the security boundary is reviewed.
+Phase 2 deliberately does not accept arbitrary payment identity, amount, or transaction data from the UI. A real notification/payment source must be authenticated and validated in a later stage before spoken announcements are enabled for production use.
