@@ -49,7 +49,14 @@ export interface VaultRepositorySnapshot {
 export async function initializeVault(): Promise<void> {
   const existingKey = await loadVaultMasterKey();
   const existingMeta = await loadVaultMeta();
+
   if (existingKey && existingMeta) return;
+  if (!existingKey && existingMeta) {
+    throw new Error('Vault key is missing while encrypted Vault data still exists.');
+  }
+  if (existingKey && !existingMeta) {
+    throw new Error('Vault metadata is missing while the Vault key still exists.');
+  }
 
   await generateVaultKey();
   const aad = buildVaultAad(DEFAULT_KEY_VERSION);
@@ -73,16 +80,24 @@ export async function initializeVault(): Promise<void> {
   };
 
   await saveVaultMasterKey();
-  await saveVaultMeta(serializeEnvelope(envelope));
+  try {
+    await saveVaultMeta(serializeEnvelope(envelope));
+  } catch (error) {
+    await deleteVaultMasterKey().catch(() => undefined);
+    throw error;
+  }
 }
 
 export async function readVault(): Promise<VaultRepositorySnapshot> {
   const keyAvailable = await loadVaultMasterKey();
   const rawEnvelope = await loadVaultMeta();
 
-  if (!keyAvailable || !rawEnvelope) {
+  if (!keyAvailable && !rawEnvelope) {
     await initializeVault();
     return readVault();
+  }
+  if (!keyAvailable || !rawEnvelope) {
+    throw new Error('Vault integrity state is invalid. Vault remains locked.');
   }
 
   const envelope = parseEnvelope(rawEnvelope);
