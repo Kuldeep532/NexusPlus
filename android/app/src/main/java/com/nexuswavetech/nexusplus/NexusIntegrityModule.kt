@@ -21,13 +21,16 @@ class NexusIntegrityModule(private val reactContext: ReactApplicationContext) : 
         try {
             val normalized = requestHash.trim()
             require(normalized.isNotEmpty()) { "Request hash is required." }
+            val projectNumber = com.nexuswavetech.nexusplus.BuildConfig.PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER
+            require(projectNumber > 0L) { "Play Integrity cloud project is not configured." }
+
             val digest = MessageDigest.getInstance("SHA-256")
                 .digest(normalized.toByteArray(Charsets.UTF_8))
             val encodedHash = Base64.getUrlEncoder().withoutPadding().encodeToString(digest)
 
             val manager = IntegrityManagerFactory.create(reactContext)
             val request = IntegrityTokenRequest.builder()
-                .setCloudProjectNumber(0L)
+                .setCloudProjectNumber(projectNumber)
                 .setNonce(encodedHash)
                 .build()
 
