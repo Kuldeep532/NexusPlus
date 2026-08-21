@@ -3,6 +3,13 @@ name: Android APK
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -25,9 +32,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: pnpm
 
       - name: Enable Corepack
         run: corepack enable
+
+      - name: Install pnpm
+        run: corepack prepare pnpm@9.15.4 --activate
 
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
@@ -37,18 +48,20 @@ jobs:
 
       - name: Validate Android host
         run: |
+          set -euo pipefail
           test -f android/settings.gradle
           test -f android/app/build.gradle
           test -f android/gradlew
           test -f app.json
           test -f package.json
+          test -f pnpm-lock.yaml
           echo "Root Android host and Expo app detected."
 
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
       - name: Build debug APK
-        run: ./android/gradlew -p android assembleDebug --stacktrace --no-daemon
+        run: ./android/gradlew -p android assembleDebug --stacktrace --no-daemon --warning-mode all
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
