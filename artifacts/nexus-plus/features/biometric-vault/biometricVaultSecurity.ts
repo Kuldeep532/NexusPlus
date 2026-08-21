@@ -13,6 +13,11 @@ type NativeVaultSecurity = {
   ensureKey: () => Promise<void>;
   deleteKey: () => Promise<void>;
   isKeyAvailable: () => Promise<boolean>;
+  saveMetadata: (value: string) => Promise<void>;
+  loadMetadata: () => Promise<string | null>;
+  deleteMetadata: () => Promise<void>;
+  saveCredentialMode: (mode: VaultCredentialMode) => Promise<void>;
+  loadCredentialMode: () => Promise<VaultCredentialMode>;
 };
 
 const { NexusVault } = NativeModules;
@@ -70,33 +75,25 @@ export async function deleteVaultMasterKey(): Promise<void> {
 }
 
 export async function saveVaultMeta(meta: string): Promise<void> {
-  if (Platform.OS !== 'android') throw new Error('A platform-native Vault storage provider is required.');
-  // Metadata persistence remains in the existing platform storage layer during migration.
-  const storage = require('@react-native-async-storage/async-storage');
-  await storage.default.setItem(VAULT_META_KEY, meta);
+  if (Platform.OS === 'android') return nativeSecurity().saveMetadata(meta);
+  throw new Error('A platform-native Vault storage provider is required.');
 }
 
 export async function loadVaultMeta(): Promise<string | null> {
-  if (Platform.OS !== 'android') return null;
-  const storage = require('@react-native-async-storage/async-storage');
-  return storage.default.getItem(VAULT_META_KEY);
+  if (Platform.OS === 'android') return nativeSecurity().loadMetadata();
+  return null;
 }
 
 export async function deleteVaultMeta(): Promise<void> {
-  if (Platform.OS !== 'android') return;
-  const storage = require('@react-native-async-storage/async-storage');
-  await storage.default.removeItem(VAULT_META_KEY);
+  if (Platform.OS === 'android') return nativeSecurity().deleteMetadata();
 }
 
 export async function saveVaultCredentialMode(mode: VaultCredentialMode): Promise<void> {
-  if (Platform.OS !== 'android') throw new Error('A platform-native Vault storage provider is required.');
-  const storage = require('@react-native-async-storage/async-storage');
-  await storage.default.setItem(VAULT_CREDENTIAL_MODE_KEY, mode);
+  if (Platform.OS === 'android') return nativeSecurity().saveCredentialMode(mode);
+  throw new Error('A platform-native Vault storage provider is required.');
 }
 
 export async function loadVaultCredentialMode(): Promise<VaultCredentialMode> {
-  if (Platform.OS !== 'android') return 'biometric-only';
-  const storage = require('@react-native-async-storage/async-storage');
-  const mode = await storage.default.getItem(VAULT_CREDENTIAL_MODE_KEY);
-  return mode === 'device-auth' ? 'device-auth' : 'biometric-only';
+  if (Platform.OS === 'android') return nativeSecurity().loadCredentialMode();
+  return 'biometric-only';
 }
