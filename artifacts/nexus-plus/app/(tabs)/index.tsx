@@ -11,6 +11,7 @@ type Feature = { key: string; title: string; icon: React.ComponentProps<typeof M
 
 const features: Feature[] = [
   { key: 'reader', title: 'Book Reader', icon: 'book-open-page-variant', route: '/reader' },
+  { key: 'media-player', title: 'Advanced Media Player', icon: 'play-circle', route: '/media-player' },
   { key: 'vault', title: 'Biometric Vault', icon: 'shield-lock', route: '/biometric-vault' },
   { key: 'utilities', title: 'Utilities', icon: 'tools', route: '/utilities' },
   { key: 'pdf-tools', title: 'PDF Tools', icon: 'file-pdf-box', route: '/pdf-tools' },

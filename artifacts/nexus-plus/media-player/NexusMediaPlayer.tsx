@@ -1,129 +1,117 @@
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import React, { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { ReturnType } from 'react';
-import type { MediaItemModel, RepeatMode } from './types';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { AccessibilityInfo, Alert, FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { VideoView } from 'expo-video';
+import { scanLocalMedia, buildCollections } from './library';
+import { createPlaylist, loadDevicePlaylists } from './playlists';
+import { isYouTubeMusicInstalled, openYouTubeMusicSearch, searchYouTubeMusic, handoffYouTubeMusic, type YouTubeMusicSearchResult } from './youtubeMusic';
+import { vocalRemoverService } from './vocal-remover/VocalRemoverService';
+import { findActiveCue, formatTime, parseSrt } from './subtitles';
+import { useMediaPlayer } from './useMediaPlayer';
+import type { MediaItemModel, SubtitleCue } from './types';
 
-function formatTime(valueMs: number): string {
-  const total = Math.max(0, Math.floor(valueMs / 1000));
-  const seconds = total % 60;
-  const minutes = Math.floor(total / 60) % 60;
-  const hours = Math.floor(total / 3600);
-  return hours ? `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}` : `${minutes}:${String(seconds).padStart(2, '0')}`;
+type Props = { initialItems?: MediaItemModel[]; onBack?: () => void };
+type LibraryTab = 'tracks' | 'albums' | 'playlists';
+type MediaTab = 'audio' | 'video';
+type Screen = 'library' | 'player';
+
+function Button({ label, hint, onPress, text, selected = false }: { label: string; hint?: string; onPress: () => void; text: string; selected?: boolean }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityHint={hint} onPress={onPress} style={({ pressed }) => [styles.button, selected && styles.selectedButton, pressed && styles.pressed]}><Text accessible={false} style={styles.buttonText}>{text}</Text></Pressable>;
 }
 
-function Button({ label, icon, onPress, selected }: { label: string; icon: React.ComponentProps<typeof Feather>['name']; onPress: () => void; selected?: boolean }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={selected !== undefined ? { selected } : undefined}
-      onPress={onPress}
-      style={({ pressed }) => [styles.iconButton, selected && styles.selectedButton, pressed && styles.pressed]}
-    >
-      <Feather name={icon} size={21} color="currentColor" />
-    </Pressable>
-  );
-}
+export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
+  const [library, setLibrary] = useState<MediaItemModel[]>(initialItems);
+  const [screen, setScreen] = useState<Screen>('library');
+  const [mediaTab, setMediaTab] = useState<MediaTab>('audio');
+  const [libraryTab, setLibraryTab] = useState<LibraryTab>('tracks');
+  const [query, setQuery] = useState('');
+  const [youtubeQuery, setYoutubeQuery] = useState('');
+  const [youtubeResults, setYoutubeResults] = useState<YouTubeMusicSearchResult[]>([]);
+  const [youtubeInstalled, setYoutubeInstalled] = useState(false);
+  const [playlists, setPlaylists] = useState<Awaited<ReturnType<typeof loadDevicePlaylists>>>([]);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
+  const [subtitleCues, setSubtitleCues] = useState<SubtitleCue[]>([]);
+  const [vocalBusy, setVocalBusy] = useState(false);
+  const [vocalProgress, setVocalProgress] = useState(0);
+  const [vocalMode, setVocalMode] = useState<'instrumental' | 'vocals'>('instrumental');
+  const player = useMediaPlayer(library);
 
-export function NexusMediaPlayer({ player }: { player: ReturnType<any> }) {
-  const state = player.state;
-  const current = state.current as MediaItemModel | null;
-  const progress = state.durationMs > 0 ? Math.min(1, state.positionMs / state.durationMs) : 0;
-  const activeSubtitle = useMemo(() => current?.subtitles?.find((cue) => state.positionMs >= cue.startMs && state.positionMs <= cue.endMs)?.text ?? '', [current?.subtitles, state.positionMs]);
+  const refresh = useCallback(async () => {
+    const result = await scanLocalMedia();
+    const merged = [...result.audio, ...result.video];
+    setLibrary(merged);
+    player.updateQueue(merged);
+    setPlaylists(await loadDevicePlaylists());
+  }, [player]);
 
-  return (
-    <View style={styles.root}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View accessibilityRole="header" style={styles.header}>
-          <View style={styles.badge}><MaterialCommunityIcons name={current?.kind === 'video' ? 'video-outline' : 'music-note-outline'} size={18} color="#FFFFFF" /></View>
-          <View style={styles.headerCopy}>
-            <Text style={styles.kicker}>NEXUS MEDIA</Text>
-            <Text style={styles.title}>Audio and Video Player</Text>
-          </View>
-        </View>
+  useEffect(() => { void refresh(); void isYouTubeMusicInstalled().then(setYoutubeInstalled); }, [refresh]);
+  useEffect(() => { if (player.state.current) void AccessibilityInfo.announceForAccessibility(`Playing ${player.state.current.title}`); }, [player.state.current?.id]);
 
-        {current?.kind === 'video' ? (
-          <View style={styles.videoPlaceholder} accessibilityLabel={`Video area for ${current.title}`}>
-            <MaterialCommunityIcons name="play-circle-outline" size={64} color="#FFFFFF" />
-            {activeSubtitle ? <Text accessibilityLiveRegion="polite" style={styles.subtitle}>{activeSubtitle}</Text> : null}
-          </View>
-        ) : (
-          <View style={styles.artworkPlaceholder} accessibilityLabel={current ? `Audio artwork for ${current.title}` : 'No audio selected'}>
-            <MaterialCommunityIcons name="music-box-multiple-outline" size={72} color="#FFFFFF" />
-          </View>
-        )}
+  const audio = useMemo(() => library.filter((item) => item.kind === 'audio'), [library]);
+  const video = useMemo(() => library.filter((item) => item.kind === 'video'), [library]);
+  const collections = useMemo(() => buildCollections(audio, playlists), [audio, playlists]);
+  const visibleTracks = useMemo(() => {
+    const source = mediaTab === 'audio' ? audio : video;
+    const needle = query.trim().toLowerCase();
+    return needle ? source.filter((item) => [item.title, item.artist, item.album].some((v) => v?.toLowerCase().includes(needle))) : source;
+  }, [audio, video, mediaTab, query]);
+  const current = player.state.current;
+  const isRadio = current?.source === 'radio';
+  const canVocalRemove = current?.kind === 'audio' && !isRadio && (current.source ?? 'local') === 'local';
+  const activeCue = findActiveCue(subtitleCues, player.state.positionMs);
 
-        <View style={styles.nowPlaying}>
-          <Text style={styles.currentTitle} numberOfLines={2}>{current?.title ?? 'Select media from your library'}</Text>
-          <Text style={styles.currentMeta} numberOfLines={1}>{current?.artist ?? 'Nexus Media Player'}</Text>
-        </View>
+  const loadItem = useCallback((item: MediaItemModel, queue = library) => { player.load(item, queue); setScreen('player'); }, [library, player]);
 
-        <View accessibilityLabel={`Playback progress ${formatTime(state.positionMs)} of ${formatTime(state.durationMs)}`} style={styles.progressArea}>
-          <View style={styles.track}><View style={[styles.fill, { width: `${progress * 100}%` }]} /></View>
-          <View style={styles.times}><Text style={styles.time}>{formatTime(state.positionMs)}</Text><Text style={styles.time}>{formatTime(state.durationMs)}</Text></View>
-        </View>
+  const runVocalRemoval = useCallback(async () => {
+    if (!current || !canVocalRemove) return;
+    setVocalBusy(true);
+    try {
+      const result = await vocalRemoverService.removeVocals(current, { outputStem: vocalMode, quality: 'studio' }, (job) => setVocalProgress(job.progress));
+      const derived: MediaItemModel = { ...current, id: `${current.id}:${result.stem}:${Date.now()}`, uri: result.outputUri, title: `${current.title} — ${result.stem === 'instrumental' ? 'Instrumental' : 'Vocals'}`, source: 'local' };
+      loadItem(derived, [derived]);
+      void AccessibilityInfo.announceForAccessibility('Vocal separation completed');
+    } catch (error) { Alert.alert('Vocal Remover', error instanceof Error ? error.message : 'Vocal separation failed.'); }
+    finally { setVocalBusy(false); setVocalProgress(0); }
+  }, [canVocalRemove, current, loadItem, vocalMode]);
 
-        <View style={styles.controls}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Previous media" onPress={player.previous} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}><Feather name="skip-back" size={22} color="#FFFFFF" /></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel={state.isPlaying ? 'Pause' : 'Play'} onPress={player.toggle} style={({ pressed }) => [styles.playButton, pressed && styles.pressed]}><Feather name={state.isPlaying ? 'pause' : 'play'} size={25} color="#FFFFFF" /></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Next media" onPress={player.next} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}><Feather name="skip-forward" size={22} color="#FFFFFF" /></Pressable>
-        </View>
+  const savePlaylist = useCallback(async () => {
+    try {
+      const playlist = await createPlaylist(newPlaylistName);
+      setPlaylists((items) => [...items, playlist]);
+      setNewPlaylistName('');
+      setShowCreatePlaylist(false);
+      void AccessibilityInfo.announceForAccessibility(`Playlist ${playlist.name} created`);
+    } catch (error) { Alert.alert('Playlist', error instanceof Error ? error.message : 'Could not create playlist.'); }
+  }, [newPlaylistName]);
 
-        <View style={styles.secondaryControls}>
-          <Pressable accessibilityRole="button" accessibilityLabel={`Repeat mode ${state.repeat}`} onPress={() => player.setRepeat(state.repeat === 'off' ? 'all' : state.repeat === 'all' ? 'one' : 'off')} style={styles.secondaryButton}><Feather name="repeat" size={19} color="#FFFFFF" /><Text style={styles.secondaryText}>{state.repeat === 'off' ? 'Repeat' : state.repeat === 'all' ? 'Repeat all' : 'Repeat one'}</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel={state.shuffle ? 'Disable shuffle' : 'Enable shuffle'} onPress={() => player.setShuffle(!state.shuffle)} style={styles.secondaryButton}><Feather name="shuffle" size={19} color="#FFFFFF" /><Text style={styles.secondaryText}>{state.shuffle ? 'Shuffle on' : 'Shuffle'}</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Playback speed" onPress={() => player.setRate(state.rate >= 2 ? 1 : state.rate + 0.25)} style={styles.secondaryButton}><Feather name="activity" size={19} color="#FFFFFF" /><Text style={styles.secondaryText}>{state.rate.toFixed(2)}×</Text></Pressable>
-        </View>
+  const onLoadSrt = useCallback(async (uri: string) => { try { setSubtitleCues(parseSrt(await (await fetch(uri)).text())); } catch { setSubtitleCues([]); } }, []);
+  const searchYT = useCallback(async () => setYoutubeResults(await searchYouTubeMusic(youtubeQuery)), [youtubeQuery]);
 
-        <View style={styles.queueHeader}><Text style={styles.queueTitle}>Up next</Text><Text style={styles.queueCount}>{state.queue.length} items</Text></View>
-        {state.queue.map((item: MediaItemModel, index: number) => (
-          <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`${index === state.index ? 'Now playing, ' : ''}${item.title}`} accessibilityState={{ selected: index === state.index }} onPress={() => player.load(item, true)} style={[styles.queueRow, index === state.index && styles.queueRowActive]}>
-            <View style={styles.queueIcon}><MaterialCommunityIcons name={item.kind === 'video' ? 'video-outline' : 'music-note'} size={19} color="#FFFFFF" /></View>
-            <View style={styles.queueCopy}><Text style={styles.queueItemTitle} numberOfLines={1}>{item.title}</Text><Text style={styles.queueItemMeta} numberOfLines={1}>{item.artist ?? item.album ?? item.kind}</Text></View>
-            {index === state.index ? <Feather name={state.isPlaying ? 'volume-2' : 'pause-circle'} size={18} color="#FFFFFF" /> : <Text style={styles.positionText}>{index + 1}</Text>}
-          </Pressable>
-        ))}
-      </ScrollView>
-    </View>
-  );
+  if (screen === 'player') {
+    return <View style={styles.root}>
+      <View style={styles.header}><Button label="Back to media library" onPress={() => setScreen('library')} text="‹" /><View style={styles.headerText}><Text accessibilityRole="header" style={styles.title}>Now Playing</Text><Text style={styles.muted}>{isRadio ? 'Radio' : current?.kind?.toUpperCase() || 'Media'}</Text></View></View>
+      {current?.kind === 'video' ? <View style={styles.video}><VideoView player={player.videoPlayer} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls={false} />{activeCue ? <View style={styles.subtitle}><Text style={styles.subtitleText}>{activeCue.text}</Text></View> : null}</View> : <View style={styles.artwork}>{current?.artworkUri ? <Image source={{ uri: current.artworkUri }} style={styles.artworkImage} /> : <Text style={styles.glyph}>♫</Text>}</View>}
+      <View style={styles.nowPlaying}><Text accessibilityRole="header" numberOfLines={2} style={styles.trackTitle}>{current?.title || 'Nothing playing'}</Text><Text style={styles.muted}>{current?.artist || current?.album || ''}</Text></View>
+      {!isRadio ? <View style={styles.progressRow}><Text style={styles.time}>{formatTime(player.state.positionMs)}</Text><Pressable accessibilityRole="adjustable" accessibilityLabel="Playback position" accessibilityValue={{ min: 0, max: Math.max(1, player.state.durationMs), now: player.state.positionMs }} onPress={() => player.seekTo(Math.min(player.state.durationMs, player.state.positionMs + 10000))} style={styles.progress}><View style={[styles.progressFill, { width: `${player.state.durationMs ? Math.min(100, player.state.positionMs / player.state.durationMs * 100) : 0}%` }]} /></Pressable><Text style={styles.time}>{formatTime(player.state.durationMs)}</Text></View> : <Text accessibilityRole="text" style={styles.live}>LIVE RADIO · SEEKING DISABLED</Text>}
+      <View style={styles.controls}>{!isRadio ? <Button label="Previous" hint="Play previous track" onPress={player.previous} text="⏮" /> : null}<Button label={player.state.isPlaying ? 'Pause' : 'Play'} onPress={player.togglePlayPause} text={player.state.isPlaying ? '❚❚' : '▶'} selected />{!isRadio ? <Button label="Next" hint="Play next track" onPress={player.next} text="⏭" /> : null}</View>
+      <View style={styles.controls}><Button label="Shuffle" onPress={player.toggleShuffle} text="🔀" selected={player.state.shuffle} /><Button label="Repeat" onPress={player.cycleRepeat} text="↻" /><Button label="Volume down" onPress={() => player.setVolume(player.state.volume - .1)} text="🔉" /><Button label="Volume up" onPress={() => player.setVolume(player.state.volume + .1)} text="🔊" /></View>
+      {canVocalRemove ? <View style={styles.vocalCard} accessible accessibilityLabel="Vocal Remover"><Text style={styles.sectionTitle}>Vocal Remover</Text><Text style={styles.muted}>AI separation runs through the modular on-device engine when installed.</Text><View style={styles.rowButtons}><Button label="Create instrumental" onPress={() => setVocalMode('instrumental')} text="Instrumental" selected={vocalMode === 'instrumental'} /><Button label="Extract vocals" onPress={() => setVocalMode('vocals')} text="Vocals" selected={vocalMode === 'vocals'} /><Button label={vocalBusy ? 'Processing' : 'Remove vocals'} onPress={() => { void runVocalRemoval(); }} text={vocalBusy ? `${Math.round(vocalProgress * 100)}%` : 'Process'} /></View></View> : null}
+      {current?.subtitleTracks?.length ? <View style={styles.rowButtons}>{current.subtitleTracks.map((track) => <Button key={track.id} label={`Subtitle ${track.label}`} onPress={() => { if (track.uri) void onLoadSrt(track.uri); else setSubtitleCues(track.cues || []); }} text={track.label} />)}</View> : null}
+    </View>;
+  }
+
+  return <View style={styles.root}>
+    <View style={styles.header}><Button label="Back" onPress={() => onBack?.()} text="‹" /><View style={styles.headerText}><Text accessibilityRole="header" style={styles.title}>Nexus Media</Text><Text style={styles.muted}>Library and player</Text></View><Button label="Refresh media" onPress={() => { void refresh(); }} text="↻" /></View>
+    <View style={styles.tabs}><Button label="Audio" onPress={() => setMediaTab('audio')} text="Audio" selected={mediaTab === 'audio'} /><Button label="Videos" onPress={() => setMediaTab('video')} text="Videos" selected={mediaTab === 'video'} /></View>
+    {mediaTab === 'audio' ? <View style={styles.tabs}><Button label="Tracks" onPress={() => setLibraryTab('tracks')} text="Tracks" selected={libraryTab === 'tracks'} /><Button label="Albums" onPress={() => setLibraryTab('albums')} text="Albums" selected={libraryTab === 'albums'} /><Button label="Playlists" onPress={() => setLibraryTab('playlists')} text="Playlists" selected={libraryTab === 'playlists'} /></View> : null}
+    <View style={styles.searchWrap}><TextInput accessibilityLabel="Search local media" value={query} onChangeText={setQuery} placeholder="Search device media" placeholderTextColor="#7f8794" style={styles.search} /></View>
+    {mediaTab === 'audio' && youtubeInstalled ? <View style={styles.youtubeCard}><Text style={styles.sectionTitle}>YouTube Music</Text><View style={styles.rowButtons}><TextInput accessibilityLabel="YouTube Music search" value={youtubeQuery} onChangeText={setYoutubeQuery} placeholder="Search YouTube Music" placeholderTextColor="#7f8794" style={styles.searchSmall} /><Button label="Search YouTube Music" onPress={() => { void searchYT(); }} text="Search" /></View>{youtubeResults.map((result) => <Pressable key={result.uri} accessibilityRole="button" accessibilityLabel={`YouTube Music result ${result.title}`} onPress={() => { void handoffYouTubeMusic(result.uri); }} style={styles.ytResult}><Text style={styles.rowTitle}>{result.title}</Text><Text style={styles.muted}>Open in YouTube Music</Text></Pressable>)}<Button label="Open YouTube Music search" onPress={() => { void openYouTubeMusicSearch(youtubeQuery); }} text="Open in YouTube Music" /></View> : null}
+    {mediaTab === 'audio' && libraryTab === 'albums' ? <FlatList data={collections.albums} keyExtractor={(item) => item.id} contentContainerStyle={styles.list} renderItem={({ item }) => <Pressable accessibilityRole="button" accessibilityLabel={`Album ${item.title}`} onPress={() => { setLibraryTab('tracks'); setQuery(item.title); }} style={styles.album}><Text style={styles.rowTitle}>{item.title}</Text><Text style={styles.muted}>{item.artist || 'Unknown artist'} · {item.trackIds.length} tracks</Text></Pressable>} /> : null}
+    {mediaTab === 'audio' && libraryTab === 'playlists' ? <View style={styles.list}><Button label="Show create playlist form" onPress={() => setShowCreatePlaylist((value) => !value)} text="＋ Create playlist" />{showCreatePlaylist ? <View style={styles.playlistForm}><TextInput accessibilityLabel="New playlist name" value={newPlaylistName} onChangeText={setNewPlaylistName} placeholder="Playlist name" placeholderTextColor="#7f8794" style={styles.search} /><Button label="Save playlist" onPress={() => { void savePlaylist(); }} text="Save" /></View> : null}{playlists.map((playlist) => <Pressable key={playlist.id} accessibilityRole="button" accessibilityLabel={`Playlist ${playlist.name}`} style={styles.album}><Text style={styles.rowTitle}>{playlist.name}</Text><Text style={styles.muted}>{playlist.itemIds.length} tracks{playlist.isDevicePlaylist ? ' · Device playlist' : ''}</Text></Pressable>)}</View> : null}
+    {(mediaTab === 'video' || libraryTab === 'tracks') ? <FlatList data={visibleTracks} keyExtractor={(item) => item.id} contentContainerStyle={styles.list} renderItem={({ item }) => <Pressable accessibilityRole="button" accessibilityLabel={`${item.kind === 'video' ? 'Video' : 'Audio'} ${item.title}`} onPress={() => loadItem(item, visibleTracks)} style={styles.row}><View style={styles.thumbnail}>{item.artworkUri ? <Image source={{ uri: item.artworkUri }} style={styles.thumbImage} /> : <Text style={styles.glyphSmall}>{item.kind === 'video' ? '▶' : '♫'}</Text>}</View><View style={styles.rowText}><Text numberOfLines={1} style={styles.rowTitle}>{item.title}</Text><Text numberOfLines={1} style={styles.muted}>{item.artist || item.album || item.kind}</Text></View><Text style={styles.muted}>{formatTime(item.durationMs || 0)}</Text></Pressable>} ListEmptyComponent={<Text style={styles.empty}>No media found.</Text>} /> : null}
+  </View>;
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#08131B' },
-  content: { padding: 20, paddingBottom: 80 },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 22 },
-  badge: { width: 42, height: 42, borderRadius: 13, backgroundColor: '#193441', alignItems: 'center', justifyContent: 'center' },
-  headerCopy: { marginLeft: 11, flex: 1 },
-  kicker: { color: '#8FAAB6', fontSize: 10, letterSpacing: 1.8, fontWeight: '700', marginBottom: 3 },
-  title: { color: '#FFFFFF', fontSize: 22, fontWeight: '700' },
-  videoPlaceholder: { aspectRatio: 16 / 9, borderRadius: 20, backgroundColor: '#13242D', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-  subtitle: { position: 'absolute', bottom: 18, left: 18, right: 18, color: '#FFFFFF', textAlign: 'center', fontSize: 15, fontWeight: '600', backgroundColor: '#00000088', padding: 8, borderRadius: 10 },
-  artworkPlaceholder: { aspectRatio: 1, maxHeight: 320, borderRadius: 24, backgroundColor: '#13242D', justifyContent: 'center', alignItems: 'center', alignSelf: 'center', width: '88%' },
-  nowPlaying: { marginTop: 20 },
-  currentTitle: { color: '#FFFFFF', fontSize: 21, fontWeight: '700', lineHeight: 28 },
-  currentMeta: { color: '#9DB1BA', fontSize: 13, marginTop: 5 },
-  progressArea: { marginTop: 22 },
-  track: { height: 5, borderRadius: 3, backgroundColor: '#29404A', overflow: 'hidden' },
-  fill: { height: 5, backgroundColor: '#73C8E8', borderRadius: 3 },
-  times: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
-  time: { color: '#8EA5AE', fontSize: 11 },
-  controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 23, marginTop: 22 },
-  playButton: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#73C8E8', alignItems: 'center', justifyContent: 'center' },
-  iconButton: { width: 46, height: 46, borderRadius: 15, backgroundColor: '#17303B', alignItems: 'center', justifyContent: 'center' },
-  selectedButton: { backgroundColor: '#294A58' },
-  secondaryControls: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 17, gap: 8 },
-  secondaryButton: { flex: 1, minHeight: 44, backgroundColor: '#17303B', borderRadius: 13, alignItems: 'center', justifyContent: 'center', gap: 3 },
-  secondaryText: { color: '#D9E7ED', fontSize: 10, fontWeight: '600' },
-  queueHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 30, marginBottom: 10 },
-  queueTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
-  queueCount: { color: '#8EA5AE', fontSize: 11 },
-  queueRow: { minHeight: 64, borderRadius: 15, backgroundColor: '#11242D', paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  queueRowActive: { backgroundColor: '#193844' },
-  queueIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#23414D', justifyContent: 'center', alignItems: 'center' },
-  queueCopy: { flex: 1, marginHorizontal: 10 },
-  queueItemTitle: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
-  queueItemMeta: { color: '#8EA5AE', fontSize: 10, marginTop: 3 },
-  positionText: { color: '#7B929D', fontSize: 11 },
-  pressed: { opacity: 0.76 },
+  root: { flex: 1, backgroundColor: '#0d0f12' }, header: { flexDirection: 'row', alignItems: 'center', padding: 12 }, headerText: { flex: 1, paddingHorizontal: 8 }, title: { color: '#fff', fontSize: 21, fontWeight: '800' }, muted: { color: '#aeb4be', fontSize: 13, marginTop: 3 }, button: { minWidth: 52, minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 }, selectedButton: { backgroundColor: '#26303d' }, buttonText: { color: '#fff', fontWeight: '700' }, pressed: { opacity: .65 }, tabs: { flexDirection: 'row', paddingHorizontal: 8, gap: 4 }, searchWrap: { padding: 12 }, search: { minHeight: 48, borderRadius: 14, backgroundColor: '#181c22', color: '#fff', paddingHorizontal: 16, fontSize: 16 }, searchSmall: { flex: 1, minHeight: 44, borderRadius: 12, backgroundColor: '#181c22', color: '#fff', paddingHorizontal: 12 }, list: { padding: 10, paddingBottom: 30 }, row: { minHeight: 72, borderRadius: 14, padding: 10, flexDirection: 'row', alignItems: 'center' }, rowText: { flex: 1, paddingHorizontal: 12 }, rowTitle: { color: '#fff', fontSize: 15, fontWeight: '700' }, thumbnail: { width: 52, height: 52, borderRadius: 10, backgroundColor: '#262d37', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, thumbImage: { width: '100%', height: '100%' }, glyph: { color: '#aeb4be', fontSize: 90 }, glyphSmall: { color: '#aeb4be', fontSize: 20 }, video: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000' }, subtitle: { position: 'absolute', bottom: 16, left: 16, right: 16, alignItems: 'center' }, subtitleText: { color: '#fff', backgroundColor: '#000c', padding: 8, borderRadius: 7, fontSize: 16 }, artwork: { margin: 24, aspectRatio: 1, maxHeight: 340, borderRadius: 24, overflow: 'hidden', backgroundColor: '#1b2028', alignItems: 'center', justifyContent: 'center' }, artworkImage: { width: '100%', height: '100%' }, nowPlaying: { paddingHorizontal: 24, paddingTop: 8 }, trackTitle: { color: '#fff', fontSize: 21, fontWeight: '800' }, progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 18 }, time: { color: '#aeb4be', width: 44, textAlign: 'center' }, progress: { flex: 1, height: 36, justifyContent: 'center' }, progressFill: { height: 5, backgroundColor: '#fff', borderRadius: 3 }, controls: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 4 }, live: { textAlign: 'center', color: '#e4e7ec', fontSize: 12, padding: 12 }, vocalCard: { margin: 14, padding: 14, borderRadius: 18, backgroundColor: '#181c22' }, sectionTitle: { color: '#fff', fontSize: 16, fontWeight: '800', marginBottom: 5 }, rowButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, alignItems: 'center' }, youtubeCard: { marginHorizontal: 12, marginBottom: 8, padding: 12, borderRadius: 18, backgroundColor: '#181c22' }, ytResult: { paddingVertical: 10 }, album: { padding: 16, marginBottom: 8, borderRadius: 14, backgroundColor: '#181c22' }, playlistForm: { padding: 10, gap: 6 }, empty: { color: '#aeb4be', textAlign: 'center', padding: 30 },
 });
