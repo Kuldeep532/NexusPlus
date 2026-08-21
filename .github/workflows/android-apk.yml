@@ -3,14 +3,14 @@ name: Android APK
 on:
   workflow_dispatch:
   push:
-    branches: ["feature/clock-alarm-module"]
+    branches: ["refactor/root-app-reorganization"]
 
 jobs:
   build-apk:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: artifacts/nexus-plus
+        working-directory: .
 
     steps:
       - name: Checkout
@@ -27,8 +27,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: pnpm
-          cache-dependency-path: artifacts/nexus-plus/pnpm-lock.yaml
 
       - name: Enable Corepack
         run: corepack enable
@@ -40,19 +38,18 @@ jobs:
         run: pnpm run typecheck
 
       - name: Validate Android host
-        working-directory: .
         run: |
           test -f android/settings.gradle
           test -f android/app/build.gradle
           test -f android/gradlew
-          test -f artifacts/nexus-plus/app.json
-          echo "Android native host and Expo config detected."
+          test -f app.json
+          test -f package.json
+          echo "Root Android host and Expo app detected."
 
       - name: Make Gradle executable
-        run: chmod +x ../../android/gradlew
+        run: chmod +x android/gradlew
 
       - name: Build debug APK
-        working-directory: .
         run: ./android/gradlew -p android assembleDebug --stacktrace --no-daemon
 
       - name: Upload APK
