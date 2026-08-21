@@ -6,7 +6,7 @@ plugins {
 
 react {
     autolinkLibrariesWithApp()
-    entryFile = file('../app/node_modules/expo-router/entry.js')
+    entryFile = file('../../node_modules/expo-router/entry.js')
 }
 
 android {

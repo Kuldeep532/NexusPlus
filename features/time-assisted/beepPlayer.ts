@@ -13,6 +13,6 @@ export function playTimeAnnouncementBeep(): void {
     player?.seekTo(0);
     player?.play();
   } catch {
-    // The spoken announcement should still proceed when the optional cue cannot play.
+    // Spoken announcement continues even when the optional cue cannot play.
   }
 }

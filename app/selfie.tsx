@@ -13,7 +13,7 @@ import type { TimeAnnouncementSettings } from '@/features/time-announcer/timeAnn
 
 let shutterAsset: number | null = null;
 try {
-  shutterAsset = require('../assets/selfie_shutter_nexus_01.mp3');
+  shutterAsset = require('../assets/audio/selfie_shutter_nexus_01.mp3');
 } catch {
   shutterAsset = null;
 }
