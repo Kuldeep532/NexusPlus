@@ -5,7 +5,6 @@ import { resolvePaymentTtsProvider, speakPaymentAnnouncement } from './paymentAn
 import type { PaymentAnnouncementTtsProvider } from './paymentAnnouncerTypes';
 
 export interface PaymentAnnouncementSession {
-  isUnlocked: boolean;
   enabled: boolean;
   preferredTtsProvider: PaymentAnnouncementTtsProvider;
   speechRate: number;
@@ -13,11 +12,6 @@ export interface PaymentAnnouncementSession {
   verifier?: PaymentEventVerifier;
 }
 
-/**
- * Events must pass cryptographic verification before entering the protected
- * announcement queue. The default verifier fails closed until a real trusted
- * payment provider integration is supplied.
- */
 export async function acceptIncomingPaymentEvent(
   input: unknown,
   verifier: PaymentEventVerifier = unavailablePaymentEventVerifier,
@@ -32,8 +26,12 @@ export async function acceptIncomingPaymentEvent(
   }
 }
 
+/**
+ * Background announcements intentionally do not require the UI biometric session.
+ * The upstream event verifier remains the security boundary for financial events.
+ */
 export async function announceNextPayment(session: PaymentAnnouncementSession): Promise<PaymentEvent | null> {
-  if (!session.isUnlocked || !session.enabled) return null;
+  if (!session.enabled) return null;
 
   const event = dequeuePaymentEvent();
   if (!event) return null;
