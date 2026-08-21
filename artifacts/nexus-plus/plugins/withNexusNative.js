@@ -2,7 +2,7 @@ const { withProjectBuildGradle, withMainApplication, createRunOncePlugin } = req
 
 /**
  * Native Android integration kept behind the Expo config layer so EAS can
- * regenerate the Android project without losing the security/PDF/file/media modules.
+ * regenerate the Android project without losing the security/PDF/file/media/video/audio modules.
  *
  * iOS remains intentionally untouched; shared TypeScript contracts keep the
  * platform boundary ready for future Keychain/LocalAuthentication/PDF/media adapters.
@@ -25,6 +25,8 @@ function withNexusNative(config) {
       'import com.nexuswavetech.nexusplus.NexusPdfNativePackage;',
       'import com.nexuswavetech.nexusplus.NexusFileUriPackage;',
       'import com.nexuswavetech.nexusplus.NexusMediaPackage;',
+      'import com.nexuswavetech.nexusplus.NexusVideoEditorPackage;',
+      'import com.nexuswavetech.nexusplus.NexusVocalRemoverPackage;',
     ];
 
     for (const importLine of imports) {
@@ -39,6 +41,8 @@ function withNexusNative(config) {
       '        packages.add(new NexusPdfNativePackage());',
       '        packages.add(new NexusFileUriPackage());',
       '        packages.add(new NexusMediaPackage());',
+      '        packages.add(new NexusVideoEditorPackage());',
+      '        packages.add(new NexusVocalRemoverPackage());',
     ].join('\n');
 
     const needle = 'PackageList(this).packages';
@@ -52,4 +56,4 @@ function withNexusNative(config) {
   });
 }
 
-module.exports = createRunOncePlugin(withNexusNative, 'with-nexus-native', '1.3.0');
+module.exports = createRunOncePlugin(withNexusNative, 'with-nexus-native', '1.4.0');
