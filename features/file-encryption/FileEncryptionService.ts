@@ -10,28 +10,29 @@ export type EncryptionResult = {
   originalName: string;
 };
 
-/**
- * The file container format is implemented by the native crypto module.
- * TypeScript intentionally handles orchestration and metadata only.
- */
 export type NativeFileEncryptionBridge = {
   isAvailable(): boolean;
-  lockFile(inputUri: string, outputUri: string, password: string, iterations: number): Promise<void>;
-  unlockFile(inputUri: string, outputUri: string, password: string): Promise<void>;
+  lockFile(inputUri: string, outputUri: string, password: string): Promise<string>;
+  unlockFile(inputUri: string, outputUri: string, password: string): Promise<string>;
 };
 
 export function getNativeFileEncryptionBridge(): NativeFileEncryptionBridge {
   const bridge = (globalThis as typeof globalThis & {
     NexusFileEncryption?: NativeFileEncryptionBridge;
   }).NexusFileEncryption;
-  if (!bridge?.isAvailable()) {
-    throw new Error('Native file-encryption engine is not available in this build.');
+  if (!bridge) throw new Error('Native file-encryption engine is unavailable in this build.');
+  let available = false;
+  try {
+    available = bridge.isAvailable();
+  } catch {
+    available = false;
   }
+  if (!available) throw new Error('Native file-encryption engine is unavailable in this build.');
   return bridge;
 }
 
 export async function createEncryptedOutputUri(originalName: string): Promise<string> {
-  const safeName = originalName.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const safeName = originalName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 128);
   const id = Crypto.randomUUID();
   return `${FileSystem.cacheDirectory}nexus-${id}-${safeName}.nexusenc`;
 }

@@ -10,6 +10,7 @@
     "dev:tunnel": "pnpm exec expo start --tunnel --clear",
     "dev:lan": "pnpm exec expo start --lan --clear",
     "build": "node scripts/build.js",
+    "brand:assets": "node scripts/generate-brand-assets.js",
     "android:apk": "pnpm exec eas build --platform android --profile preview",
     "android:release": "pnpm exec eas build --platform android --profile production",
     "serve": "node server/serve.js",

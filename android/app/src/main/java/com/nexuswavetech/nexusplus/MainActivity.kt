@@ -7,8 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 
 /**
  * Native launch shell. The React Native/Expo app owns the visual UI; this
- * activity only preserves Android intent handoff for media/document "Open with"
- * launches and provides a stable native entry point.
+ * activity only preserves Android intent handoff for media launches.
  */
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -24,13 +23,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun publishIncomingIntent(intent: Intent?) {
-        val uri: Uri = intent?.data ?: return
-        if (intent.action != Intent.ACTION_VIEW) return
+        if (intent?.action != Intent.ACTION_VIEW) return
+        val uri: Uri = intent.data ?: return
+        val scheme = uri.scheme?.lowercase() ?: return
+        if (scheme !in setOf("content", "file", "http", "https")) return
+
         val mime = intent.type ?: contentResolver.getType(uri) ?: return
         if (!NexusMediaIntent.isSupportedMediaType(mime)) return
+        if (uri.toString().contains('\u0000')) return
 
-        // The RN/Expo layer can consume this URI through the app-launch handoff
-        // contract without exposing filesystem paths to JavaScript.
         MediaLaunchStore.setPendingMedia(uri.toString(), mime)
     }
 }

@@ -7,6 +7,7 @@ import { useColors } from '@/hooks/useColors';
 import { loadLanguagePreferences, type LanguagePreferences } from '@/features/language-preferences/languagePreferences';
 import { DEFAULT_BATTERY_ANNOUNCER_SETTINGS, type BatteryAnnouncementSettings } from '@/features/battery-announcer/batteryAnnouncerTypes';
 import { getBatteryPhrase, getBatteryStatus, readCurrentBattery } from '@/features/battery-announcer/batteryAnnouncer';
+import { loadBatteryAnnouncementSettings, saveBatteryAnnouncementSettings } from '@/features/battery-announcer/batteryAnnouncerSettings';
 import { speakFeatureText } from '@/features/language-preferences/speakFeatureText';
 
 export default function BatteryAnnouncerScreen() {
@@ -20,19 +21,33 @@ export default function BatteryAnnouncerScreen() {
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
+  const updateSettings = async (patch: Partial<BatteryAnnouncementSettings>) => {
+    const next = { ...settingsRef.current, ...patch };
+    setSettings(next);
+    settingsRef.current = next;
+    try {
+      await saveBatteryAnnouncementSettings(next);
+    } catch {
+      AccessibilityInfo.announceForAccessibility('Battery setting could not be saved.');
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
     const refresh = async () => {
-      const [nextLevel, nextState, prefs] = await Promise.all([
+      const [nextLevel, nextState, prefs, savedSettings] = await Promise.all([
         Battery.getBatteryLevelAsync(),
         Battery.getBatteryStateAsync(),
         loadLanguagePreferences(),
+        loadBatteryAnnouncementSettings(),
       ]);
       if (!mounted) return;
       levelRef.current = nextLevel;
       setLevel(nextLevel);
       setState(nextState);
       setLanguage(prefs.featureTtsLanguage);
+      setSettings(savedSettings);
+      settingsRef.current = savedSettings;
     };
     void refresh();
 
@@ -46,10 +61,19 @@ export default function BatteryAnnouncerScreen() {
       setState(batteryState);
       const current = settingsRef.current;
       if (!current.enabled || !current.announceStatusChanges) return;
-      const prefs = await loadLanguagePreferences();
-      const phrase = getBatteryPhrase(levelRef.current, getBatteryStatus(batteryState), prefs.featureTtsLanguage);
-      void speakFeatureText(phrase, prefs.featureTtsLanguage);
-      AccessibilityInfo.announceForAccessibility(phrase);
+      try {
+        const prefs = await loadLanguagePreferences();
+        const phrase = getBatteryPhrase(
+          levelRef.current,
+          getBatteryStatus(batteryState),
+          prefs.featureTtsLanguage,
+          current,
+        );
+        await speakFeatureText(phrase, prefs.featureTtsLanguage);
+        AccessibilityInfo.announceForAccessibility(phrase);
+      } catch {
+        // Battery announcements are optional and must not interrupt the listener.
+      }
     });
 
     return () => {
@@ -60,10 +84,14 @@ export default function BatteryAnnouncerScreen() {
   }, []);
 
   const announceNow = async () => {
-    const prefs = await loadLanguagePreferences();
-    setLanguage(prefs.featureTtsLanguage);
-    await readCurrentBattery(prefs.featureTtsLanguage, speakFeatureText);
-    AccessibilityInfo.announceForAccessibility('Current battery status announced.');
+    try {
+      const prefs = await loadLanguagePreferences();
+      setLanguage(prefs.featureTtsLanguage);
+      await readCurrentBattery(prefs.featureTtsLanguage, speakFeatureText, settingsRef.current);
+      AccessibilityInfo.announceForAccessibility('Current battery status announced.');
+    } catch {
+      AccessibilityInfo.announceForAccessibility('Unable to announce current battery status.');
+    }
   };
 
   const status = getBatteryStatus(state);
@@ -82,9 +110,9 @@ export default function BatteryAnnouncerScreen() {
       </View>
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Automatic announcements</Text>
-        <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Battery Announcer</Text><Text style={[styles.rowDetail, { color: colors.mutedForeground }]}>Announce when charging state changes.</Text></View><Switch accessibilityRole="switch" accessibilityLabel="Enable Battery Announcer" value={settings.enabled} onValueChange={(enabled) => setSettings((current) => ({ ...current, enabled }))} trackColor={{ false: colors.secondary, true: colors.primary }} thumbColor={settings.enabled ? colors.primaryForeground : colors.mutedForeground} /></View>
-        <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Status changes</Text><Text style={[styles.rowDetail, { color: colors.mutedForeground }]}>Speak when charging or discharging starts.</Text></View><Switch accessibilityRole="switch" accessibilityLabel="Announce battery status changes" value={settings.announceStatusChanges} onValueChange={(announceStatusChanges) => setSettings((current) => ({ ...current, announceStatusChanges }))} trackColor={{ false: colors.secondary, true: colors.primary }} thumbColor={settings.announceStatusChanges ? colors.primaryForeground : colors.mutedForeground} /></View>
-        <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Battery percentage</Text><Text style={[styles.rowDetail, { color: colors.mutedForeground }]}>Include the exact percentage in announcements.</Text></View><Switch accessibilityRole="switch" accessibilityLabel="Include battery percentage" value={settings.announcePercentage} onValueChange={(announcePercentage) => setSettings((current) => ({ ...current, announcePercentage }))} trackColor={{ false: colors.secondary, true: colors.primary }} thumbColor={settings.announcePercentage ? colors.primaryForeground : colors.mutedForeground} /></View>
+        <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Battery Announcer</Text><Text style={[styles.rowDetail, { color: colors.mutedForeground }]}>Announce when charging state changes.</Text></View><Switch accessibilityRole="switch" accessibilityLabel="Enable Battery Announcer" value={settings.enabled} onValueChange={(enabled) => void updateSettings({ enabled })} trackColor={{ false: colors.secondary, true: colors.primary }} thumbColor={settings.enabled ? colors.primaryForeground : colors.mutedForeground} /></View>
+        <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Status changes</Text><Text style={[styles.rowDetail, { color: colors.mutedForeground }]}>Speak when charging or discharging starts.</Text></View><Switch accessibilityRole="switch" accessibilityLabel="Announce battery status changes" value={settings.announceStatusChanges} onValueChange={(announceStatusChanges) => void updateSettings({ announceStatusChanges })} trackColor={{ false: colors.secondary, true: colors.primary }} thumbColor={settings.announceStatusChanges ? colors.primaryForeground : colors.mutedForeground} /></View>
+        <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Battery percentage</Text><Text style={[styles.rowDetail, { color: colors.mutedForeground }]}>Include the exact percentage in announcements.</Text></View><Switch accessibilityRole="switch" accessibilityLabel="Include battery percentage" value={settings.announcePercentage} onValueChange={(announcePercentage) => void updateSettings({ announcePercentage })} trackColor={{ false: colors.secondary, true: colors.primary }} thumbColor={settings.announcePercentage ? colors.primaryForeground : colors.mutedForeground} /></View>
       </View>
     </ScrollView>
   );

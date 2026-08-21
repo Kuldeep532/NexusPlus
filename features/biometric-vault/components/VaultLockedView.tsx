@@ -77,13 +77,13 @@ export function VaultLockedView({
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Set up a separate Vault password"
-        accessibilityHint="Create a password used only by the Vault, separate from the phone lock screen."
+        accessibilityLabel="Use device PIN, pattern, or password for the Vault"
+        accessibilityHint="Use the device screen-lock credential as the Vault authentication method. This does not create a separate Vault password."
         onPress={onCredentialSetup}
         style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
       >
-        <MaterialCommunityIcons name="key-variant" size={18} color={colors.primary} />
-        <Text style={[styles.linkText, { color: colors.primary }]}>Create a separate Vault password</Text>
+        <MaterialCommunityIcons name="cellphone-lock" size={18} color={colors.primary} />
+        <Text style={[styles.linkText, { color: colors.primary }]}>Use device PIN, pattern, or password</Text>
       </Pressable>
     </View>
   );

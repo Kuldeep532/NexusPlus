@@ -4,31 +4,31 @@
     "slug": "nexus-plus",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/generated-branding/nexus-plus-1024.png",
     "scheme": "nexus-plus",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/icon.png",
+      "image": "./assets/generated-branding/nexus-plus-1024.png",
       "resizeMode": "contain",
-      "backgroundColor": "#08131B"
+      "backgroundColor": "#120B24"
     },
     "ios": { "supportsTablet": false },
     "android": {
       "package": "com.nexuswavetech.nexusplus",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#08131B"
+        "foregroundImage": "./assets/generated-branding/nexus-plus-1024.png",
+        "backgroundColor": "#120B24"
       }
     },
-    "web": { "favicon": "./assets/images/icon.png" },
+    "web": { "favicon": "./assets/generated-branding/nexus-plus-192.png" },
     "plugins": [
       ["expo-router", { "origin": "https://replit.com/" }],
       "./plugins/withNexusNative",
       "expo-font",
       "expo-document-picker",
       "expo-web-browser",
-      ["expo-camera", { "cameraPermission": "Allow Nexus Plus to use your camera for automatic selfies." }],
+      ["expo-camera", { "cameraPermission": "Allow Nexus Plus to use your camera for selfies." }],
       ["expo-notifications", { "defaultChannel": "nexus-alarm" }],
       "expo-local-authentication",
       "expo-secure-store",

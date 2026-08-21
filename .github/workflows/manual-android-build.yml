@@ -15,6 +15,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: manual-android-${{ github.ref }}-${{ inputs.profile }}
+  cancel-in-progress: false
+
 env:
   APP_DIR: .
 
@@ -31,6 +35,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
 
       - name: Enable Corepack
         run: corepack enable
@@ -40,16 +45,13 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ env.APP_DIR }}
-        run: pnpm install --frozen-lockfile=false
+        run: pnpm install --frozen-lockfile
 
       - name: Materialize Firebase config and Android keystore
         working-directory: ${{ env.APP_DIR }}
         env:
           GOOGLE_SERVICES_JSON_CONTENT: ${{ secrets.GOOGLE_SERVICES_JSON }}
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           test -n "$GOOGLE_SERVICES_JSON_CONTENT"
@@ -61,17 +63,21 @@ jobs:
           chmod 600 nexusplus-release.jks
           test -s nexusplus-release.jks
 
-          cat > .android-signing.env <<'EOF'
-          ANDROID_KEYSTORE_PATH=nexusplus-release.jks
-          ANDROID_KEYSTORE_PASSWORD=${ANDROID_KEYSTORE_PASSWORD}
-          ANDROID_KEY_ALIAS=${ANDROID_KEY_ALIAS}
-          ANDROID_KEY_PASSWORD=${ANDROID_KEY_PASSWORD}
-          EOF
-          chmod 600 .android-signing.env
-
       - name: Validate TypeScript
         working-directory: ${{ env.APP_DIR }}
-        run: pnpm typecheck
+        run: pnpm run typecheck
+
+      - name: Validate signing inputs
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
 
       - name: Install EAS CLI
         run: npm install --global eas-cli
@@ -86,14 +92,22 @@ jobs:
           set -euo pipefail
           test -n "$EXPO_TOKEN"
           test -n "$EAS_PROJECT_ID"
-          if [ "${{ inputs.profile }}" = "production" ]; then
-            eas build --platform android --profile production --non-interactive
-          else
-            eas build --platform android --profile preview --non-interactive
-          fi
+          case "${{ inputs.profile }}" in
+            production)
+              eas build --platform android --profile production --non-interactive
+              ;;
+            preview)
+              eas build --platform android --profile preview --non-interactive
+              ;;
+            *)
+              echo "Unsupported EAS profile: ${{ inputs.profile }}" >&2
+              exit 1
+              ;;
+          esac
 
       - name: Remove secret material
         if: always()
         working-directory: ${{ env.APP_DIR }}
         run: |
-          rm -f google-services.json nexusplus-release.jks .android-signing.env
+          set +x
+          rm -f google-services.json nexusplus-release.jks

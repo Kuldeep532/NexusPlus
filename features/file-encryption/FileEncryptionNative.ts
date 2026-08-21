@@ -8,15 +8,33 @@ declare global {
 }
 
 export const FileEncryptionNative = {
-  isAvailable: () => Boolean(globalThis.NexusFileEncryption?.isAvailable?.()),
-  lockFile: (inputUri: string, outputUri: string, password: string) => {
-    const bridge = globalThis.NexusFileEncryption;
-    if (!bridge) throw new Error('Native file encryption is unavailable in this build.');
-    return bridge.lockFile(inputUri, outputUri, password);
+  isAvailable: () => {
+    try {
+      return Boolean(globalThis.NexusFileEncryption?.isAvailable?.());
+    } catch {
+      return false;
+    }
   },
-  unlockFile: (inputUri: string, outputUri: string, password: string) => {
+  lockFile: async (inputUri: string, outputUri: string, password: string) => {
     const bridge = globalThis.NexusFileEncryption;
-    if (!bridge) throw new Error('Native file encryption is unavailable in this build.');
-    return bridge.unlockFile(inputUri, outputUri, password);
+    if (!bridge?.isAvailable?.()) throw new Error('Native file encryption is unavailable in this build.');
+    try {
+      const result = await bridge.lockFile(inputUri, outputUri, password);
+      if (!result || result.startsWith('ERROR:')) throw new Error('File encryption failed.');
+      return result;
+    } catch {
+      throw new Error('File encryption failed.');
+    }
+  },
+  unlockFile: async (inputUri: string, outputUri: string, password: string) => {
+    const bridge = globalThis.NexusFileEncryption;
+    if (!bridge?.isAvailable?.()) throw new Error('Native file encryption is unavailable in this build.');
+    try {
+      const result = await bridge.unlockFile(inputUri, outputUri, password);
+      if (!result || result.startsWith('ERROR:')) throw new Error('Wrong password or corrupted file.');
+      return result;
+    } catch {
+      throw new Error('Wrong password or corrupted file.');
+    }
   },
 };

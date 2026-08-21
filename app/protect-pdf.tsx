@@ -19,6 +19,7 @@ export default function ProtectPdfScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [result, setResult] = useState<ProtectPdfResult | null>(null);
   const [status, setStatus] = useState('');
+  const [vaultSaveAvailable, setVaultSaveAvailable] = useState(false);
 
   useEffect(() => () => { setPassword(''); setConfirmPassword(''); }, []);
 
@@ -27,6 +28,7 @@ export default function ProtectPdfScreen() {
   const pickPdf = async () => {
     setStatus('');
     setResult(null);
+    setVaultSaveAvailable(false);
     const picked = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', multiple: false, copyToCacheDirectory: true });
     if (picked.canceled || !picked.assets?.[0]) return;
     setPdf({ uri: picked.assets[0].uri, name: picked.assets[0].name || 'document.pdf' });
@@ -47,24 +49,30 @@ export default function ProtectPdfScreen() {
     try {
       const protectedPdf = await protectPdfWithEngine(pdf, password);
       setResult(protectedPdf);
+      setVaultSaveAvailable(true);
       setState('completed');
-      setStatus('PDF protected successfully.');
-    } catch (error) {
+      setStatus('PDF protected successfully. Save the password to Nexus Vault now if needed.');
+    } catch {
       setState('error');
-      setStatus(error instanceof Error ? error.message : 'Could not protect this PDF.');
+      setStatus('Could not protect this PDF.');
       setPassword('');
       setConfirmPassword('');
+      setVaultSaveAvailable(false);
     }
   };
 
   const share = async () => {
     if (!result || !(await Sharing.isAvailableAsync())) return;
-    await Sharing.shareAsync(result.uri, { mimeType: 'application/pdf', dialogTitle: 'Share protected PDF' });
+    try {
+      await Sharing.shareAsync(result.uri, { mimeType: 'application/pdf', dialogTitle: 'Share protected PDF' });
+    } catch {
+      Alert.alert('Share unavailable', 'The protected PDF could not be shared.');
+    }
   };
 
   const savePassword = async () => {
-    if (!password) {
-      Alert.alert('Password unavailable', 'For your security, the password is no longer retained after processing failed or the screen was reset.');
+    if (!vaultSaveAvailable || !password) {
+      Alert.alert('Password unavailable', 'For your security, the password is no longer retained. Protect the PDF again to save its password to Nexus Vault.');
       return;
     }
     try {
@@ -72,6 +80,7 @@ export default function ProtectPdfScreen() {
       Alert.alert('Saved to Nexus Vault', `${filenameWithoutExtension} password was saved securely in the Nexus Vault.`);
       setPassword('');
       setConfirmPassword('');
+      setVaultSaveAvailable(false);
     } catch {
       Alert.alert('Could not save password', 'The encrypted Nexus Vault could not be updated. Your PDF was not changed.');
     }
@@ -82,6 +91,7 @@ export default function ProtectPdfScreen() {
     setResult(null);
     setPassword('');
     setConfirmPassword('');
+    setVaultSaveAvailable(false);
     setStatus('');
     setState('idle');
   };
@@ -140,7 +150,7 @@ export default function ProtectPdfScreen() {
               <TextInput accessibilityLabel="PDF password" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} textContentType="newPassword" style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
               <Text style={[styles.label, { color: colors.foreground }]}>Confirm password</Text>
               <TextInput accessibilityLabel="Confirm PDF password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} textContentType="newPassword" style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
-              <Text style={[styles.hint, { color: colors.mutedForeground }]}>The password is kept only in memory for this workflow. It is not written to logs or ordinary app storage.</Text>
+              <Text style={[styles.hint, { color: colors.mutedForeground }]}>The password is kept only in memory for this workflow. It is never written to ordinary app storage or logs.</Text>
               <Pressable accessibilityRole="button" accessibilityLabel="Protect PDF" onPress={protect} disabled={!password || !confirmPassword} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.primary }, (pressed || !password || !confirmPassword) && styles.disabled]}>
                 <MaterialCommunityIcons name="shield-lock" size={19} color={colors.primaryForeground} />
                 <Text style={[styles.primaryText, { color: colors.primaryForeground }]}>Protect PDF</Text>
@@ -156,7 +166,7 @@ export default function ProtectPdfScreen() {
                 <Feather name="share-2" size={18} color={colors.primary} />
                 <Text style={[styles.actionText, { color: colors.foreground }]}>Share</Text>
               </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Save password to Nexus Vault" onPress={savePassword} style={[styles.actionButton, { borderColor: colors.border, backgroundColor: colors.card }]}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Save password to Nexus Vault" onPress={savePassword} disabled={!vaultSaveAvailable} style={[styles.actionButton, { borderColor: colors.border, backgroundColor: colors.card }, !vaultSaveAvailable && styles.disabled]}>
                 <MaterialCommunityIcons name="shield-key" size={19} color={colors.primary} />
                 <Text style={[styles.actionText, { color: colors.foreground }]}>Save Password to Nexus Vault</Text>
               </Pressable>

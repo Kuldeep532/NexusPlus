@@ -1,8 +1,6 @@
 package com.nexuswavetech.nexusplus
 
-import android.app.KeyguardManager
 import android.content.Context
-import android.os.Build
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
@@ -25,6 +23,7 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
         private const val KEY_ALIAS = "nexusplus.biometric-vault.master-key.v1"
         private const val META_FILE = "vault_meta.json"
         private const val MODE_FILE = "vault_credential_mode.txt"
+        private const val MAX_METADATA_BYTES = 512 * 1024L
     }
 
     override fun getName(): String = MODULE
@@ -36,11 +35,21 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
             val strong = manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)
             val device = manager.canAuthenticate(BiometricManager.Authenticators.DEVICE_CREDENTIAL)
             val hardware = strong != BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE
-            val enrolled = strong == BiometricManager.BIOMETRIC_SUCCESS || device == BiometricManager.BIOMETRIC_SUCCESS
-            val securityLevel = if (strong == BiometricManager.BIOMETRIC_SUCCESS) "strong" else if (hardware) "weak" else "none"
-            promise.resolve(mapOf("hardware" to hardware, "enrolled" to enrolled, "securityLevel" to securityLevel))
+            val strongEnrolled = strong == BiometricManager.BIOMETRIC_SUCCESS
+            val deviceCredentialAvailable = device == BiometricManager.BIOMETRIC_SUCCESS
+            val securityLevel = when {
+                strongEnrolled -> "strong"
+                hardware -> "weak"
+                else -> "none"
+            }
+            promise.resolve(mapOf(
+                "hardware" to hardware,
+                "enrolled" to strongEnrolled,
+                "deviceCredentialAvailable" to deviceCredentialAvailable,
+                "securityLevel" to securityLevel,
+            ))
         } catch (error: Throwable) {
-            promise.reject("VAULT_CAPABILITY", error)
+            promise.reject("VAULT_CAPABILITY", "Unable to determine Vault authentication capability.", null)
         }
     }
 
@@ -48,27 +57,33 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
     fun authenticate(reason: String, mode: String, promise: Promise) {
         val activity = currentActivity
         if (activity == null) {
-            promise.reject("VAULT_ACTIVITY", "Vault authentication requires an active Android activity.")
+            promise.resolve(mapOf("success" to false, "error" to "activity_unavailable"))
             return
         }
 
         val manager = BiometricManager.from(activity)
-        val hasStrong = manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
-        if (!hasStrong) {
-            promise.resolve(mapOf("success" to false, "error" to "biometric_unavailable"))
+        val strongResult = manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+        val deviceResult = manager.canAuthenticate(BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+        val hasStrong = strongResult == BiometricManager.BIOMETRIC_SUCCESS
+        val hasDeviceCredential = deviceResult == BiometricManager.BIOMETRIC_SUCCESS
+        val allowDevice = mode == "device-auth"
+
+        if (!hasStrong && (!allowDevice || !hasDeviceCredential)) {
+            val error = if (allowDevice && !hasDeviceCredential) "credential_unavailable" else "biometric_unavailable"
+            promise.resolve(mapOf("success" to false, "error" to error))
             return
         }
 
         val executor = ContextCompat.getMainExecutor(activity)
-        val allowDevice = mode == "device-auth"
         val authenticators = if (allowDevice) {
             BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
         } else {
             BiometricManager.Authenticators.BIOMETRIC_STRONG
         }
 
+        val safeReason = reason.trim().take(120).ifBlank { "Unlock Nexus Biometric Vault" }
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle(reason)
+            .setTitle(safeReason)
             .setSubtitle("Unlock Nexus Plus Vault")
             .setAllowedAuthenticators(authenticators)
             .build()
@@ -79,7 +94,18 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
             }
 
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                promise.resolve(mapOf("success" to false, "error" to errorCode.toString()))
+                val normalized = when (errorCode) {
+                    BiometricPrompt.ERROR_USER_CANCELED,
+                    BiometricPrompt.ERROR_NEGATIVE_BUTTON,
+                    BiometricPrompt.ERROR_CANCELED -> "user_cancel"
+                    BiometricPrompt.ERROR_LOCKOUT,
+                    BiometricPrompt.ERROR_LOCKOUT_PERMANENT -> "lockout"
+                    BiometricPrompt.ERROR_NO_BIOMETRICS,
+                    BiometricPrompt.ERROR_HW_NOT_PRESENT,
+                    BiometricPrompt.ERROR_HW_UNAVAILABLE -> "biometric_unavailable"
+                    else -> "unknown"
+                }
+                promise.resolve(mapOf("success" to false, "error" to normalized))
             }
 
             override fun onAuthenticationFailed() {
@@ -96,7 +122,7 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
             getOrCreateKey()
             promise.resolve(null)
         } catch (error: Throwable) {
-            promise.reject("VAULT_KEY", error)
+            promise.reject("VAULT_KEY", "Unable to initialize secure Vault key.", null)
         }
     }
 
@@ -105,7 +131,7 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
         try {
             promise.resolve(getKey() != null)
         } catch (error: Throwable) {
-            promise.reject("VAULT_KEY", error)
+            promise.reject("VAULT_KEY", "Unable to inspect secure Vault key.", null)
         }
     }
 
@@ -116,13 +142,16 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
             if (keyStore.containsAlias(KEY_ALIAS)) keyStore.deleteEntry(KEY_ALIAS)
             promise.resolve(null)
         } catch (error: Throwable) {
-            promise.reject("VAULT_KEY", error)
+            promise.reject("VAULT_KEY", "Unable to remove secure Vault key.", null)
         }
     }
 
     @ReactMethod
     fun encrypt(plaintext: String, aad: String, promise: Promise) {
         try {
+            require(plaintext.toByteArray(Charsets.UTF_8).size <= MAX_METADATA_BYTES) {
+                "Vault payload exceeds the supported size limit."
+            }
             val key = getOrCreateKey()
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.ENCRYPT_MODE, key)
@@ -137,7 +166,7 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
                 "tag" to Base64.getEncoder().encodeToString(tag),
             ))
         } catch (error: Throwable) {
-            promise.reject("VAULT_CRYPTO", error)
+            promise.reject("VAULT_CRYPTO", "Vault encryption failed.", null)
         }
     }
 
@@ -145,30 +174,38 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
     fun decrypt(ciphertext: String, iv: String, tag: String, aad: String, promise: Promise) {
         try {
             val key = getKey() ?: throw IllegalStateException("Vault master key is unavailable.")
+            val ivBytes = Base64.getDecoder().decode(iv)
+            val ciphertextBytes = Base64.getDecoder().decode(ciphertext)
+            val tagBytes = Base64.getDecoder().decode(tag)
+            require(ivBytes.size == 12 && tagBytes.size == 16) { "Invalid Vault encryption parameters." }
+            require(ciphertextBytes.size <= MAX_METADATA_BYTES) { "Vault payload exceeds the supported size limit." }
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(
                 Cipher.DECRYPT_MODE,
                 key,
-                GCMParameterSpec(128, Base64.getDecoder().decode(iv)),
+                GCMParameterSpec(128, ivBytes),
             )
             cipher.updateAAD(aad.toByteArray(Charsets.UTF_8))
-            val encrypted = Base64.getDecoder().decode(ciphertext) + Base64.getDecoder().decode(tag)
+            val encrypted = ciphertextBytes + tagBytes
             val plaintext = cipher.doFinal(encrypted)
+            require(plaintext.size <= MAX_METADATA_BYTES) { "Vault payload exceeds the supported size limit." }
             promise.resolve(String(plaintext, Charsets.UTF_8))
         } catch (error: Throwable) {
-            promise.reject("VAULT_CRYPTO", error)
+            promise.reject("VAULT_CRYPTO", "Vault decryption failed or authentication did not succeed.", null)
         }
     }
 
     @ReactMethod
     fun saveMetadata(value: String, promise: Promise) {
         try {
+            val bytes = value.toByteArray(Charsets.UTF_8)
+            require(bytes.size <= MAX_METADATA_BYTES) { "Vault metadata exceeds the supported size limit." }
             reactContext.openFileOutput(META_FILE, Context.MODE_PRIVATE).use { stream ->
-                stream.write(value.toByteArray(Charsets.UTF_8))
+                stream.write(bytes)
             }
             promise.resolve(null)
         } catch (error: Throwable) {
-            promise.reject("VAULT_STORAGE", error)
+            promise.reject("VAULT_STORAGE", "Unable to store Vault metadata.", null)
         }
     }
 
@@ -180,9 +217,10 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
                 promise.resolve(null)
                 return
             }
+            require(file.isFile && file.length() <= MAX_METADATA_BYTES) { "Vault metadata is invalid or too large." }
             promise.resolve(reactContext.openFileInput(META_FILE).bufferedReader(Charsets.UTF_8).use { it.readText() })
         } catch (error: Throwable) {
-            promise.reject("VAULT_STORAGE", error)
+            promise.reject("VAULT_STORAGE", "Unable to read Vault metadata.", null)
         }
     }
 
@@ -192,17 +230,18 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
             reactContext.deleteFile(META_FILE)
             promise.resolve(null)
         } catch (error: Throwable) {
-            promise.reject("VAULT_STORAGE", error)
+            promise.reject("VAULT_STORAGE", "Unable to remove Vault metadata.", null)
         }
     }
 
     @ReactMethod
     fun saveCredentialMode(mode: String, promise: Promise) {
         try {
+            require(mode == "biometric-only" || mode == "device-auth") { "Invalid Vault credential mode." }
             reactContext.openFileOutput(MODE_FILE, Context.MODE_PRIVATE).use { it.write(mode.toByteArray(Charsets.UTF_8)) }
             promise.resolve(null)
         } catch (error: Throwable) {
-            promise.reject("VAULT_STORAGE", error)
+            promise.reject("VAULT_STORAGE", "Unable to store Vault credential mode.", null)
         }
     }
 
@@ -214,10 +253,11 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
                 promise.resolve("biometric-only")
                 return
             }
+            require(file.isFile && file.length() <= 32) { "Vault credential mode is invalid." }
             val mode = reactContext.openFileInput(MODE_FILE).bufferedReader(Charsets.UTF_8).use { it.readText() }
             promise.resolve(if (mode == "device-auth") "device-auth" else "biometric-only")
         } catch (error: Throwable) {
-            promise.reject("VAULT_STORAGE", error)
+            promise.reject("VAULT_STORAGE", "Unable to read Vault credential mode.", null)
         }
     }
 
@@ -237,6 +277,7 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
             .setKeySize(256)
             .setRandomizedEncryptionRequired(true)
+            .setUserAuthenticationRequired(true)
 
         generator.init(builder.build())
         return generator.generateKey()

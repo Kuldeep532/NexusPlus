@@ -21,31 +21,45 @@ class AlarmRingActivity : AppCompatActivity() {
         setContentView(R.layout.activity_alarm_ring)
 
         findViewById<Button>(R.id.stop_alarm).setOnClickListener {
-            player?.stop()
+            stopPlayback()
             finishAndRemoveTask()
         }
         startPlayback()
     }
 
     private fun startPlayback() {
-        val uri = Uri.parse("android.resource://$packageName/${R.raw.first_light_at_the_brook}")
-        player = MediaPlayer().apply {
-            setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build(),
-            )
-            setDataSource(this@AlarmRingActivity, uri)
-            isLooping = true
-            prepare()
-            start()
+        if (player != null) return
+        try {
+            val uri = Uri.parse("android.resource://$packageName/${R.raw.first_light_at_the_brook}")
+            player = MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build(),
+                )
+                setOnErrorListener { _, _, _ ->
+                    stopPlayback()
+                    true
+                }
+                setDataSource(this@AlarmRingActivity, uri)
+                isLooping = true
+                prepare()
+                start()
+            }
+        } catch (_: Exception) {
+            stopPlayback()
         }
     }
 
-    override fun onDestroy() {
+    private fun stopPlayback() {
+        player?.runCatching { stop() }
         player?.release()
         player = null
+    }
+
+    override fun onDestroy() {
+        stopPlayback()
         super.onDestroy()
     }
 }
