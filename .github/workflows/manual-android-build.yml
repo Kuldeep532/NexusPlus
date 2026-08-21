@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 env:
-  APP_DIR: artifacts/nexus-plus
+  APP_DIR: .
 
 jobs:
   build-android:
