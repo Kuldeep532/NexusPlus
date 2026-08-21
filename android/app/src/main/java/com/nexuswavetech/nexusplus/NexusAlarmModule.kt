@@ -9,6 +9,11 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 
 class NexusAlarmModule(private val reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
+    companion object {
+        const val ALARM_STORE_NAME = "nexus-plus-alarm-bridge"
+        const val ALARM_STORE_KEY = "nexus-plus.time-assisted.alarms.v1"
+    }
+
     override fun getName(): String = "NexusAlarm"
 
     @ReactMethod
@@ -17,11 +22,24 @@ class NexusAlarmModule(private val reactContext: ReactApplicationContext) : Reac
     }
 
     @ReactMethod
+    fun persistDefinitions(json: String, promise: Promise) {
+        try {
+            require(json.length <= 64 * 1024) { "Alarm definition data is too large." }
+            val normalized = AlarmPersistence.normalize(json)
+            reactContext.getSharedPreferences(ALARM_STORE_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString(ALARM_STORE_KEY, normalized)
+                .apply()
+            promise.resolve(true)
+        } catch (error: Throwable) {
+            promise.reject("ALARM_STORAGE", error.message ?: "Unable to save alarm definitions.", null)
+        }
+    }
+
+    @ReactMethod
     fun schedule(id: String, hour: Int, minute: Int, promise: Promise) {
         try {
             requireValid(id, hour, minute)
-            val alarmManager = reactContext.getSystemService(AlarmManager::class.java)
-                ?: throw IllegalStateException("Alarm service is unavailable.")
             if (!AlarmPermission.canUseExactAlarms(reactContext)) {
                 promise.resolve(Arguments.makeNativeMap(mapOf("scheduled" to false, "reason" to "exact_alarm_permission")))
                 return
