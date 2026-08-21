@@ -1,51 +1,34 @@
-import { NativeModules, Platform } from 'react-native';
 import * as ScreenCapture from 'expo-screen-capture';
+import type { NativeVaultBackend } from '@/features/biometric-vault/nativeVaultContract';
+import { getAndroidVaultBackend } from '@/features/biometric-vault/nativeVaultBackend.android';
 
-type NativePaymentSecurity = {
-  getBiometricCapability: () => Promise<{
-    hardware: boolean;
-    enrolled: boolean;
-    deviceCredentialAvailable: boolean;
-    securityLevel: 'strong' | 'weak' | 'none';
-  }>;
-  authenticate: (
-    promptMessage: string,
-  ) => Promise<{ success: boolean; error?: string }>;
-};
+const PAYMENT_AUTH_REASON = 'Unlock Payment Announcer';
+const PAYMENT_SCREEN_PROTECTION_KEY = 'nexusplus-payment-announcer';
 
-const { NexusVault } = NativeModules;
-
-function nativeSecurity(): NativePaymentSecurity {
-  if (Platform.OS === 'android' && NexusVault) return NexusVault as NativePaymentSecurity;
-  throw new Error('Native payment security module is unavailable.');
+function getVaultBackend(): NativeVaultBackend | null {
+  return getAndroidVaultBackend();
 }
 
-export async function getPaymentBiometricCapability() {
-  if (Platform.OS === 'android') return nativeSecurity().getBiometricCapability();
-  return {
-    hardware: false,
-    enrolled: false,
-    deviceCredentialAvailable: false,
-    securityLevel: 'none' as const,
-  };
+export async function isPaymentBiometricAvailable(): Promise<boolean> {
+  const backend = getVaultBackend();
+  if (!backend) return false;
+  return backend.isAvailable();
 }
 
 export async function authenticatePaymentAnnouncer(): Promise<boolean> {
-  if (Platform.OS !== 'android') return false;
-  const capability = await getPaymentBiometricCapability();
-  if (!capability.hardware || !capability.enrolled || capability.securityLevel !== 'strong') {
-    return false;
-  }
-  const result = await nativeSecurity().authenticate('Unlock Payment Announcer');
-  return result.success === true;
+  const backend = getVaultBackend();
+  if (!backend || !(await backend.isAvailable())) return false;
+
+  // Payment Announcer is intentionally biometric-only. Device credentials are not accepted.
+  return backend.authenticate(PAYMENT_AUTH_REASON, false);
 }
 
 export async function enablePaymentScreenProtection(): Promise<void> {
-  await ScreenCapture.preventScreenCaptureAsync('nexusplus-payment-announcer');
+  await ScreenCapture.preventScreenCaptureAsync(PAYMENT_SCREEN_PROTECTION_KEY);
   await ScreenCapture.enableAppSwitcherProtectionAsync(1);
 }
 
 export async function disablePaymentScreenProtection(): Promise<void> {
-  await ScreenCapture.allowScreenCaptureAsync('nexusplus-payment-announcer');
+  await ScreenCapture.allowScreenCaptureAsync(PAYMENT_SCREEN_PROTECTION_KEY);
   await ScreenCapture.disableAppSwitcherProtectionAsync();
 }
