@@ -1,0 +1,54 @@
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["feature/clock-alarm-module"]
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: artifacts/nexus-plus
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: artifacts/nexus-plus/pnpm-lock.yaml
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify TypeScript
+        run: pnpm run typecheck
+
+      - name: Make Gradle executable
+        run: chmod +x ../../android/gradlew
+
+      - name: Build debug APK
+        working-directory: .
+        run: ./android/gradlew -p android assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-plus-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
