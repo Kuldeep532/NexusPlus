@@ -12,7 +12,9 @@ type Feature = { key: string; title: string; icon: React.ComponentProps<typeof M
 const features: Feature[] = [
   { key: 'reader', title: 'Book Reader', icon: 'book-open-page-variant', route: '/reader' },
   { key: 'media-player', title: 'Advanced Media Player', icon: 'play-circle', route: '/media-player' },
+  { key: 'video-editor', title: 'Video Editor', icon: 'movie-edit-outline', route: '/video-editor' },
   { key: 'vault', title: 'Biometric Vault', icon: 'shield-lock', route: '/biometric-vault' },
+  { key: 'file-encryption', title: 'File Encryption', icon: 'file-lock', route: '/file-encryption' },
   { key: 'utilities', title: 'Utilities', icon: 'tools', route: '/utilities' },
   { key: 'pdf-tools', title: 'PDF Tools', icon: 'file-pdf-box', route: '/pdf-tools' },
   { key: 'online-radio', title: 'Online Radio', icon: 'radio-tower', route: '/online-radio' },
@@ -47,7 +49,6 @@ export default function HomeScreen() {
           <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
         </Pressable>
       </View>
-
       <View style={styles.list}>
         {features.map((feature) => (
           <Pressable key={feature.key} accessibilityRole="button" accessibilityLabel={`Open ${feature.title}`} onPress={() => router.push(feature.route as never)} style={({ pressed }) => [styles.row, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]}>

@@ -33,6 +33,7 @@ function RootLayoutNav() {
       <Stack.Screen name="profile" options={{ title: 'Profile' }} />
       <Stack.Screen name="reader" options={{ title: 'Book Reader' }} />
       <Stack.Screen name="media-player" options={{ title: 'Media Player' }} />
+      <Stack.Screen name="video-editor" options={{ title: 'Video Editor' }} />
       <Stack.Screen name="biometric-vault" options={{ title: 'Biometric Vault' }} />
       <Stack.Screen name="selfie" options={{ title: 'Selfie' }} />
       <Stack.Screen name="time-assisted" options={{ title: 'Time Assisted' }} />
@@ -52,6 +53,7 @@ function RootLayoutNav() {
       <Stack.Screen name="pdf-to-images" options={{ title: 'PDF to Images' }} />
       <Stack.Screen name="protect-pdf" options={{ title: 'Protect PDF' }} />
       <Stack.Screen name="unlock-pdf" options={{ title: 'Unlock PDF' }} />
+      <Stack.Screen name="file-encryption" options={{ title: 'File Encryption' }} />
       <Stack.Screen name="privacy-policy" options={{ title: 'Privacy Policy' }} />
       <Stack.Screen name="terms-and-conditions" options={{ title: 'Terms and Conditions' }} />
       <Stack.Screen name="about-us" options={{ title: 'About Us' }} />
