@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createAudioPlayer, type AudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { useVideoPlayer } from 'expo-video';
 import type { MediaItemModel, PlayerState, RepeatMode } from './types';
@@ -17,174 +17,181 @@ const EMPTY: PlayerState = {
   shuffle: false,
 };
 
-function ms(seconds: number | undefined): number {
-  return Math.max(0, Math.round((seconds ?? 0) * 1000));
-}
-
 export function useMediaPlayer(initialQueue: MediaItemModel[] = []) {
-  const [state, setState] = useState<PlayerState>(() => ({
-    ...EMPTY,
-    queue: initialQueue,
-    current: initialQueue[0] ?? null,
-    index: initialQueue.length ? 0 : -1,
-  }));
   const audioRef = useRef<AudioPlayer | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const video = useVideoPlayer(state.current?.kind === 'video' ? state.current.uri : null, (player) => {
-    player.timeUpdateEventInterval = 0.25;
-  });
+  const [state, setState] = useState<PlayerState>(() => ({ ...EMPTY, queue: initialQueue }));
+  const current = state.current;
 
-  useEffect(() => {
-    void setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true });
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      audioRef.current?.remove();
-      audioRef.current = null;
-    };
-  }, []);
+  const videoPlayer = useVideoPlayer(
+    current?.kind === 'video' ? { uri: current.uri, contentType: 'auto' } : null,
+    (player) => {
+      player.timeUpdateEventInterval = 0.25;
+    },
+  );
 
-  const startPositionUpdates = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      if (state.current?.kind === 'audio' && audioRef.current) {
-        setState((prev) => ({
-          ...prev,
-          positionMs: ms(audioRef.current?.currentTime),
-          durationMs: ms(audioRef.current?.duration),
-          bufferedMs: ms(audioRef.current?.bufferedPosition),
-          isPlaying: Boolean(audioRef.current?.playing),
-        }));
-      }
-      if (state.current?.kind === 'video') {
-        setState((prev) => ({
-          ...prev,
-          positionMs: ms(video.currentTime),
-          durationMs: ms(video.duration),
-          isPlaying: Boolean(video.playing),
-        }));
-      }
-    }, 250);
-  }, [state.current?.kind, video]);
-
-  const load = useCallback(async (item: MediaItemModel, autoplay = true) => {
-    audioRef.current?.remove();
-    audioRef.current = null;
-
-    const index = state.queue.findIndex((entry) => entry.id === item.id);
-    setState((prev) => ({
-      ...prev,
-      current: item,
-      index: index >= 0 ? index : prev.index,
-      positionMs: 0,
-      durationMs: item.durationMs ?? 0,
-      bufferedMs: 0,
-      isPlaying: false,
-    }));
-
-    if (item.kind === 'audio') {
-      const player = createAudioPlayer(item.uri);
-      player.volume = state.volume;
-      player.playbackRate = state.rate;
-      audioRef.current = player;
-      if (autoplay) player.play();
-    } else if (autoplay) {
-      video.play();
-    }
-    startPositionUpdates();
-  }, [startPositionUpdates, state.queue, state.rate, state.volume, video]);
-
-  const play = useCallback(() => {
-    if (!state.current) return;
-    if (state.current.kind === 'audio') audioRef.current?.play();
-    else video.play();
-    setState((prev) => ({ ...prev, isPlaying: true }));
-  }, [state.current, video]);
-
-  const pause = useCallback(() => {
-    if (!state.current) return;
-    if (state.current.kind === 'audio') audioRef.current?.pause();
-    else video.pause();
-    setState((prev) => ({ ...prev, isPlaying: false }));
-  }, [state.current, video]);
-
-  const seekTo = useCallback((positionMs: number) => {
-    const seconds = Math.max(0, positionMs) / 1000;
-    if (state.current?.kind === 'audio' && audioRef.current) audioRef.current.seekTo(seconds);
-    if (state.current?.kind === 'video') video.currentTime = seconds;
-    setState((prev) => ({ ...prev, positionMs: Math.max(0, positionMs) }));
-  }, [state.current?.kind, video]);
-
-  const setRate = useCallback((rate: number) => {
-    const safe = Math.min(3, Math.max(0.25, rate));
-    if (audioRef.current) audioRef.current.playbackRate = safe;
-    video.playbackRate = safe;
-    setState((prev) => ({ ...prev, rate: safe }));
-  }, [video]);
-
-  const setVolume = useCallback((volume: number) => {
-    const safe = Math.min(1, Math.max(0, volume));
-    if (audioRef.current) audioRef.current.volume = safe;
-    video.volume = safe;
-    setState((prev) => ({ ...prev, volume: safe }));
-  }, [video]);
-
-  const setRepeat = useCallback((repeat: RepeatMode) => setState((prev) => ({ ...prev, repeat })), []);
-  const setShuffle = useCallback((shuffle: boolean) => setState((prev) => ({ ...prev, shuffle })), []);
-
-  const next = useCallback(() => {
-    if (!state.queue.length) return;
-    let nextIndex: number;
-    if (state.shuffle && state.queue.length > 1) {
-      do nextIndex = Math.floor(Math.random() * state.queue.length); while (nextIndex === state.index);
-    } else {
-      nextIndex = state.index + 1;
-    }
-
-    if (nextIndex >= state.queue.length) {
-      if (state.repeat === 'all') nextIndex = 0;
-      else {
-        pause();
-        return;
-      }
-    }
-    void load(state.queue[nextIndex], true);
-  }, [load, pause, state.index, state.queue, state.repeat, state.shuffle]);
-
-  const previous = useCallback(() => {
-    if (!state.queue.length) return;
-    if (state.positionMs > 5000) {
-      seekTo(0);
+  const syncFromNative = useCallback(() => {
+    if (!current) return;
+    if (current.kind === 'audio') {
+      const player = audioRef.current;
+      if (!player) return;
+      setState((s) => ({
+        ...s,
+        isPlaying: player.playing,
+        positionMs: player.currentTime * 1000,
+        durationMs: Number.isFinite(player.duration) ? player.duration * 1000 : s.durationMs,
+      }));
       return;
     }
-    const previousIndex = state.index <= 0 ? state.queue.length - 1 : state.index - 1;
-    void load(state.queue[previousIndex], true);
-  }, [load, seekTo, state.index, state.positionMs, state.queue]);
+    setState((s) => ({
+      ...s,
+      isPlaying: videoPlayer.playing,
+      positionMs: videoPlayer.currentTime * 1000,
+      durationMs: Number.isFinite(videoPlayer.duration) ? videoPlayer.duration * 1000 : s.durationMs,
+    }));
+  }, [current, videoPlayer]);
 
-  const setQueue = useCallback((queue: MediaItemModel[], startIndex = 0) => {
-    const safeIndex = queue.length ? Math.max(0, Math.min(startIndex, queue.length - 1)) : -1;
-    setState((prev) => ({ ...prev, queue, index: safeIndex, current: queue[safeIndex] ?? null }));
-  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    void setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: true,
+      interruptionMode: 'mixWithOthers',
+    });
+    if (!current || current.kind !== 'audio') return;
 
-  const toggle = useCallback(() => {
+    const player = createAudioPlayer({ uri: current.uri }, 250);
+    audioRef.current = player;
+    player.volume = state.volume;
+    player.setPlaybackRate(state.rate);
+    player.play();
+    setState((s) => ({ ...s, isPlaying: true, error: undefined }));
+
+    const subscription = player.addListener('playbackStatusUpdate', () => {
+      if (!cancelled) syncFromNative();
+      if (player.didJustFinish) void next();
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.remove();
+      player.remove();
+      audioRef.current = null;
+    };
+    // Deliberately restart only when the media identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id]);
+
+  useEffect(() => {
+    if (current?.kind !== 'video') return;
+    videoPlayer.play();
+  }, [current?.id]);
+
+  const play = useCallback(() => {
+    if (!current) return;
+    if (current.kind === 'audio') audioRef.current?.play();
+    else videoPlayer.play();
+    setState((s) => ({ ...s, isPlaying: true }));
+  }, [current, videoPlayer]);
+
+  const pause = useCallback(() => {
+    if (!current) return;
+    if (current.kind === 'audio') audioRef.current?.pause();
+    else videoPlayer.pause();
+    setState((s) => ({ ...s, isPlaying: false }));
+  }, [current, videoPlayer]);
+
+  const togglePlayPause = useCallback(() => {
     if (state.isPlaying) pause();
     else play();
   }, [pause, play, state.isPlaying]);
 
-  return {
+  const seekTo = useCallback((positionMs: number) => {
+    const seconds = Math.max(0, positionMs) / 1000;
+    if (current?.kind === 'audio') audioRef.current?.seekTo(seconds);
+    if (current?.kind === 'video') videoPlayer.currentTime = seconds;
+    setState((s) => ({ ...s, positionMs: Math.max(0, positionMs) }));
+  }, [current, videoPlayer]);
+
+  const load = useCallback((item: MediaItemModel, queue = state.queue) => {
+    const index = queue.findIndex((candidate) => candidate.id === item.id);
+    setState((s) => ({ ...s, current: item, queue, index: index >= 0 ? index : s.index, positionMs: 0, durationMs: item.durationMs ?? 0, error: undefined }));
+  }, [state.queue]);
+
+  const next = useCallback(() => {
+    if (!state.queue.length) return;
+    if (state.repeat === 'one' && current) {
+      load(current);
+      return;
+    }
+    const candidates = state.queue.length;
+    let nextIndex = state.index + 1;
+    if (state.shuffle && candidates > 1) {
+      const available = [...Array(candidates).keys()].filter((i) => i !== state.index);
+      nextIndex = available[Math.floor(Math.random() * available.length)];
+    }
+    if (nextIndex >= candidates) {
+      if (state.repeat !== 'all') {
+        pause();
+        return;
+      }
+      nextIndex = 0;
+    }
+    load(state.queue[nextIndex]);
+  }, [current, load, pause, state.index, state.queue, state.repeat, state.shuffle]);
+
+  const previous = useCallback(() => {
+    if (state.positionMs > 3000) {
+      seekTo(0);
+      return;
+    }
+    if (!state.queue.length) return;
+    const index = state.index <= 0 ? state.queue.length - 1 : state.index - 1;
+    load(state.queue[index]);
+  }, [load, seekTo, state.index, state.positionMs, state.queue]);
+
+  const setRate = useCallback((rate: number) => {
+    const safeRate = Math.max(0.25, Math.min(3, rate));
+    audioRef.current?.setPlaybackRate(safeRate);
+    videoPlayer.playbackRate = safeRate;
+    setState((s) => ({ ...s, rate: safeRate }));
+  }, [videoPlayer]);
+
+  const setVolume = useCallback((volume: number) => {
+    const safeVolume = Math.max(0, Math.min(1, volume));
+    if (audioRef.current) audioRef.current.volume = safeVolume;
+    videoPlayer.volume = safeVolume;
+    setState((s) => ({ ...s, volume: safeVolume }));
+  }, [videoPlayer]);
+
+  const cycleRepeat = useCallback(() => {
+    setState((s) => ({ ...s, repeat: ({ off: 'one', one: 'all', all: 'off' } as Record<RepeatMode, RepeatMode>)[s.repeat] }));
+  }, []);
+
+  const toggleShuffle = useCallback(() => setState((s) => ({ ...s, shuffle: !s.shuffle })), []);
+
+  const updateQueue = useCallback((queue: MediaItemModel[]) => {
+    setState((s) => ({ ...s, queue }));
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(syncFromNative, 250);
+    return () => clearInterval(id);
+  }, [syncFromNative]);
+
+  return useMemo(() => ({
     state,
-    current: state.current,
+    videoPlayer,
     load,
     play,
     pause,
-    toggle,
+    togglePlayPause,
+    seekTo,
     next,
     previous,
-    seekTo,
     setRate,
     setVolume,
-    setRepeat,
-    setShuffle,
-    setQueue,
-    video,
-  };
+    cycleRepeat,
+    toggleShuffle,
+    updateQueue,
+  }), [cycleRepeat, load, next, pause, play, previous, seekTo, setRate, setVolume, state, togglePlayPause, toggleShuffle, updateQueue, videoPlayer]);
 }

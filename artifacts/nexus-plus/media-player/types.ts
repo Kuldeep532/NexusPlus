@@ -1,22 +1,37 @@
 export type MediaKind = 'audio' | 'video';
+export type MediaSource = 'local' | 'radio' | 'youtube-music';
 export type RepeatMode = 'off' | 'one' | 'all';
 
 export interface SubtitleCue {
+  id: string;
   startMs: number;
   endMs: number;
   text: string;
 }
 
+export interface SubtitleTrack {
+  id: string;
+  label: string;
+  language?: string;
+  uri?: string;
+  cues?: SubtitleCue[];
+}
+
 export interface MediaItemModel {
   id: string;
   uri: string;
+  kind: MediaKind;
+  source?: MediaSource;
   title: string;
   artist?: string;
   album?: string;
-  artworkUri?: string;
   durationMs?: number;
-  kind: MediaKind;
-  subtitles?: SubtitleCue[];
+  artworkUri?: string;
+  subtitleTracks?: SubtitleTrack[];
+  isLocal?: boolean;
+  mimeType?: string;
+  width?: number;
+  height?: number;
 }
 
 export interface PlayerState {
@@ -31,4 +46,34 @@ export interface PlayerState {
   volume: number;
   repeat: RepeatMode;
   shuffle: boolean;
+  selectedSubtitleId?: string;
+  error?: string;
+}
+
+export interface MediaLibraryState {
+  permissionGranted: boolean;
+  loading: boolean;
+  audio: MediaItemModel[];
+  video: MediaItemModel[];
+  error?: string;
+}
+
+export interface MediaPlaylist {
+  id: string;
+  name: string;
+  itemIds: string[];
+  isDevicePlaylist?: boolean;
+}
+
+export interface MediaCollections {
+  tracks: MediaItemModel[];
+  albums: Array<{ id: string; title: string; artist?: string; artworkUri?: string; trackIds: string[] }>;
+  playlists: MediaPlaylist[];
+}
+
+export interface LocalMediaAi {
+  transcribe(uri: string): Promise<string>;
+  summarize(text: string): Promise<string>;
+  extractChapters(text: string): Promise<Array<{ title: string; startMs: number }>>;
+  suggestTags(metadata: Pick<MediaItemModel, 'title' | 'artist' | 'album'>): Promise<string[]>;
 }
