@@ -1,17 +1,17 @@
+import * as Crypto from 'expo-crypto';
+import * as FileSystem from 'expo-file-system';
 import { PdfNativeBridge } from '../pdf-native/PdfNativeBridge';
 import type { ProtectPdfInput, ProtectPdfResult } from './protectPdfTypes';
 
-function outputName(name: string, suffix: string): string {
-  return `${name.replace(/\.pdf$/i, '')}-${suffix}.pdf`;
+function safeBaseName(name: string): string {
+  return name.replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 128) || 'document';
 }
 
-/**
- * The native bridge accepts an app-accessible filesystem path.
- * Higher-level screens can later hand the returned path to the platform
- * sharing/export adapter without changing the PDF engine API.
- */
-function outputPath(name: string): string {
-  return `nexusplus-cache/${name}`;
+async function outputPath(name: string, suffix: string): Promise<string> {
+  const base = FileSystem.cacheDirectory;
+  if (!base) throw new Error('App cache storage is unavailable.');
+  const id = Crypto.randomUUID();
+  return `${base}nexus-pdf-${id}-${safeBaseName(name)}-${suffix}.pdf`;
 }
 
 export async function protectPdfWithEngine(
@@ -21,10 +21,9 @@ export async function protectPdfWithEngine(
   if (!userPassword || userPassword.length < 8) {
     throw new Error('PDF password must be at least 8 characters.');
   }
-  const name = outputName(input.name, 'protected');
-  const path = outputPath(name);
+  const path = await outputPath(input.name, 'protected');
   await PdfNativeBridge.protect(input.uri, path, userPassword);
-  return { uri: path, name };
+  return { uri: path, name: `${safeBaseName(input.name)}-protected.pdf` };
 }
 
 export async function unlockPdfWithEngine(
@@ -32,8 +31,7 @@ export async function unlockPdfWithEngine(
   password: string,
 ): Promise<ProtectPdfResult> {
   if (!password) throw new Error('PDF password is required.');
-  const name = outputName(input.name, 'unlocked');
-  const path = outputPath(name);
+  const path = await outputPath(input.name, 'unlocked');
   await PdfNativeBridge.unlock(input.uri, path, password);
-  return { uri: path, name };
+  return { uri: path, name: `${safeBaseName(input.name)}-unlocked.pdf` };
 }
