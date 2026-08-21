@@ -1,0 +1,55 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'com.facebook.react'
+}
+
+react {
+    autolinkLibrariesWithApp()
+    entryFile = file('../../artifacts/nexus-plus/node_modules/expo-router/entry.js')
+}
+
+android {
+    namespace 'com.nexuswavetech.nexusplus'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.nexuswavetech.nexusplus'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    buildFeatures { buildConfig true }
+
+    packaging {
+        jniLibs { useLegacyPackaging = false }
+        resources {
+            excludes += [
+                'META-INF/DEPENDENCIES',
+                'META-INF/LICENSE*',
+                'META-INF/NOTICE*',
+                'META-INF/*.version'
+            ]
+        }
+    }
+
+    buildTypes {
+        debug { minifyEnabled false }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.15.0'
+    implementation 'androidx.activity:activity-ktx:1.10.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.biometric:biometric:1.1.0'
+    implementation 'com.tom-roush:pdfbox-android:2.0.27.0'
+    implementation 'com.facebook.react:react-android:0.81.5'
+}
