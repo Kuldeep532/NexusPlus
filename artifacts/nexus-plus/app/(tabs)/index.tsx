@@ -14,6 +14,7 @@ const features: Feature[] = [
   { key: 'media-player', title: 'Advanced Media Player', icon: 'play-circle', route: '/media-player' },
   { key: 'video-editor', title: 'Video Editor', icon: 'movie-edit-outline', route: '/video-editor' },
   { key: 'vault', title: 'Biometric Vault', icon: 'shield-lock', route: '/biometric-vault' },
+  { key: 'file-encryption', title: 'File Encryption', icon: 'file-lock', route: '/file-encryption' },
   { key: 'utilities', title: 'Utilities', icon: 'tools', route: '/utilities' },
   { key: 'pdf-tools', title: 'PDF Tools', icon: 'file-pdf-box', route: '/pdf-tools' },
   { key: 'online-radio', title: 'Online Radio', icon: 'radio-tower', route: '/online-radio' },
