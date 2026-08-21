@@ -5,11 +5,13 @@ function outputName(name: string, suffix: string): string {
   return `${name.replace(/\.pdf$/i, '')}-${suffix}.pdf`;
 }
 
-function cacheOutput(name: string): string {
-  // The native Android/iOS bridge owns the actual destination path/URI.
-  // Callers that need a shareable/exportable URI should pass a SAF/content URI
-  // adapter at the platform boundary.
-  return name;
+/**
+ * The native bridge accepts an app-accessible filesystem path.
+ * Higher-level screens can later hand the returned path to the platform
+ * sharing/export adapter without changing the PDF engine API.
+ */
+function outputPath(name: string): string {
+  return `nexusplus-cache/${name}`;
 }
 
 export async function protectPdfWithEngine(
@@ -20,9 +22,9 @@ export async function protectPdfWithEngine(
     throw new Error('PDF password must be at least 8 characters.');
   }
   const name = outputName(input.name, 'protected');
-  const uri = cacheOutput(name);
-  await PdfNativeBridge.protect(input.uri, uri, userPassword);
-  return { uri, name };
+  const path = outputPath(name);
+  await PdfNativeBridge.protect(input.uri, path, userPassword);
+  return { uri: path, name };
 }
 
 export async function unlockPdfWithEngine(
@@ -31,7 +33,7 @@ export async function unlockPdfWithEngine(
 ): Promise<ProtectPdfResult> {
   if (!password) throw new Error('PDF password is required.');
   const name = outputName(input.name, 'unlocked');
-  const uri = cacheOutput(name);
-  await PdfNativeBridge.unlock(input.uri, uri, password);
-  return { uri, name };
+  const path = outputPath(name);
+  await PdfNativeBridge.unlock(input.uri, path, password);
+  return { uri: path, name };
 }
