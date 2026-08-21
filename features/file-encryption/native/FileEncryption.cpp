@@ -1,10 +1,10 @@
 #include "FileEncryption.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <fstream>
 #include <random>
 #include <sstream>
-#include <limits>
 
 namespace nexus::crypto {
 namespace {
@@ -13,20 +13,24 @@ constexpr char kMagic[] = "NEXUSENC";
 constexpr std::uint8_t kVersion = 1;
 constexpr std::size_t kSaltBytes = 16;
 constexpr std::size_t kIvBytes = 12;
-constexpr std::size_t kKeyBytes = 32;
 constexpr std::size_t kTagBytes = 16;
 constexpr std::uint32_t kCanonicalIterations = 600000;
 constexpr std::uint64_t kMaxFileBytes = 256ULL * 1024ULL * 1024ULL;
 
-std::vector<std::uint8_t> readAll(const std::string& path) {
-  std::ifstream input(path, std::ios::binary);
+std::uint64_t fileSizeBytes(const std::string& path) {
+  std::ifstream input(path, std::ios::binary | std::ios::ate);
   if (!input) throw std::runtime_error("Cannot open input file");
-  input.seekg(0, std::ios::end);
   const auto size = input.tellg();
   if (size < 0) throw std::runtime_error("Cannot determine input file size");
-  const auto fileSize = static_cast<std::uint64_t>(size);
-  if (fileSize > kMaxFileBytes) throw std::runtime_error("File is too large for secure encryption processing");
-  input.seekg(0, std::ios::beg);
+  return static_cast<std::uint64_t>(size);
+}
+
+std::vector<std::uint8_t> readAll(const std::string& path) {
+  const auto fileSize = fileSizeBytes(path);
+  if (fileSize > kMaxFileBytes) throw std::runtime_error("File is too large for secure processing");
+
+  std::ifstream input(path, std::ios::binary);
+  if (!input) throw std::runtime_error("Cannot open input file");
   std::vector<std::uint8_t> bytes(static_cast<std::size_t>(fileSize));
   if (!bytes.empty()) {
     input.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
@@ -43,6 +47,27 @@ void writeAll(const std::string& path, const std::vector<std::uint8_t>& bytes) {
   if (!output) throw std::runtime_error("Failed writing encrypted file");
 }
 
+void writeAtomic(const std::string& outputPath, const std::vector<std::uint8_t>& bytes) {
+  const std::string temporaryPath = outputPath + ".nexus-tmp";
+  std::remove(temporaryPath.c_str());
+  try {
+    writeAll(temporaryPath, bytes);
+    std::remove(outputPath.c_str());
+    if (std::rename(temporaryPath.c_str(), outputPath.c_str()) != 0) {
+      std::remove(temporaryPath.c_str());
+      throw std::runtime_error("Failed to finalize output file");
+    }
+  } catch (...) {
+    std::remove(temporaryPath.c_str());
+    throw;
+  }
+}
+
+void validatePaths(const std::string& inputPath, const std::string& outputPath) {
+  if (inputPath.empty() || outputPath.empty()) throw std::runtime_error("Input and output paths are required");
+  if (inputPath == outputPath) throw std::runtime_error("Input and output files must be different");
+}
+
 void randomBytes(std::vector<std::uint8_t>& bytes) {
   std::random_device rd;
   for (auto& value : bytes) value = static_cast<std::uint8_t>(rd());
@@ -52,7 +77,6 @@ bool validIterations(std::uint32_t iterations) {
   return iterations == kCanonicalIterations;
 }
 
-// Cryptographic primitives are intentionally isolated behind this layer.
 bool sealAesGcm(const std::vector<std::uint8_t>& plaintext,
                 const std::vector<std::uint8_t>& key,
                 const std::vector<std::uint8_t>& iv,
@@ -80,6 +104,7 @@ bool FileEncryption::lock(const std::string& inputPath,
                           const Options& options,
                           std::string* error) const {
   try {
+    validatePaths(inputPath, outputPath);
     if (options.password.size() < 8) throw std::runtime_error("Password must contain at least 8 characters");
     if (!validIterations(options.iterations)) throw std::runtime_error("Unsupported encryption KDF parameters");
 
@@ -108,9 +133,10 @@ bool FileEncryption::lock(const std::string& inputPath,
     add32(options.iterations);
     container.insert(container.end(), tag.begin(), tag.end());
     container.insert(container.end(), ciphertext.begin(), ciphertext.end());
-    writeAll(outputPath, container);
+    writeAtomic(outputPath, container);
     return true;
   } catch (const std::exception& exception) {
+    std::remove(outputPath.c_str());
     if (error) *error = exception.what();
     return false;
   }
@@ -121,6 +147,7 @@ bool FileEncryption::unlock(const std::string& inputPath,
                             const Options& options,
                             std::string* error) const {
   try {
+    validatePaths(inputPath, outputPath);
     if (options.password.size() < 8) throw std::runtime_error("Password must contain at least 8 characters");
 
     const auto container = readAll(inputPath);
@@ -147,9 +174,10 @@ bool FileEncryption::unlock(const std::string& inputPath,
       if (error && error->empty()) *error = "Wrong password or corrupted file";
       return false;
     }
-    writeAll(outputPath, plaintext);
+    writeAtomic(outputPath, plaintext);
     return true;
   } catch (const std::exception& exception) {
+    std::remove(outputPath.c_str());
     if (error) *error = exception.what();
     return false;
   }
