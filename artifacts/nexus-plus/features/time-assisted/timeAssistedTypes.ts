@@ -30,6 +30,7 @@ export type AnnouncementSettings = {
   voiceIdentifier?: string;
   includeDate: boolean;
   includeDay: boolean;
+  soundEnabled: boolean;
 };
 
 export const DEFAULT_ANNOUNCEMENT_SETTINGS: AnnouncementSettings = {
@@ -40,4 +41,5 @@ export const DEFAULT_ANNOUNCEMENT_SETTINGS: AnnouncementSettings = {
   pitch: 1.0,
   includeDate: true,
   includeDay: true,
+  soundEnabled: true,
 };
