@@ -52,9 +52,6 @@ jobs:
         env:
           GOOGLE_SERVICES_JSON_CONTENT: ${{ secrets.GOOGLE_SERVICES_JSON }}
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           test -n "$GOOGLE_SERVICES_JSON_CONTENT"
@@ -65,14 +62,6 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > nexusplus-release.jks
           chmod 600 nexusplus-release.jks
           test -s nexusplus-release.jks
-
-          cat > .android-signing.env <<EOF
-ANDROID_KEYSTORE_PATH=nexusplus-release.jks
-ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD
-ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS
-ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD
-EOF
-          chmod 600 .android-signing.env
 
       - name: Validate TypeScript
         working-directory: ${{ env.APP_DIR }}
@@ -120,4 +109,5 @@ EOF
         if: always()
         working-directory: ${{ env.APP_DIR }}
         run: |
-          rm -f google-services.json nexusplus-release.jks .android-signing.env
+          set +x
+          rm -f google-services.json nexusplus-release.jks
