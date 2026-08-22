@@ -11,8 +11,9 @@ export interface HomeFeatureDefinition {
   order?: number;
 }
 
-// Keep the primary Nexus Plus experiences explicit and ordered. The Home screen
-// consumes this registry instead of maintaining a second hard-coded feature list.
+// Only major, user-facing Nexus Plus experiences are featured on Home.
+// Individual tools belong to their category screen and are intentionally not
+// rendered as individual Home cards.
 const registry: HomeFeatureDefinition[] = [
   { id: 'book-reader', title: 'Book Reader', description: 'Read books and documents.', route: '/reader', icon: 'book-open', category: 'productivity', featured: true, order: 10 },
   { id: 'media-player', title: 'Media Player', description: 'Play audio and media.', route: '/media-player', icon: 'play-circle', category: 'media', featured: true, order: 20 },
@@ -21,7 +22,6 @@ const registry: HomeFeatureDefinition[] = [
   { id: 'payment-announcer', title: 'Payment Announcer', description: 'Secure payment announcements.', route: '/payment-announcer', icon: 'volume-2', category: 'security', featured: true, order: 50 },
   { id: 'expense-tracker', title: 'Finance Tracker', description: 'Track and review expenses securely.', route: '/expense-tracker', icon: 'credit-card', category: 'security', featured: true, order: 60 },
   { id: 'video-editor', title: 'Video Editor', description: 'Edit and export videos.', route: '/video-editor', icon: 'video', category: 'media', featured: true, order: 70 },
-  { id: 'geeta-nexus', title: 'Geeta Nexus', description: 'Study the Bhagavad Gita, verses and audio.', route: '/geeta-nexus', icon: 'book', category: 'productivity', featured: true, order: 80 },
   { id: 'time-announcer', title: 'Time Announcer', description: 'Configure time announcements.', route: '/time-announcer', icon: 'volume-2', category: 'utility' },
   { id: 'clock', title: 'Clock', description: 'Announce and work with the current time.', route: '/time-announcer', icon: 'clock', category: 'utility' },
   { id: 'battery-announcer', title: 'Battery Announcer', description: 'Announce battery state.', route: '/battery-announcer', icon: 'battery', category: 'utility' },
@@ -49,9 +49,9 @@ export function getFeaturesByCategory(category: FeatureCategory): HomeFeatureDef
 }
 
 export const FEATURE_CATEGORY_META: Record<FeatureCategory, { title: string; description: string; icon: string; route: string }> = {
-  utility: { title: 'Utility Tools', description: 'Clock, time and accessibility utilities.', icon: 'clock', route: '/categories/utility-tools' },
-  pdf: { title: 'PDF Tools', description: 'Convert, protect and manage PDFs.', icon: 'file-text', route: '/categories/pdf-tools' },
+  utility: { title: 'Utility Tools', description: 'Clock, time, alarm and accessibility utilities.', icon: 'clock', route: '/categories/utility-tools' },
+  pdf: { title: 'PDF Tools', description: 'Convert, protect, lock, unlock and manage PDFs.', icon: 'file-text', route: '/categories/pdf-tools' },
   media: { title: 'Media Tools', description: 'Audio, radio and video tools.', icon: 'film', route: '/categories/media-tools' },
   security: { title: 'Security & Privacy', description: 'Security-sensitive tools and financial protection.', icon: 'shield', route: '/categories/security-tools' },
-  productivity: { title: 'Productivity Tools', description: 'Reading, computer control and focused workflows.', icon: 'grid', route: '/categories/productivity-tools' },
+  productivity: { title: 'Productivity Tools', description: 'Focused workflows and productivity utilities.', icon: 'grid', route: '/categories/productivity-tools' },
 };
