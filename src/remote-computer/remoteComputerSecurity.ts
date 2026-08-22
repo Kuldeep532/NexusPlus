@@ -1,9 +1,7 @@
 import * as LocalAuthentication from 'expo-local-authentication';
-import * as SecureStore from 'expo-secure-store';
 import { getRandomBytesAsync } from 'expo-crypto';
 import type { RemoteComputerUnlockRequest } from './remoteComputerTypes';
-
-const DEVICE_KEY_ID = 'remote-computer.device-key-id';
+import { getRemoteDevicePublicKey, isRemoteKeyAvailable, signRemoteChallenge } from './remoteComputerNative';
 
 export interface RemoteComputerBiometricResult {
   authenticated: boolean;
@@ -19,13 +17,13 @@ function toHex(bytes: Uint8Array): string {
 export async function canUseRemoteComputerBiometrics(): Promise<boolean> {
   const hasHardware = await LocalAuthentication.hasHardwareAsync();
   const enrolled = await LocalAuthentication.isEnrolledAsync();
-  return hasHardware && enrolled;
+  return hasHardware && enrolled && isRemoteKeyAvailable();
 }
 
 export async function authenticateForRemoteComputer(): Promise<RemoteComputerBiometricResult> {
   const supported = await canUseRemoteComputerBiometrics();
   if (!supported) {
-    return { authenticated: false, reason: 'Phone biometric authentication is unavailable.' };
+    return { authenticated: false, reason: 'Phone biometric authentication or the device-bound key is unavailable.' };
   }
 
   const result = await LocalAuthentication.authenticateAsync({
@@ -39,22 +37,21 @@ export async function authenticateForRemoteComputer(): Promise<RemoteComputerBio
     return { authenticated: false, reason: 'Biometric authentication was cancelled or failed.' };
   }
 
-  let keyId = await SecureStore.getItemAsync(DEVICE_KEY_ID);
-  if (!keyId) {
-    keyId = `nexus-${toHex(await getRandomBytesAsync(16))}`;
-    await SecureStore.setItemAsync(DEVICE_KEY_ID, keyId, {
-      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-    });
+  const publicKey = await getRemoteDevicePublicKey();
+  if (!publicKey.keyId) {
+    return { authenticated: false, reason: 'The device-bound signing key could not be initialized.' };
   }
 
-  // The private signing key must live in a native OS keystore / secure
-  // hardware boundary in a later stage. The JS layer only receives the
-  // non-secret key identifier after the user has authenticated.
   return {
     authenticated: true,
-    keyId,
+    keyId: publicKey.keyId,
     biometricStrength: 'strong',
   };
+}
+
+export async function createRemotePairingIdentity() {
+  if (!isRemoteKeyAvailable()) throw new Error('Device-bound remote key is unavailable on this platform.');
+  return getRemoteDevicePublicKey();
 }
 
 export async function buildUnlockRequest(
@@ -67,14 +64,16 @@ export async function buildUnlockRequest(
     throw new Error(result.reason ?? 'Biometric authentication failed.');
   }
 
-  // Signing intentionally stays native. Never replace this with a JS hash,
-  // client secret, or reversible token: those would not prove possession of
-  // a device-bound private key and must not unlock a computer.
+  const signedChallenge = await signRemoteChallenge(challenge);
   return {
     computerId,
     challengeId,
-    signedChallenge: `native-signature-required:${challenge}`,
+    signedChallenge,
     deviceKeyId: result.keyId,
     biometricStrength: result.biometricStrength ?? 'strong',
   };
+}
+
+export function createPairingNonce(): string {
+  return toHex(new Uint8Array(getRandomBytesAsync ? [] : []));
 }
