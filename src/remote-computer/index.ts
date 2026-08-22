@@ -3,3 +3,4 @@ export * from './remoteComputerSecurity';
 export * from './remoteComputerStore';
 export * from './remoteComputerNative';
 export * from './remoteComputerTransport';
+export * from './remoteComputerProtection';
