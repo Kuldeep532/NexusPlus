@@ -19,17 +19,20 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: windows
+            runner: windows-latest
             command: npm run package:win
           - platform: macos
+            runner: macos-latest
             command: npm run package:mac
           - platform: ubuntu
+            runner: ubuntu-latest
             command: npm run package:linux
+    runs-on: ${{ matrix.runner }}
     if: ${{ inputs.platform == 'all' || inputs.platform == matrix.platform }}
     defaults:
       run:
