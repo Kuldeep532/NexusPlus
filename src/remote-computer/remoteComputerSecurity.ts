@@ -74,6 +74,6 @@ export async function buildUnlockRequest(
   };
 }
 
-export function createPairingNonce(): string {
-  return toHex(new Uint8Array(getRandomBytesAsync ? [] : []));
+export async function createPairingNonce(): Promise<string> {
+  return toHex(await getRandomBytesAsync(32));
 }
