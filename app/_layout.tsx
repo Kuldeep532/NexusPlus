@@ -5,6 +5,7 @@ import { useAuth } from '@/features/auth/useAuth';
 import { useColors } from '@/hooks/useColors';
 import { getLaunchRoute } from '@/features/app-shell/launchPreferences';
 import { PersistentMediaProvider } from '@/media-player/PersistentMediaController';
+import { GlobalMiniPlayer } from '@/features/media/GlobalMiniPlayer';
 
 export default function RootLayout() {
   const auth = useAuth();
@@ -47,12 +48,16 @@ export default function RootLayout() {
 
   return (
     <PersistentMediaProvider>
-      <Stack screenOptions={{ headerShown: true }} />
+      <View style={styles.root}>
+        <Stack screenOptions={{ headerShown: true }} />
+        <GlobalMiniPlayer />
+      </View>
     </PersistentMediaProvider>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   splashBridge: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   brand: { fontSize: 30, fontFamily: 'Inter_700Bold', marginBottom: 8 },
   message: { fontSize: 13, fontFamily: 'Inter_700Bold', letterSpacing: 1.4 },
