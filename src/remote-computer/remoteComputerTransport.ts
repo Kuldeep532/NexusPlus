@@ -45,7 +45,6 @@ export async function requestRemoteUnlock(url: string, computerId: string): Prom
   });
 }
 
-/** Stage 3: allowlisted remote control. Each command gets a fresh desktop challenge and phone biometric signature. */
 export async function sendRemoteCommand(url: string, request: Omit<RemoteComputerCommandRequest, 'commandId'>): Promise<RemoteComputerCommandResult> {
   const socket = await openSocket(url); const identity = await createRemotePairingIdentity(); const commandId = await createPairingNonce();
   return new Promise((resolve, reject) => {
@@ -60,6 +59,33 @@ export async function sendRemoteCommand(url: string, request: Omit<RemoteCompute
       if (message.type === 'error') throw new Error(message.message ?? 'Remote command rejected.');
     } catch (error) { clearTimeout(timeout); socket.close(); reject(error instanceof Error ? error : new Error('Remote command failed.')); } };
     socket.send(JSON.stringify({ type: 'command_request', computerId: request.computerId, source: request.source, transcript: request.transcript, commandId }));
+  });
+}
+
+/** Securely deliver a voice transcript to the paired agent. The transcript itself is not trusted until its challenge is signed. */
+export async function sendRemoteVoiceTranscript(url: string, transcript: string): Promise<{ ok: boolean; output?: string; error?: string }> {
+  const socket = await openSocket(url); const identity = await createRemotePairingIdentity();
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => { socket.close(); reject(new Error('Voice command timed out.')); }, 20000);
+    socket.onmessage = async (event) => { try { const message = JSON.parse(String(event.data));
+      if (message.type === 'voice_challenge') {
+        const signed = await buildUnlockRequest('voice', await createPairingNonce(), message.challenge);
+        socket.send(JSON.stringify({ type: 'voice_response', challenge: message.challenge, signature: signed.signedChallenge, publicKey: identity.publicKey }));
+        return;
+      }
+      if (message.type === 'voice_result') { clearTimeout(timeout); socket.close(); resolve({ ok: message.ok === true, output: message.output, error: message.error }); return; }
+      if (message.type === 'error') throw new Error(message.message ?? 'Voice command rejected.');
+    } catch (error) { clearTimeout(timeout); socket.close(); reject(error instanceof Error ? error : new Error('Voice command failed.')); } };
+    socket.send(JSON.stringify({ type: 'voice_transcript', transcript }));
+  });
+}
+
+export async function sendRemoteVoiceAudio(url: string, chunkBase64: string, sequence: number): Promise<void> {
+  const socket = await openSocket(url); const identity = await createRemotePairingIdentity();
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => { socket.close(); reject(new Error('Voice audio connection timed out.')); }, 10000);
+    socket.onmessage = (event) => { try { const message = JSON.parse(String(event.data)); if (message.type === 'voice_audio_ack') { clearTimeout(timeout); socket.close(); resolve(); } else if (message.type === 'error') throw new Error(message.message ?? 'Voice audio rejected.'); } catch (error) { clearTimeout(timeout); socket.close(); reject(error instanceof Error ? error : new Error('Voice audio failed.')); } };
+    socket.send(JSON.stringify({ type: 'voice_audio', chunk: chunkBase64, sequence, publicKey: identity.publicKey }));
   });
 }
 
