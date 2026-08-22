@@ -1,6 +1,6 @@
 # Remote Computer Access — Stages 1–3
 
-Nexus Plus can pair an Android phone with a personal Windows, Ubuntu/Linux, or macOS computer through the Nexus Plus desktop agent.
+Nexus Plus pairs an Android phone with a personal Windows, Ubuntu/Linux, or macOS computer through the Nexus Plus desktop agent.
 
 ## Stage 1 — foundation
 
@@ -43,7 +43,7 @@ The desktop agent rejects arbitrary shell/command execution. Unsupported accessi
 
 The desktop never receives the phone private key or the computer password.
 
-## Production requirements for later stages
+## Production requirements
 
 - TLS/mutually authenticated relay instead of exposing the development WebSocket listener directly to the internet.
 - Signed installers and secure auto-update.
