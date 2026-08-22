@@ -4,6 +4,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '@/features/auth/useAuth';
 import { useColors } from '@/hooks/useColors';
 import { getLaunchRoute } from '@/features/app-shell/launchPreferences';
+import { PersistentMediaProvider } from '@/media-player/PersistentMediaController';
 
 export default function RootLayout() {
   const auth = useAuth();
@@ -44,7 +45,11 @@ export default function RootLayout() {
     );
   }
 
-  return <Stack screenOptions={{ headerShown: true }} />;
+  return (
+    <PersistentMediaProvider>
+      <Stack screenOptions={{ headerShown: true }} />
+    </PersistentMediaProvider>
+  );
 }
 
 const styles = StyleSheet.create({
