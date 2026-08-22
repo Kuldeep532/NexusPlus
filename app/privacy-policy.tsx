@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { getFeatureContent } from '@/src/content/contentRepository';
 
-const sections = [
+const fallbackSections: Array<[string, string]> = [
   ['Nexus Plus features', 'Nexus Plus provides accessibility-focused tools including Geeta Nexus, Book Reader, Media Player, Utility Tools, Voice Payment Announcer, Expense Tracker, document/PDF tools, time tools, radio and Remote Computer. Each feature is designed to process only the data needed for the feature the user enables.'],
   ['Computer Control', 'Computer Control connects the Android app to a user-paired desktop agent. Pairing uses a unique setup code and device-bound cryptographic identity. Protected commands require a fresh challenge and phone authentication. The Protection Password is local to the Android app and is never sent to the desktop.'],
   ['Remote screen, keyboard, mouse and audio', 'When explicitly enabled, the desktop agent can receive authorized keyboard, pointer, clipboard, voice and accessibility commands. Screen, microphone and audio streaming are capability-controlled and must be enabled by the user. Remote commands are not arbitrary shell commands.'],
@@ -18,6 +20,8 @@ const sections = [
 
 export default function PrivacyPolicy() {
   const colors = useColors(); const insets = useSafeAreaInsets();
+  const [sections, setSections] = useState(fallbackSections);
+  useEffect(() => { let active = true; void getFeatureContent('privacy', 'en').then((rows) => { if (!active || rows.length === 0) return; const dynamic = rows.flatMap((row) => { const value = row.value as { title?: unknown; body?: unknown }; return typeof value?.title === 'string' && typeof value?.body === 'string' ? [[value.title, value.body] as [string, string]] : []; }); if (dynamic.length) setSections(dynamic); }).catch(() => undefined); return () => { active = false; }; }, []);
   return <ScrollView style={[styles.screen, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingTop: insets.top + 20, paddingBottom: insets.bottom + 40 }}>
     <View style={styles.header}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Privacy Policy</Text><Text style={[styles.updated, { color: colors.mutedForeground }]}>Nexus Plus feature and Remote Computer privacy</Text></View>
     {sections.map(([title, body]) => <View key={title} style={[styles.section, { borderBottomColor: colors.border }]}><Text accessibilityRole="header" style={[styles.heading, { color: colors.foreground }]}>{title}</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>{body}</Text></View>)}
