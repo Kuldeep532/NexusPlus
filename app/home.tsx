@@ -5,10 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 
 const featuredTools = [
-  { title: 'Book Reader', description: 'Read books and documents.', route: '/reader', icon: 'book-open' as const },
   { title: 'Biometric Vault', description: 'Protect sensitive data.', route: '/biometric-vault', icon: 'shield' as const },
   { title: 'Payment Announcer', description: 'Secure payment announcements.', route: '/payment-announcer', icon: 'volume-2' as const },
-  { title: 'Expense Tracker', description: 'Track and review expenses.', route: '/expense-tracker', icon: 'credit-card' as const },
+  { title: 'Expense Tracker', description: 'Track and review expenses securely.', route: '/expense-tracker', icon: 'credit-card' as const },
+  { title: 'Book Reader', description: 'Read books and documents.', route: '/reader', icon: 'book-open' as const },
   { title: 'Media Player', description: 'Play your audio and media.', route: '/media-player', icon: 'play-circle' as const },
   { title: 'Video Editor', description: 'Edit and export videos.', route: '/video-editor', icon: 'video' as const },
 ];
@@ -17,7 +17,6 @@ const categories = [
   { title: 'Utility Tools', description: 'Clock, time and announcer utilities.', route: '/categories/utility-tools', icon: 'clock' as const },
   { title: 'PDF Tools', description: 'Convert, protect and manage PDFs.', route: '/categories/pdf-tools', icon: 'file-text' as const },
   { title: 'Media Tools', description: 'Audio, radio and video tools.', route: '/categories/media-tools', icon: 'film' as const },
-  { title: 'Security & Privacy', description: 'Vault and protected utilities.', route: '/categories/security-tools', icon: 'lock' as const },
 ];
 
 export default function HomeScreen() {
@@ -30,7 +29,8 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 92 }]}>
         <View style={styles.header}>
           <View style={styles.headerCopy}>
-            <Text style={[styles.kicker, { color: colors.primary }]}>NEXUS PLUS</Text>
+            <Text style={[styles.brand, { color: colors.foreground }]}>Nexus Plus</Text>
+            <Text style={[styles.kicker, { color: colors.primary }]}>Spiritual Sundays</Text>
             <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Home</Text>
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Your tools, organised and easy to reach.</Text>
           </View>
@@ -39,7 +39,7 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Featured tools</Text>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Top-level features</Text>
         <View style={styles.list}>
           {featuredTools.map((tool) => (
             <Pressable key={tool.route} accessibilityRole="button" accessibilityLabel={`${tool.title}. ${tool.description}`} onPress={() => router.push(tool.route as never)} style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -50,7 +50,7 @@ export default function HomeScreen() {
           ))}
         </View>
 
-        <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 8 }]}>Categories</Text>
+        <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 18 }]}>Tool categories</Text>
         <View style={styles.list}>
           {categories.map((category) => (
             <Pressable key={category.route} accessibilityRole="button" accessibilityLabel={`${category.title}. ${category.description}`} onPress={() => router.push(category.route as never)} style={[styles.categoryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -75,7 +75,8 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 18 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
   headerCopy: { flex: 1, paddingRight: 16 },
-  kicker: { fontSize: 10, letterSpacing: 1.7, fontFamily: 'Inter_700Bold', marginBottom: 6 },
+  brand: { fontSize: 24, fontFamily: 'Inter_700Bold', marginBottom: 2 },
+  kicker: { fontSize: 10, letterSpacing: 1.7, fontFamily: 'Inter_700Bold', marginBottom: 7 },
   title: { fontSize: 28, fontFamily: 'Inter_700Bold' },
   subtitle: { fontSize: 12, lineHeight: 18, marginTop: 5 },
   profileButton: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
