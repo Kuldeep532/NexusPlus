@@ -5,16 +5,21 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { getDailySpiritualMessage } from '@/features/spiritual/spiritualMessageLibrary';
-import { FEATURE_CATEGORY_META, getFeaturesByCategory, getFeaturedHomeFeatures, type FeatureCategory } from '@/features/app-shell/featureRegistry';
+import { FEATURE_CATEGORY_META, getCategoryTools, getFeaturedHomeFeatures, type FeatureCategory } from '@/features/app-shell/featureRegistry';
 
 const CATEGORY_ORDER: FeatureCategory[] = ['utility', 'pdf', 'media', 'security', 'productivity'];
+const PDF_TOOL_COUNT = 3;
 
 export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const featuredTools = useMemo(() => getFeaturedHomeFeatures(), []);
-  const categorySections = useMemo(() => CATEGORY_ORDER.map((category) => ({ category, meta: FEATURE_CATEGORY_META[category], features: getFeaturesByCategory(category) })).filter((section) => section.features.length > 0), []);
+  const categorySections = useMemo(() => CATEGORY_ORDER.map((category) => ({
+    category,
+    meta: FEATURE_CATEGORY_META[category],
+    count: category === 'pdf' ? PDF_TOOL_COUNT : getCategoryTools(category).length,
+  })).filter((section) => section.count > 0), []);
   const dailyMessage = getDailySpiritualMessage();
 
   return (
@@ -24,7 +29,7 @@ export default function HomeScreen() {
           <View style={styles.headerCopy}>
             <Text style={[styles.brand, { color: colors.foreground }]}>Nexus Plus</Text>
             <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Home</Text>
-            <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Your major features first. Smaller tools stay inside their dedicated sections.</Text>
+            <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Major features first. Smaller tools stay inside dedicated screens.</Text>
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel="Open profile" onPress={() => router.push('/profile')} style={[styles.profileButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="user" size={22} color={colors.foreground} />
@@ -51,12 +56,12 @@ export default function HomeScreen() {
         </View>
 
         <Text style={[styles.categorySectionTitle, { color: colors.foreground }]}>Tool categories</Text>
-        <Text style={[styles.categoryIntro, { color: colors.mutedForeground }]}>Open a category to access its individual tools. Utility and PDF tools are not duplicated on Home.</Text>
+        <Text style={[styles.categoryIntro, { color: colors.mutedForeground }]}>Open a dedicated screen for individual tools. Utility and PDF tools are never duplicated on Home.</Text>
         <View style={styles.list}>
-          {categorySections.map(({ category, meta, features }) => (
-            <Pressable key={category} accessibilityRole="button" accessibilityLabel={`${meta.title}. ${meta.description}. ${features.length} tools available.`} onPress={() => router.push(meta.route as never)} style={[styles.categoryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          {categorySections.map(({ category, meta, count }) => (
+            <Pressable key={category} accessibilityRole="button" accessibilityLabel={`${meta.title}. ${meta.description}. ${count} tools available.`} onPress={() => router.push(meta.route as never)} style={[styles.categoryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[styles.categoryIcon, { backgroundColor: colors.secondary }]}><Feather name={meta.icon as never} size={20} color={colors.primary} /></View>
-              <View style={styles.toolCopy}><Text style={[styles.toolTitle, { color: colors.foreground }]}>{meta.title}</Text><Text style={[styles.toolDescription, { color: colors.mutedForeground }]}>{meta.description}</Text><Text style={[styles.count, { color: colors.primary }]}>{features.length} tools</Text></View>
+              <View style={styles.toolCopy}><Text style={[styles.toolTitle, { color: colors.foreground }]}>{meta.title}</Text><Text style={[styles.toolDescription, { color: colors.mutedForeground }]}>{meta.description}</Text><Text style={[styles.count, { color: colors.primary }]}>{count} tools</Text></View>
               <Feather name="chevron-right" size={19} color={colors.mutedForeground} accessibilityElementsHidden />
             </Pressable>
           ))}
