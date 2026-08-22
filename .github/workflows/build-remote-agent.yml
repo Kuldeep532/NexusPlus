@@ -1,0 +1,58 @@
+name: Build Remote Computer Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Desktop target to build'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - windows
+          - macos
+          - ubuntu
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            runner: windows-latest
+            command: npm run package:win
+          - platform: macos
+            runner: macos-latest
+            command: npm run package:mac
+          - platform: ubuntu
+            runner: ubuntu-latest
+            command: npm run package:linux
+    runs-on: ${{ matrix.runner }}
+    if: ${{ inputs.platform == 'all' || inputs.platform == matrix.platform }}
+    defaults:
+      run:
+        working-directory: desktop/remote-computer-agent
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build package
+        run: ${{ matrix.command }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexusplus-remote-agent-${{ matrix.platform }}
+          path: desktop/remote-computer-agent/release/**
+          if-no-files-found: error
