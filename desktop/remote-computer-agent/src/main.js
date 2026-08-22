@@ -5,6 +5,7 @@ const { WebSocketServer } = require('ws');
 const keytar = require('keytar');
 const { loadOrCreateIdentity } = require('./security');
 const { requestOsUnlock, executeRemoteCommand, executeVoiceTranscript, getScreenReaderInfo } = require('./unlock');
+const { parseDynamicCommand } = require('./dynamic-command');
 
 const PORT = 47821;
 const SERVICE = 'NexusPlus.RemoteComputer';
@@ -20,9 +21,8 @@ function verifyPhoneSignature(challenge, signature) {
   return crypto.verify('sha256', Buffer.from(challenge), phonePublicKey(), Buffer.from(signature, 'base64'));
 }
 function capabilities() {
-  return ['keyboard', 'pointer', 'clipboard', 'voice-command', 'voice-receiving', 'audio-receiving', 'screen', 'screen-reader', 'unlock', 'lock'];
+  return ['keyboard', 'pointer', 'clipboard', 'voice-command', 'voice-receiving', 'audio-receiving', 'screen', 'screen-reader', 'unlock', 'lock', 'dynamic-command-lane'];
 }
-
 async function loadState() { identity = await loadOrCreateIdentity(); pairedPhone = await keytar.getPassword(SERVICE, PAIRED_PHONE); }
 
 function startSocketServer() {
@@ -30,7 +30,7 @@ function startSocketServer() {
   wss.on('connection', (socket) => {
     let pendingUnlockChallenge = null;
     let pendingCommand = null;
-    send(socket, { type: 'agent_hello', protocol: 4, computerId: computerId(), publicKey: identity.publicKey, paired: Boolean(pairedPhone), screenReader: getScreenReaderInfo().kind, capabilities: capabilities() });
+    send(socket, { type: 'agent_hello', protocol: 5, computerId: computerId(), publicKey: identity.publicKey, paired: Boolean(pairedPhone), screenReader: getScreenReaderInfo().kind, capabilities: capabilities() });
 
     socket.on('message', async (raw) => {
       try {
@@ -90,13 +90,13 @@ function startSocketServer() {
           const pending = socket.__pendingVoice;
           if (!pending || message.publicKey !== pairedPhone || message.challenge !== pending.challenge || !verifyPhoneSignature(pending.challenge, message.signature)) throw new Error('Voice authorization failed.');
           socket.__pendingVoice = null;
+          const dynamicCommand = parseDynamicCommand(pending.transcript);
           const result = await executeVoiceTranscript(pending.transcript);
-          send(socket, { type: 'voice_result', ok: result.ok, output: result.output, error: result.error });
+          send(socket, { type: 'voice_result', ok: result.ok, output: result.output, error: result.error, dynamicCommand });
           return;
         }
         if (message.type === 'voice_audio') {
           if (!pairedPhone || message.publicKey !== pairedPhone || typeof message.chunk !== 'string' || message.chunk.length > 512000) throw new Error('Invalid voice audio frame.');
-          // Audio frames are accepted only from the paired phone. A future audio sink can consume them.
           send(socket, { type: 'voice_audio_ack', sequence: message.sequence ?? null });
           return;
         }
