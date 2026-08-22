@@ -1,0 +1,135 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { AccessibilityInfo, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useColors } from '@/hooks/useColors';
+import {
+  configureRemoteComputerProtection,
+  getProtectedComputer,
+  isRemoteComputerProtectionConfigured,
+  setRemoteComputerSessionUnlocked,
+  verifyRemoteComputerProtection,
+} from '@/src/remote-computer/remoteComputerProtection';
+import { confirmDesktopPairing, pairWithDesktopAgent } from '@/src/remote-computer/remoteComputerTransport';
+
+export default function RemoteComputerProtection() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ setup?: string; url?: string }>();
+  const [configured, setConfigured] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [agentUrl, setAgentUrl] = useState(params.url || 'ws://127.0.0.1:8787');
+  const [pairingCode, setPairingCode] = useState('');
+  const [pendingPublicKey, setPendingPublicKey] = useState('');
+  const [pendingComputerId, setPendingComputerId] = useState('');
+  const [computerName, setComputerName] = useState('Nexus Plus Computer');
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    isRemoteComputerProtectionConfigured().then(setConfigured);
+  }, []);
+
+  const setup = params.setup === '1' || !configured;
+
+  const beginPairing = async () => {
+    setBusy(true); setMessage('Connecting to the computer agent.');
+    try {
+      const result = await pairWithDesktopAgent(agentUrl.trim());
+      setPendingPublicKey(result.publicKey); setPendingComputerId(result.computerId); setPairingCode(result.code);
+      AccessibilityInfo.announceForAccessibility('Pairing code received. Confirm it on the computer agent.');
+      setMessage(`Pairing code: ${result.code}. Confirm this code on the computer agent.`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not start pairing.'); }
+    finally { setBusy(false); }
+  };
+
+  const finishPairing = async () => {
+    if (!pendingPublicKey || !pendingComputerId || !pairingCode.trim()) return;
+    setBusy(true); setMessage('Confirming secure pairing.');
+    try {
+      await confirmDesktopPairing(agentUrl.trim(), pairingCode.trim(), pendingPublicKey);
+      setMessage('Computer paired. Now create your Protection Password.');
+      AccessibilityInfo.announceForAccessibility('Computer paired successfully. Create the Protection Password.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Pairing confirmation failed.'); }
+    finally { setBusy(false); }
+  };
+
+  const createProtection = async () => {
+    if (!pendingComputerId || !pendingPublicKey) { setMessage('Pair the computer agent first.'); return; }
+    if (password !== confirm) { setMessage('Passwords do not match.'); return; }
+    setBusy(true);
+    try {
+      await configureRemoteComputerProtection(password, pendingComputerId, computerName);
+      setRemoteComputerSessionUnlocked(true);
+      AccessibilityInfo.announceForAccessibility('Protection Password created. Remote Computer is ready.');
+      router.replace('/remote-computer');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not create Protection Password.'); }
+    finally { setBusy(false); }
+  };
+
+  const unlock = async () => {
+    setBusy(true); setMessage('Checking Protection Password.');
+    try {
+      const ok = await verifyRemoteComputerProtection(password);
+      if (!ok) { setMessage('Incorrect Protection Password.'); return; }
+      setRemoteComputerSessionUnlocked(true);
+      router.replace('/remote-computer');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not unlock Remote Computer.'); }
+    finally { setBusy(false); }
+  };
+
+  const protectedComputer = configured ? getProtectedComputer : null;
+
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
+      <View style={styles.header}>
+        <View style={[styles.icon, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="shield-lock" size={30} color={colors.primary} /></View>
+        <View style={styles.copy}>
+          <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Protection Password</Text>
+          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Only a paired computer agent can authorize first-time setup.</Text>
+        </View>
+      </View>
+
+      {setup ? (
+        <View style={styles.content}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>1. Pair the computer agent</Text>
+          <TextInput accessibilityLabel="Computer agent address" placeholder="Computer agent address" placeholderTextColor={colors.mutedForeground} value={agentUrl} onChangeText={setAgentUrl} autoCapitalize="none" style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]} />
+          <Pressable disabled={busy} accessibilityRole="button" accessibilityLabel="Connect to computer agent" onPress={beginPairing} style={[styles.button, { backgroundColor: colors.primary, opacity: busy ? 0.6 : 1 }]}><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Connect to Agent</Text></Pressable>
+          {!!pairingCode && <View accessible accessibilityRole="text" style={[styles.codeBox, { backgroundColor: colors.secondary }]}><Text style={[styles.codeLabel, { color: colors.mutedForeground }]}>Agent pairing code</Text><Text style={[styles.code, { color: colors.foreground }]}>{pairingCode}</Text></View>}
+          {!!pairingCode && <Pressable disabled={busy} accessibilityRole="button" accessibilityLabel="Confirm pairing code" onPress={finishPairing} style={[styles.button, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>Confirm Pairing</Text></Pressable>}
+
+          <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 24 }]}>2. Create Protection Password</Text>
+          <TextInput accessibilityLabel="Protection Password" placeholder="Protection Password" placeholderTextColor={colors.mutedForeground} value={password} onChangeText={setPassword} secureTextEntry style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]} />
+          <TextInput accessibilityLabel="Confirm Protection Password" placeholder="Confirm Protection Password" placeholderTextColor={colors.mutedForeground} value={confirm} onChangeText={setConfirm} secureTextEntry style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]} />
+          <Pressable disabled={busy || !pendingComputerId} accessibilityRole="button" accessibilityLabel="Create Protection Password" onPress={createProtection} style={[styles.button, { backgroundColor: colors.primary, opacity: busy || !pendingComputerId ? 0.5 : 1 }]}><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Create Protection Password</Text></Pressable>
+        </View>
+      ) : (
+        <View style={styles.content}>
+          <View accessible accessibilityRole="text" style={[styles.status, { backgroundColor: colors.secondary }]}>
+            <MaterialCommunityIcons name="desktop-tower" size={24} color={colors.primary} />
+            <Text style={[styles.statusText, { color: colors.secondaryForeground }]}>Remote Computer is protected. Enter the Protection Password to continue.</Text>
+          </View>
+          <TextInput accessibilityLabel="Protection Password" placeholder="Protection Password" placeholderTextColor={colors.mutedForeground} value={password} onChangeText={setPassword} secureTextEntry autoFocus style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]} />
+          <Pressable disabled={busy} accessibilityRole="button" accessibilityLabel="Unlock Remote Computer" onPress={unlock} style={[styles.button, { backgroundColor: colors.primary, opacity: busy ? 0.6 : 1 }]}><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Unlock Remote Computer</Text></Pressable>
+          <Text style={[styles.note, { color: colors.mutedForeground }]}>The password verifier is stored in Android SecureStore. It is never sent to the desktop agent.</Text>
+        </View>
+      )}
+      {!!message && <Text accessibilityLiveRegion="polite" accessible style={[styles.message, { color: colors.mutedForeground }]}>{message}</Text>}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, paddingHorizontal: 20 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 22 },
+  icon: { width: 58, height: 58, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  copy: { flex: 1 }, title: { fontSize: 26, fontWeight: '700' }, subtitle: { marginTop: 4, fontSize: 13, lineHeight: 19 },
+  content: { gap: 10 }, sectionTitle: { fontSize: 17, fontWeight: '700', marginBottom: 2 },
+  input: { minHeight: 52, borderWidth: 1, borderRadius: 14, paddingHorizontal: 15, fontSize: 16 },
+  button: { minHeight: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 }, buttonText: { fontSize: 15, fontWeight: '700' },
+  codeBox: { borderRadius: 16, padding: 16, alignItems: 'center' }, codeLabel: { fontSize: 12 }, code: { marginTop: 4, fontSize: 28, fontWeight: '800', letterSpacing: 5 },
+  status: { borderRadius: 16, padding: 16, flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 10 }, statusText: { flex: 1, fontSize: 14, lineHeight: 20 },
+  note: { fontSize: 12, lineHeight: 18, marginTop: 8 }, message: { marginTop: 18, fontSize: 13, lineHeight: 19 },
+});
