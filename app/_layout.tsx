@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '@/features/auth/useAuth';
 import { useColors } from '@/hooks/useColors';
+import { getLaunchRoute } from '@/features/app-shell/launchPreferences';
 
 export default function RootLayout() {
   const auth = useAuth();
@@ -21,15 +22,15 @@ export default function RootLayout() {
 
     const inAuth = segments[0] === 'login-plus-register';
     const inPublicWelcome = segments[0] === 'welcome';
-    const inHome = segments[0] === 'home';
+    const inLaunchScreen = segments[0] === 'home' || segments[0] === 'geeta-nexus';
 
     if (!auth.session) {
       if (!inAuth && !inPublicWelcome) router.replace('/login-plus-register');
       return;
     }
 
-    if (auth.session && (inAuth || inPublicWelcome || !inHome)) {
-      router.replace('/home');
+    if (auth.session && (inAuth || inPublicWelcome || !inLaunchScreen)) {
+      void getLaunchRoute().then((route) => router.replace(route));
     }
   }, [auth.loading, auth.session, router, segments, splashDone]);
 
