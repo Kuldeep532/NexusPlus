@@ -11,6 +11,7 @@
     .status { padding: 16px; border: 1px solid #888; border-radius: 12px; margin: 18px 0; }
     button { min-height: 48px; padding: 10px 18px; margin-right: 8px; font: inherit; }
     code { word-break: break-all; }
+    #pairCode { font-size: 2rem; letter-spacing: .2rem; }
   </style>
 </head>
 <body>
@@ -23,6 +24,11 @@
     <div><strong>Phone paired:</strong> <span id="paired">Loading…</span></div>
     <div><strong>Agent port:</strong> <span id="port">Loading…</span></div>
   </div>
+  <section aria-labelledby="pair-title">
+    <h2 id="pair-title">Pairing confirmation</h2>
+    <p id="pairHelp">When a phone requests pairing, verify the code shown below matches the phone before approving it in the phone app.</p>
+    <div id="pairCode" aria-live="assertive">No pending request</div>
+  </section>
   <h2>Security</h2>
   <p>Unlock requests require a challenge signed by the paired phone's device-bound key after phone biometric authentication. This agent never receives the phone's private key or OS password.</p>
   <button id="forget">Forget paired phone</button>
@@ -41,7 +47,8 @@
     document.getElementById('message').textContent = 'Paired phone forgotten.';
   };
   window.nexusAgent.onPairingRequest((data) => {
-    document.getElementById('message').textContent = 'Pairing request received. Verify the code shown in the Nexus Plus phone app before approving pairing.';
+    document.getElementById('pairCode').textContent = data.code;
+    document.getElementById('message').textContent = 'Pairing request received. Verify this code against the Nexus Plus phone before confirming.';
   });
 })();
 </script>
