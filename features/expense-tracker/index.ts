@@ -9,4 +9,5 @@ export * from './expenseTrackerStage2Sync';
 export * from './expensePaymentBridge';
 export * from './expenseSmsParser';
 export * from './expenseTrackerDetection';
+export * from './expenseMerchantLearning';
 export * from './useExpenseTracker';
