@@ -16,7 +16,8 @@ class NexusRemoteKeyModule(private val context: ReactApplicationContext) : React
     companion object {
         private const val MODULE = "NexusRemoteKey"
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
-        private const val ALIAS = "nexus.remote.computer.v1"
+        // v2 is authentication-bound; v1 was intentionally superseded because it was not Keystore-auth protected.
+        private const val ALIAS = "nexus.remote.computer.v2"
     }
 
     override fun getName(): String = MODULE
@@ -26,12 +27,10 @@ class NexusRemoteKeyModule(private val context: ReactApplicationContext) : React
         if (store.containsAlias(ALIAS)) return
         val generator = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, ANDROID_KEYSTORE)
         generator.initialize(
-            KeyGenParameterSpec.Builder(
-                ALIAS,
-                KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY,
-            )
+            KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY)
                 .setDigests(KeyProperties.DIGEST_SHA256)
-                .setUserAuthenticationRequired(false)
+                .setUserAuthenticationRequired(true)
+                .setUserAuthenticationValidityDurationSeconds(30)
                 .build(),
         )
         generator.generateKeyPair()
@@ -45,7 +44,7 @@ class NexusRemoteKeyModule(private val context: ReactApplicationContext) : React
             val certificate = store.getCertificate(ALIAS)
             promise.resolve(mapOf(
                 "keyId" to ALIAS,
-                "algorithm" to "ECDSA-P256-SHA256",
+                "algorithm" to "ECDSA-P256-SHA256-AUTHENTICATED",
                 "publicKey" to Base64.getEncoder().encodeToString(certificate.publicKey.encoded),
             ))
         } catch (error: Throwable) {
@@ -67,9 +66,10 @@ class NexusRemoteKeyModule(private val context: ReactApplicationContext) : React
                 initSign(privateKey as java.security.PrivateKey)
                 update(challenge.toByteArray(Charsets.UTF_8))
             }
+            // Android Keystore refuses this operation unless the user has recently authenticated.
             promise.resolve(Base64.getEncoder().encodeToString(signature.sign()))
         } catch (error: Throwable) {
-            promise.reject("REMOTE_KEY_SIGN", "Could not sign the remote challenge.", error)
+            promise.reject("REMOTE_KEY_SIGN", "Could not sign the remote challenge. Authenticate with the phone biometric prompt first.", error)
         }
     }
 }
