@@ -3,13 +3,13 @@ import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { getFeaturesByCategory } from '@/features/app-shell/featureRegistry';
+import { getCategoryTools } from '@/features/app-shell/featureRegistry';
 
 export default function UtilityToolsScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const tools = getFeaturesByCategory('utility');
+  const tools = getCategoryTools('utility');
   return <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 18, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24 }}>
     <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Utility Tools</Text>
     <Text style={[styles.body, { color: colors.mutedForeground }]}>Everyday accessibility and announcement utilities.</Text>
