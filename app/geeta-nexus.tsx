@@ -4,12 +4,26 @@ import { ScrollView, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { GITA_CHAPTERS } from '@/features/geeta-nexus/geetaTypes';
+import { loadCachedVerseBundle } from '@/features/geeta-nexus/geetaStage5Repository';
 import { getDailySpiritualMessage } from '@/features/spiritual/spiritualMessageLibrary';
+import { useEffect, useState } from 'react';
 
 export default function GeetaNexusHome() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const daily = getDailySpiritualMessage();
+  const [cachedVerses, setCachedVerses] = useState(0);
+  const [cacheVersion, setCacheVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void loadCachedVerseBundle().then((bundle) => {
+      if (!active || !bundle) return;
+      setCachedVerses(bundle.verses.length);
+      setCacheVersion(bundle.version);
+    });
+    return () => { active = false; };
+  }, []);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}> 
@@ -17,7 +31,7 @@ export default function GeetaNexusHome() {
       <ScrollView contentContainerStyle={{ padding: 20, paddingTop: insets.top + 18, paddingBottom: insets.bottom + 90 }}>
         <Text style={[styles.kicker, { color: colors.primary }]}>GEETA NEXUS</Text>
         <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Bhagavad Gita</Text>
-        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Study, listen and explore the Gita.</Text>
+        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Study, listen and explore the Gita offline.</Text>
 
         <View style={[styles.messageCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <MaterialCommunityIcons name="flower" size={24} color={colors.primary} />
@@ -27,21 +41,21 @@ export default function GeetaNexusHome() {
           </View>
         </View>
 
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Audio Chapters</Text>
+        <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View><Text style={[styles.statNumber, { color: colors.foreground }]}>18</Text><Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Chapters</Text></View>
+          <View><Text style={[styles.statNumber, { color: colors.foreground }]}>{cachedVerses || '—'}</Text><Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Cached verses</Text></View>
+          <View><Text style={[styles.statNumber, { color: colors.foreground }]}>{cacheVersion ? 'Offline' : 'Ready'}</Text><Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{cacheVersion ? `v${cacheVersion}` : 'Library'}</Text></View>
+        </View>
+
+        <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 22 }]}>Audio Chapters</Text>
         <View style={styles.list}>
-          {GITA_CHAPTERS.slice(0, 5).map((chapter) => (
-            <Pressable key={chapter.number} accessibilityRole="button" accessibilityLabel={`Play Chapter ${chapter.number}, ${chapter.nameEnglish}`} onPress={() => router.push('/media-player' as never)} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="play" size={18} color={colors.primary} /></View>
+          {GITA_CHAPTERS.map((chapter) => (
+            <Pressable key={chapter.number} accessibilityRole="button" accessibilityLabel={`Open Chapter ${chapter.number}, ${chapter.nameEnglish}`} onPress={() => router.push(`/geeta-nexus/chapters?chapter=${chapter.number}` as never)} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="headphones" size={18} color={colors.primary} /></View>
               <View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Chapter {chapter.number}</Text><Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{chapter.nameEnglish} · {chapter.verseCount} verses</Text></View>
               <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
             </Pressable>
           ))}
-        </View>
-
-        <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View><Text style={[styles.statNumber, { color: colors.foreground }]}>18</Text><Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Chapters</Text></View>
-          <View><Text style={[styles.statNumber, { color: colors.foreground }]}>700+</Text><Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Verses</Text></View>
-          <View><Text style={[styles.statNumber, { color: colors.foreground }]}>Offline</Text><Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Library ready</Text></View>
         </View>
       </ScrollView>
 
@@ -58,20 +72,20 @@ const styles = StyleSheet.create({
   kicker: { fontSize: 10, letterSpacing: 1.7, fontFamily: 'Inter_700Bold', marginBottom: 6 },
   title: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
   subtitle: { fontSize: 12, lineHeight: 18, marginBottom: 18 },
-  messageCard: { borderWidth: 1, borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'flex-start', marginBottom: 22 },
+  messageCard: { borderWidth: 1, borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'flex-start' },
   messageCopy: { flex: 1, marginLeft: 11 },
   cardKicker: { fontSize: 9, letterSpacing: 1.4, fontFamily: 'Inter_700Bold', marginBottom: 6 },
   message: { fontSize: 13, lineHeight: 19, fontFamily: 'Inter_600SemiBold' },
+  statCard: { marginTop: 14, borderWidth: 1, borderRadius: 18, padding: 15, flexDirection: 'row', justifyContent: 'space-between' },
+  statNumber: { fontSize: 17, fontFamily: 'Inter_700Bold', marginBottom: 3 },
+  statLabel: { fontSize: 9.5 },
   sectionTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', marginBottom: 10 },
-  list: { gap: 10 },
-  row: { minHeight: 72, borderWidth: 1, borderRadius: 16, padding: 12, flexDirection: 'row', alignItems: 'center' },
+  list: { gap: 8 },
+  row: { minHeight: 68, borderWidth: 1, borderRadius: 16, padding: 12, flexDirection: 'row', alignItems: 'center' },
   icon: { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   copy: { flex: 1, marginLeft: 11, marginRight: 8 },
   rowTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', marginBottom: 3 },
   rowMeta: { fontSize: 10, lineHeight: 15 },
-  statCard: { marginTop: 18, borderWidth: 1, borderRadius: 18, padding: 15, flexDirection: 'row', justifyContent: 'space-between' },
-  statNumber: { fontSize: 17, fontFamily: 'Inter_700Bold', marginBottom: 3 },
-  statLabel: { fontSize: 9.5 },
   bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, minHeight: 64, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-around', paddingTop: 8 },
   tab: { alignItems: 'center', justifyContent: 'center', minWidth: 110, gap: 3 },
   tabLabel: { fontSize: 10, fontFamily: 'Inter_700Bold' },
