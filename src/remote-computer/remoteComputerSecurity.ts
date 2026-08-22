@@ -4,7 +4,6 @@ import { getRandomBytesAsync } from 'expo-crypto';
 import type { RemoteComputerUnlockRequest } from './remoteComputerTypes';
 
 const DEVICE_KEY_ID = 'remote-computer.device-key-id';
-const DEVICE_SECRET = 'remote-computer.device-secret';
 
 export interface RemoteComputerBiometricResult {
   authenticated: boolean;
@@ -41,21 +40,16 @@ export async function authenticateForRemoteComputer(): Promise<RemoteComputerBio
   }
 
   let keyId = await SecureStore.getItemAsync(DEVICE_KEY_ID);
-  let secret = await SecureStore.getItemAsync(DEVICE_SECRET);
-  if (!keyId || !secret) {
+  if (!keyId) {
     keyId = `nexus-${toHex(await getRandomBytesAsync(16))}`;
-    secret = toHex(await getRandomBytesAsync(32));
     await SecureStore.setItemAsync(DEVICE_KEY_ID, keyId, {
-      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-    });
-    await SecureStore.setItemAsync(DEVICE_SECRET, secret, {
       keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
     });
   }
 
-  // Stage 1 deliberately exposes only a stable device-key identity to JS.
-  // The secret is never returned to the UI and is intended for the native
-  // secure signing layer added in the next stage.
+  // The private signing key must live in a native OS keystore / secure
+  // hardware boundary in a later stage. The JS layer only receives the
+  // non-secret key identifier after the user has authenticated.
   return {
     authenticated: true,
     keyId,
@@ -73,9 +67,9 @@ export async function buildUnlockRequest(
     throw new Error(result.reason ?? 'Biometric authentication failed.');
   }
 
-  // Cryptographic signing is intentionally delegated to a native keystore
-  // implementation. Do not substitute a JS hash/HMAC here: the raw secret
-  // must remain inside secure hardware/keystore boundaries in the next stage.
+  // Signing intentionally stays native. Never replace this with a JS hash,
+  // client secret, or reversible token: those would not prove possession of
+  // a device-bound private key and must not unlock a computer.
   return {
     computerId,
     challengeId,
