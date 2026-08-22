@@ -1,14 +1,14 @@
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { usePaymentAnnouncer } from '@/features/payment-announcer/usePaymentAnnouncer';
-import { resolvePaymentTtsProvider } from '@/features/payment-announcer/paymentAnnouncerTts';
 
 export default function PaymentAnnouncerScreen() {
   const colors = useColors();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const payment = usePaymentAnnouncer();
 
@@ -27,15 +27,6 @@ export default function PaymentAnnouncerScreen() {
     if (!ok && payment.error) Alert.alert('Payment Announcer', payment.error);
   };
 
-  const testVoice = async () => {
-    if (!payment.isUnlocked) return;
-    const provider = await resolvePaymentTtsProvider(payment.settings.preferredTtsProvider);
-    Alert.alert(
-      'Voice availability',
-      provider ? `${provider} is available for Payment Announcer.` : 'No supported Payment Announcer voice is available yet.',
-    );
-  };
-
   if (!payment.isReady) {
     return <View style={[styles.root, { backgroundColor: colors.background }]} accessible accessibilityLabel="Loading Payment Announcer security" />;
   }
@@ -43,14 +34,11 @@ export default function PaymentAnnouncerScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}> 
       <Stack.Screen options={{ headerShown: false }} />
-      <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 36 }]}
-        accessibilityLabel="Payment Announcer"
-      >
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 36 }]} accessibilityLabel="Payment Announcer dashboard">
         <View style={styles.header}>
           <Text style={[styles.kicker, { color: colors.primary }]}>SECURE PAYMENTS</Text>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Payment Announcer</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Announce incoming user-to-user payments using your installed voice or Android's default TTS.</Text>
+          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Securely announce incoming payments with a protected, accessible control center.</Text>
         </View>
 
         <View style={[styles.securityCard, { backgroundColor: colors.card, borderColor: colors.border }]} accessible accessibilityRole="summary">
@@ -58,69 +46,46 @@ export default function PaymentAnnouncerScreen() {
             <MaterialCommunityIcons name="fingerprint" size={28} color={colors.primary} />
           </View>
           <View style={styles.securityCopy}>
-            <Text style={[styles.securityTitle, { color: colors.foreground }]}>Biometric Vault protection</Text>
-            <Text style={[styles.securityText, { color: colors.mutedForeground }]}>{setupLabel}. The same biometric enrolled in Vault is used here.</Text>
+            <Text style={[styles.securityTitle, { color: colors.foreground }]}>{setupLabel}</Text>
+            <Text style={[styles.securityText, { color: colors.mutedForeground }]}>The same strong biometric enrolled in Biometric Vault protects this feature. Device PIN/password fallback is not accepted.</Text>
           </View>
         </View>
 
         {!payment.setupComplete ? (
           <View style={[styles.setupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Secure setup required</Text>
-            <Text style={[styles.body, { color: colors.mutedForeground }]}>Payment Announcer cannot be used until you verify the biometric already managed by Biometric Vault.</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Set up Payment Announcer with Biometric Vault"
-              disabled={!payment.biometricAvailable}
-              onPress={() => void onSetup()}
-              style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: payment.biometricAvailable ? 1 : 0.5 }]}
-            >
+            <Text style={[styles.body, { color: colors.mutedForeground }]}>Verify the existing Biometric Vault credential before opening payment controls.</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Set up Payment Announcer with Biometric Vault" disabled={!payment.biometricAvailable} onPress={() => void onSetup()} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: payment.biometricAvailable ? 1 : 0.5 }]}>
               <Feather name="lock" size={17} color={colors.primaryForeground} />
               <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Secure with existing biometric</Text>
             </Pressable>
-            {!payment.biometricAvailable && (
-              <Text style={[styles.warning, { color: colors.mutedForeground }]}>Open Biometric Vault and enroll a strong biometric first.</Text>
-            )}
+            {!payment.biometricAvailable && <Text style={[styles.warning, { color: colors.mutedForeground }]}>Open Biometric Vault and enroll a strong biometric first.</Text>}
           </View>
         ) : !payment.isUnlocked ? (
           <View style={[styles.setupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Payment Announcer is locked</Text>
-            <Text style={[styles.body, { color: colors.mutedForeground }]}>Authenticate before viewing payment controls or processing announcement data.</Text>
+            <Text style={[styles.body, { color: colors.mutedForeground }]}>Authenticate before viewing payment controls, histories, or security settings.</Text>
             <Pressable accessibilityRole="button" accessibilityLabel="Unlock Payment Announcer" onPress={() => void onUnlock()} style={[styles.primaryButton, { backgroundColor: colors.primary }]}>
               <Feather name="unlock" size={17} color={colors.primaryForeground} />
-              <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Unlock with fingerprint</Text>
+              <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Unlock with biometric</Text>
             </Pressable>
           </View>
         ) : (
           <>
-            <View style={[styles.liveCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.liveIcon, { backgroundColor: colors.secondary }]}>
-                <MaterialCommunityIcons name="bullhorn-outline" size={26} color={colors.primary} />
-              </View>
+            <View style={[styles.statusCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.statusIcon, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="bullhorn-outline" size={26} color={colors.primary} /></View>
               <View style={styles.securityCopy}>
-                <Text style={[styles.securityTitle, { color: colors.foreground }]}>Ready</Text>
-                <Text style={[styles.securityText, { color: colors.mutedForeground }]}>Payment data is not accepted from arbitrary UI input. The transaction/notification source will be connected in the next implementation stage.</Text>
+                <Text style={[styles.securityTitle, { color: colors.foreground }]}>{payment.settings.enabled ? 'Announcements enabled' : 'Announcements paused'}</Text>
+                <Text style={[styles.securityText, { color: colors.mutedForeground }]}>Payment data is accepted only through the authenticated payment-event boundary, not arbitrary UI entry.</Text>
               </View>
             </View>
 
-            <View style={[styles.controlsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Voice and behavior</Text>
-              <View style={styles.row}>
-                <View style={styles.rowCopy}>
-                  <Text style={[styles.rowTitle, { color: colors.foreground }]}>Announcements</Text>
-                  <Text style={[styles.body, { color: colors.mutedForeground }]}>Enable spoken payment announcements.</Text>
-                </View>
-                <Pressable accessibilityRole="switch" accessibilityState={{ checked: payment.settings.enabled }} accessibilityLabel="Payment announcements enabled" onPress={() => void payment.updateSettings({ enabled: !payment.settings.enabled })} style={[styles.switch, { backgroundColor: payment.settings.enabled ? colors.primary : colors.secondary }]}>
-                  <View style={[styles.switchThumb, { backgroundColor: payment.settings.enabled ? colors.primaryForeground : colors.mutedForeground, alignSelf: payment.settings.enabled ? 'flex-end' : 'flex-start' }]} />
-                </Pressable>
-              </View>
-              <View style={styles.divider} />
-              <Text style={[styles.rowTitle, { color: colors.foreground }]}>Preferred voice</Text>
-              <Text style={[styles.body, { color: colors.mutedForeground }]}>Installed voice sheet first; Android default TTS remains the fallback.</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="Check available Payment Announcer voice" onPress={() => void testVoice()} style={[styles.secondaryButton, { borderColor: colors.border, backgroundColor: colors.secondary }]}>
-                <Feather name="volume-2" size={16} color={colors.foreground} />
-                <Text style={[styles.secondaryButtonText, { color: colors.foreground }]}>Check voice</Text>
-              </Pressable>
-            </View>
+            <SectionCard icon="credit-card" title="Payments" description="Recent payment activity and announcement status." onPress={() => router.push('/payment-announcer/payments')} colors={colors} />
+            <SectionCard icon="bar-chart-2" title="Analytics" description="Announcement counts, delivery status, and usage insights." onPress={() => router.push('/payment-announcer/analytics')} colors={colors} />
+            <SectionCard icon="volume-2" title="Voice" description="Choose voice strategy, adjust speech, and test availability." onPress={() => router.push('/payment-announcer/voice')} colors={colors} />
+            <SectionCard icon="sliders" title="Announcement rules" description="Control which verified payment events are announced." onPress={() => router.push('/payment-announcer/announcement-rules')} colors={colors} />
+            <SectionCard icon="shield" title="Security" description="Biometric status, screen protection, lock policy, and access controls." onPress={() => router.push('/payment-announcer/security')} colors={colors} />
+            <SectionCard icon="settings" title="Settings" description="Feature preferences and accessibility-friendly behavior." onPress={() => router.push('/payment-announcer/settings')} colors={colors} />
 
             <Pressable accessibilityRole="button" accessibilityLabel="Lock Payment Announcer" onPress={() => void payment.lock()} style={[styles.lockButton, { borderColor: colors.border }]}>
               <Feather name="lock" size={16} color={colors.foreground} />
@@ -133,9 +98,22 @@ export default function PaymentAnnouncerScreen() {
   );
 }
 
+function SectionCard({ icon, title, description, onPress, colors }: { icon: React.ComponentProps<typeof Feather>['name']; title: string; description: string; onPress: () => void; colors: ReturnType<typeof useColors> }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={`${title}. ${description}`} onPress={onPress} style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={[styles.sectionIcon, { backgroundColor: colors.secondary }]}><Feather name={icon} size={21} color={colors.primary} /></View>
+      <View style={styles.sectionCopy}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{title}</Text>
+        <Text style={[styles.body, { color: colors.mutedForeground }]}>{description}</Text>
+      </View>
+      <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { paddingHorizontal: 20, gap: 14 },
+  content: { paddingHorizontal: 20, gap: 12 },
   header: { marginBottom: 2 },
   kicker: { fontSize: 10, letterSpacing: 1.8, fontFamily: 'Inter_700Bold', marginBottom: 8 },
   title: { fontSize: 29, fontFamily: 'Inter_700Bold', marginBottom: 7 },
@@ -151,17 +129,11 @@ const styles = StyleSheet.create({
   primaryButton: { marginTop: 15, minHeight: 48, borderRadius: 14, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   primaryButtonText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
   warning: { marginTop: 11, fontSize: 10, lineHeight: 15 },
-  liveCard: { borderRadius: 18, borderWidth: 1, padding: 14, flexDirection: 'row', alignItems: 'center' },
-  liveIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  controlsCard: { borderRadius: 18, borderWidth: 1, padding: 16 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  rowCopy: { flex: 1 },
-  rowTitle: { fontSize: 12, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  switch: { width: 48, height: 28, borderRadius: 14, padding: 3, justifyContent: 'center' },
-  switchThumb: { width: 22, height: 22, borderRadius: 11 },
-  divider: { height: 1, marginVertical: 15 },
-  secondaryButton: { marginTop: 12, minHeight: 42, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  secondaryButtonText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
-  lockButton: { minHeight: 44, borderRadius: 13, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  statusCard: { borderRadius: 18, borderWidth: 1, padding: 14, flexDirection: 'row', alignItems: 'center' },
+  statusIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  sectionCard: { minHeight: 78, borderRadius: 18, borderWidth: 1, padding: 14, flexDirection: 'row', alignItems: 'center' },
+  sectionIcon: { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  sectionCopy: { flex: 1, marginLeft: 12, marginRight: 8 },
+  lockButton: { minHeight: 46, borderRadius: 13, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 2 },
   lockButtonText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
 });
