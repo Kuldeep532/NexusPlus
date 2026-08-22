@@ -32,9 +32,9 @@ export async function writeLaunchPreferences(next: LaunchPreferences): Promise<v
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
 }
 
-export async function getLaunchRoute(): Promise<'/home' | '/geeta-nexus'> {
+export async function getLaunchRoute(): Promise<'/(tabs)' | '/geeta-nexus'> {
   const preferences = await readLaunchPreferences();
-  return preferences.launchTarget === 'geeta-nexus' ? '/geeta-nexus' : '/home';
+  return preferences.launchTarget === 'geeta-nexus' ? '/geeta-nexus' : '/(tabs)';
 }
 
 export { STORAGE_KEY as LAUNCH_PREFERENCES_STORAGE_KEY };
