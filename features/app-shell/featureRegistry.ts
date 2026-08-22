@@ -8,17 +8,20 @@ export interface HomeFeatureDefinition {
   icon: string;
   category: FeatureCategory;
   featured?: boolean;
+  order?: number;
 }
 
+// Keep the primary Nexus Plus experiences explicit and ordered. The Home screen
+// consumes this registry instead of maintaining a second hard-coded feature list.
 const registry: HomeFeatureDefinition[] = [
-  { id: 'book-reader', title: 'Book Reader', description: 'Read books and documents.', route: '/reader', icon: 'book-open', category: 'productivity', featured: true },
-  { id: 'media-player', title: 'Media Player', description: 'Play audio and media.', route: '/media-player', icon: 'play-circle', category: 'media', featured: true },
-  { id: 'biometric-vault', title: 'Biometric Vault', description: 'Protect sensitive information.', route: '/biometric-vault', icon: 'shield', category: 'security', featured: true },
-  { id: 'computer-control', title: 'Computer Control', description: 'Control your computer remotely.', route: '/remote-computer', icon: 'monitor', category: 'productivity', featured: true },
-  { id: 'payment-announcer', title: 'Payment Announcer', description: 'Secure payment announcements.', route: '/payment-announcer', icon: 'volume-2', category: 'security', featured: true },
-  { id: 'expense-tracker', title: 'Finance Tracker', description: 'Track and review expenses securely.', route: '/expense-tracker', icon: 'credit-card', category: 'security', featured: true },
-  { id: 'video-editor', title: 'Video Editor', description: 'Edit and export videos.', route: '/video-editor', icon: 'video', category: 'media', featured: true },
-  { id: 'geeta-nexus', title: 'Geeta Nexus', description: 'Study the Bhagavad Gita, verses and audio.', route: '/geeta-nexus', icon: 'book', category: 'productivity', featured: true },
+  { id: 'book-reader', title: 'Book Reader', description: 'Read books and documents.', route: '/reader', icon: 'book-open', category: 'productivity', featured: true, order: 10 },
+  { id: 'media-player', title: 'Media Player', description: 'Play audio and media.', route: '/media-player', icon: 'play-circle', category: 'media', featured: true, order: 20 },
+  { id: 'biometric-vault', title: 'Biometric Vault', description: 'Protect sensitive information.', route: '/biometric-vault', icon: 'shield', category: 'security', featured: true, order: 30 },
+  { id: 'computer-control', title: 'Computer Control', description: 'Control your computer remotely.', route: '/remote-computer', icon: 'monitor', category: 'productivity', featured: true, order: 40 },
+  { id: 'payment-announcer', title: 'Payment Announcer', description: 'Secure payment announcements.', route: '/payment-announcer', icon: 'volume-2', category: 'security', featured: true, order: 50 },
+  { id: 'expense-tracker', title: 'Finance Tracker', description: 'Track and review expenses securely.', route: '/expense-tracker', icon: 'credit-card', category: 'security', featured: true, order: 60 },
+  { id: 'video-editor', title: 'Video Editor', description: 'Edit and export videos.', route: '/video-editor', icon: 'video', category: 'media', featured: true, order: 70 },
+  { id: 'geeta-nexus', title: 'Geeta Nexus', description: 'Study the Bhagavad Gita, verses and audio.', route: '/geeta-nexus', icon: 'book', category: 'productivity', featured: true, order: 80 },
   { id: 'time-announcer', title: 'Time Announcer', description: 'Configure time announcements.', route: '/time-announcer', icon: 'volume-2', category: 'utility' },
   { id: 'clock', title: 'Clock', description: 'Announce and work with the current time.', route: '/time-announcer', icon: 'clock', category: 'utility' },
   { id: 'battery-announcer', title: 'Battery Announcer', description: 'Announce battery state.', route: '/battery-announcer', icon: 'battery', category: 'utility' },
@@ -34,15 +37,15 @@ export function registerFeature(feature: HomeFeatureDefinition): void {
 }
 
 export function getHomeFeatures(): HomeFeatureDefinition[] {
-  return [...registry];
+  return [...registry].sort((a, b) => (a.order ?? 1000) - (b.order ?? 1000));
 }
 
 export function getFeaturedHomeFeatures(): HomeFeatureDefinition[] {
-  return registry.filter((feature) => feature.featured);
+  return getHomeFeatures().filter((feature) => feature.featured);
 }
 
 export function getFeaturesByCategory(category: FeatureCategory): HomeFeatureDefinition[] {
-  return registry.filter((feature) => feature.category === category);
+  return getHomeFeatures().filter((feature) => feature.category === category);
 }
 
 export const FEATURE_CATEGORY_META: Record<FeatureCategory, { title: string; description: string; icon: string; route: string }> = {
