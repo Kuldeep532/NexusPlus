@@ -8,22 +8,44 @@ Desktop companion for Nexus Plus remote-computer access.
 - Ubuntu/Linux — Orca-aware integration boundary; session unlock uses `loginctl` when local policy permits it.
 - macOS — VoiceOver-aware integration boundary; login unlock requires a signed Nexus authorization helper.
 
-## Stage 7 desktop control
+## Accessibility
 
-The agent accepts the structured Nexus Plus command protocol and never exposes arbitrary shell execution to the phone.
+The desktop UI exposes semantic regions, live status announcements, visible keyboard focus, large controls, and a keyboard shortcut help section. The agent advertises NVDA, Orca, or VoiceOver capability to the phone. Native accessibility helpers are required for operations that are not available through standard desktop APIs.
 
-Supported command families:
+## Keyboard shortcuts
 
-- Keyboard key presses with validated keys and modifiers.
-- Pointer move, click, and double-click through platform input tooling/helpers.
-- Clipboard read/write subject to local OS tooling and policy.
-- Authenticated voice transcript receiving with a fresh challenge and phone biometric/device-key signature.
-- Authenticated voice-audio frame receiving/acknowledgement for the future audio sink.
-- Computer lock.
-- Screen-reader commands remain behind the native NVDA/Orca/VoiceOver helper boundary.
-- Screen streaming and OS-level audio playback/recording are capability boundaries; they require explicit native capture/output components before production use.
+- Ctrl+Space — mute/unmute microphone
+- Ctrl+Shift+V — toggle meeting video
+- F6 — move focus to agent status
+- F8 — toggle voice input
+- Ctrl+F10 — lock computer
 
-Every sensitive operation uses the paired phone public key and a fresh challenge. The computer password is never sent to the phone.
+These are an accessible agent-level shortcut registry. Application-specific shortcuts must be executed only after the corresponding application adapter confirms the active target.
+
+## Dynamic voice command lane
+
+Android sends natural-language transcripts rather than embedding Zoom, WhatsApp, or YouTube command codes. The desktop agent parses the transcript into an auditable intent and routes it through application adapters.
+
+Examples of supported intent shapes include:
+
+- "unmute" / "mute"
+- "turn on video" / "turn off video"
+- "send a message to <target> saying <message>"
+- "play <search query>"
+- "lock computer"
+
+The command lane is deliberately not arbitrary shell execution. Zoom/WhatsApp/media integrations should use official APIs or OS accessibility automation with explicit permissions. If no authorized adapter can safely handle a request, it returns a structured failure instead of guessing or executing arbitrary commands.
+
+## Manual desktop builds
+
+`.github/workflows/build-remote-agent.yml` is a **workflow_dispatch-only** workflow. It builds the Windows NSIS installer, macOS DMG, or Ubuntu/Linux AppImage on native GitHub-hosted runners and uploads each result as a workflow artifact. It is intentionally not triggered by push or pull request events.
+
+Package scripts:
+
+- `npm run typecheck`
+- `npm run package:win`
+- `npm run package:mac`
+- `npm run package:linux`
 
 ## Development security
 
@@ -32,5 +54,5 @@ The WebSocket listener is intended for a trusted local network during developmen
 ### Native helper requirements
 
 - Windows: NVDA controller integration, low-level input helper, and signed Credential Provider for legitimate pre-login authentication.
-- Ubuntu/Linux: AT-SPI/Orca helper, `xdotool`/Wayland-compatible input helper, and secure session integration.
-- macOS: VoiceOver accessibility helper, Accessibility-permission-aware input helper such as `cliclick` or a native CoreGraphics component, and signed authorization/login helper.
+- Ubuntu/Linux: AT-SPI/Orca helper, Wayland-compatible input helper, and secure session integration.
+- macOS: VoiceOver accessibility helper, Accessibility-permission-aware input helper, and signed authorization/login helper.
