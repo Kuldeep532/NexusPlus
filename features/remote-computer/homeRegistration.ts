@@ -11,4 +11,6 @@ export const remoteComputerHomeFeature = {
   capabilities: ['keyboard', 'pointer', 'clipboard', 'audio', 'voice-command', 'screen-reader', 'unlock'] as RemoteComputerCapability[],
   orderGroup: 'tools',
   priority: 40,
+  contentFeatureId: 'home',
+  contentKey: 'remote-computer',
 } as const;
