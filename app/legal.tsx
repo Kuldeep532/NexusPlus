@@ -1,11 +1,12 @@
 import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 
 const links = [
   ['Privacy Policy', '/privacy-policy'],
   ['Terms & Conditions', '/terms-and-conditions'],
-];
+] as const;
 
 const externalLinks = [
   ['Official Website', 'https://nexusweb.co.in'],
@@ -14,11 +15,12 @@ const externalLinks = [
   ['Facebook', 'https://www.facebook.com/profile.php?id=61590971301245'],
   ['WhatsApp Channel', 'https://whatsapp.com/channel/0029VbDI2cL42Dcc9m6nfm3T'],
   ['LinkedIn', 'https://www.linkedin.com/company/nexus-wave-technologies/'],
-];
+] as const;
 
 export default function LegalAndSupport() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const open = async (url: string) => {
     try { await Linking.openURL(url); } catch { /* keep the page usable if no handler exists */ }
@@ -45,10 +47,7 @@ export default function LegalAndSupport() {
             accessibilityLabel={label}
             accessibilityHint={`Open ${label}`}
             style={[styles.row, { borderBottomColor: colors.border }]}
-            onPress={() => {
-              // Expo Router handles these app routes when the user activates the row.
-              void open(`nexusplus://${route.replace(/^\//, '')}`);
-            }}
+            onPress={() => router.push(route as '/privacy-policy' | '/terms-and-conditions')}
           >
             <Text style={[styles.rowText, { color: colors.foreground }]}>{label}</Text>
           </TouchableOpacity>
