@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 const { WebSocketServer } = require('ws');
 const keytar = require('keytar');
 const { loadOrCreateIdentity } = require('./security');
-const { requestOsUnlock, executeRemoteCommand, getScreenReaderInfo } = require('./unlock');
+const { requestOsUnlock, executeRemoteCommand, executeVoiceTranscript, getScreenReaderInfo } = require('./unlock');
 
 const PORT = 47821;
 const SERVICE = 'NexusPlus.RemoteComputer';
@@ -19,15 +19,18 @@ function verifyPhoneSignature(challenge, signature) {
   if (!pairedPhone || typeof signature !== 'string') return false;
   return crypto.verify('sha256', Buffer.from(challenge), phonePublicKey(), Buffer.from(signature, 'base64'));
 }
+function capabilities() {
+  return ['keyboard', 'pointer', 'clipboard', 'voice-command', 'voice-receiving', 'audio-receiving', 'screen', 'screen-reader', 'unlock', 'lock'];
+}
 
 async function loadState() { identity = await loadOrCreateIdentity(); pairedPhone = await keytar.getPassword(SERVICE, PAIRED_PHONE); }
 
 function startSocketServer() {
-  const wss = new WebSocketServer({ host: '0.0.0.0', port: PORT, maxPayload: 128 * 1024 });
+  const wss = new WebSocketServer({ host: '0.0.0.0', port: PORT, maxPayload: 1024 * 1024 });
   wss.on('connection', (socket) => {
     let pendingUnlockChallenge = null;
     let pendingCommand = null;
-    send(socket, { type: 'agent_hello', protocol: 3, computerId: computerId(), publicKey: identity.publicKey, paired: Boolean(pairedPhone), screenReader: getScreenReaderInfo().kind, capabilities: ['keyboard', 'pointer', 'clipboard', 'voice-command', 'screen-reader', 'unlock'] });
+    send(socket, { type: 'agent_hello', protocol: 4, computerId: computerId(), publicKey: identity.publicKey, paired: Boolean(pairedPhone), screenReader: getScreenReaderInfo().kind, capabilities: capabilities() });
 
     socket.on('message', async (raw) => {
       try {
@@ -64,16 +67,37 @@ function startSocketServer() {
         if (message.type === 'command_request') {
           if (!pairedPhone || message.computerId !== computerId()) throw new Error('This phone is not paired with the computer.');
           if (!message.commandId) throw new Error('Command ID is required.');
-          pendingCommand = { commandId: message.commandId, source: message.source, transcript: message.transcript };
-          send(socket, { type: 'command_challenge', challenge: makeChallenge() });
+          pendingCommand = { commandId: message.commandId, source: message.source, transcript: message.transcript, challenge: makeChallenge() };
+          send(socket, { type: 'command_challenge', challenge: pendingCommand.challenge });
           return;
         }
         if (message.type === 'command_response') {
           if (!pairedPhone || message.publicKey !== pairedPhone || !pendingCommand || message.request?.commandId !== pendingCommand.commandId) throw new Error('Invalid command authorization.');
-          if (!verifyPhoneSignature(message.challenge, message.signature)) throw new Error('Phone signature verification failed.');
+          if (message.challenge !== pendingCommand.challenge || !verifyPhoneSignature(pendingCommand.challenge, message.signature)) throw new Error('Phone signature verification failed.');
           const result = await executeRemoteCommand(message.request?.command, { source: pendingCommand.source, transcript: pendingCommand.transcript });
           pendingCommand = null;
           send(socket, { type: 'command_result', result: { commandId: message.request.commandId, ...result } });
+          return;
+        }
+        if (message.type === 'voice_transcript') {
+          if (!pairedPhone || message.publicKey !== pairedPhone) throw new Error('Unpaired phone.');
+          const challenge = makeChallenge();
+          send(socket, { type: 'voice_challenge', challenge });
+          socket.__pendingVoice = { challenge, transcript: String(message.transcript || '') };
+          return;
+        }
+        if (message.type === 'voice_response') {
+          const pending = socket.__pendingVoice;
+          if (!pending || message.publicKey !== pairedPhone || message.challenge !== pending.challenge || !verifyPhoneSignature(pending.challenge, message.signature)) throw new Error('Voice authorization failed.');
+          socket.__pendingVoice = null;
+          const result = await executeVoiceTranscript(pending.transcript);
+          send(socket, { type: 'voice_result', ok: result.ok, output: result.output, error: result.error });
+          return;
+        }
+        if (message.type === 'voice_audio') {
+          if (!pairedPhone || message.publicKey !== pairedPhone || typeof message.chunk !== 'string' || message.chunk.length > 512000) throw new Error('Invalid voice audio frame.');
+          // Audio frames are accepted only from the paired phone. A future audio sink can consume them.
+          send(socket, { type: 'voice_audio_ack', sequence: message.sequence ?? null });
           return;
         }
         if (message.type === 'ping') send(socket, { type: 'pong' });
@@ -88,7 +112,7 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 }
 
-ipcMain.handle('agent-state', async () => ({ port: PORT, paired: Boolean(pairedPhone), computerId: computerId(), platform: process.platform, screenReader: getScreenReaderInfo().kind }));
+ipcMain.handle('agent-state', async () => ({ port: PORT, paired: Boolean(pairedPhone), computerId: computerId(), platform: process.platform, screenReader: getScreenReaderInfo().kind, capabilities: capabilities() }));
 ipcMain.handle('forget-phone', async () => { pairedPhone = undefined; await keytar.deletePassword(SERVICE, PAIRED_PHONE); return { paired: false }; });
 app.whenReady().then(async () => { await loadState(); startSocketServer(); createWindow(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
