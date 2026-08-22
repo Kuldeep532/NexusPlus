@@ -3,6 +3,18 @@ import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-const tools=[['Biometric Vault','/biometric-vault','shield','Protect sensitive information with the app vault.'],['Payment Announcer','/payment-announcer','volume-2','Financial feature protected by strong biometric authentication.'],['Expense Tracker','/expense-tracker','credit-card','Track financial activity behind the biometric gate.']] as const;
-export default function SecurityToolsScreen(){const c=useColors(),r=useRouter(),i=useSafeAreaInsets();return <View style={[s.root,{backgroundColor:c.background}]}><ScrollView contentContainerStyle={{padding:18,paddingTop:i.top+12,paddingBottom:i.bottom+24}}><Text accessibilityRole="header" style={[s.title,{color:c.foreground}]}>Security & Privacy</Text><Text style={[s.body,{color:c.mutedForeground}]}>Security-sensitive features are grouped separately and keep their existing protection boundaries.</Text><View style={s.list}>{tools.map(([t,route,icon,d])=><Pressable key={route+t} accessibilityRole="button" accessibilityLabel={`${t}. ${d}`} onPress={()=>r.push(route as never)} style={[s.card,{backgroundColor:c.card,borderColor:c.border}]}><View style={[s.icon,{backgroundColor:c.secondary}]}><Feather name={icon as never} size={20} color={c.primary}/></View><View style={s.copy}><Text style={[s.cardTitle,{color:c.foreground}]}>{t}</Text><Text style={[s.body,{color:c.mutedForeground}]}>{d}</Text></View><Feather name="chevron-right" size={19} color={c.mutedForeground}/></Pressable>)}</View></ScrollView></View>}
-const s=StyleSheet.create({root:{flex:1},title:{fontSize:26,fontFamily:'Inter_700Bold',marginBottom:6},body:{fontSize:11,lineHeight:17},list:{marginTop:18,gap:10},card:{minHeight:74,borderWidth:1,borderRadius:18,padding:13,flexDirection:'row',alignItems:'center'},icon:{width:44,height:44,borderRadius:13,alignItems:'center',justifyContent:'center'},copy:{flex:1,marginLeft:12,marginRight:8},cardTitle:{fontSize:13,fontFamily:'Inter_700Bold',marginBottom:3}});
+import { getFeaturesByCategory } from '@/features/app-shell/featureRegistry';
+
+export default function SecurityToolsScreen() {
+  const colors = useColors();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const tools = getFeaturesByCategory('security');
+  return <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 18, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24 }}>
+    <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Security & Privacy</Text>
+    <Text style={[styles.body, { color: colors.mutedForeground }]}>Security-sensitive features keep their existing protection boundaries.</Text>
+    <View style={styles.list}>{tools.map((tool) => <Pressable key={tool.id} accessibilityRole="button" accessibilityLabel={`${tool.title}. ${tool.description}`} onPress={() => router.push(tool.route as never)} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name={tool.icon as never} size={20} color={colors.primary} /></View><View style={styles.copy}><Text style={[styles.cardTitle, { color: colors.foreground }]}>{tool.title}</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>{tool.description}</Text></View><Feather name="chevron-right" size={19} color={colors.mutedForeground} accessibilityElementsHidden /></Pressable>)}</View>
+  </ScrollView>;
+}
+
+const styles = StyleSheet.create({ root: { flex: 1 }, title: { fontSize: 26, fontFamily: 'Inter_700Bold', marginBottom: 6 }, body: { fontSize: 11, lineHeight: 17 }, list: { marginTop: 18, gap: 10 }, card: { minHeight: 74, borderWidth: 1, borderRadius: 18, padding: 13, flexDirection: 'row', alignItems: 'center' }, icon: { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, copy: { flex: 1, marginLeft: 12, marginRight: 8 }, cardTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', marginBottom: 3 } });
