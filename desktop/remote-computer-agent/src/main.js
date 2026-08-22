@@ -30,7 +30,6 @@ function send(socket, message) {
 function startSocketServer() {
   const wss = new WebSocketServer({ host: '0.0.0.0', port: PORT, maxPayload: 128 * 1024 });
   wss.on('connection', (socket) => {
-    let authenticated = false;
     let pendingChallenge = null;
 
     send(socket, {
@@ -62,7 +61,7 @@ function startSocketServer() {
         }
 
         if (message.type === 'unlock_request') {
-          if (!pairedPhone || message.publicKey !== pairedPhone) throw new Error('This phone is not paired with the computer.');
+          if (!pairedPhone) throw new Error('No phone is paired with this computer.');
           pendingChallenge = makeChallenge();
           send(socket, { type: 'unlock_challenge', challenge: pendingChallenge });
           return;
@@ -75,7 +74,6 @@ function startSocketServer() {
           const valid = crypto.verify('sha256', Buffer.from(pendingChallenge), publicKey, Buffer.from(message.signature, 'base64'));
           pendingChallenge = null;
           if (!valid) throw new Error('Phone signature verification failed.');
-          authenticated = true;
           const result = await requestOsUnlock();
           send(socket, { type: 'unlock_result', ok: true, result });
           return;
