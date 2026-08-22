@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { Link } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 
@@ -32,24 +32,24 @@ export default function HomeScreen() {
       <View style={styles.list} accessibilityRole="list">
         {actions.map((action) => (
           <Link key={action.href} href={action.href as any} asChild>
-            <Link.Trigger>
-              <View
-                accessible
-                accessibilityRole="button"
-                accessibilityLabel={action.title}
-                accessibilityHint={action.detail}
-                style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
-              >
-                <View style={[styles.icon, { backgroundColor: colors.secondary }]}>
-                  <Feather name={action.icon} size={22} color={colors.primary} />
-                </View>
-                <View style={styles.copy}>
-                  <Text style={[styles.cardTitle, { color: colors.foreground }]}>{action.title}</Text>
-                  <Text style={[styles.detail, { color: colors.mutedForeground }]}>{action.detail}</Text>
-                </View>
-                <Feather name="chevron-right" size={22} color={colors.mutedForeground} accessibilityElementsHidden />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={action.title}
+              accessibilityHint={action.detail}
+              style={({ pressed }) => [
+                styles.card,
+                { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <View style={[styles.icon, { backgroundColor: colors.secondary }]} accessible={false}>
+                <Feather name={action.icon} size={22} color={colors.primary} accessibilityElementsHidden />
               </View>
-            </Link.Trigger>
+              <View style={styles.copy} accessible={false}>
+                <Text style={[styles.cardTitle, { color: colors.foreground }]}>{action.title}</Text>
+                <Text style={[styles.detail, { color: colors.mutedForeground }]}>{action.detail}</Text>
+              </View>
+              <Feather name="chevron-right" size={22} color={colors.mutedForeground} accessibilityElementsHidden />
+            </Pressable>
           </Link>
         ))}
       </View>
