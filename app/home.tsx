@@ -1,19 +1,22 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { getDailySpiritualMessage } from '@/features/spiritual/spiritualMessageLibrary';
+import { readLaunchPreferences } from '@/features/app-shell/launchPreferences';
 
-const featuredTools = [
+const baseFeaturedTools = [
   { title: 'Biometric Vault', description: 'Protect sensitive data.', route: '/biometric-vault', icon: 'shield' as const },
   { title: 'Payment Announcer', description: 'Secure payment announcements.', route: '/payment-announcer', icon: 'volume-2' as const },
   { title: 'Expense Tracker', description: 'Track and review expenses securely.', route: '/expense-tracker', icon: 'credit-card' as const },
-  { title: 'Geeta Nexus', description: 'Explore Bhagavad Gita chapters, verses and audio.', route: '/geeta-nexus', icon: 'book' as const },
   { title: 'Book Reader', description: 'Read books and documents.', route: '/reader', icon: 'book-open' as const },
   { title: 'Media Player', description: 'Play your audio and media.', route: '/media-player', icon: 'play-circle' as const },
   { title: 'Video Editor', description: 'Edit and export videos.', route: '/video-editor', icon: 'video' as const },
 ];
+
+const geetaTool = { title: 'Geeta Nexus', description: 'Explore Bhagavad Gita chapters, verses and audio.', route: '/geeta-nexus', icon: 'book' as const };
 
 const categories = [
   { title: 'Utility Tools', description: 'Clock, time and announcer utilities.', route: '/categories/utility-tools', icon: 'clock' as const },
@@ -26,6 +29,13 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const dailyMessage = getDailySpiritualMessage();
+  const [showGeetaNexusOnHome, setShowGeetaNexusOnHome] = useState(true);
+
+  useEffect(() => {
+    void readLaunchPreferences().then((preferences) => setShowGeetaNexusOnHome(preferences.showGeetaNexusOnHome));
+  }, []);
+
+  const featuredTools = useMemo(() => showGeetaNexusOnHome ? [baseFeaturedTools[0], baseFeaturedTools[1], baseFeaturedTools[2], geetaTool, ...baseFeaturedTools.slice(3)] : baseFeaturedTools, [showGeetaNexusOnHome]);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}> 
