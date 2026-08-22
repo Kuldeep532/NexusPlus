@@ -1,4 +1,5 @@
 import { createPairingNonce, createRemotePairingIdentity, buildUnlockRequest } from './remoteComputerSecurity';
+import type { RemoteComputerCommandRequest, RemoteComputerCommandResult } from './remoteComputerTypes';
 
 export interface RemoteAgentHello {
   type: 'agent_hello';
@@ -6,6 +7,8 @@ export interface RemoteAgentHello {
   computerId: string;
   publicKey: string;
   paired: boolean;
+  screenReader?: 'nvda' | 'orca' | 'voiceover' | 'none' | 'unknown';
+  capabilities?: string[];
 }
 
 export interface RemoteUnlockResult {
@@ -21,13 +24,10 @@ export async function pairWithDesktopAgent(url: string): Promise<{ computerId: s
     socket.onmessage = (event) => {
       const message = JSON.parse(String(event.data)) as RemoteAgentHello | { type: string; code?: string; computerId?: string; message?: string };
       if (message.type === 'pair_pending' && message.code) {
-        clearTimeout(timeout);
-        socket.close();
+        clearTimeout(timeout); socket.close();
         resolve({ computerId: message.computerId ?? 'pending', code: message.code, publicKey: identity.publicKey });
       } else if (message.type === 'error') {
-        clearTimeout(timeout);
-        socket.close();
-        reject(new Error(message.message ?? 'Desktop pairing failed.'));
+        clearTimeout(timeout); socket.close(); reject(new Error(message.message ?? 'Desktop pairing failed.'));
       }
     };
     socket.send(JSON.stringify({ type: 'pair_request', publicKey: identity.publicKey }));
@@ -40,15 +40,8 @@ export async function confirmDesktopPairing(url: string, code: string, publicKey
     const timeout = setTimeout(() => { socket.close(); reject(new Error('Desktop pairing confirmation timed out.')); }, 15000);
     socket.onmessage = (event) => {
       const message = JSON.parse(String(event.data));
-      if (message.type === 'pair_success') {
-        clearTimeout(timeout);
-        socket.close();
-        resolve();
-      } else if (message.type === 'error') {
-        clearTimeout(timeout);
-        socket.close();
-        reject(new Error(message.message ?? 'Desktop pairing confirmation failed.'));
-      }
+      if (message.type === 'pair_success') { clearTimeout(timeout); socket.close(); resolve(); }
+      else if (message.type === 'error') { clearTimeout(timeout); socket.close(); reject(new Error(message.message ?? 'Desktop pairing confirmation failed.')); }
     };
     socket.send(JSON.stringify({ type: 'pair_confirm', code, publicKey }));
   });
@@ -69,19 +62,43 @@ export async function requestRemoteUnlock(url: string, computerId: string): Prom
           return;
         }
         if (message.type === 'unlock_result') {
-          clearTimeout(timeout);
-          socket.close();
+          clearTimeout(timeout); socket.close();
           resolve({ ok: message.ok === true, result: message.result });
           return;
         }
         if (message.type === 'error') throw new Error(message.message ?? 'Remote unlock was rejected.');
       } catch (error) {
-        clearTimeout(timeout);
-        socket.close();
+        clearTimeout(timeout); socket.close();
         reject(error instanceof Error ? error : new Error('Remote unlock failed.'));
       }
     };
     socket.send(JSON.stringify({ type: 'unlock_request', computerId }));
+  });
+}
+
+/** Execute only the explicit, allowlisted remote-control command schema. No arbitrary shell commands are sent. */
+export async function sendRemoteCommand(
+  url: string,
+  request: Omit<RemoteComputerCommandRequest, 'commandId'>,
+): Promise<RemoteComputerCommandResult> {
+  const socket = await openSocket(url);
+  const commandId = await createPairingNonce();
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => { socket.close(); reject(new Error('Remote command timed out.')); }, 15000);
+    socket.onmessage = (event) => {
+      try {
+        const message = JSON.parse(String(event.data));
+        if (message.type === 'command_result') {
+          clearTimeout(timeout); socket.close();
+          resolve(message.result as RemoteComputerCommandResult);
+        } else if (message.type === 'error') {
+          clearTimeout(timeout); socket.close(); reject(new Error(message.message ?? 'Remote command rejected.'));
+        }
+      } catch (error) {
+        clearTimeout(timeout); socket.close(); reject(error instanceof Error ? error : new Error('Invalid desktop response.'));
+      }
+    };
+    socket.send(JSON.stringify({ type: 'command_request', request: { ...request, commandId } }));
   });
 }
 
