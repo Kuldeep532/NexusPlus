@@ -1,38 +1,26 @@
 # Nexus Plus Remote Computer Agent
 
-The desktop side of Nexus Plus remote computer access.
+Desktop companion for Nexus Plus remote-computer access.
 
-## Stage 2 security flow
+## Supported platforms
 
-1. The Android app creates an EC P-256 device-bound key in Android Keystore.
-2. The public key is sent during pairing; the private key never leaves the phone.
-3. The desktop agent displays a pairing code and stores the approved phone public key in the operating system credential store.
-4. A remote unlock request causes the desktop agent to generate a fresh random challenge.
-5. The phone requires local biometric authentication and signs the challenge with the device-bound private key.
-6. The desktop verifies the signature against the pinned phone public key.
-7. Only after successful verification does the platform unlock adapter run.
+- Windows — NVDA-aware integration boundary; pre-login unlock requires a signed Nexus Credential Provider/helper.
+- Ubuntu/Linux — Orca-aware integration boundary; session unlock uses `loginctl` when local policy permits it.
+- macOS — VoiceOver-aware integration boundary; login unlock requires a signed Nexus authorization helper.
 
-## Final desktop application
+## Stage 3 remote control
 
-The Electron application provides an accessible status panel, pairing verification, and an installed-agent control surface. The agent listens on TCP/WebSocket port `47821` by default.
+The agent accepts only the structured Nexus Plus command protocol. It does not expose arbitrary shell execution to the phone.
 
-For production internet access, put this agent behind a mutually authenticated relay/TLS transport. Do not expose the raw agent port directly to the public internet.
+Supported command families:
 
-## OS unlock policy
+- Validated keyboard key presses.
+- Clipboard operations subject to local OS tooling/policy.
+- Lock the current computer session.
+- Screen-reader and pointer command boundaries for native accessibility helpers.
 
-The agent deliberately does not bypass OS passwords or defeat login security controls.
+Each command is protected by a fresh challenge and phone biometric/device-key signature. Unsupported native operations return a structured `unsupported` result rather than executing a fallback shell command.
 
-- **Ubuntu/Linux:** the current-user desktop session can use `loginctl unlock-session` when the OS policy allows it.
-- **Windows:** a dedicated Nexus Windows Credential Provider/helper is required for pre-logon unlock. A normal Electron application cannot unlock the Windows sign-in screen.
-- **macOS:** a dedicated Nexus authorization/login helper and an explicitly enrolled user policy are required. A normal application cannot bypass the macOS login credential UI.
+## Development security
 
-This distinction is intentional: the Android biometric proves possession of the enrolled phone key; the desktop OS still decides whether its configured unlock mechanism may act.
-
-## Development
-
-```bash
-pnpm install
-pnpm start
-```
-
-Do not publish the development WebSocket port directly to the internet. Production packaging should add a signed installer, auto-update policy, firewall rules, service startup, and the platform-specific privileged helper only after security review.
+The WebSocket listener is intended for a trusted local network during development. Do not expose port `47821` directly to the public internet. Production deployment requires authenticated TLS transport/relay, signed installers, firewall rules, secure updates, and OS-specific privileged accessibility/login helpers.
