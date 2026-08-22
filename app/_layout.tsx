@@ -4,6 +4,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '@/features/auth/useAuth';
 import { useColors } from '@/hooks/useColors';
 import { getLaunchRoute } from '@/features/app-shell/launchPreferences';
+import { hasCompletedWelcome } from '@/features/app-shell/onboardingPreferences';
 import { PersistentMediaProvider } from '@/media-player/PersistentMediaController';
 import { GlobalMiniPlayer } from '@/features/media/GlobalMiniPlayer';
 
@@ -22,26 +23,31 @@ export default function RootLayout() {
   useEffect(() => {
     if (!splashDone || auth.loading) return;
 
-    const inAuth = segments[0] === 'login-plus-register';
-    const inPublicWelcome = segments[0] === 'welcome';
-    const inLaunchScreen = segments[0] === 'home' || segments[0] === 'geeta-nexus';
+    const firstSegment = segments[0];
+    const inAuth = firstSegment === 'login-plus-register';
+    const inWelcome = firstSegment === 'welcome';
+    const inTabs = firstSegment === '(tabs)';
+    const inGeeta = firstSegment === 'geeta-nexus';
 
     if (!auth.session) {
-      if (!inAuth && !inPublicWelcome) router.replace('/login-plus-register');
+      if (inAuth || inWelcome) return;
+      void hasCompletedWelcome().then((completed) => {
+        router.replace(completed ? '/login-plus-register' : '/welcome');
+      });
       return;
     }
 
-    if (auth.session && (inAuth || inPublicWelcome || !inLaunchScreen)) {
+    if (inAuth || inWelcome || (!firstSegment && !inTabs && !inGeeta)) {
       void getLaunchRoute().then((route) => router.replace(route));
     }
   }, [auth.loading, auth.session, router, segments, splashDone]);
 
   if (!splashDone) {
     return (
-      <View style={[styles.splashBridge, { backgroundColor: colors.background }]} accessible accessibilityLabel="Nexus Plus loading. Please wait three seconds.">
-        <Text style={[styles.brand, { color: colors.foreground }]}>Nexus Plus</Text>
+      <View style={[styles.splashBridge, { backgroundColor: colors.background }]} accessible accessibilityLabel="Nexus Plus splash screen. Loading the app.">
+        <Text accessibilityRole="header" style={[styles.brand, { color: colors.foreground }]}>Nexus Plus</Text>
         <Text style={[styles.message, { color: colors.primary }]}>Spiritual Sundays</Text>
-        <ActivityIndicator accessibilityLabel="Loading" color={colors.primary} style={styles.spinner} />
+        <ActivityIndicator accessibilityLabel="Loading Nexus Plus" color={colors.primary} style={styles.spinner} />
       </View>
     );
   }
