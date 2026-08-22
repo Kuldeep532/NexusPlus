@@ -31,9 +31,19 @@ function parseMerchant(text: string): string | null {
   return null;
 }
 
+function fingerprintMessage(messageId: string, timestampMs: number, body: string): string {
+  let hash = 2166136261;
+  const input = `${messageId}|${timestampMs}|${body.trim().toLowerCase()}`;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `sms:${(hash >>> 0).toString(16).padStart(8, '0')}`;
+}
+
 /**
  * Parses a single SMS body only. Runtime SMS access is intentionally outside this parser.
- * Callers must obtain a permitted Android SMS message and pass only that message here.
+ * Raw SMS text must not be persisted or sent to the backend.
  */
 export function parseExpenseSmsMessage(
   messageId: string,
@@ -50,6 +60,6 @@ export function parseExpenseSmsMessage(
     currency: /\bUSD\b|\$/i.test(body) ? 'USD' : 'INR',
     occurredAtMs: timestampMs,
     merchantText: parseMerchant(body),
-    rawTextFingerprint: body.trim().slice(0, 256),
+    rawTextFingerprint: fingerprintMessage(messageId, timestampMs, body),
   };
 }
