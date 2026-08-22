@@ -63,3 +63,25 @@ export interface RemoteComputerVoiceCommand {
   locale: string;
   confidence?: number;
 }
+
+export type RemoteComputerCommand =
+  | { type: 'keyboard'; action: 'press'; key: string; modifiers?: string[] }
+  | { type: 'pointer'; action: 'move' | 'click' | 'double-click'; x?: number; y?: number; button?: 'left' | 'right' | 'middle' }
+  | { type: 'clipboard'; action: 'read' | 'write'; text?: string }
+  | { type: 'screen-reader'; action: 'read-current' | 'pause' | 'resume' | 'next' | 'previous' }
+  | { type: 'system'; action: 'lock' | 'sleep' };
+
+export interface RemoteComputerCommandRequest {
+  commandId: string;
+  computerId: string;
+  command: RemoteComputerCommand;
+  source: 'voice' | 'touch';
+  transcript?: string;
+}
+
+export interface RemoteComputerCommandResult {
+  commandId: string;
+  ok: boolean;
+  output?: string;
+  error?: 'not-paired' | 'unsupported' | 'policy-denied' | 'invalid-command' | 'execution-failed';
+}
