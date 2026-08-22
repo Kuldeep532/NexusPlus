@@ -3,11 +3,13 @@ import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { getDailySpiritualMessage } from '@/features/spiritual/spiritualMessageLibrary';
 
 const featuredTools = [
   { title: 'Biometric Vault', description: 'Protect sensitive data.', route: '/biometric-vault', icon: 'shield' as const },
   { title: 'Payment Announcer', description: 'Secure payment announcements.', route: '/payment-announcer', icon: 'volume-2' as const },
   { title: 'Expense Tracker', description: 'Track and review expenses securely.', route: '/expense-tracker', icon: 'credit-card' as const },
+  { title: 'Geeta Nexus', description: 'Explore Bhagavad Gita chapters, verses and audio.', route: '/geeta-nexus', icon: 'book' as const },
   { title: 'Book Reader', description: 'Read books and documents.', route: '/reader', icon: 'book-open' as const },
   { title: 'Media Player', description: 'Play your audio and media.', route: '/media-player', icon: 'play-circle' as const },
   { title: 'Video Editor', description: 'Edit and export videos.', route: '/video-editor', icon: 'video' as const },
@@ -23,6 +25,7 @@ export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const dailyMessage = getDailySpiritualMessage();
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}> 
@@ -30,13 +33,20 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <Text style={[styles.brand, { color: colors.foreground }]}>Nexus Plus</Text>
-            <Text style={[styles.kicker, { color: colors.primary }]}>Spiritual Sundays</Text>
             <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Home</Text>
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Your tools, organised and easy to reach.</Text>
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel="Open profile" onPress={() => router.push('/profile')} style={[styles.profileButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="user" size={22} color={colors.foreground} />
           </Pressable>
+        </View>
+
+        <View style={[styles.messageCard, { backgroundColor: colors.card, borderColor: colors.border }]} accessible accessibilityRole="summary">
+          <Feather name="sunrise" size={21} color={colors.primary} />
+          <View style={styles.messageCopy}>
+            <Text style={[styles.messageLabel, { color: colors.primary }]}>SPIRITUAL SUNDAYS</Text>
+            <Text style={[styles.message, { color: colors.foreground }]}>{dailyMessage.text}</Text>
+          </View>
         </View>
 
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Top-level features</Text>
@@ -75,11 +85,14 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 18 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
   headerCopy: { flex: 1, paddingRight: 16 },
-  brand: { fontSize: 24, fontFamily: 'Inter_700Bold', marginBottom: 2 },
-  kicker: { fontSize: 10, letterSpacing: 1.7, fontFamily: 'Inter_700Bold', marginBottom: 7 },
+  brand: { fontSize: 24, fontFamily: 'Inter_700Bold', marginBottom: 5 },
   title: { fontSize: 28, fontFamily: 'Inter_700Bold' },
   subtitle: { fontSize: 12, lineHeight: 18, marginTop: 5 },
   profileButton: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  messageCard: { borderWidth: 1, borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20 },
+  messageCopy: { flex: 1, marginLeft: 10 },
+  messageLabel: { fontSize: 9, letterSpacing: 1.4, fontFamily: 'Inter_700Bold', marginBottom: 5 },
+  message: { fontSize: 12.5, lineHeight: 18, fontFamily: 'Inter_600SemiBold' },
   sectionTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', marginBottom: 10 },
   list: { gap: 10 },
   toolCard: { minHeight: 76, borderWidth: 1, borderRadius: 18, padding: 13, flexDirection: 'row', alignItems: 'center' },
