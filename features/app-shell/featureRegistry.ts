@@ -1,7 +1,5 @@
 export type FeatureCategory = 'utility' | 'pdf' | 'media' | 'security' | 'productivity';
-
 export interface HomeFeatureDefinition { id: string; title: string; description: string; route: string; icon: string; category: FeatureCategory; featured?: boolean; order?: number; }
-
 const registry: HomeFeatureDefinition[] = [
   { id: 'book-reader', title: 'Book Reader', description: 'Read books and documents.', route: '/reader', icon: 'book-open', category: 'productivity', featured: true, order: 10 },
   { id: 'media-player', title: 'Media Player', description: 'Play audio and media.', route: '/media-player', icon: 'play-circle', category: 'media', featured: true, order: 20 },
@@ -16,9 +14,8 @@ const registry: HomeFeatureDefinition[] = [
   { id: 'pdf-tools', title: 'PDF Tools', description: 'Convert, protect, lock, unlock and manage PDFs.', route: '/categories/pdf-tools', icon: 'file-text', category: 'pdf' },
   { id: 'online-radio', title: 'Online Radio', description: 'Listen to online radio.', route: '/online-radio', icon: 'radio', category: 'media' },
   { id: 'file-encryption', title: 'File Encryption', description: 'Protect files with encrypted containers.', route: '/file-encryption', icon: 'lock', category: 'security' },
-  { id: 'ai-workflow', title: 'AI Workflow', description: 'Draft emails and plan meeting or calendar actions.', route: '/productivity-ai', icon: 'zap', category: 'productivity' },
+  { id: 'nexus-ai-workflow', title: 'Nexus AI Workflow', description: 'Draft bilingual messages and plan email, meeting and calendar workflows.', route: '/productivity-ai', icon: 'zap', category: 'productivity' },
 ];
-
 export function registerFeature(feature: HomeFeatureDefinition): void { const existingIndex = registry.findIndex((item) => item.id === feature.id); if (existingIndex >= 0) registry[existingIndex] = feature; else registry.push(feature); }
 export function getHomeFeatures(): HomeFeatureDefinition[] { return [...registry].sort((a, b) => (a.order ?? 1000) - (b.order ?? 1000)); }
 export function getFeaturedHomeFeatures(): HomeFeatureDefinition[] { return getHomeFeatures().filter((feature) => feature.featured); }
