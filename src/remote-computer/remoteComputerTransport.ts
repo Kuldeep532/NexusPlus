@@ -1,4 +1,4 @@
-import { createRemotePairingIdentity, buildUnlockRequest } from './remoteComputerSecurity';
+import { createPairingNonce, createRemotePairingIdentity, buildUnlockRequest } from './remoteComputerSecurity';
 
 export interface RemoteAgentHello {
   type: 'agent_hello';
@@ -13,16 +13,17 @@ export interface RemoteUnlockResult {
   result?: { platform: string; action: string };
 }
 
-export async function pairWithDesktopAgent(url: string): Promise<{ computerId: string; code: string }> {
+export async function pairWithDesktopAgent(url: string): Promise<{ computerId: string; code: string; publicKey: string }> {
   const identity = await createRemotePairingIdentity();
   const socket = await openSocket(url);
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => { socket.close(); reject(new Error('Desktop agent pairing timed out.')); }, 15000);
     socket.onmessage = (event) => {
-      const message = JSON.parse(String(event.data)) as RemoteAgentHello | { type: string; code?: string; message?: string };
-      if (message.type === 'pair_pending' && 'code' in message && message.code) {
+      const message = JSON.parse(String(event.data)) as RemoteAgentHello | { type: string; code?: string; computerId?: string; message?: string };
+      if (message.type === 'pair_pending' && message.code) {
         clearTimeout(timeout);
-        resolve({ computerId: 'pending', code: message.code });
+        socket.close();
+        resolve({ computerId: message.computerId ?? 'pending', code: message.code, publicKey: identity.publicKey });
       } else if (message.type === 'error') {
         clearTimeout(timeout);
         socket.close();
@@ -33,18 +34,38 @@ export async function pairWithDesktopAgent(url: string): Promise<{ computerId: s
   });
 }
 
-export async function requestRemoteUnlock(url: string, computerId: string): Promise<RemoteUnlockResult> {
+export async function confirmDesktopPairing(url: string, code: string, publicKey: string): Promise<void> {
   const socket = await openSocket(url);
   return new Promise((resolve, reject) => {
-    let challenge: string | undefined;
+    const timeout = setTimeout(() => { socket.close(); reject(new Error('Desktop pairing confirmation timed out.')); }, 15000);
+    socket.onmessage = (event) => {
+      const message = JSON.parse(String(event.data));
+      if (message.type === 'pair_success') {
+        clearTimeout(timeout);
+        socket.close();
+        resolve();
+      } else if (message.type === 'error') {
+        clearTimeout(timeout);
+        socket.close();
+        reject(new Error(message.message ?? 'Desktop pairing confirmation failed.'));
+      }
+    };
+    socket.send(JSON.stringify({ type: 'pair_confirm', code, publicKey }));
+  });
+}
+
+export async function requestRemoteUnlock(url: string, computerId: string): Promise<RemoteUnlockResult> {
+  const socket = await openSocket(url);
+  const identity = await createRemotePairingIdentity();
+  return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => { socket.close(); reject(new Error('Remote unlock timed out.')); }, 30000);
     socket.onmessage = async (event) => {
       try {
         const message = JSON.parse(String(event.data));
         if (message.type === 'unlock_challenge') {
-          challenge = message.challenge;
-          const request = await buildUnlockRequest(computerId, crypto.randomUUID(), challenge);
-          socket.send(JSON.stringify({ type: 'unlock_response', challenge, signature: request.signedChallenge, publicKey: (await createRemotePairingIdentity()).publicKey }));
+          const challengeId = await createPairingNonce();
+          const request = await buildUnlockRequest(computerId, challengeId, message.challenge);
+          socket.send(JSON.stringify({ type: 'unlock_response', challenge: message.challenge, signature: request.signedChallenge, publicKey: identity.publicKey }));
           return;
         }
         if (message.type === 'unlock_result') {
