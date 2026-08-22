@@ -1,9 +1,10 @@
 import { Feather } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { getLaunchRoute, readLaunchPreferences, writeLaunchPreferences, type LaunchTarget } from '@/features/app-shell/launchPreferences';
+import { readLaunchPreferences, writeLaunchPreferences, type LaunchTarget } from '@/features/app-shell/launchPreferences';
 
 const SETTINGS = [
   { title: 'Language & preferences', description: 'Language, accessibility and general preferences.', route: '/language-and-preference', icon: 'globe' as const },
