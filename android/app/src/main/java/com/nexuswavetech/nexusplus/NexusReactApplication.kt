@@ -23,6 +23,8 @@ class NexusReactApplication : Application(), ReactApplication {
                 NexusFileUriPackage(),
                 NexusDocumentReaderPackage(),
                 NexusAlarmPackage(),
+                NexusAuthPackage(),
+                NexusIntegrityPackage(),
             )
 
         override fun getJSMainModuleName(): String = "expo-router/entry"
