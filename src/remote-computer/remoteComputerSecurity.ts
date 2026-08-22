@@ -27,5 +27,4 @@ export async function buildUnlockRequest(computerId: string, challengeId: string
   const signedChallenge = await signRemoteChallenge(challenge);
   return { computerId, challengeId, signedChallenge, deviceKeyId: result.keyId, biometricStrength: result.biometricStrength ?? 'strong' };
 }
-
 export async function createPairingNonce(): Promise<string> { return toHex(await getRandomBytesAsync(32)); }
