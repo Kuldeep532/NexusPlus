@@ -19,6 +19,16 @@ export interface GitaVerse {
   audioUri?: string;
 }
 
+export interface GitaAudioChapter {
+  id: string;
+  chapterNumber: number;
+  title: string;
+  uri: string;
+  durationSeconds?: number;
+  mimeType?: string;
+  artworkUri?: string;
+}
+
 export interface GitaAudioTrack {
   id: string;
   chapter: number;
