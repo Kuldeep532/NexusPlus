@@ -16,7 +16,6 @@ class NexusRemoteKeyModule(private val context: ReactApplicationContext) : React
     companion object {
         private const val MODULE = "NexusRemoteKey"
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
-        // v2 is authentication-bound; v1 was intentionally superseded because it was not Keystore-auth protected.
         private const val ALIAS = "nexus.remote.computer.v2"
     }
 
@@ -29,8 +28,9 @@ class NexusRemoteKeyModule(private val context: ReactApplicationContext) : React
         generator.initialize(
             KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY)
                 .setDigests(KeyProperties.DIGEST_SHA256)
+                // Zero validity means Android requires user authentication for every signature use.
                 .setUserAuthenticationRequired(true)
-                .setUserAuthenticationValidityDurationSeconds(30)
+                .setUserAuthenticationValidityDurationSeconds(0)
                 .build(),
         )
         generator.generateKeyPair()
@@ -42,34 +42,20 @@ class NexusRemoteKeyModule(private val context: ReactApplicationContext) : React
             ensureKey()
             val store = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
             val certificate = store.getCertificate(ALIAS)
-            promise.resolve(mapOf(
-                "keyId" to ALIAS,
-                "algorithm" to "ECDSA-P256-SHA256-AUTHENTICATED",
-                "publicKey" to Base64.getEncoder().encodeToString(certificate.publicKey.encoded),
-            ))
-        } catch (error: Throwable) {
-            promise.reject("REMOTE_KEY_PUBLIC", "Could not access the device-bound public key.", error)
-        }
+            promise.resolve(mapOf("keyId" to ALIAS, "algorithm" to "ECDSA-P256-SHA256-AUTHENTICATED", "publicKey" to Base64.getEncoder().encodeToString(certificate.publicKey.encoded)))
+        } catch (error: Throwable) { promise.reject("REMOTE_KEY_PUBLIC", "Could not access the device-bound public key.", error) }
     }
 
     @ReactMethod
     fun signChallenge(challenge: String, promise: Promise) {
-        if (challenge.isBlank() || challenge.length > 4096) {
-            promise.reject("REMOTE_KEY_INPUT", "Challenge is required and must be at most 4096 characters.")
-            return
-        }
+        if (challenge.isBlank() || challenge.length > 4096) { promise.reject("REMOTE_KEY_INPUT", "Challenge is required and must be at most 4096 characters."); return }
         try {
             ensureKey()
             val store = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
             val privateKey = store.getKey(ALIAS, null)
-            val signature = Signature.getInstance("SHA256withECDSA").apply {
-                initSign(privateKey as java.security.PrivateKey)
-                update(challenge.toByteArray(Charsets.UTF_8))
-            }
-            // Android Keystore refuses this operation unless the user has recently authenticated.
+            val signature = Signature.getInstance("SHA256withECDSA").apply { initSign(privateKey as java.security.PrivateKey); update(challenge.toByteArray(Charsets.UTF_8)) }
+            // Android Keystore rejects signing until the user authenticates for this use.
             promise.resolve(Base64.getEncoder().encodeToString(signature.sign()))
-        } catch (error: Throwable) {
-            promise.reject("REMOTE_KEY_SIGN", "Could not sign the remote challenge. Authenticate with the phone biometric prompt first.", error)
-        }
+        } catch (error: Throwable) { promise.reject("REMOTE_KEY_SIGN", "Could not sign the remote challenge. Authenticate with the phone biometric prompt first.", error) }
     }
 }
