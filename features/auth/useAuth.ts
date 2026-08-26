@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AuthSession, EmailPasswordInput } from './authTypes';
-import { nativeGoogleSignIn } from './authNative';
 import {
   getStoredAuthSession,
   supabaseAuthAdapter,
@@ -30,18 +29,10 @@ export function useAuth() {
   useEffect(() => {
     let cancelled = false;
     getStoredAuthSession()
-      .then((value) => {
-        if (!cancelled) setSession(value);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not restore sign-in state.');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .then((value) => { if (!cancelled) setSession(value); })
+      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : 'Could not restore sign-in state.'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   const run = useCallback(async (action: () => Promise<AuthSession>) => {
@@ -61,8 +52,7 @@ export function useAuth() {
   }, []);
 
   const google = useCallback(() => run(async () => {
-    const credential = await nativeGoogleSignIn();
-    const value = await supabaseAuthAdapter.signInWithGoogleIdToken(credential.idToken) as any;
+    const value = await supabaseAuthAdapter.signInWithGoogleWeb() as any;
     return normalizeSession(value, 'google');
   }), [run]);
 
