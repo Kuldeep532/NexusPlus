@@ -16,16 +16,9 @@ const DOCUMENT_EXTENSIONS = new Set([
 ]);
 
 export function resolveFileOpenTarget(entry: FileManagerEntry): FileOpenTarget {
-  if (entry.isDirectory) {
-    return { kind: 'external', route: null, reason: 'Folders are opened by the File Manager browser.' };
-  }
-
+  if (entry.isDirectory) return { kind: 'external', route: null, reason: 'Folders stay inside File Manager.' };
   const extension = entry.extension.toLowerCase();
-  if (MEDIA_EXTENSIONS.has(extension)) {
-    return { kind: 'media', route: '/media-player', reason: 'Media file detected.' };
-  }
-  if (DOCUMENT_EXTENSIONS.has(extension)) {
-    return { kind: 'document', route: '/reader', reason: 'Readable document detected.' };
-  }
-  return { kind: 'external', route: null, reason: 'No Nexus Plus specialized viewer is registered for this file type.' };
+  if (MEDIA_EXTENSIONS.has(extension)) return { kind: 'media', route: '/media-player', reason: 'Media file detected.' };
+  if (DOCUMENT_EXTENSIONS.has(extension)) return { kind: 'document', route: '/reader', reason: 'Readable document detected.' };
+  return { kind: 'external', route: null, reason: 'No specialized Nexus Plus viewer is registered for this extension.' };
 }
