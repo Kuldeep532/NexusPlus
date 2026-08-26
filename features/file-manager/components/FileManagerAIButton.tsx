@@ -1,8 +1,9 @@
 import { Feather } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import type { FileManagerEntry } from '../FileManagerTypes';
+import { ensureLocalFileModel, isLocalFileModelReady, FILE_MANAGER_MODEL_MANIFEST } from '../FileManagerLocalModel';
 import { runLocalFileAI, type LocalFileAIAction } from '../FileManagerAIService';
 
 const ACTIONS: ReadonlyArray<{ id: LocalFileAIAction; title: string; icon: keyof typeof Feather.glyphMap }> = [
@@ -17,6 +18,34 @@ export function FileManagerAIButton({ entry }: { entry: FileManagerEntry }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<LocalFileAIAction | null>(null);
   const [result, setResult] = useState<{ title: string; body: string } | null>(null);
+  const [modelReady, setModelReady] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [preparing, setPreparing] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    void isLocalFileModelReady().then((ready) => {
+      if (active) setModelReady(ready);
+    });
+    return () => { active = false; };
+  }, [open]);
+
+  const openAI = async () => {
+    setOpen(true);
+    setResult(null);
+    if (modelReady) return;
+    setPreparing(true);
+    setDownloadProgress(0);
+    try {
+      await ensureLocalFileModel((progress) => setDownloadProgress(progress));
+      setModelReady(true);
+    } catch (error) {
+      Alert.alert('Local AI model', error instanceof Error ? error.message : String(error));
+    } finally {
+      setPreparing(false);
+    }
+  };
 
   const run = async (action: LocalFileAIAction) => {
     setBusy(action);
@@ -35,7 +64,7 @@ export function FileManagerAIButton({ entry }: { entry: FileManagerEntry }) {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Local AI tools for ${entry.name}`}
-        onPress={() => { setResult(null); setOpen(true); }}
+        onPress={() => void openAI()}
         style={[styles.button, { backgroundColor: colors.card, borderColor: colors.border }]}
       >
         <Feather name="cpu" size={18} color={colors.primary} />
@@ -44,12 +73,29 @@ export function FileManagerAIButton({ entry }: { entry: FileManagerEntry }) {
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)} accessibilityViewIsModal>
         <View style={styles.backdrop}>
-          <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="Close local AI" onPress={() => setOpen(false)} />
+          <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="Close local AI" onPress={() => !preparing && setOpen(false)} />
           <View style={[styles.sheet, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={styles.handle} />
-            <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Local AI</Text>
-            <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Runs on the device boundary; this feature does not upload your file to a remote AI service.</Text>
-            {!result ? (
+            <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>File Manager Local AI</Text>
+            <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>On-device analysis. Your file content is not uploaded to a remote AI service.</Text>
+
+            {preparing ? (
+              <View style={[styles.loadingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <ActivityIndicator color={colors.primary} size="large" />
+                <Text accessibilityRole="text" style={[styles.loadingTitle, { color: colors.foreground }]}>Please wait</Text>
+                <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>Downloading the File Manager AI model for first use.</Text>
+                <Text style={[styles.progressText, { color: colors.primary }]}>{Math.round(downloadProgress * 100)}%</Text>
+                <View style={[styles.progressTrack, { backgroundColor: colors.border }]}><View style={[styles.progressFill, { backgroundColor: colors.primary, width: `${Math.round(downloadProgress * 100)}%` }]} /></View>
+                <Text style={[styles.sizeText, { color: colors.mutedForeground }]}>Model download: approximately {Math.round(FILE_MANAGER_MODEL_MANIFEST.sizeBytes / (1024 * 1024))} MB</Text>
+              </View>
+            ) : !modelReady ? (
+              <View style={[styles.loadingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Feather name="download-cloud" size={28} color={colors.primary} />
+                <Text style={[styles.loadingTitle, { color: colors.foreground }]}>AI model required</Text>
+                <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>The model is downloaded only when you open File Manager AI for the first time.</Text>
+                <Pressable accessibilityRole="button" onPress={() => void openAI()} style={[styles.primary, { backgroundColor: colors.primary }]}><Text style={{ color: colors.primaryForeground, fontWeight: '700' }}>Download and continue</Text></Pressable>
+              </View>
+            ) : !result ? (
               <View style={styles.grid}>
                 {ACTIONS.map((action) => (
                   <Pressable key={action.id} accessibilityRole="button" accessibilityLabel={`${action.title} ${entry.name}`} onPress={() => void run(action.id)} disabled={busy !== null} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }, busy !== null && busy !== action.id && styles.disabled]}>
@@ -88,4 +134,12 @@ const styles = StyleSheet.create({
   resultTitle: { fontSize: 13, fontWeight: '700' },
   resultBody: { fontSize: 11, lineHeight: 17 },
   back: { minHeight: 42, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  loadingCard: { borderRadius: 15, borderWidth: 1, padding: 18, alignItems: 'center', gap: 9 },
+  loadingTitle: { fontSize: 15, fontWeight: '700' },
+  loadingText: { fontSize: 10.5, lineHeight: 16, textAlign: 'center' },
+  progressText: { fontSize: 13, fontWeight: '800' },
+  progressTrack: { width: '100%', height: 7, borderRadius: 4, overflow: 'hidden' },
+  progressFill: { height: 7, borderRadius: 4 },
+  sizeText: { fontSize: 9.5 },
+  primary: { minHeight: 44, borderRadius: 11, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
 });
