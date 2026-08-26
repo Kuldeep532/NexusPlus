@@ -2,6 +2,7 @@ import type { AuthSession, AuthUserProfile, EmailPasswordInput } from './authTyp
 
 export interface SupabaseAuthAdapter {
   signInWithGoogleIdToken(idToken: string): Promise<unknown>;
+  signInWithGoogleWeb(): Promise<unknown>;
   signInWithEmailPassword(email: string, password: string): Promise<unknown>;
   registerWithEmailPassword(input: EmailPasswordInput): Promise<unknown>;
   upsertProfile(profile: AuthUserProfile): Promise<unknown>;
