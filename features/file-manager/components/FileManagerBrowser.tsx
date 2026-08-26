@@ -151,7 +151,7 @@ export function FileManagerBrowser({
         onMore={() => setSelectedIds([])}
       />
 
-      <FileManagerBreadcrumbs items={breadcrumbs} onNavigate={setCurrentUri} />
+      <FileManagerBreadcrumbs items={breadcrumbs} onNavigate={(uri) => { setSelectedIds([]); setCurrentUri(uri); }} />
 
       {selectedIds.length > 0 && (
         <View style={[styles.selectionBar, { backgroundColor: colors.primaryContainer ?? colors.card, borderColor: colors.border }]}>
