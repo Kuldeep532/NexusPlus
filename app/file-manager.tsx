@@ -1,8 +1,8 @@
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { FileManagerBrowser } from '@/features/file-manager/components/FileManagerBrowser';
 import { FileManagerActionHost } from '@/features/file-manager/components/FileManagerActionHost';
@@ -27,7 +27,7 @@ export default function FileManagerScreen() {
   const [tab, setTab] = useState<FileManagerTab>('browse');
   const [activeEntry, setActiveEntry] = useState<FileManagerEntry | null>(null);
   const [previewEntry, setPreviewEntry] = useState<FileManagerEntry | null>(null);
-  const [actionOpen, setActionOpen] = useState(false);
+  const [actionSheetEntry, setActionSheetEntry] = useState<FileManagerEntry | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
 
   const refresh = useCallback(async () => {
@@ -37,9 +37,7 @@ export default function FileManagerScreen() {
   const handleAction = (action: FileManagerSelectionAction, entry: FileManagerEntry) => {
     setActiveEntry(entry);
     if (action === 'open') setPreviewEntry(entry);
-    else if (action === 'properties') setActionOpen(true);
-    else if (action === 'encrypt') router.push({ pathname: '/file-encryption', params: { uri: entry.uri, name: entry.name } });
-    else setActionOpen(true);
+    else setActionSheetEntry(entry);
   };
 
   return (
@@ -67,21 +65,44 @@ export default function FileManagerScreen() {
       </View>
 
       <View style={styles.workspace} key={`${tab}-${refreshToken}`}>
-        {tab === 'browse' && <FileManagerBrowser onFileAction={handleAction} />}
+        {tab === 'browse' && (
+          <FileManagerBrowser
+            onFileAction={handleAction}
+          />
+        )}
         {tab === 'categories' && <FileManagerCategoriesPanel />}
         {tab === 'recent' && <FileManagerRecentPanel onOpen={(entry) => setPreviewEntry(entry)} />}
-        {tab === 'secure' && <FileManagerSecurePanel onEncrypt={(entry) => handleAction('encrypt', entry)} onDecrypt={(entry) => setActiveEntry(entry)} />}
+        {tab === 'secure' && (
+          <FileManagerSecurePanel
+            onEncrypt={(entry) => {
+              setActiveEntry(entry);
+              setTab('secure');
+            }}
+            onDecrypt={(entry) => setActiveEntry(entry)}
+          />
+        )}
       </View>
 
-      {tab === 'browse' && activeEntry && (
-        <FileManagerActionHost refresh={refresh} onEncrypt={(entry) => router.push({ pathname: '/file-encryption', params: { uri: entry.uri, name: entry.name } })} />
+      {tab === 'browse' && actionSheetEntry && (
+        <FileManagerActionHost
+          refresh={refresh}
+          onEncrypt={(entry) => {
+            setActionSheetEntry(null);
+            setActiveEntry(entry);
+            setTab('secure');
+          }}
+          onOpen={(entry) => {
+            setActionSheetEntry(null);
+            setPreviewEntry(entry);
+          }}
+        />
       )}
 
-      <FileManagerPreviewSheet entry={previewEntry} visible={previewEntry !== null} onClose={() => setPreviewEntry(null)} />
-
-      {actionOpen && activeEntry && (
-        <Pressable accessibilityRole="button" accessibilityLabel={`Close actions for ${activeEntry.name}`} onPress={() => setActionOpen(false)} style={styles.invisibleClose} />
-      )}
+      <FileManagerPreviewSheet
+        entry={previewEntry}
+        visible={previewEntry !== null}
+        onClose={() => setPreviewEntry(null)}
+      />
     </View>
   );
 }
@@ -97,5 +118,4 @@ const styles = StyleSheet.create({
   tab: { minHeight: 44, borderRadius: 12, paddingHorizontal: 8, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   tabText: { fontSize: 10.5, fontFamily: 'Inter_700Bold' },
   workspace: { flex: 1, paddingHorizontal: 18, paddingTop: 8 },
-  invisibleClose: { display: 'none' },
 });
