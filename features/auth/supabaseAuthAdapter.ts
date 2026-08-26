@@ -1,10 +1,15 @@
+import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
+import * as WebBrowser from 'expo-web-browser';
 import { SUPABASE_URL } from './authConfig';
 import type { AuthUserProfile, EmailPasswordInput } from './authTypes';
 import type { SupabaseAuthAdapter } from './authRepository';
 
 const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? '';
 const SESSION_KEY = 'nexus-plus.supabase.session.v1';
+const PKCE_VERIFIER_KEY = 'nexus-plus.supabase.google.pkce.v1';
+const PKCE_STATE_KEY = 'nexus-plus.supabase.google.state.v1';
+const REDIRECT_URI = 'nexus-plus://auth/callback';
 
 type SupabaseUser = {
   id: string;
@@ -21,9 +26,7 @@ type SupabaseSessionResponse = {
 };
 
 function assertConfigured(): void {
-  if (!SUPABASE_URL || !ANON_KEY) {
-    throw new Error('SUPABASE_AUTH_NOT_CONFIGURED');
-  }
+  if (!SUPABASE_URL || !ANON_KEY) throw new Error('SUPABASE_AUTH_NOT_CONFIGURED');
 }
 
 function headers(accessToken?: string): Record<string, string> {
@@ -41,19 +44,19 @@ async function parseError(response: Response): Promise<never> {
     const payload = await response.json();
     message = String(payload?.msg ?? payload?.message ?? payload?.error_description ?? payload?.error ?? message);
   } catch {
-    // Keep the stable status-based error.
+    // Keep stable status-based error.
   }
   throw new Error(message);
 }
 
-async function requestSession(path: string, body: unknown): Promise<AuthSessionResponse> {
+async function requestSession(path: string, body: unknown): Promise<SupabaseSessionResponse> {
   const response = await fetch(`${SUPABASE_URL}${path}`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify(body),
   });
   if (!response.ok) return parseError(response);
-  return response.json() as Promise<AuthSessionResponse>;
+  return response.json() as Promise<SupabaseSessionResponse>;
 }
 
 function mapSession(response: SupabaseSessionResponse, fallbackProvider: 'google' | 'password') {
@@ -87,6 +90,23 @@ async function readStoredSession(): Promise<SupabaseSessionResponse | null> {
   }
 }
 
+async function createVerifier(): Promise<string> {
+  return `${Crypto.randomUUID()}${Crypto.randomUUID()}${Crypto.randomUUID()}`.replace(/-/g, '');
+}
+
+async function createChallenge(verifier: string): Promise<string> {
+  const digest = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    verifier,
+    { encoding: Crypto.CryptoEncoding.BASE64 },
+  );
+  return digest.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function randomState(): string {
+  return `${Crypto.randomUUID()}${Crypto.randomUUID()}`;
+}
+
 export async function getStoredAuthSession() {
   const stored = await readStoredSession();
   if (!stored?.access_token || !stored.user?.id) return null;
@@ -118,13 +138,71 @@ export async function getSupabaseAccessToken(): Promise<string | null> {
 }
 
 export const supabaseAuthAdapter: SupabaseAuthAdapter = {
-  async signInWithGoogleIdToken(idToken: string) {
-    const response = await requestSession('/auth/v1/token?grant_type=id_token', {
+  async signInWithGoogleIdToken(_idToken: string) {
+    throw new Error('GOOGLE_LOGIN_MUST_USE_SUPABASE_WEB_AUTH');
+  },
+
+  async signInWithGoogleWeb() {
+    assertConfigured();
+    const verifier = await createVerifier();
+    const challenge = await createChallenge(verifier);
+    const state = randomState();
+
+    await SecureStore.setItemAsync(PKCE_VERIFIER_KEY, verifier);
+    await SecureStore.setItemAsync(PKCE_STATE_KEY, state);
+
+    const params = new URLSearchParams({
       provider: 'google',
-      id_token: idToken,
+      redirect_to: REDIRECT_URI,
+      response_type: 'code',
+      code_challenge: challenge,
+      code_challenge_method: 's256',
+      state,
     });
-    await persistSession(response);
-    return mapSession(response, 'google');
+
+    const result = await WebBrowser.openAuthSessionAsync(
+      `${SUPABASE_URL}/auth/v1/authorize?${params.toString()}`,
+      REDIRECT_URI,
+    );
+
+    if (result.type !== 'success' || !result.url) {
+      await SecureStore.deleteItemAsync(PKCE_VERIFIER_KEY);
+      await SecureStore.deleteItemAsync(PKCE_STATE_KEY);
+      throw new Error('GOOGLE_SIGN_IN_CANCELLED');
+    }
+
+    const callback = new URL(result.url);
+    const returnedState = callback.searchParams.get('state');
+    const error = callback.searchParams.get('error');
+    const errorDescription = callback.searchParams.get('error_description');
+
+    if (error) throw new Error(errorDescription || `GOOGLE_SIGN_IN_${error}`);
+    if (!returnedState || returnedState !== state) throw new Error('GOOGLE_SIGN_IN_STATE_MISMATCH');
+
+    const code = callback.searchParams.get('code');
+    if (!code) throw new Error('GOOGLE_SIGN_IN_CODE_MISSING');
+
+    const storedVerifier = await SecureStore.getItemAsync(PKCE_VERIFIER_KEY);
+    if (!storedVerifier || storedVerifier !== verifier) throw new Error('GOOGLE_SIGN_IN_VERIFIER_MISSING');
+
+    try {
+      const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=pkce`, {
+        method: 'POST',
+        headers: {
+          apikey: ANON_KEY,
+          Authorization: `Bearer ${ANON_KEY}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ auth_code: code, code_verifier: storedVerifier }).toString(),
+      });
+      if (!response.ok) return parseError(response);
+      const session = await response.json() as SupabaseSessionResponse;
+      await persistSession(session);
+      return mapSession(session, 'google');
+    } finally {
+      await SecureStore.deleteItemAsync(PKCE_VERIFIER_KEY);
+      await SecureStore.deleteItemAsync(PKCE_STATE_KEY);
+    }
   },
 
   async signInWithEmailPassword(email: string, password: string) {
@@ -147,8 +225,6 @@ export const supabaseAuthAdapter: SupabaseAuthAdapter = {
   },
 
   async upsertProfile(_profile: AuthUserProfile) {
-    // The Supabase auth user metadata is the canonical lightweight profile.
-    // Feature-specific profile tables can be added behind a secure RPC later.
     return undefined;
   },
 
@@ -161,7 +237,7 @@ export const supabaseAuthAdapter: SupabaseAuthAdapter = {
           headers: headers(token),
         });
       } catch {
-        // Local session is still cleared even if the network is unavailable.
+        // Local session is still cleared when offline.
       }
     }
     await SecureStore.deleteItemAsync(SESSION_KEY);
@@ -169,15 +245,9 @@ export const supabaseAuthAdapter: SupabaseAuthAdapter = {
 };
 
 export function validateEmailPasswordInput(input: EmailPasswordInput): void {
-  if (input.name.trim().length < 1 || input.name.trim().length > 80) {
-    throw new Error('Name must be between 1 and 80 characters.');
-  }
-  if (!/^\S+@\S+\.\S+$/.test(input.email.trim())) {
-    throw new Error('Please enter a valid email address.');
-  }
-  if (input.password.length < 8) {
-    throw new Error('Password must contain at least 8 characters.');
-  }
+  if (input.name.trim().length < 1 || input.name.trim().length > 80) throw new Error('Name must be between 1 and 80 characters.');
+  if (!/^\S+@\S+\.\S+$/.test(input.email.trim())) throw new Error('Please enter a valid email address.');
+  if (input.password.length < 8) throw new Error('Password must contain at least 8 characters.');
 }
 
 export type AuthSessionResponse = SupabaseSessionResponse;
