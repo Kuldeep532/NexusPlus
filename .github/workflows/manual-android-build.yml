@@ -1,5 +1,7 @@
 name: Manual Android Build
 
+# Intentionally manual-only. Select the build profile explicitly from
+# GitHub Actions > Run workflow. No push/PR/comment event may trigger builds.
 on:
   workflow_dispatch:
     inputs:
@@ -47,17 +49,12 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         run: pnpm install --frozen-lockfile
 
-      - name: Materialize Firebase config and Android keystore
+      - name: Materialize Android signing keystore only
         working-directory: ${{ env.APP_DIR }}
         env:
-          GOOGLE_SERVICES_JSON_CONTENT: ${{ secrets.GOOGLE_SERVICES_JSON }}
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           set -euo pipefail
-          test -n "$GOOGLE_SERVICES_JSON_CONTENT"
-          printf '%s' "$GOOGLE_SERVICES_JSON_CONTENT" > google-services.json
-          test -s google-services.json
-
           test -n "$ANDROID_KEYSTORE_BASE64"
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > nexusplus-release.jks
           chmod 600 nexusplus-release.jks
@@ -87,7 +84,6 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EAS_PROJECT_ID: ${{ secrets.EAS_PROJECT_ID }}
-          GOOGLE_SERVICES_JSON: ${{ github.workspace }}/${{ env.APP_DIR }}/google-services.json
         run: |
           set -euo pipefail
           test -n "$EXPO_TOKEN"
@@ -110,4 +106,4 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         run: |
           set +x
-          rm -f google-services.json nexusplus-release.jks
+          rm -f nexusplus-release.jks
