@@ -1,4 +1,5 @@
-import { WorkflowPlan, WorkflowStep } from './workflowEngine';
+import { callGateway, discoverGatewayEndpoints, type GatewayEndpoint } from '@/features/api-gateway/apiGatewayClient';
+import { WorkflowPlan } from './workflowEngine';
 
 export interface ProductivityProvider {
   sendEmail(input: { to: string; subject: string; body: string }): Promise<{ id: string }>;
@@ -7,7 +8,42 @@ export interface ProductivityProvider {
   cancelCalendarEvent(eventId: string): Promise<void>;
 }
 
-/** Account/API boundary. Keep provider credentials out of the workflow layer. */
+function findEndpoint(endpoints: GatewayEndpoint[], feature: string, action: string): GatewayEndpoint {
+  const featureKey = feature.toLowerCase();
+  const actionKey = action.toLowerCase();
+  const match = endpoints.find((endpoint) => {
+    const haystack = `${endpoint.id} ${endpoint.path} ${endpoint.feature ?? ''} ${endpoint.description ?? ''}`.toLowerCase();
+    return haystack.includes(featureKey) && haystack.includes(actionKey);
+  });
+  if (!match) throw new Error(`GATEWAY_ENDPOINT_NOT_FOUND:${feature}:${action}`);
+  return match;
+}
+
+async function invokeProductivityEndpoint<T>(feature: string, action: string, body: unknown): Promise<T> {
+  const endpoints = await discoverGatewayEndpoints();
+  const endpoint = findEndpoint(endpoints, feature, action);
+  return callGateway<T>(endpoint.path, { method: endpoint.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', body });
+}
+
+/** Credentials remain outside the workflow layer. Providers use only the gateway contract. */
+export class GatewayProductivityProvider implements ProductivityProvider {
+  async sendEmail(input: { to: string; subject: string; body: string }): Promise<{ id: string }> {
+    return invokeProductivityEndpoint('email', 'send', input);
+  }
+
+  async createMeeting(input: { title: string; startIso: string; endIso: string; attendees: string[]; description?: string }): Promise<{ id: string; url?: string }> {
+    return invokeProductivityEndpoint('calendar', 'create', input);
+  }
+
+  async listCalendar(input: { fromIso: string; toIso: string }): Promise<Array<{ id: string; title: string; startIso: string; endIso: string }>> {
+    return invokeProductivityEndpoint('calendar', 'list', input);
+  }
+
+  async cancelCalendarEvent(eventId: string): Promise<void> {
+    await invokeProductivityEndpoint('calendar', 'cancel', { eventId });
+  }
+}
+
 export class UnconfiguredProductivityProvider implements ProductivityProvider {
   async sendEmail(): Promise<{ id: string }> { throw new Error('EMAIL_PROVIDER_NOT_CONFIGURED'); }
   async createMeeting(): Promise<{ id: string }> { throw new Error('CALENDAR_PROVIDER_NOT_CONFIGURED'); }
