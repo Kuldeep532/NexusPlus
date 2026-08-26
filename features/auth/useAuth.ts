@@ -1,6 +1,24 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AuthSession, EmailPasswordInput } from './authTypes';
-import { nativeCurrentSession, nativeEmailRegister, nativeEmailSignIn, nativeGoogleSignIn, nativeSignOut } from './authNative';
+import {
+  getStoredAuthSession,
+  supabaseAuthAdapter,
+  validateEmailPasswordInput,
+} from './supabaseAuthAdapter';
+
+function normalizeSession(value: any, provider: 'google' | 'password'): AuthSession {
+  return {
+    user: {
+      uid: value.user.uid,
+      email: value.user.email,
+      displayName: value.user.displayName ?? '',
+      photoUrl: value.user.photoUrl ?? null,
+      provider,
+    },
+    idToken: value.idToken,
+    expiresAt: value.expiresAt ?? null,
+  };
+}
 
 export function useAuth() {
   const [session, setSession] = useState<AuthSession | null>(null);
@@ -10,19 +28,11 @@ export function useAuth() {
 
   useEffect(() => {
     let cancelled = false;
-    nativeCurrentSession()
-      .then((value) => {
-        if (!cancelled) setSession(value);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not restore sign-in state.');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    getStoredAuthSession()
+      .then((value) => { if (!cancelled) setSession(value); })
+      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : 'Could not restore sign-in state.'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   const run = useCallback(async (action: () => Promise<AuthSession>) => {
@@ -41,15 +51,30 @@ export function useAuth() {
     }
   }, []);
 
-  const google = useCallback(() => run(nativeGoogleSignIn), [run]);
-  const emailSignIn = useCallback((email: string, password: string) => run(() => nativeEmailSignIn(email, password)), [run]);
-  const register = useCallback((input: EmailPasswordInput) => run(() => nativeEmailRegister(input)), [run]);
+  const google = useCallback(() => run(async () => {
+    const value = await supabaseAuthAdapter.signInWithGoogleWeb() as any;
+    return normalizeSession(value, 'google');
+  }), [run]);
+
+  const emailSignIn = useCallback((email: string, password: string) => run(async () => {
+    const value = await supabaseAuthAdapter.signInWithEmailPassword(email, password) as any;
+    return normalizeSession(value, 'password');
+  }), [run]);
+
+  const register = useCallback((input: EmailPasswordInput) => run(async () => {
+    validateEmailPasswordInput(input);
+    const value = await supabaseAuthAdapter.registerWithEmailPassword(input) as any;
+    return normalizeSession(value, 'password');
+  }), [run]);
 
   const signOut = useCallback(async () => {
     setBusy(true);
+    setError(null);
     try {
-      await nativeSignOut();
+      await supabaseAuthAdapter.signOut();
       setSession(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not sign out.');
     } finally {
       setBusy(false);
     }

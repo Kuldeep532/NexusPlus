@@ -8,7 +8,6 @@ const PACKAGE_CLASSES = [
   'NexusVideoEditorPackage',
   'NexusVocalRemoverPackage',
   'NexusDocumentReaderPackage',
-  'NexusRemoteKeyPackage',
 ];
 
 function withNexusNative(config) {
@@ -52,4 +51,4 @@ function withNexusNative(config) {
   });
 }
 
-module.exports = createRunOncePlugin(withNexusNative, 'with-nexus-native', '1.7.0');
+module.exports = createRunOncePlugin(withNexusNative, 'with-nexus-native', '1.6.0');
