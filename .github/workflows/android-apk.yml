@@ -1,73 +1,15 @@
-name: Android APK
+name: Android APK (Retired)
 
-# Intentionally manual-only. This workflow must never start from a push,
-# pull request, comment, or automatic repository event.
-on:
-  workflow_dispatch:
+# Retired intentionally. This workflow has no trigger and cannot run.
+# Use `.github/workflows/manual-android-apk.yml` only when a manual APK build is required.
+on: {}
 
 permissions:
   contents: read
 
-concurrency:
-  group: android-apk-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build-apk:
+  retired:
+    if: ${{ false }}
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: .
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-          cache: gradle
-
-      - name: Set up Node 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: pnpm
-
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Install pnpm
-        run: corepack prepare pnpm@9.15.4 --activate
-
-      - name: Install JavaScript dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Typecheck
-        run: pnpm run typecheck
-
-      - name: Validate Android host
-        run: |
-          set -euo pipefail
-          test -f android/settings.gradle
-          test -f android/app/build.gradle
-          test -f android/gradlew
-          test -f app.json
-          test -f package.json
-          test -f pnpm-lock.yaml
-          echo "Root Android host detected. Runtime configuration is supplied by the app/backend contract."
-
-      - name: Make Gradle executable
-        run: chmod +x android/gradlew
-
-      - name: Build debug APK
-        run: ./android/gradlew -p android assembleDebug --stacktrace --no-daemon --warning-mode all
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-plus-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+      - run: echo 'Retired workflow. Use the dedicated manual workflow.'
