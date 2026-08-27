@@ -10,11 +10,11 @@ All reminder stages intentionally stay on one branch and one pull request.
 - Persistent local reminder records and scheduler reconciliation.
 
 ## Stage 3 — Production reminder engine — in progress
-- Durable reminder lifecycle metadata and persistence update timestamps.
-- Backend operations for enable/disable, delete and snooze.
-- Home registration under **Productivity Tools** so reminders are discoverable as a planning/productivity feature.
-- Reminder types now carry lifecycle metadata for updates and snoozing.
-- Existing downloaded ONNX voices remain preferred when the native Piper bridge is available; system TTS remains fallback.
-- Remaining work: direct edit/enable/snooze UX integration, native Android headless Piper execution, reboot restoration, exact-alarm handling and automated tests.
+- Durable lifecycle metadata and update timestamps.
+- Backend enable/disable, delete and snooze operations.
+- Reminder UI now exposes Edit, Enable/Disable, Snooze and Delete actions.
+- Home registration under **Productivity Tools**.
+- Existing downloaded ONNX voices remain preferred when Piper is available, with system TTS fallback.
+- Remaining production work: Android headless Piper after process death, reboot restoration, exact-alarm handling and automated tests.
 
-No separate PR is intended for this feature; remaining Stage 3 work continues on the same PR.
+No separate PR is intended; all remaining Stage 3 work continues on this same PR.
