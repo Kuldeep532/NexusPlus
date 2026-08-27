@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { getSupabaseAccessToken } from '@/features/auth/supabaseAuthAdapter';
+import { isFirebaseConfigured } from '@/features/firebase/firebaseConfig';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? '';
 const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? '';
@@ -38,7 +39,7 @@ async function saveToken(token: string): Promise<void> {
 }
 
 export async function registerForFirebaseNotifications(): Promise<string | null> {
-  if (Platform.OS !== 'android') return null;
+  if (Platform.OS !== 'android' || !isFirebaseConfigured()) return null;
 
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: 'Nexus Plus Notifications',
