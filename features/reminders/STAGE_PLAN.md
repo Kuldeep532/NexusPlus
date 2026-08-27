@@ -2,21 +2,26 @@
 
 This feature is intentionally delivered in small stages while staying on one pull request.
 
-## Stage 1 — React Native + Expo foundation
-- Recreates the supplied Android reminder flow with title, message, minute delay, presets, active queue, cancellation, and accessibility labels.
-- Uses `expo-notifications` for local scheduling and the existing Nexus notification sound/channel.
-- Adds a voice layer that prefers an installed Nexus Plus voice and the native Piper bridge when available, with `expo-speech` as the reliable system-TTS fallback.
-- Uses the existing downloaded ONNX voice library rather than bundling large voice models into the APK.
-- Adds English and Hindi voice selection from the voices already downloaded by Nexus Plus.
+## Stage 1 — React Native + Expo foundation — complete
+- Accessible reminder creation flow, local notifications, English/Hindi selection, downloaded-voice preference and system TTS fallback.
 
-## Stage 2 — Native Piper execution
-- Add the actual Android `NexusPiper` native runtime so downloaded ONNX models can synthesize dynamic reminder text while the app is backgrounded or closed.
-- Keep the same JS voice contract so the UI and scheduler do not need to be redesigned.
+## Stage 2 — Custom timing + local reminder backend — in progress
+- Custom one-time local time.
+- Daily recurring reminders.
+- Weekly recurring reminders.
+- Repeat-every-N-minutes reminders.
+- Persistent local reminder records using AsyncStorage.
+- Scheduler reconciliation API and pending-reminder count.
+- Reschedule/cancel backend primitives.
+- Existing downloaded ONNX voice library remains the source of installed voices; Piper is preferred when its native bridge exists and system TTS remains the fallback.
+
+### Stage 2 remaining native work
+- Add the actual Android `NexusPiper` runtime and background/headless execution so ONNX speech can be generated after the app process is gone.
+- Add Android reboot restoration and exact-alarm handling where the platform requires it.
 
 ## Stage 3 — Production reminder engine
-- Persist reminders and voice choices across process/device restart.
-- Reconcile cancelled/fired reminders with the scheduled notification queue.
-- Restore schedules after reboot and handle Android exact-alarm/background restrictions where required.
-- Add automated tests for scheduling, cancellation, voice selection, and fallback behavior.
+- Stronger lifecycle reconciliation for fired/cancelled notifications.
+- Full reminder editing and enable/disable controls.
+- Automated tests for timing, persistence, cancellation, voice selection and fallback.
 
 All stages belong to this single PR; no separate PR is intended for each stage.
