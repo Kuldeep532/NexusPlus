@@ -9,6 +9,7 @@ const registry: HomeFeatureDefinition[] = [
   { id: 'expense-tracker', title: 'Finance Tracker', description: 'Track and review expenses securely.', route: '/expense-tracker', icon: 'credit-card', category: 'security', featured: true, order: 60 },
   { id: 'video-editor', title: 'Video Editor', description: 'Edit and export videos.', route: '/video-editor', icon: 'video', category: 'media', featured: true, order: 70 },
   { id: 'file-manager', title: 'File Manager', description: 'Browse, organize, preview and secure local files.', route: '/file-manager', icon: 'folder', category: 'utility', featured: true, order: 75 },
+  { id: 'reminders', title: 'My Reminders', description: 'Plan, schedule and manage accessible voice reminders.', route: '/reminders', icon: 'bell', category: 'productivity', order: 78 },
   { id: 'time-announcer', title: 'Time Announcer', description: 'Configure time announcements.', route: '/time-announcer', icon: 'volume-2', category: 'utility' },
   { id: 'clock', title: 'Clock', description: 'Announce and work with the current time.', route: '/time-announcer', icon: 'clock', category: 'utility' },
   { id: 'battery-announcer', title: 'Battery Announcer', description: 'Announce battery state.', route: '/battery-announcer', icon: 'battery', category: 'utility' },
@@ -26,5 +27,5 @@ export const FEATURE_CATEGORY_META: Record<FeatureCategory, { title: string; des
   pdf: { title: 'PDF Tools', description: 'Convert, protect, lock, unlock and manage PDFs.', icon: 'file-text', route: '/categories/pdf-tools' },
   media: { title: 'Media Tools', description: 'Audio, radio and video tools.', icon: 'film', route: '/categories/media-tools' },
   security: { title: 'Security Tools', description: 'Additional security and privacy utilities. File encryption lives in File Manager.', icon: 'shield', route: '/categories/security-tools' },
-  productivity: { title: 'Productivity Tools', description: 'Additional focused workflows and tools.', icon: 'grid', route: '/categories/productivity-tools' },
+  productivity: { title: 'Productivity Tools', description: 'Planning, reading and focused workflows.', icon: 'grid', route: '/categories/productivity-tools' },
 };
