@@ -1,7 +1,7 @@
 name: Manual Android Build
 
-# Intentionally manual-only. Select the build profile explicitly from
-# GitHub Actions > Run workflow. No push/PR/comment event may trigger builds.
+# Manual-only Android build. GitHub Secrets are synchronized into the
+# matching EAS environment immediately before the cloud build.
 on:
   workflow_dispatch:
     inputs:
@@ -79,7 +79,57 @@ jobs:
       - name: Install EAS CLI
         run: npm install --global eas-cli
 
-      - name: Build with EAS
+      - name: Validate application service secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          set -euo pipefail
+          for value in SUPABASE_URL SUPABASE_ANON_KEY FIREBASE_API_KEY FIREBASE_AUTH_DOMAIN FIREBASE_PROJECT_ID FIREBASE_STORAGE_BUCKET FIREBASE_MESSAGING_SENDER_ID FIREBASE_APP_ID FIREBASE_GOOGLE_SERVICES_JSON_BASE64; do
+            test -n "${!value}"
+          done
+
+      - name: Sync application configuration to EAS
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          EAS_ENV: ${{ inputs.profile == 'production' && 'production' || 'preview' }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
+          FIREBASE_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          set -euo pipefail
+          set +x
+          eas env:set "$EAS_ENV" --name EXPO_PUBLIC_SUPABASE_URL --value "$SUPABASE_URL" --visibility sensitive --scope project --non-interactive
+          eas env:set "$EAS_ENV" --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "$SUPABASE_ANON_KEY" --visibility sensitive --scope project --non-interactive
+          eas env:set "$EAS_ENV" --name EXPO_PUBLIC_FIREBASE_API_KEY --value "$FIREBASE_API_KEY" --visibility sensitive --scope project --non-interactive
+          eas env:set "$EAS_ENV" --name EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN --value "$FIREBASE_AUTH_DOMAIN" --visibility sensitive --scope project --non-interactive
+          eas env:set "$EAS_ENV" --name EXPO_PUBLIC_FIREBASE_PROJECT_ID --value "$FIREBASE_PROJECT_ID" --visibility sensitive --scope project --non-interactive
+          eas env:set "$EAS_ENV" --name EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET --value "$FIREBASE_STORAGE_BUCKET" --visibility sensitive --scope project --non-interactive
+          eas env:set "$EAS_ENV" --name EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID --value "$FIREBASE_MESSAGING_SENDER_ID" --visibility sensitive --scope project --non-interactive
+          eas env:set "$EAS_ENV" --name EXPO_PUBLIC_FIREBASE_APP_ID --value "$FIREBASE_APP_ID" --visibility sensitive --scope project --non-interactive
+          if [ -n "${FIREBASE_MEASUREMENT_ID:-}" ]; then
+            eas env:set "$EAS_ENV" --name EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID --value "$FIREBASE_MEASUREMENT_ID" --visibility sensitive --scope project --non-interactive
+          fi
+          printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > "$RUNNER_TEMP/google-services.json"
+          test -s "$RUNNER_TEMP/google-services.json"
+          eas env:set "$EAS_ENV" --name GOOGLE_SERVICES_JSON --type file --value "$RUNNER_TEMP/google-services.json" --visibility secret --scope project --non-interactive
+          rm -f "$RUNNER_TEMP/google-services.json"
+
+      - name: Validate EAS project inputs
         working-directory: ${{ env.APP_DIR }}
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -88,12 +138,20 @@ jobs:
           set -euo pipefail
           test -n "$EXPO_TOKEN"
           test -n "$EAS_PROJECT_ID"
+
+      - name: Build with EAS
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_PROJECT_ID: ${{ secrets.EAS_PROJECT_ID }}
+        run: |
+          set -euo pipefail
           case "${{ inputs.profile }}" in
             production)
-              eas build --platform android --profile production --non-interactive
+              eas build --platform android --profile production --environment production --non-interactive
               ;;
             preview)
-              eas build --platform android --profile preview --non-interactive
+              eas build --platform android --profile preview --environment preview --non-interactive
               ;;
             *)
               echo "Unsupported EAS profile: ${{ inputs.profile }}" >&2
@@ -107,3 +165,4 @@ jobs:
         run: |
           set +x
           rm -f nexusplus-release.jks
+          rm -f "$RUNNER_TEMP/google-services.json"
