@@ -1,6 +1,8 @@
 # Mobile CD build secrets
 
-The manual mobile workflow is GitHub-hosted and does **not** invoke an EAS cloud build for native compilation. This avoids consuming an Expo/EAS build-time limit for Android/iOS compilation.
+The manual mobile workflow is GitHub-hosted and performs native Android compilation directly, so Android APK/AAB builds do not consume an EAS cloud build-time limit.
+
+EAS Build remains separately available for Expo cloud builds using the project's `preview` and `production` profiles.
 
 ## One-copy secret setup
 
@@ -16,19 +18,42 @@ The manual workflow supports:
 - Android AAB
 - both in one run (`all`)
 
-Android signing values are stored in GitHub Secrets. Google Play service-account JSON is also represented as one base64 secret (`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64`) for future/manual Play upload steps.
+## Android signing
 
-## iOS output
+Release signing is performed only at runner runtime:
 
-The manual workflow uses a macOS GitHub-hosted runner and produces an iOS `.xcarchive`. Apple distribution credentials are represented as single-secret values in the template. The workflow deliberately does not auto-submit anything.
+- `ANDROID_KEYSTORE_BASE64`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_PASSWORD`
 
-## Manual-only policy
+The workflow decodes the existing keystore into the runner's temporary directory, writes `android/key.properties` only for the build, signs the release APK/AAB through Gradle, and deletes both the keystore and `key.properties` in an `always()` cleanup step.
 
-There are no push, pull_request, schedule, or release triggers for the mobile CD workflow. A build starts only from **Actions → Manual Mobile Build → Run workflow**.
+No keystore, alias, password, or other signing credential is committed to the repository.
 
-## Secrets
+For EAS cloud builds, the `eas.json` profiles use EAS-managed (`remote`) Android credentials. Configure the same existing Android signing credential in EAS once with `eas credentials --platform android`; EAS stores and uses it remotely. The GitHub runner does not upload the private keystore to EAS as part of the native CD build.
 
-### Runtime client configuration
+## GitHub Actions vs EAS
+
+Use **GitHub Actions** when you need a native Android build that is independent of an EAS cloud build-time limit.
+
+Use **EAS Build** when you want Expo's cloud build service, for example:
+
+```bash
+eas build --platform android --profile preview
+eas build --platform android --profile production
+```
+
+The `preview` profile generates an APK for internal distribution; the `production` profile generates an AAB suitable for Google Play. EAS uses the credentials configured for the selected profile.
+
+## EAS project/authentication
+
+- `EXPO_TOKEN` is used for non-interactive authenticated Expo CLI operations where needed.
+- `EAS_PROJECT_ID` identifies the linked EAS project for CI/project operations.
+
+These are not required by the native GitHub Android build itself.
+
+## Runtime client configuration
 
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
@@ -41,16 +66,14 @@ There are no push, pull_request, schedule, or release triggers for the mobile CD
 - `FIREBASE_MEASUREMENT_ID` (optional)
 - `FIREBASE_GOOGLE_SERVICES_JSON_BASE64`
 
-### Android / store
+## Google Play Store
 
-- `ANDROID_KEYSTORE_BASE64`
-- `ANDROID_KEY_ALIAS`
-- `ANDROID_KEYSTORE_PASSWORD`
-- `ANDROID_KEY_PASSWORD`
 - `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64`
 - `GOOGLE_PLAY_PACKAGE_NAME`
 
-### Apple / store
+The Google Play service-account key is for trusted CI/EAS submission operations and must never be bundled into the mobile application.
+
+## Apple / App Store
 
 - `ASC_API_KEY_P8_BASE64`
 - `ASC_KEY_ID`
@@ -61,9 +84,9 @@ There are no push, pull_request, schedule, or release triggers for the mobile CD
 - `IOS_DISTRIBUTION_CERT_PASSWORD`
 - `IOS_PROVISIONING_PROFILE_BASE64`
 
-`EXPO_TOKEN` and `EAS_PROJECT_ID` may still be needed for Expo project operations, but this native CD workflow does not call EAS Build.
+## Manual-only policy
 
-Firebase service-account private keys must never be bundled into the mobile application.
+The native mobile CD workflow is intentionally manual-only. It does not run on push, pull request, schedule, or release events.
 
 ## Firebase notifications and Supabase remote config
 
