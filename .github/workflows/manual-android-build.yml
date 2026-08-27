@@ -1,8 +1,7 @@
 name: Manual Mobile Build
 
-# Manual-only CD pipeline. Nothing runs on push, pull request, schedule,
-# or release. GitHub-hosted runners perform the native builds directly so
-# an EAS build-time limit is not used for Android/iOS compilation.
+# Manual-only CD pipeline. Native Android compilation runs on GitHub-hosted
+# runners, so it does not consume an EAS cloud build-time limit.
 on:
   workflow_dispatch:
     inputs:
@@ -48,6 +47,7 @@ jobs:
   android:
     if: ${{ inputs.platform == 'android-apk' || inputs.platform == 'android-aab' || inputs.platform == 'all' }}
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,6 +83,27 @@ jobs:
           printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
           chmod 600 android/app/google-services.json
 
+      - name: Materialize Android release signing credentials
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for value in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            test -n "${!value}"
+          done
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nexusplus-release.jks"
+          chmod 600 "$RUNNER_TEMP/nexusplus-release.jks"
+          cat > android/key.properties <<EOF
+          storeFile=$RUNNER_TEMP/nexusplus-release.jks
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+          chmod 600 android/key.properties
+
       - name: Validate required application configuration
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -95,7 +116,9 @@ jobs:
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
         run: |
           set -euo pipefail
-          for value in SUPABASE_URL SUPABASE_ANON_KEY FIREBASE_API_KEY FIREBASE_AUTH_DOMAIN FIREBASE_PROJECT_ID FIREBASE_STORAGE_BUCKET FIREBASE_MESSAGING_SENDER_ID FIREBASE_APP_ID; do test -n "${!value}"; done
+          for value in SUPABASE_URL SUPABASE_ANON_KEY FIREBASE_API_KEY FIREBASE_AUTH_DOMAIN FIREBASE_PROJECT_ID FIREBASE_STORAGE_BUCKET FIREBASE_MESSAGING_SENDER_ID FIREBASE_APP_ID; do
+            test -n "${!value}"
+          done
 
       - name: Typecheck
         run: pnpm run typecheck
@@ -154,9 +177,11 @@ jobs:
           path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
 
-      - name: Remove Firebase configuration
+      - name: Remove secret material
         if: always()
-        run: rm -f android/app/google-services.json
+        run: |
+          rm -f android/app/google-services.json android/key.properties
+          rm -f "$RUNNER_TEMP/nexusplus-release.jks"
 
   ios:
     if: ${{ inputs.platform == 'ios' || inputs.platform == 'all' }}
