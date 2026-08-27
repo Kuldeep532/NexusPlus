@@ -1,10 +1,10 @@
 import { Feather } from '@expo/vector-icons';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { fetchRemoteConfig, type RemoteConfigRow } from './remoteConfig';
 
-type Props = { children: React.ReactNode };
+type Props = { children: ReactNode };
 
 export function RemoteConfigOverlay({ children }: Props) {
   const colors = useColors();
@@ -33,14 +33,14 @@ export function RemoteConfigOverlay({ children }: Props) {
 
   const banner = useMemo(() => rows.find((row) => row.kind === 'top_banner'), [rows]);
   const dialog = useMemo(() => rows.find((row) => row.kind === 'dialog'), [rows]);
-  const activeDialog = dialogKey === dialog?.key ? dialog : dialog && dialogKey === null ? dialog : null;
+  const activeDialog = dialogKey === dialog?.key ? dialog : null;
 
   useEffect(() => {
     if (!dialog) {
       setDialogKey(null);
       return;
     }
-    setDialogKey((current) => current ?? dialog.key);
+    setDialogKey(dialog.key);
   }, [dialog]);
 
   const openAction = async (row: RemoteConfigRow) => {
