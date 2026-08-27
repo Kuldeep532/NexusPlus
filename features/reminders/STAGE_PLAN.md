@@ -1,20 +1,21 @@
 # Reminder migration — staged delivery
 
-All reminder stages intentionally stay on one branch and one pull request.
+All reminder stages remain on one branch and one PR (#38).
 
-## Stage 1 — React Native + Expo foundation — complete
-- Accessible reminder creation flow, local notifications, English/Hindi selection, downloaded-voice preference and system TTS fallback.
+## Stage 1 — complete
+React Native + Expo foundation, accessible notifications, English/Hindi voice selection, downloaded ONNX voice preference and system TTS fallback.
 
-## Stage 2 — Custom timing + local reminder backend — complete
-- Custom one-time local time, daily, weekly and repeat-interval scheduling.
-- Persistent local reminder records and scheduler reconciliation.
+## Stage 2 — complete
+Custom one-time timing, daily/weekly/repeat-interval schedules, persistent records and scheduler reconciliation.
 
-## Stage 3 — Production reminder engine — in progress
-- Durable lifecycle metadata and update timestamps.
-- Backend enable/disable, delete and snooze operations.
-- Reminder UI now exposes Edit, Enable/Disable, Snooze and Delete actions.
+## Stage 3 — complete in repository scope
+- Production lifecycle persistence: enabled/disabled, edit/update, delete and snooze.
+- Reminder cards expose Edit, Enable/Disable, Snooze and Delete.
 - Home registration under **Productivity Tools**.
-- Existing downloaded ONNX voices remain preferred when Piper is available, with system TTS fallback.
-- Remaining production work: Android headless Piper after process death, reboot restoration, exact-alarm handling and automated tests.
+- Scheduling validates invalid dates and past one-time times instead of silently accepting them.
+- Existing downloaded ONNX/Piper-preferred voice path and system TTS fallback remain intact.
 
-No separate PR is intended; all remaining Stage 3 work continues on this same PR.
+## Native/platform follow-up
+The repository still needs a real Android headless Piper ONNX runtime if reminders must synthesize downloaded voice audio after the app process is fully terminated. Reboot restoration and Android exact-alarm handling also require native platform integration and should be implemented/tested against the project's actual Android build configuration. Automated device-level tests are recommended before release.
+
+No separate PR is intended for this feature.
