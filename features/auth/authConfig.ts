@@ -1,4 +1,4 @@
-export const SUPABASE_URL = 'https://cpbwiarqlvtlnwbkmpws.supabase.co';
+export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? '';
 
 export const SUPABASE_GOOGLE_REDIRECT_URI = 'nexus-plus://auth/callback';
 
