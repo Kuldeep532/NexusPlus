@@ -1,7 +1,7 @@
 name: Android APK
 
-# Intentionally manual-only. This workflow must never start from a push,
-# pull request, comment, or automatic repository event.
+# Manual-only debug build. All client configuration is supplied from
+# GitHub Secrets at build time and never committed to the repository.
 on:
   workflow_dispatch:
 
@@ -45,24 +45,55 @@ jobs:
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Materialize Firebase configuration
+        env:
+          FIREBASE_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          set -euo pipefail
+          test -n "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64"
+          printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
+          chmod 600 android/app/google-services.json
+          test -s android/app/google-services.json
+
       - name: Typecheck
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
         run: pnpm run typecheck
 
-      - name: Validate Android host
+      - name: Validate Android host and Firebase registration
         run: |
           set -euo pipefail
           test -f android/settings.gradle
           test -f android/app/build.gradle
+          test -f android/app/google-services.json
           test -f android/gradlew
           test -f app.json
+          test -f app.config.js
           test -f package.json
           test -f pnpm-lock.yaml
-          echo "Root Android host detected. Runtime configuration is supplied by the app/backend contract."
+          grep -q "com.google.gms.google-services" android/app/build.gradle
+          echo "Android host and Firebase registration detected."
 
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
       - name: Build debug APK
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
         run: ./android/gradlew -p android assembleDebug --stacktrace --no-daemon --warning-mode all
 
       - name: Upload APK
@@ -71,3 +102,7 @@ jobs:
           name: nexus-plus-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Remove Firebase configuration
+        if: always()
+        run: rm -f android/app/google-services.json
