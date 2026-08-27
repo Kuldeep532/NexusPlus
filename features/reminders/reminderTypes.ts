@@ -1,4 +1,5 @@
 export type ReminderVoiceMode = 'piper' | 'system';
+export type ReminderScheduleKind = 'delay' | 'at' | 'daily' | 'weekly' | 'interval';
 
 export type ReminderItem = {
   id: string;
@@ -6,9 +7,15 @@ export type ReminderItem = {
   body: string;
   delayMinutes: number;
   scheduledAt: string;
+  scheduledFor: string;
   notificationId: string;
   language: string;
   voiceId?: string;
+  scheduleKind: ReminderScheduleKind;
+  repeatEveryMinutes?: number;
+  weekdays?: number[];
+  enabled: boolean;
+  createdAt: string;
 };
 
 export type ReminderDraft = {
@@ -17,4 +24,8 @@ export type ReminderDraft = {
   delayMinutes: string;
   language: 'en-US' | 'hi-IN';
   voiceId?: string;
+  scheduleKind?: ReminderScheduleKind;
+  scheduledFor?: string;
+  repeatEveryMinutes?: number;
+  weekdays?: number[];
 };
