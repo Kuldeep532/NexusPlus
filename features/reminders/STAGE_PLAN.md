@@ -9,11 +9,12 @@ This feature is intentionally delivered in small stages while staying on one pul
 - Custom one-time local time, daily, weekly and repeat-interval scheduling.
 - Persistent local reminder records and scheduler reconciliation.
 
-## Stage 3 — Production reminder engine — started
-- Lifecycle backend now supports durable enabled/disabled state, delete and snooze operations.
-- Home registration is now under **Productivity Tools**, keeping reminders discoverable without overcrowding the main-feature list.
-- Existing downloaded ONNX voices remain the preferred voice source when the native Piper bridge is available, with system TTS fallback.
-- Next native work: Android headless Piper execution for reminders when the app process is gone, plus reboot restoration/exact-alarm handling.
-- Remaining UI work: expose edit, enable/disable and snooze actions directly on each reminder card, then add automated tests for timing, persistence, cancellation and voice fallback.
+## Stage 3 — Production reminder engine — in progress
+- Lifecycle backend supports durable enabled/disabled state, delete and snooze operations.
+- Home registration is under **Productivity Tools**, keeping reminders discoverable without overcrowding the main-feature list.
+- Reminder records now have update/enable persistence primitives.
+- Next UI work: expose edit, enable/disable and snooze actions directly on each reminder card.
+- Native work still required: Android headless Piper execution after app process death, reboot restoration and exact-alarm handling where required.
+- Automated tests remain required for timing, persistence, cancellation, lifecycle reconciliation and voice fallback.
 
 All stages belong to this single PR; no separate PR is intended for each stage.
