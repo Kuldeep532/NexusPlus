@@ -30,7 +30,7 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <View style={styles.brandRow}>
-              <Image accessibilityLabel="Nexus Plus logo" source={require('@/assets/generated-branding/nexus-plus-192.png')} style={styles.logo} />
+              <Image accessibilityLabel="Nexus Plus logo" source={require('../assets/generated-branding/nexus-plus-192.png')} style={styles.logo} />
               <View>
                 <Text style={[styles.brand, { color: colors.foreground }]}>Nexus Plus</Text>
                 <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Home</Text>
