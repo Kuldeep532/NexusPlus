@@ -1,45 +1,72 @@
-# Android build secrets
+# Mobile CD build secrets
 
-The Android workflows expect these GitHub Actions secrets. Do not commit `.env` files or `google-services.json`.
+The manual mobile workflow is GitHub-hosted and does **not** invoke an EAS cloud build for native compilation. This avoids consuming an Expo/EAS build-time limit for Android/iOS compilation.
 
-## Supabase
+## One-copy secret setup
 
-- `SUPABASE_URL` — hosted Supabase project URL.
-- `SUPABASE_ANON_KEY` — Supabase publishable/anon client key.
+Use `docs/STORE_BUILD_SECRETS.template.env` as the single source-of-truth template. Fill the values locally and create GitHub Actions secrets with the exact names. Never commit the filled file.
 
-## Firebase client configuration
+Firebase Android configuration is consolidated into **one secret**: `FIREBASE_GOOGLE_SERVICES_JSON_BASE64`. It is decoded only inside the Android runner into a temporary `android/app/google-services.json` and deleted after the build.
 
+## Android outputs
+
+The manual workflow supports:
+
+- Android APK
+- Android AAB
+- both in one run (`all`)
+
+Android signing values are stored in GitHub Secrets. Google Play service-account JSON is also represented as one base64 secret (`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64`) for future/manual Play upload steps.
+
+## iOS output
+
+The manual workflow uses a macOS GitHub-hosted runner and produces an iOS `.xcarchive`. Apple distribution credentials are represented as single-secret values in the template. The workflow deliberately does not auto-submit anything.
+
+## Manual-only policy
+
+There are no push, pull_request, schedule, or release triggers for the mobile CD workflow. A build starts only from **Actions → Manual Mobile Build → Run workflow**.
+
+## Secrets
+
+### Runtime client configuration
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
 - `FIREBASE_API_KEY`
 - `FIREBASE_AUTH_DOMAIN`
 - `FIREBASE_PROJECT_ID`
 - `FIREBASE_STORAGE_BUCKET`
 - `FIREBASE_MESSAGING_SENDER_ID`
 - `FIREBASE_APP_ID`
-- `FIREBASE_MEASUREMENT_ID` — optional.
-- `FIREBASE_GOOGLE_SERVICES_JSON_BASE64` — base64-encoded `google-services.json` for Android FCM.
+- `FIREBASE_MEASUREMENT_ID` (optional)
+- `FIREBASE_GOOGLE_SERVICES_JSON_BASE64`
 
-## Existing Android/EAS secrets
+### Android / store
 
-- `EXPO_TOKEN`
-- `EAS_PROJECT_ID`
 - `ANDROID_KEYSTORE_BASE64`
 - `ANDROID_KEY_ALIAS`
 - `ANDROID_KEYSTORE_PASSWORD`
 - `ANDROID_KEY_PASSWORD`
+- `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64`
+- `GOOGLE_PLAY_PACKAGE_NAME`
 
-The manual EAS workflow copies the GitHub values into the matching EAS `preview` or `production` environment before the build. The `GOOGLE_SERVICES_JSON` EAS variable is a secret file variable. Client-side `EXPO_PUBLIC_*` values are embedded in the application bundle, so they must be treated as public at runtime even when stored as GitHub/EAS secrets.
+### Apple / store
 
-## Firebase notification flow
+- `ASC_API_KEY_P8_BASE64`
+- `ASC_KEY_ID`
+- `ASC_ISSUER_ID`
+- `APPLE_TEAM_ID`
+- `APPLE_BUNDLE_ID`
+- `IOS_DISTRIBUTION_CERT_P12_BASE64`
+- `IOS_DISTRIBUTION_CERT_PASSWORD`
+- `IOS_PROVISIONING_PROFILE_BASE64`
 
-The app uses `expo-notifications` to obtain the native Android FCM token and stores that token in the Supabase `push_tokens` table for the authenticated user. FCM HTTP v1 sending must happen from a trusted server or CI environment using a Firebase service-account credential; never put a Firebase service-account private key in the Android app.
+`EXPO_TOKEN` and `EAS_PROJECT_ID` may still be needed for Expo project operations, but this native CD workflow does not call EAS Build.
 
-## Supabase remote configuration
+Firebase service-account private keys must never be bundled into the mobile application.
 
-Apply `supabase/migrations/20260827113000_remote_config_and_push_tokens.sql` to the Supabase project. The app polls `remote_config` every 60 seconds and currently supports:
+## Firebase notifications and Supabase remote config
 
-- `top_banner` — a message bar across the app.
-- `dialog` — a remotely controlled modal dialog.
-- `feature_flag` — generic remote values available through the remote-config client.
-- `content` — generic JSON content for future feature integrations.
+The app obtains native FCM tokens and stores authenticated tokens in Supabase `push_tokens`. FCM HTTP v1 sending must run from a trusted server/CI environment.
 
-Use `payload.value` for a simple feature value, or store richer JSON in `payload` for feature-specific configuration. `starts_at` and `ends_at` allow scheduled changes without a new app build.
+The app polls Supabase `remote_config` every 60 seconds and supports `top_banner`, `dialog`, `feature_flag`, and JSON `content`. Apply `supabase/migrations/20260827113000_remote_config_and_push_tokens.sql` once to the Supabase project.
