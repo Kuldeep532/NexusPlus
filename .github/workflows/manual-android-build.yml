@@ -57,20 +57,16 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Set up Node 20
+      - name: Set up Node 24
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Activate pinned pnpm
+      - name: Install pnpm
         shell: bash
         run: |
           set -euo pipefail
-          corepack prepare pnpm@9.15.4 --activate
-          echo "$(dirname "$(command -v pnpm)")" >> "$GITHUB_PATH"
+          npm install --global pnpm@9.15.4
           command -v pnpm
           pnpm --version
 
@@ -78,9 +74,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.local/share/pnpm/store
-          key: pnpm-store-node20-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
-            pnpm-store-node20-${{ runner.os }}-
+            pnpm-store-${{ runner.os }}-
 
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
@@ -143,14 +139,10 @@ jobs:
           EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
           EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
 
-      - name: Make Gradle executable
-        run: chmod +x android/gradlew
-
-      - name: Verify Android Gradle wrapper
-        run: |
-          set -euo pipefail
-          test -f android/gradle/wrapper/gradle-wrapper.jar
-          ./android/gradlew --version
+      - name: Set up Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
 
       - name: Build Android APK
         if: ${{ inputs.platform == 'android-apk' || inputs.platform == 'all' }}
@@ -163,7 +155,7 @@ jobs:
           EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
           EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
           EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-        run: ./android/gradlew -p android assembleRelease --no-daemon --stacktrace
+        run: gradle -p android assembleRelease --no-daemon --stacktrace
 
       - name: Build Android AAB
         if: ${{ inputs.platform == 'android-aab' || inputs.platform == 'all' }}
@@ -176,7 +168,7 @@ jobs:
           EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
           EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
           EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-        run: ./android/gradlew -p android bundleRelease --no-daemon --stacktrace
+        run: gradle -p android bundleRelease --no-daemon --stacktrace
 
       - name: Upload APK
         if: ${{ inputs.platform == 'android-apk' || inputs.platform == 'all' }}
@@ -207,20 +199,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node 20
+      - name: Set up Node 24
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Activate pinned pnpm
+      - name: Install pnpm
         shell: bash
         run: |
           set -euo pipefail
-          corepack prepare pnpm@9.15.4 --activate
-          echo "$(dirname "$(command -v pnpm)")" >> "$GITHUB_PATH"
+          npm install --global pnpm@9.15.4
           command -v pnpm
           pnpm --version
 
@@ -228,9 +216,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.local/share/pnpm/store
-          key: pnpm-store-node20-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
-            pnpm-store-node20-${{ runner.os }}-
+            pnpm-store-${{ runner.os }}-
 
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
