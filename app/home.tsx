@@ -1,12 +1,13 @@
 import { Feather } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { useMemo } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/features/auth/useAuth';
 import { getDailySpiritualMessage } from '@/features/spiritual/spiritualMessageLibrary';
 import { FEATURE_CATEGORY_META, getCategoryTools, getFeaturedHomeFeatures, type FeatureCategory } from '@/features/app-shell/featureRegistry';
+import { NexusBrandMark } from '@/features/branding/NexusBrandMark';
 
 const CATEGORY_ORDER: FeatureCategory[] = ['utility', 'pdf', 'media', 'security', 'productivity'];
 const PDF_TOOL_COUNT = 3;
@@ -31,7 +32,7 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <View style={styles.brandRow}>
-              <Image accessibilityLabel="Nexus Plus logo" source={require('../assets/generated-branding/nexus-plus-192.png')} style={styles.logo} />
+              <NexusBrandMark size={42} />
               <View>
                 <Text style={[styles.brand, { color: colors.foreground }]}>Nexus Plus</Text>
                 <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Home</Text>
@@ -97,7 +98,6 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
   headerCopy: { flex: 1, paddingRight: 16 },
   brandRow: { flexDirection: 'row', alignItems: 'center' },
-  logo: { width: 42, height: 42, borderRadius: 10, marginRight: 10 },
   brand: { fontSize: 20, fontFamily: 'Inter_700Bold', marginBottom: 2 },
   title: { fontSize: 26, fontFamily: 'Inter_700Bold' },
   subtitle: { fontSize: 12, lineHeight: 18, marginTop: 6 },
