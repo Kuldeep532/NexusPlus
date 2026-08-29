@@ -45,9 +45,14 @@ export default function RootLayout() {
     const inHome = firstSegment === 'home';
 
     if (!auth.session) {
-      if (inAuth || inWelcome || inHome || inTabs || inGeeta) return;
+      if (inWelcome || inAuth) return;
+
       void hasCompletedWelcome().then((completed) => {
-        router.replace(completed ? '/home' : '/welcome');
+        if (!completed) {
+          router.replace('/welcome');
+          return;
+        }
+        router.replace('/login-plus-register');
       });
       return;
     }
