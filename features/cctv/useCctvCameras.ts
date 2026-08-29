@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { CctvCamera } from './cctvTypes';
-import { deleteCctvCamera, listCctvCameras, saveCctvCamera, saveCctvSecrets } from './cctvStorage';
-import { detectCctvCamera, type CctvDetectionInput } from './cctvService';
+import { addCctvCamera, getCctvCameras, removeCctvCameraSecurely } from './cctvController';
+import type { CctvDetectionInput } from './cctvService';
 
 export function useCctvCameras() {
   const [cameras, setCameras] = useState<CctvCamera[]>([]);
@@ -10,7 +10,7 @@ export function useCctvCameras() {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      setCameras(await listCctvCameras());
+      setCameras(await getCctvCameras());
     } finally {
       setLoading(false);
     }
@@ -20,19 +20,14 @@ export function useCctvCameras() {
     void reload();
   }, [reload]);
 
-  const addCamera = useCallback(async (input: CctvDetectionInput, erasePasswordHash = '') => {
-    const camera = await detectCctvCamera(input);
-    await saveCctvCamera(camera);
-    await saveCctvSecrets(camera.id, {
-      cameraPassword: input.password,
-      erasePasswordHash,
-    });
+  const addCamera = useCallback(async (input: CctvDetectionInput) => {
+    const camera = await addCctvCamera(input);
     await reload();
     return camera;
   }, [reload]);
 
   const removeCamera = useCallback(async (cameraId: string) => {
-    await deleteCctvCamera(cameraId);
+    await removeCctvCameraSecurely(cameraId);
     await reload();
   }, [reload]);
 
