@@ -4,22 +4,11 @@
     "slug": "nexus-plus",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/generated-branding/nexus-plus-1024.png",
     "scheme": "nexus-plus",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/generated-branding/nexus-plus-1024.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#120B24"
-    },
-    "ios": { "supportsTablet": false },
     "android": {
       "package": "com.nexuswavetech.nexusplus",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/generated-branding/nexus-plus-1024.png",
-        "backgroundColor": "#120B24"
-      },
       "intentFilters": [
         {
           "action": "VIEW",
@@ -35,7 +24,8 @@
         }
       ]
     },
-    "web": { "favicon": "./assets/generated-branding/nexus-plus-192.png" },
+    "ios": { "supportsTablet": false },
+    "web": {},
     "plugins": [
       ["expo-router", { "origin": "https://replit.com/" }],
       "./plugins/withNexusNative",
