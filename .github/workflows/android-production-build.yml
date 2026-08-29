@@ -77,17 +77,12 @@ jobs:
       - name: Verify pnpm
         run: pnpm --version
 
-      - name: Prepare dependencies
+      - name: Synchronize lockfile and install dependencies
         shell: bash
         run: |
           set -euo pipefail
-          if pnpm install --frozen-lockfile --ignore-scripts; then
-            echo "Frozen lockfile is valid."
-          else
-            echo "Frozen lockfile rejected; regenerating it from package manifests."
-            pnpm install --lockfile-only --no-frozen-lockfile
-            pnpm install --frozen-lockfile --ignore-scripts
-          fi
+          pnpm install --lockfile-only --no-frozen-lockfile
+          pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Install EAS CLI
         run: pnpm dlx eas-cli@latest --version
@@ -155,17 +150,12 @@ jobs:
       - name: Verify pnpm
         run: pnpm --version
 
-      - name: Prepare dependencies
+      - name: Synchronize lockfile and install dependencies
         shell: bash
         run: |
           set -euo pipefail
-          if pnpm install --frozen-lockfile --ignore-scripts; then
-            echo "Frozen lockfile is valid."
-          else
-            echo "Frozen lockfile rejected; regenerating it from package manifests."
-            pnpm install --lockfile-only --no-frozen-lockfile
-            pnpm install --frozen-lockfile --ignore-scripts
-          fi
+          pnpm install --lockfile-only --no-frozen-lockfile
+          pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Materialize Firebase configuration
         shell: bash
@@ -231,7 +221,7 @@ jobs:
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1"
 
-      - name: Validate Gradle and Android toolchain
+      - name: Validate Gradle and Android project
         working-directory: android
         run: |
           set -euo pipefail
