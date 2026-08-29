@@ -65,24 +65,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          files=(
-            package.json
-            pnpm-lock.yaml
-            app.json
-            eas.json
-            android/gradlew
-            android/settings.gradle
-            android/build.gradle
-            android/app/build.gradle
-            android/app/src/main/AndroidManifest.xml
-            android/app/src/main/cpp/CMakeLists.txt
-            android/app/src/main/cpp/nexus_vocal_remover.cpp
-            android/app/src/main/cpp/nexus_vocal_remover.h
-            android/app/src/main/cpp/nexus_vocal_remover_jni.cpp
-          )
-          for file in "${files[@]}"; do
-            test -f "$file" || { echo "ERROR: missing $file" >&2; exit 1; }
-          done
+          test -f package.json
+          test -f pnpm-lock.yaml
+          test -f app.json
+          test -f eas.json
+          test -f android/gradlew
+          test -f android/settings.gradle
+          test -f android/build.gradle
+          test -f android/app/build.gradle
+          test -f android/app/src/main/AndroidManifest.xml
+          test -f android/app/src/main/cpp/CMakeLists.txt
+          test -f android/app/src/main/cpp/nexus_vocal_remover.cpp
+          test -f android/app/src/main/cpp/nexus_vocal_remover.h
+          test -f android/app/src/main/cpp/nexus_vocal_remover_jni.cpp
 
       - name: Materialize Firebase configuration
         shell: bash
@@ -90,16 +85,10 @@ jobs:
           FIREBASE_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           set -euo pipefail
-          test -n "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" || {
-            echo "ERROR: FIREBASE_GOOGLE_SERVICES_JSON_BASE64 is missing" >&2
-            exit 1
-          }
+          test -n "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64"
           mkdir -p android/app
           printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
-          test -s android/app/google-services.json || {
-            echo "ERROR: google-services.json decode failed or produced an empty file" >&2
-            exit 1
-          }
+          test -s android/app/google-services.json
           chmod 600 android/app/google-services.json
 
       - name: Materialize Android signing configuration
@@ -111,40 +100,33 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
-            test -n "${!name}" || { echo "ERROR: $name is missing" >&2; exit 1; }
-          done
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nexusplus-release.jks"
-          test -s "$RUNNER_TEMP/nexusplus-release.jks" || {
-            echo "ERROR: Android keystore decode failed or produced an empty file" >&2
-            exit 1
-          }
+          test -s "$RUNNER_TEMP/nexusplus-release.jks"
           chmod 600 "$RUNNER_TEMP/nexusplus-release.jks"
-          cat > android/key.properties <<EOF
-storeFile=$RUNNER_TEMP/nexusplus-release.jks
-storePassword=$ANDROID_KEYSTORE_PASSWORD
-keyAlias=$ANDROID_KEY_ALIAS
-keyPassword=$ANDROID_KEY_PASSWORD
-EOF
+          printf '%s\n' \
+            "storeFile=$RUNNER_TEMP/nexusplus-release.jks" \
+            "storePassword=$ANDROID_KEYSTORE_PASSWORD" \
+            "keyAlias=$ANDROID_KEY_ALIAS" \
+            "keyPassword=$ANDROID_KEY_PASSWORD" \
+            > android/key.properties
           chmod 600 android/key.properties
 
       - name: Validate build secrets
         shell: bash
         run: |
           set -euo pipefail
-          required=(
-            SUPABASE_URL
-            SUPABASE_ANON_KEY
-            FIREBASE_API_KEY
-            FIREBASE_AUTH_DOMAIN
-            FIREBASE_PROJECT_ID
-            FIREBASE_STORAGE_BUCKET
-            FIREBASE_MESSAGING_SENDER_ID
-            FIREBASE_APP_ID
-          )
-          for name in "${required[@]}"; do
-            test -n "${!name}" || { echo "ERROR: $name is missing" >&2; exit 1; }
-          done
+          test -n "$SUPABASE_URL"
+          test -n "$SUPABASE_ANON_KEY"
+          test -n "$FIREBASE_API_KEY"
+          test -n "$FIREBASE_AUTH_DOMAIN"
+          test -n "$FIREBASE_PROJECT_ID"
+          test -n "$FIREBASE_STORAGE_BUCKET"
+          test -n "$FIREBASE_MESSAGING_SENDER_ID"
+          test -n "$FIREBASE_APP_ID"
 
       - name: Typecheck
         run: pnpm run typecheck:all
