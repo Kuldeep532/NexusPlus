@@ -2,13 +2,36 @@ name: Android Production Build
 
 on:
   workflow_dispatch:
+    inputs:
+      build_source:
+        description: Build with Expo EAS or GitHub Runner
+        required: true
+        default: expo
+        type: choice
+        options:
+          - expo
+          - github
+      build_type:
+        description: Android package type
+        required: true
+        default: aab
+        type: choice
+        options:
+          - apk
+          - aab
+          - both
 
 permissions:
   contents: read
 
+concurrency:
+  group: android-production
+  cancel-in-progress: false
+
 jobs:
-  android:
-    name: Android Production Build
+  expo:
+    name: Expo EAS Production Build
+    if: ${{ inputs.build_source == 'expo' }}
     runs-on: ubuntu-latest
     environment: production
     env:
@@ -30,7 +53,66 @@ jobs:
       EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
       EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
       PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER: ${{ secrets.PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER }}
+      EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install EAS CLI
+        run: pnpm add --global eas-cli@latest
+
+      - name: Validate Expo configuration
+        run: pnpm exec expo config --type public
+
+      - name: Validate EAS token
+        run: test -n "$EAS_TOKEN"
+
+      - name: Build Android APK with Expo EAS
+        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
+        run: eas build --platform android --profile preview --non-interactive --wait
+
+      - name: Build Android AAB with Expo EAS
+        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
+        run: eas build --platform android --profile production --non-interactive --wait
+
+  github:
+    name: GitHub Runner Production Build
+    if: ${{ inputs.build_source == 'github' }}
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+      FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+      FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+      FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+      FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+      FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+      FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+      EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+      EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+      PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER: ${{ secrets.PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,8 +128,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -57,24 +137,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Validate required files
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f package.json
-          test -f pnpm-lock.yaml
-          test -f app.json
-          test -f eas.json
-          test -f android/gradlew
-          test -f android/settings.gradle
-          test -f android/build.gradle
-          test -f android/app/build.gradle
-          test -f android/app/src/main/AndroidManifest.xml
-          test -f android/app/src/main/cpp/CMakeLists.txt
-          test -f android/app/src/main/cpp/nexus_vocal_remover.cpp
-          test -f android/app/src/main/cpp/nexus_vocal_remover.h
-          test -f android/app/src/main/cpp/nexus_vocal_remover_jni.cpp
 
       - name: Materialize Firebase configuration
         shell: bash
@@ -113,7 +175,6 @@ jobs:
           chmod 600 android/key.properties
 
       - name: Validate build secrets
-        shell: bash
         run: |
           set -euo pipefail
           test -n "$SUPABASE_URL"
@@ -137,14 +198,17 @@ jobs:
         run: chmod +x android/gradlew
 
       - name: Build release APK
+        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon --stacktrace --warning-mode all
 
       - name: Build release AAB
+        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
         working-directory: android
         run: ./gradlew bundleRelease --no-daemon --stacktrace --warning-mode all
 
       - name: Upload APK
+        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         uses: actions/upload-artifact@v4
         with:
           name: nexusplus-android-apk
@@ -152,6 +216,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload AAB
+        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
         uses: actions/upload-artifact@v4
         with:
           name: nexusplus-android-aab
