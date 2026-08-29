@@ -84,11 +84,23 @@ jobs:
           set -euo pipefail
           node <<'NODE'
           const fs = require('fs');
-          const yaml = require('yaml');
-          const workspace = yaml.parse(fs.readFileSync('pnpm-workspace.yaml', 'utf8'));
-          const lockfile = yaml.parse(fs.readFileSync('pnpm-lock.yaml', 'utf8'));
-          const normalize = (value) => JSON.stringify(value ?? {});
-          if (normalize(workspace.overrides) !== normalize(lockfile.overrides)) {
+          const workspaceText = fs.readFileSync('pnpm-workspace.yaml', 'utf8');
+          const lockfileText = fs.readFileSync('pnpm-lock.yaml', 'utf8');
+          const extractOverrides = (text, fileName) => {
+            const marker = /^overrides:\s*$/m;
+            const match = marker.exec(text);
+            if (!match) {
+              throw new Error(`ERROR: overrides section not found in ${fileName}`);
+            }
+            const start = match.index + match[0].length;
+            const remainder = text.slice(start);
+            const nextSection = remainder.search(/^\S/m);
+            const block = (nextSection >= 0 ? remainder.slice(0, nextSection) : remainder).trim();
+            return block;
+          };
+          const workspaceOverrides = extractOverrides(workspaceText, 'pnpm-workspace.yaml');
+          const lockfileOverrides = extractOverrides(lockfileText, 'pnpm-lock.yaml');
+          if (workspaceOverrides !== lockfileOverrides) {
             console.error('ERROR: pnpm workspace overrides do not match pnpm-lock.yaml.');
             process.exit(1);
           }
@@ -124,11 +136,11 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nexusplus-release.jks"
           chmod 600 "$RUNNER_TEMP/nexusplus-release.jks"
           cat > android/key.properties <<EOF
-          storeFile=$RUNNER_TEMP/nexusplus-release.jks
-          storePassword=$ANDROID_KEYSTORE_PASSWORD
-          keyAlias=$ANDROID_KEY_ALIAS
-          keyPassword=$ANDROID_KEY_PASSWORD
-          EOF
+storeFile=$RUNNER_TEMP/nexusplus-release.jks
+storePassword=$ANDROID_KEYSTORE_PASSWORD
+keyAlias=$ANDROID_KEY_ALIAS
+keyPassword=$ANDROID_KEY_PASSWORD
+EOF
           chmod 600 android/key.properties
 
       - name: Validate required application configuration
@@ -238,7 +250,7 @@ jobs:
         if: ${{ inputs.platform == 'android-apk' || inputs.platform == 'all' }}
         uses: actions/upload-artifact@v4
         with:
-          name: nexus-plus-android-apk
+          name: nexusplus-android-apk
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
@@ -246,121 +258,12 @@ jobs:
         if: ${{ inputs.platform == 'android-aab' || inputs.platform == 'all' }}
         uses: actions/upload-artifact@v4
         with:
-          name: nexus-plus-android-aab
+          name: nexusplus-android-aab
           path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
 
       - name: Remove secret material
-        if: always()
-        run: |
-          rm -f android/app/google-services.json android/key.properties
-          rm -f "$RUNNER_TEMP/nexusplus-release.jks"
-
-  ios:
-    if: ${{ inputs.platform == 'ios' || inputs.platform == 'all' }}
-    runs-on: macos-14
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: Install pnpm
+        if: ${{ always() }}
         shell: bash
         run: |
-          set -euo pipefail
-          npm install --global pnpm@9.15.4
-          command -v pnpm
-          pnpm --version
-
-      - name: Configure pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.local/share/pnpm/store
-          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-store-${{ runner.os }}-
-
-      - name: Verify pnpm lockfile configuration
-        shell: bash
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const fs = require('fs');
-          const yaml = require('yaml');
-          const workspace = yaml.parse(fs.readFileSync('pnpm-workspace.yaml', 'utf8'));
-          const lockfile = yaml.parse(fs.readFileSync('pnpm-lock.yaml', 'utf8'));
-          const normalize = (value) => JSON.stringify(value ?? {});
-          if (normalize(workspace.overrides) !== normalize(lockfile.overrides)) {
-            console.error('ERROR: pnpm workspace overrides do not match pnpm-lock.yaml.');
-            process.exit(1);
-          }
-          console.log('pnpm lockfile override configuration is synchronized.');
-          NODE
-
-      - name: Install JavaScript dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          pnpm install --frozen-lockfile
-
-      - name: Validate configuration
-        shell: bash
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-        run: |
-          set -euo pipefail
-          for value in SUPABASE_URL SUPABASE_ANON_KEY FIREBASE_API_KEY FIREBASE_PROJECT_ID FIREBASE_APP_ID; do
-            test -n "${!value}"
-          done
-
-      - name: Generate native iOS project
-        env:
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-          EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-        run: pnpm exec expo prebuild --platform ios --non-interactive
-
-      - name: Install CocoaPods
-        working-directory: ios
-        run: pod install --repo-update
-
-      - name: Build iOS archive
-        env:
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-          EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-        run: |
-          set -euo pipefail
-          WORKSPACE=$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)
-          test -n "$WORKSPACE"
-          SCHEME=$(xcodebuild -list -workspace "$WORKSPACE" | awk '/Schemes:/{getline; print $1; exit}')
-          test -n "$SCHEME"
-          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release -sdk iphoneos -archivePath "$RUNNER_TEMP/NexusPlus.xcarchive" archive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
-
-      - name: Package unsigned iOS archive
-        run: tar -czf "$RUNNER_TEMP/NexusPlus-iOS-unsigned.tar.gz" -C "$RUNNER_TEMP" NexusPlus.xcarchive
-
-      - name: Upload iOS archive
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-plus-ios-unsigned-archive
-          path: ${{ runner.temp }}/NexusPlus-iOS-unsigned.tar.gz
-          if-no-files-found: error
+          rm -f android/app/google-services.json android/key.properties "$RUNNER_TEMP/nexusplus-release.jks"
