@@ -52,10 +52,7 @@ function setSharedSession(value: AuthSession | null): void {
 }
 
 function normalizeSession(value: any, provider: 'google' | 'password'): AuthSession {
-  if (!value?.user?.uid || !value?.idToken) {
-    throw new Error('AUTH_SESSION_NOT_CREATED');
-  }
-
+  if (!value?.user?.uid || !value?.idToken) throw new Error('AUTH_SESSION_NOT_CREATED');
   return {
     user: {
       uid: value.user.uid,
@@ -114,8 +111,17 @@ export function useAuth() {
 
   const register = useCallback((input: EmailPasswordInput) => run(async () => {
     validateEmailPasswordInput(input);
-    const value = await supabaseAuthAdapter.registerWithEmailPassword(input) as any;
-    return normalizeSession(value, 'password');
+    try {
+      const value = await supabaseAuthAdapter.registerWithEmailPassword(input) as any;
+      return normalizeSession(value, 'password');
+    } catch (err) {
+      if (err instanceof Error && err.message === 'ACCOUNT_CREATED_CHECK_EMAIL') {
+        // Signup succeeded but Supabase requires email confirmation before a session exists.
+        // Do not route the user to Home without an authenticated session.
+        throw err;
+      }
+      throw err;
+    }
   }), [run]);
 
   const signOut = useCallback(async () => {
