@@ -67,7 +67,6 @@ jobs:
         run: |
           set -euo pipefail
           npm install --global pnpm@9.15.4
-          command -v pnpm
           pnpm --version
 
       - name: Configure pnpm cache
@@ -84,22 +83,22 @@ jobs:
           set -euo pipefail
           node <<'NODE'
           const fs = require('fs');
-          const workspaceText = fs.readFileSync('pnpm-workspace.yaml', 'utf8');
-          const lockfileText = fs.readFileSync('pnpm-lock.yaml', 'utf8');
+          const workspace = fs.readFileSync('pnpm-workspace.yaml', 'utf8');
+          const lockfile = fs.readFileSync('pnpm-lock.yaml', 'utf8');
           const extractOverrides = (text, fileName) => {
-            const marker = /^overrides:\s*$/m;
-            const match = marker.exec(text);
-            if (!match) {
-              throw new Error(`ERROR: overrides section not found in ${fileName}`);
+            const lines = text.replace(/\r\n/g, '\n').split('\n');
+            const marker = lines.findIndex((line) => /^overrides:\s*$/.test(line));
+            if (marker < 0) throw new Error(`overrides section not found in ${fileName}`);
+            const block = [];
+            for (let i = marker + 1; i < lines.length; i++) {
+              const line = lines[i];
+              if (line && !/^\s/.test(line)) break;
+              block.push(line);
             }
-            const start = match.index + match[0].length;
-            const remainder = text.slice(start);
-            const nextSection = remainder.search(/^\S/m);
-            const block = (nextSection >= 0 ? remainder.slice(0, nextSection) : remainder).trim();
-            return block;
+            return block.join('\n').trim();
           };
-          const workspaceOverrides = extractOverrides(workspaceText, 'pnpm-workspace.yaml');
-          const lockfileOverrides = extractOverrides(lockfileText, 'pnpm-lock.yaml');
+          const workspaceOverrides = extractOverrides(workspace, 'pnpm-workspace.yaml');
+          const lockfileOverrides = extractOverrides(lockfile, 'pnpm-lock.yaml');
           if (workspaceOverrides !== lockfileOverrides) {
             console.error('ERROR: pnpm workspace overrides do not match pnpm-lock.yaml.');
             process.exit(1);
@@ -112,6 +111,13 @@ jobs:
         run: |
           set -euo pipefail
           pnpm install --frozen-lockfile
+
+      - name: Validate dependency graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile --offline --ignore-scripts
+          pnpm list --depth 0 >/dev/null
 
       - name: Materialize Firebase configuration
         env:
