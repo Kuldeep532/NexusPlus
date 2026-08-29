@@ -53,7 +53,9 @@ class MainActivity : ReactActivity() {
         if (intent?.action != Intent.ACTION_VIEW) return
         val uri: Uri = intent.data ?: return
         val scheme = uri.scheme?.lowercase() ?: return
-        if (scheme !in setOf("content", "file", "http", "https")) return
+        // Only accept content-provider and HTTPS media URIs from external intents.
+        // Reject file:// and plain HTTP to reduce arbitrary local/unencrypted input exposure.
+        if (scheme !in setOf("content", "https")) return
 
         val mime = intent.type ?: contentResolver.getType(uri) ?: return
         if (!NexusMediaIntent.isSupportedMediaType(mime)) return
