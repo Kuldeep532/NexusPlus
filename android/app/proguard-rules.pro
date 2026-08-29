@@ -1,6 +1,13 @@
-# Keep React Native bridge modules/packages that are instantiated by name or
-# discovered through ReactPackage. The Android host registers these packages
-# explicitly, but their @ReactMethod entry points must remain callable after R8.
+# Nexus Plus release R8/ProGuard hardening.
+# Keep only entry points that are required by Android, JNI, or React Native.
+# Do not keep whole application packages: that would defeat shrinking/obfuscation.
+
+# React Native native methods/JNI entry points.
+-keepclasseswithmembernames,includedescriptorclasses class * {
+    native <methods>;
+}
+
+# React Native packages registered explicitly by NexusReactApplication.
 -keep class com.nexuswavetech.nexusplus.NexusVaultModule { *; }
 -keep class com.nexuswavetech.nexusplus.NexusVaultPackage { *; }
 -keep class com.nexuswavetech.nexusplus.NexusMediaModule { *; }
@@ -10,21 +17,25 @@
 -keep class com.nexuswavetech.nexusplus.NexusDocumentReaderModule { *; }
 -keep class com.nexuswavetech.nexusplus.NexusDocumentReaderPackage { *; }
 
-# JNI methods are looked up by their generated Java/Kotlin class and exact
-# native method names. Prevent shrinking/renaming of the encryption bridge.
--keep class com.nexuswavetech.nexusplus.encryption.FileEncryptionNative { *; }
-
-# Keep the native methods referenced from JNI symbol names.
--keepclasseswithmembernames,includedescriptorclasses class * {
-    native <methods>;
-}
-
-# Preserve Android components referenced from the manifest and intent system.
+# Android manifest components and the custom Application entry point.
 -keep class com.nexuswavetech.nexusplus.MainActivity { *; }
+-keep class com.nexuswavetech.nexusplus.NexusReactApplication { *; }
 -keep class com.nexuswavetech.nexusplus.AlarmReceiver { *; }
 -keep class com.nexuswavetech.nexusplus.AlarmRingActivity { *; }
 -keep class com.nexuswavetech.nexusplus.BootReceiver { *; }
 -keep class com.nexuswavetech.nexusplus.NexusMediaPlaybackService { *; }
 
-# Keep the custom Application entry point used by the checked-in Android host.
--keep class com.nexuswavetech.nexusplus.NexusReactApplication { *; }
+# Native encryption bridge: preserve the Java/Kotlin declaration used to bind
+# JNI. The implementation itself stays in C++ and is protected by native
+# symbol visibility settings in CMake.
+-keep class com.nexuswavetech.nexusplus.encryption.FileEncryptionNative { *; }
+
+# Keep JSON/serialization annotations when libraries discover fields/methods
+# reflectively, without disabling obfuscation globally.
+-keepattributes RuntimeVisibleAnnotations,RuntimeInvisibleAnnotations,RuntimeVisibleParameterAnnotations,RuntimeInvisibleParameterAnnotations,AnnotationDefault,Signature,InnerClasses,EnclosingMethod
+
+# Never ship debug logging from release builds where R8 can remove it safely.
+-assumenosideeffects class android.util.Log {
+    public static *** d(...);
+    public static *** v(...);
+}
