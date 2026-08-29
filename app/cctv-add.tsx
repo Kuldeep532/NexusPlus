@@ -26,6 +26,11 @@ const DEFAULT_CAPABILITIES: CctvCapabilities = {
   passwordChange: false,
   discovery: false,
   multiCamera: false,
+  switchCamera: false,
+  flip: false,
+  panTiltZoom: false,
+  nightVision: false,
+  talk: false,
 };
 
 const METHODS: Array<{ id: CctvSetupMethod; title: string; description: string; icon: string }> = [
