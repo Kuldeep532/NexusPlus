@@ -79,7 +79,10 @@ jobs:
             pnpm-store-${{ runner.os }}-
 
       - name: Install JavaScript dependencies
-        run: pnpm install --frozen-lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
 
       - name: Materialize Firebase configuration
         env:
@@ -112,6 +115,7 @@ jobs:
           chmod 600 android/key.properties
 
       - name: Validate required application configuration
+        shell: bash
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
@@ -124,11 +128,17 @@ jobs:
         run: |
           set -euo pipefail
           for value in SUPABASE_URL SUPABASE_ANON_KEY FIREBASE_API_KEY FIREBASE_AUTH_DOMAIN FIREBASE_PROJECT_ID FIREBASE_STORAGE_BUCKET FIREBASE_MESSAGING_SENDER_ID FIREBASE_APP_ID; do
-            test -n "${!value}"
+            if [ -z "${!value}" ]; then
+              echo "ERROR: Required application secret $value is missing." >&2
+              exit 1
+            fi
           done
 
       - name: Typecheck
-        run: pnpm run typecheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run typecheck
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
@@ -138,14 +148,45 @@ jobs:
           EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
           EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
           EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+
+      - name: Verify Android source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          required_files=(
+            android/settings.gradle
+            android/build.gradle
+            android/app/build.gradle
+            android/app/src/main/AndroidManifest.xml
+            android/app/src/main/cpp/CMakeLists.txt
+            android/app/src/main/cpp/nexus_vocal_remover.cpp
+            android/app/src/main/cpp/nexus_vocal_remover.h
+            android/app/src/main/cpp/nexus_vocal_remover_jni.cpp
+            android/app/src/main/java/com/nexuswavetech/nexusplus/NexusReactApplication.kt
+          )
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "ERROR: Required Android source file is missing: $file" >&2
+              exit 1
+            fi
+          done
+          echo "Android source tree verification passed."
 
       - name: Set up Gradle 8.10.2
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
 
+      - name: Verify Gradle toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --version
+          test -f android/gradle/wrapper/gradle-wrapper.properties
+
       - name: Build Android APK
         if: ${{ inputs.platform == 'android-apk' || inputs.platform == 'all' }}
+        shell: bash
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
@@ -155,10 +196,14 @@ jobs:
           EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
           EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
           EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-        run: gradle -p android assembleRelease --no-daemon --stacktrace
+        run: |
+          set -euo pipefail
+          echo "Starting Android APK build with Gradle 8.10.2..."
+          gradle -p android assembleRelease --no-daemon --stacktrace --info
 
       - name: Build Android AAB
         if: ${{ inputs.platform == 'android-aab' || inputs.platform == 'all' }}
+        shell: bash
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
@@ -168,7 +213,10 @@ jobs:
           EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
           EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
           EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-        run: gradle -p android bundleRelease --no-daemon --stacktrace
+        run: |
+          set -euo pipefail
+          echo "Starting Android AAB build with Gradle 8.10.2..."
+          gradle -p android bundleRelease --no-daemon --stacktrace --info
 
       - name: Upload APK
         if: ${{ inputs.platform == 'android-apk' || inputs.platform == 'all' }}
@@ -191,89 +239,3 @@ jobs:
         run: |
           rm -f android/app/google-services.json android/key.properties
           rm -f "$RUNNER_TEMP/nexusplus-release.jks"
-
-  ios:
-    if: ${{ inputs.platform == 'ios' || inputs.platform == 'all' }}
-    runs-on: macos-14
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: Install pnpm
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm install --global pnpm@9.15.4
-          command -v pnpm
-          pnpm --version
-
-      - name: Configure pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.local/share/pnpm/store
-          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-store-${{ runner.os }}-
-
-      - name: Install JavaScript dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Validate configuration
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-        run: |
-          set -euo pipefail
-          for value in SUPABASE_URL SUPABASE_ANON_KEY FIREBASE_API_KEY FIREBASE_PROJECT_ID FIREBASE_APP_ID; do test -n "${!value}"; done
-
-      - name: Generate native iOS project
-        env:
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-          EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-        run: pnpm exec expo prebuild --platform ios --non-interactive
-
-      - name: Install CocoaPods
-        working-directory: ios
-        run: pod install --repo-update
-
-      - name: Build iOS archive
-        env:
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-          EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-        run: |
-          set -euo pipefail
-          WORKSPACE=$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)
-          test -n "$WORKSPACE"
-          SCHEME=$(xcodebuild -list -workspace "$WORKSPACE" | awk '/Schemes:/{getline; print $1; exit}')
-          test -n "$SCHEME"
-          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release -sdk iphoneos -archivePath "$RUNNER_TEMP/NexusPlus.xcarchive" archive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
-
-      - name: Package unsigned iOS archive
-        run: tar -czf "$RUNNER_TEMP/NexusPlus-iOS-unsigned.tar.gz" -C "$RUNNER_TEMP" NexusPlus.xcarchive
-
-      - name: Upload iOS archive
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-plus-ios-unsigned-archive
-          path: ${{ runner.temp }}/NexusPlus-iOS-unsigned.tar.gz
-          if-no-files-found: error
