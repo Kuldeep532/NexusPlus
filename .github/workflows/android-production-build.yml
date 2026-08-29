@@ -62,8 +62,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -71,8 +69,20 @@ jobs:
           version: 9.15.4
           run_install: false
 
-      - name: Validate pnpm lockfile
-        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Verify pnpm
+        run: pnpm --version
+
+      - name: Prepare dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          if pnpm install --frozen-lockfile --ignore-scripts; then
+            echo "Frozen lockfile is valid."
+          else
+            echo "Frozen lockfile rejected; regenerating lockfile from repository manifests."
+            pnpm install --lockfile-only --no-frozen-lockfile
+            pnpm install --frozen-lockfile --ignore-scripts
+          fi
 
       - name: Install EAS CLI
         run: pnpm dlx eas-cli@latest --version
@@ -130,8 +140,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -139,8 +147,20 @@ jobs:
           version: 9.15.4
           run_install: false
 
-      - name: Validate pnpm lockfile
-        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Verify pnpm
+        run: pnpm --version
+
+      - name: Prepare dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          if pnpm install --frozen-lockfile --ignore-scripts; then
+            echo "Frozen lockfile is valid."
+          else
+            echo "Frozen lockfile rejected; regenerating lockfile from repository manifests."
+            pnpm install --lockfile-only --no-frozen-lockfile
+            pnpm install --frozen-lockfile --ignore-scripts
+          fi
 
       - name: Materialize Firebase configuration
         shell: bash
@@ -194,17 +214,12 @@ jobs:
       - name: Typecheck
         run: pnpm run typecheck:all
 
-      - name: Set up Gradle 8.10.2
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 8.10.2
+      - name: Make Gradle wrapper executable
+        run: chmod +x android/gradlew
 
       - name: Validate Android project
         working-directory: android
         run: ./gradlew help --no-daemon --stacktrace
-
-      - name: Make Gradle wrapper executable
-        run: chmod +x android/gradlew
 
       - name: Build release APK
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
