@@ -34,13 +34,11 @@ function parseSupportedQrPayload(payload: string): Partial<CctvCamera> {
       ? kind
       : undefined;
     return {
-      manufacturer: typeof parsed.manufacturer === 'string' ? parsed.manufacturer : undefined,
-      model: typeof parsed.model === 'string' ? parsed.model : undefined,
-      serialNumber: typeof parsed.serialNumber === 'string' ? parsed.serialNumber : undefined,
+      manufacturer: typeof parsed.manufacturer === 'string' ? parsed.manufacturer.trim() : undefined,
+      model: typeof parsed.model === 'string' ? parsed.model.trim() : undefined,
+      serialNumber: typeof parsed.serialNumber === 'string' ? parsed.serialNumber.trim() : undefined,
       protocol: parsed.protocol === 'onvif' || parsed.protocol === 'rtsp' || parsed.protocol === 'http' ? parsed.protocol : 'unknown',
       deviceKind,
-      host: typeof parsed.host === 'string' ? parsed.host : undefined,
-      port: typeof parsed.port === 'number' && Number.isFinite(parsed.port) ? parsed.port : undefined,
       capabilities: { ...DEFAULT_CAPABILITIES, ...capabilities },
     };
   } catch {
@@ -51,22 +49,22 @@ function parseSupportedQrPayload(payload: string): Partial<CctvCamera> {
 export async function detectCctvCamera(input: CctvDetectionInput): Promise<CctvCamera> {
   const qrInfo = input.mode === 'qr' && input.qrPayload ? parseSupportedQrPayload(input.qrPayload) : {};
   const now = Date.now();
-  const id = await Crypto.digestStringAsync(
-    Crypto.CryptoDigestAlgorithm.SHA256,
-    `${input.serialNumber ?? qrInfo.serialNumber ?? input.model ?? qrInfo.model ?? ''}:${input.username}:${now}`,
-  );
+  const identity = [
+    input.manufacturer ?? qrInfo.manufacturer ?? '',
+    input.serialNumber ?? qrInfo.serialNumber ?? input.model ?? qrInfo.model ?? 'camera',
+    input.username.trim().toLowerCase(),
+  ].join(':');
+  const id = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, identity);
 
   return {
     id,
-    name: input.model ?? qrInfo.model ?? input.serialNumber ?? 'CCTV Camera',
+    name: input.model?.trim() ?? qrInfo.model ?? input.serialNumber ?? 'CCTV Camera',
     serialNumber: input.serialNumber ?? qrInfo.serialNumber,
-    model: input.model ?? qrInfo.model,
-    manufacturer: input.manufacturer ?? qrInfo.manufacturer,
+    model: input.model?.trim() ?? qrInfo.model,
+    manufacturer: input.manufacturer?.trim() ?? qrInfo.manufacturer,
     protocol: qrInfo.protocol ?? 'unknown',
     deviceKind: qrInfo.deviceKind,
-    host: qrInfo.host,
-    port: qrInfo.port,
-    username: input.username,
+    username: input.username.trim(),
     passwordRef: id,
     createdAt: now,
     updatedAt: now,
