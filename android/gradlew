@@ -13,17 +13,40 @@ else
   exit 1
 fi
 
+# Prefer a real Gradle wrapper JAR when one is present.
 WRAPPER_JAR="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
 if [ -f "$WRAPPER_JAR" ]; then
   exec "$JAVACMD" -classpath "$WRAPPER_JAR" org.gradle.wrapper.GradleWrapperMain "$@"
 fi
 
-# CI may use a managed/system Gradle distribution when the wrapper JAR is not
-# checked in. This keeps the launcher compatible with the repository's pinned
-# Gradle distribution metadata without requiring a binary artifact in Git.
-if command -v gradle >/dev/null 2>&1; then
-  exec gradle "$@"
+# The repository intentionally keeps the wrapper launcher text-only. When the
+# binary wrapper JAR is unavailable, bootstrap the exact pinned Gradle release
+# instead of silently using whatever Gradle happens to be installed globally.
+GRADLE_VERSION="8.10.2"
+GRADLE_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}/nexusplus-wrapper/$GRADLE_VERSION"
+GRADLE_BIN="$GRADLE_HOME/gradle-$GRADLE_VERSION/bin/gradle"
+
+if [ ! -x "$GRADLE_BIN" ]; then
+  mkdir -p "$GRADLE_HOME"
+  ARCHIVE="$GRADLE_HOME/gradle-$GRADLE_VERSION-bin.zip"
+  URL="https://services.gradle.org/distributions/gradle-$GRADLE_VERSION-bin.zip"
+
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL --retry 3 --retry-delay 2 "$URL" -o "$ARCHIVE"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q --tries=3 "$URL" -O "$ARCHIVE"
+  else
+    echo "ERROR: curl or wget is required to bootstrap Gradle $GRADLE_VERSION." >&2
+    exit 1
+  fi
+
+  if ! command -v unzip >/dev/null 2>&1; then
+    echo "ERROR: unzip is required to bootstrap Gradle $GRADLE_VERSION." >&2
+    exit 1
+  fi
+
+  unzip -q -o "$ARCHIVE" -d "$GRADLE_HOME"
+  rm -f "$ARCHIVE"
 fi
 
-echo "ERROR: Gradle wrapper JAR is missing and gradle is not available on PATH." >&2
-exit 1
+exec "$GRADLE_BIN" "$@"
