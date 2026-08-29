@@ -19,7 +19,21 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/generated-branding/nexus-plus-1024.png",
         "backgroundColor": "#120B24"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": false,
+          "data": [
+            {
+              "scheme": "nexus-plus",
+              "host": "auth",
+              "pathPrefix": "/callback"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": { "favicon": "./assets/generated-branding/nexus-plus-192.png" },
     "plugins": [
