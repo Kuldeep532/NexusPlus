@@ -97,6 +97,7 @@ export interface CctvCredentialStore {
 
 const CREDENTIAL_OPTIONS: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+  requireAuthentication: true,
 };
 
 function ensureNonEmpty(value: string, field: string): string {
@@ -153,13 +154,11 @@ export const cctvCredentialStore: CctvCredentialStore = {
 export async function deriveStableCameraId(input: {
   manufacturer?: string;
   serialNumber?: string;
-  host?: string;
   username: string;
 }): Promise<string> {
   const identity = [
     input.manufacturer?.trim().toLowerCase() ?? '',
     input.serialNumber?.trim().toLowerCase() ?? '',
-    input.host?.trim().toLowerCase() ?? '',
     input.username.trim().toLowerCase(),
   ].join('|');
   return `${CAMERA_ID_PREFIX}${await digest(identity)}`;
@@ -171,24 +170,16 @@ export function sanitizeCameraForPersistence(camera: CctvCamera): CctvCameraReco
     name: ensureNonEmpty(camera.name, 'Camera name'),
     username: ensureNonEmpty(camera.username, 'Username'),
     passwordRef: ensureNonEmpty(camera.passwordRef, 'Password reference'),
+    host: undefined,
+    port: undefined,
     schemaVersion: SCHEMA_VERSION,
     connectionState: 'idle',
   };
 }
 
-export function sanitizeNetworkField(value?: string): string | undefined {
-  if (!value) return undefined;
-  const normalized = value.trim();
-  return normalized || undefined;
-}
-
 export function validateRecordingSearch(query: CctvRecordingSearch): CctvRecordingSearch {
   if (!Number.isFinite(query.from) || !Number.isFinite(query.to) || query.to < query.from) {
-    throw new CctvBackendError({
-      code: 'INVALID_INPUT',
-      message: 'Recording time range is invalid.',
-      retryable: false,
-    });
+    throw new CctvBackendError({ code: 'INVALID_INPUT', message: 'Recording time range is invalid.', retryable: false });
   }
   const limit = query.limit === undefined ? 50 : Math.min(Math.max(Math.trunc(query.limit), 1), 200);
   return { ...query, limit };
@@ -210,7 +201,7 @@ export class UnsupportedCctvProtocolAdapter implements CctvProtocolAdapter {
   private unsupported(): never {
     throw new CctvBackendError({
       code: this.protocol === 'unknown' ? 'UNSUPPORTED_PROTOCOL' : 'NOT_IMPLEMENTED',
-      message: 'This camera protocol does not have a production adapter yet.',
+      message: 'This camera protocol does not have a verified production adapter yet.',
       retryable: false,
     });
   }
