@@ -1,9 +1,9 @@
 pluginManagement {
+    includeBuild("../node_modules/@react-native/gradle-plugin")
     repositories {
         google()
         mavenCentral()
         gradlePluginPortal()
-        maven { url = uri("../node_modules/@react-native/gradle-plugin") }
     }
 }
 
@@ -12,7 +12,6 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven { url = uri("../node_modules/@react-native/gradle-plugin") }
     }
 }
 
