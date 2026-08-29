@@ -31,7 +31,7 @@ concurrency:
 env:
   PNPM_VERSION: 9.15.4
   NODE_VERSION: '20'
-  GRADLE_VERSION: 8.10.2
+  GRADLE_VERSION: 8.13
 
 jobs:
   expo:
@@ -156,7 +156,7 @@ jobs:
         run: pnpm exec expo config --type public
       - name: Typecheck
         run: pnpm run typecheck
-      - name: Set up Gradle 8.10.2
+      - name: Set up Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: ${{ env.GRADLE_VERSION }}
@@ -166,9 +166,9 @@ jobs:
         run: |
           set -euo pipefail
           if [ -n "${PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER:-}" ]; then
-            gradle assembleRelease --no-daemon --stacktrace -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
+            gradle assembleRelease --no-daemon -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
           else
-            gradle assembleRelease --no-daemon --stacktrace
+            gradle assembleRelease --no-daemon
           fi
       - name: Build release AAB
         if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
@@ -176,9 +176,9 @@ jobs:
         run: |
           set -euo pipefail
           if [ -n "${PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER:-}" ]; then
-            gradle bundleRelease --no-daemon --stacktrace -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
+            gradle bundleRelease --no-daemon -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
           else
-            gradle bundleRelease --no-daemon --stacktrace
+            gradle bundleRelease --no-daemon
           fi
       - name: Upload APK
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
