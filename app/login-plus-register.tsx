@@ -26,9 +26,7 @@ export default function LoginPlusRegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const complete = () => {
-    if (auth.session) router.replace('/home');
-  };
+  const complete = () => router.replace('/home');
 
   const signInGoogle = async () => {
     try { await auth.google(); complete(); } catch { /* Error is rendered below. */ }
