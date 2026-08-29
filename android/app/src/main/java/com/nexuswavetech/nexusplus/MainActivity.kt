@@ -2,24 +2,51 @@ package com.nexuswavetech.nexusplus
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
-import androidx.appcompat.app.AppCompatActivity
 
-/**
- * Native launch shell. The React Native/Expo app owns the visual UI; this
- * activity only preserves Android intent handoff for media launches.
- */
-class MainActivity : AppCompatActivity() {
+import com.facebook.react.ReactActivity
+import com.facebook.react.ReactActivityDelegate
+import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
+import com.facebook.react.defaults.DefaultReactActivityDelegate
+
+import expo.modules.ReactActivityDelegateWrapper
+
+class MainActivity : ReactActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        // Required by Expo splash-screen integration before React initializes.
+        setTheme(R.style.Theme_NexusPlus)
+        super.onCreate(null)
         publishIncomingIntent(intent)
     }
+
+    override fun getMainComponentName(): String = "main"
+
+    override fun createReactActivityDelegate(): ReactActivityDelegate =
+        ReactActivityDelegateWrapper(
+            this,
+            BuildConfig.IS_NEW_ARCHITECTURE_ENABLED,
+            object : DefaultReactActivityDelegate(
+                this,
+                mainComponentName,
+                fabricEnabled,
+            ) {},
+        )
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         publishIncomingIntent(intent)
+    }
+
+    override fun invokeDefaultOnBackPressed() {
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
+            if (!moveTaskToBack(false)) {
+                super.invokeDefaultOnBackPressed()
+            }
+            return
+        }
+        super.invokeDefaultOnBackPressed()
     }
 
     private fun publishIncomingIntent(intent: Intent?) {
