@@ -40,9 +40,6 @@ export default function CctvAddScreen() {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [host, setHost] = useState('');
-  const [port, setPort] = useState('554');
-  const [protocol, setProtocol] = useState<CctvProtocol>('onvif');
   const [scanning, setScanning] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -66,19 +63,18 @@ export default function CctvAddScreen() {
         serialNumber: serialNumber || undefined,
         protocol,
         deviceKind,
-        host: host || undefined,
-        port: port ? Number(port) : undefined,
         capabilities: DEFAULT_CAPABILITIES,
       });
       Alert.alert('Camera added', `${camera.name} was saved locally on this phone.`);
       router.replace('/cctv-cameras');
     } catch {
-      Alert.alert('Could not add camera', 'The camera could not be saved. No camera credentials were sent to a remote service.');
+      Alert.alert('Could not add camera', 'The camera could not be saved. Credentials remain on this phone.');
     } finally {
       setSaving(false);
     }
   };
 
+  const [protocol, setProtocol] = useState<CctvProtocol>('onvif');
   const scanner = mode === 'qr' ? (!permission?.granted ? (
     <Pressable accessibilityRole="button" accessibilityLabel="Allow camera access for QR scanning" onPress={() => void requestPermission()} style={[styles.primaryButton, { backgroundColor: colors.primary }]}>
       <Feather name="camera" size={18} color={colors.primaryForeground} /><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Allow Camera for QR Scan</Text>
@@ -100,7 +96,7 @@ export default function CctvAddScreen() {
       <Stack.Screen options={{ title: 'Add CCTV Camera' }} />
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 28 }]} keyboardShouldPersistTaps="handled">
         <Text style={[styles.title, { color: colors.foreground }]}>Add CCTV Camera</Text>
-        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Add an IP camera, network camera, DVR or NVR. Credentials remain on this phone.</Text>
+        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Choose a device type and identify it using QR, serial number, or manual setup. Network host information is discovered automatically on the local Wi-Fi.</Text>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Device Type</Text>
         <View style={styles.grid}>{DEVICE_KINDS.map((item) => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: deviceKind === item.id }} onPress={() => setDeviceKind(item.id)} style={[styles.kindCard, { borderColor: deviceKind === item.id ? colors.primary : colors.border, backgroundColor: deviceKind === item.id ? colors.secondary : colors.card }]}><Feather name={item.icon as never} size={19} color={colors.primary} /><Text style={[styles.kindText, { color: colors.foreground }]}>{item.label}</Text></Pressable>)}</View>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Detection Method</Text>
@@ -108,23 +104,17 @@ export default function CctvAddScreen() {
         {scanner}
         {mode === 'serial' && <Field label="Serial Number" value={serialNumber} onChangeText={setSerialNumber} placeholder="Enter serial number" colors={colors} />}
         <Field label="Enter Name" value={name} onChangeText={setName} placeholder="Camera name" colors={colors} />
-        <Field label="Manufacturer" value={manufacturer} onChangeText={setManufacturer} placeholder="Optional" colors={colors} />
-        <Field label="Model" value={model} onChangeText={setModel} placeholder="Optional" colors={colors} />
         <Field label="Username" value={username} onChangeText={setUsername} placeholder="Camera username" colors={colors} autoCapitalize="none" />
         <Field label="Password" value={password} onChangeText={setPassword} placeholder="Camera password" colors={colors} secureTextEntry autoCapitalize="none" />
-        <Field label="Host" value={host} onChangeText={setHost} placeholder="Optional network host" colors={colors} autoCapitalize="none" />
-        <Field label="Port" value={port} onChangeText={setPort} placeholder="Optional" colors={colors} keyboardType="number-pad" />
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Protocol</Text>
-        <View style={styles.modeRow}>{(['onvif', 'rtsp', 'http', 'unknown'] as const).map((item) => <Pressable key={item} accessibilityRole="button" accessibilityState={{ selected: protocol === item }} onPress={() => setProtocol(item)} style={[styles.mode, { borderColor: protocol === item ? colors.primary : colors.border, backgroundColor: protocol === item ? colors.secondary : colors.card }]}><Text style={[styles.modeText, { color: colors.foreground }]}>{item.toUpperCase()}</Text></Pressable>)}</View>
-        <Text style={[styles.note, { color: colors.mutedForeground }]}>Network host and port are technical connection data and are not shown in normal camera-list UI.</Text>
+        <Text style={[styles.note, { color: colors.mutedForeground }]}>Camera host and port are never entered by the user. The transport layer is responsible for discovering the camera on the current local Wi-Fi network.</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Save CCTV camera" disabled={saving} onPress={() => void submit()} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: saving ? 0.6 : 1 }]}><Feather name="save" size={18} color={colors.primaryForeground} /><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{saving ? 'Adding Camera…' : 'Add Camera'}</Text></Pressable>
       </ScrollView>
     </View>
   );
 }
 
-function Field({ label, value, onChangeText, placeholder, colors, secureTextEntry = false, autoCapitalize = 'sentences', keyboardType = 'default' }: { label: string; value: string; onChangeText: (value: string) => void; placeholder: string; colors: ReturnType<typeof useColors>; secureTextEntry?: boolean; autoCapitalize?: 'none' | 'sentences'; keyboardType?: 'default' | 'number-pad' }) {
-  return <View style={styles.field}><Text style={[styles.label, { color: colors.foreground }]}>{label}</Text><TextInput accessibilityLabel={label} value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.mutedForeground} secureTextEntry={secureTextEntry} autoCapitalize={autoCapitalize} keyboardType={keyboardType} style={[styles.input, { color: colors.foreground, backgroundColor: colors.card, borderColor: colors.border }]} /></View>;
+function Field({ label, value, onChangeText, placeholder, colors, secureTextEntry = false, autoCapitalize = 'sentences' }: { label: string; value: string; onChangeText: (value: string) => void; placeholder: string; colors: ReturnType<typeof useColors>; secureTextEntry?: boolean; autoCapitalize?: 'none' | 'sentences' }) {
+  return <View style={styles.field}><Text style={[styles.label, { color: colors.foreground }]}>{label}</Text><TextInput accessibilityLabel={label} value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.mutedForeground} secureTextEntry={secureTextEntry} autoCapitalize={autoCapitalize} style={[styles.input, { color: colors.foreground, backgroundColor: colors.card, borderColor: colors.border }]} /></View>;
 }
 
 const styles = StyleSheet.create({ root: { flex: 1 }, content: { paddingHorizontal: 18, gap: 12 }, title: { fontSize: 24, fontFamily: 'Inter_700Bold' }, subtitle: { fontSize: 11, lineHeight: 17 }, sectionTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', marginTop: 4 }, grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, kindCard: { width: '48%', minHeight: 72, borderWidth: 1, borderRadius: 14, padding: 12, justifyContent: 'center', gap: 6 }, kindText: { fontSize: 11, fontFamily: 'Inter_700Bold' }, modeRow: { flexDirection: 'row', gap: 7 }, mode: { flex: 1, minHeight: 44, borderWidth: 1, borderRadius: 12, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 }, modeText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' }, scannerWrap: { height: 230, borderRadius: 18, overflow: 'hidden' }, scanner: { flex: 1 }, stopScan: { position: 'absolute', bottom: 10, alignSelf: 'center', paddingHorizontal: 15, paddingVertical: 9, borderRadius: 20 }, stopText: { fontSize: 11, fontFamily: 'Inter_700Bold' }, scanResult: { gap: 8 }, field: { gap: 6 }, label: { fontSize: 11, fontFamily: 'Inter_700Bold' }, input: { minHeight: 48, borderWidth: 1, borderRadius: 13, paddingHorizontal: 13, fontSize: 13 }, note: { fontSize: 10.5, lineHeight: 16 }, primaryButton: { minHeight: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }, buttonText: { fontSize: 12, fontFamily: 'Inter_700Bold' }, secondaryButton: { minHeight: 44, borderWidth: 1, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, secondaryText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' }, });
