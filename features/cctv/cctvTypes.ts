@@ -26,9 +26,4 @@ export interface CctvCamera {
   capabilities: CctvCapabilities;
 }
 
-export interface CctvLocalSecrets {
-  cameraPassword: string;
-  erasePasswordHash: string;
-}
-
 export type CctvDiscoveryMode = 'qr' | 'serial' | 'manual';
