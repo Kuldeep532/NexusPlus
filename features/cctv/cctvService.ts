@@ -21,19 +21,20 @@ const DEFAULT_CAPABILITIES: CctvCapabilities = {
   passwordChange: false,
   discovery: false,
   multiCamera: false,
+  switchCamera: false,
+  flip: false,
+  panTiltZoom: false,
+  nightVision: false,
+  talk: false,
 };
 
 function parseSupportedQrPayload(payload: string): Partial<CctvCamera> {
   try {
     const parsed = JSON.parse(payload) as Record<string, unknown>;
     const rawCapabilities = parsed.capabilities;
-    const capabilities = rawCapabilities && typeof rawCapabilities === 'object'
-      ? rawCapabilities as Partial<CctvCapabilities>
-      : {};
+    const capabilities = rawCapabilities && typeof rawCapabilities === 'object' ? rawCapabilities as Partial<CctvCapabilities> : {};
     const kind = parsed.deviceKind;
-    const deviceKind: CctvDeviceKind | undefined = kind === 'ip_camera' || kind === 'network_camera' || kind === 'dvr' || kind === 'nvr'
-      ? kind
-      : undefined;
+    const deviceKind: CctvDeviceKind | undefined = kind === 'ip_camera' || kind === 'network_camera' || kind === 'dvr' || kind === 'nvr' ? kind : undefined;
     return {
       manufacturer: typeof parsed.manufacturer === 'string' ? parsed.manufacturer.trim() : undefined,
       model: typeof parsed.model === 'string' ? parsed.model.trim() : undefined,
@@ -42,9 +43,7 @@ function parseSupportedQrPayload(payload: string): Partial<CctvCamera> {
       deviceKind,
       capabilities: { ...DEFAULT_CAPABILITIES, ...capabilities },
     };
-  } catch {
-    return {};
-  }
+  } catch { return {}; }
 }
 
 export async function detectCctvCamera(input: CctvDetectionInput): Promise<CctvCamera> {
@@ -56,36 +55,9 @@ export async function detectCctvCamera(input: CctvDetectionInput): Promise<CctvC
   const now = Date.now();
   const identity = [manufacturer ?? '', serialNumber ?? model ?? 'camera', input.username.trim().toLowerCase()].join(':');
   const id = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, identity);
-  const authenticationProfile = detectAuthenticationProfile({
-    manufacturer,
-    model,
-    protocol,
-    qrPayload: input.qrPayload,
-    source: input.mode,
-  });
-
-  return {
-    id,
-    name: model ?? serialNumber ?? 'CCTV Camera',
-    serialNumber,
-    model,
-    manufacturer,
-    protocol,
-    deviceKind: qrInfo.deviceKind,
-    username: input.username.trim(),
-    passwordRef: id,
-    createdAt: now,
-    updatedAt: now,
-    capabilities: qrInfo.capabilities ?? DEFAULT_CAPABILITIES,
-    authenticationProfile,
-  };
+  const authenticationProfile = detectAuthenticationProfile({ manufacturer, model, protocol, qrPayload: input.qrPayload, source: input.mode });
+  return { id, name: model ?? serialNumber ?? 'CCTV Camera', serialNumber, model, manufacturer, protocol, deviceKind: qrInfo.deviceKind, username: input.username.trim(), passwordRef: id, createdAt: now, updatedAt: now, capabilities: qrInfo.capabilities ?? DEFAULT_CAPABILITIES, authenticationProfile };
 }
 
-export function getMaskedCameraLabel(camera: CctvCamera): string {
-  const serial = camera.serialNumber;
-  return serial ? `Serial ending ${serial.slice(-4)}` : camera.name;
-}
-
-export function supportsCctvCapability(camera: CctvCamera, capability: keyof CctvCapabilities): boolean {
-  return camera.capabilities[capability];
-}
+export function getMaskedCameraLabel(camera: CctvCamera): string { const serial = camera.serialNumber; return serial ? `Serial ending ${serial.slice(-4)}` : camera.name; }
+export function supportsCctvCapability(camera: CctvCamera, capability: keyof CctvCapabilities): boolean { return camera.capabilities[capability]; }
