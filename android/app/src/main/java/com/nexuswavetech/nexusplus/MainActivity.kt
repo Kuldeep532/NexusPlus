@@ -9,12 +9,10 @@ import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
-
 import expo.modules.ReactActivityDelegateWrapper
 
 class MainActivity : ReactActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Required by Expo splash-screen integration before React initializes.
         setTheme(R.style.Theme_NexusPlus)
         super.onCreate(null)
         publishIncomingIntent(intent)
@@ -41,9 +39,7 @@ class MainActivity : ReactActivity() {
 
     override fun invokeDefaultOnBackPressed() {
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
-            if (!moveTaskToBack(false)) {
-                super.invokeDefaultOnBackPressed()
-            }
+            if (!moveTaskToBack(false)) super.invokeDefaultOnBackPressed()
             return
         }
         super.invokeDefaultOnBackPressed()
@@ -53,15 +49,23 @@ class MainActivity : ReactActivity() {
         if (intent?.action != Intent.ACTION_VIEW) return
         val uri: Uri = intent.data ?: return
         val scheme = uri.scheme?.lowercase() ?: return
-        // Only accept content-provider and HTTPS media URIs from external intents.
-        // Reject file:// and plain HTTP to reduce arbitrary local/unencrypted input exposure.
-        if (scheme !in setOf("content", "https")) return
+
+        // Auth callbacks are consumed by the JS auth flow. Do not treat them as media.
+        if (scheme == "nexus-plus" && uri.host == "auth") return
+
+        // Only accept provider-backed or HTTPS media URIs. Never ingest file:// paths.
+        if (scheme != "content" && scheme != "https") return
 
         val mime = intent.type ?: contentResolver.getType(uri) ?: return
-        if (!NexusMediaIntent.isSupportedMediaType(mime)) return
+        if (!isSupportedMediaType(mime)) return
         if (uri.toString().contains('\u0000')) return
 
         MediaLaunchStore.setPendingMedia(uri.toString(), mime)
+    }
+
+    private fun isSupportedMediaType(mime: String): Boolean {
+        val normalized = mime.trim().lowercase()
+        return normalized.startsWith("audio/") || normalized.startsWith("video/")
     }
 }
 
