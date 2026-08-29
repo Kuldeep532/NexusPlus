@@ -1,10 +1,10 @@
-name: Android Production Build Workflow
+name: Android Production Build
 
 on:
   workflow_dispatch:
     inputs:
       platform:
-        description: 'Build Target'
+        description: Build target
         required: true
         default: android-apk
         type: choice
@@ -13,7 +13,7 @@ on:
           - android-aab
           - all
       configuration:
-        description: 'Build Configuration'
+        description: Build configuration
         required: true
         default: release
         type: choice
@@ -23,10 +23,6 @@ on:
 
 permissions:
   contents: read
-
-concurrency:
-  group: manual-mobile-${{ github.ref }}-${{ inputs.platform }}
-  cancel-in-progress: false
 
 env:
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -46,15 +42,20 @@ env:
   EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
   EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
   EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+  PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER: ${{ secrets.PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER }}
+
+concurrency:
+  group: android-production-${{ github.ref }}-${{ inputs.platform }}
+  cancel-in-progress: false
 
 jobs:
   android:
-    if: ${{ inputs.platform == 'android-apk' || inputs.platform == 'android-aab' || inputs.platform == 'all' }}
+    name: Android ${{ inputs.platform }}
     runs-on: ubuntu-latest
     environment: production
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -64,33 +65,46 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Set up Node.js 20.x
+      - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install pnpm
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm install --global pnpm@9.15.4
-          pnpm --version
-
-      - name: Configure pnpm Cache
-        uses: actions/cache@v4
+      - name: Enable pnpm
+        uses: pnpm/action-setup@v4
         with:
-          path: ~/.local/share/pnpm/store
-          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-store-${{ runner.os }}-
+          version: 9.15.4
+          run_install: false
 
-      - name: Install JavaScript Dependencies
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate required project files
         shell: bash
         run: |
           set -euo pipefail
-          pnpm install --frozen-lockfile
+          required_files=(
+            package.json
+            pnpm-lock.yaml
+            app.json
+            eas.json
+            android/gradlew
+            android/settings.gradle
+            android/build.gradle
+            android/app/build.gradle
+            android/app/src/main/AndroidManifest.xml
+            android/app/src/main/cpp/CMakeLists.txt
+            android/app/src/main/cpp/nexus_vocal_remover.cpp
+            android/app/src/main/cpp/nexus_vocal_remover.h
+            android/app/src/main/cpp/nexus_vocal_remover_jni.cpp
+          )
+          for file in "${required_files[@]}"; do
+            test -f "$file" || { echo "ERROR: missing $file" >&2; exit 1; }
+          done
 
-      - name: Materialize Firebase Configuration
+      - name: Materialize Firebase configuration
         shell: bash
         env:
           FIREBASE_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
@@ -101,7 +115,7 @@ jobs:
           printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
           chmod 600 android/app/google-services.json
 
-      - name: Materialize Android Release Keys
+      - name: Materialize Android signing configuration
         shell: bash
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -110,8 +124,8 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          for val in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
-            test -n "${!val}"
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            test -n "${!name}" || { echo "ERROR: $name is missing" >&2; exit 1; }
           done
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nexusplus-release.jks"
           chmod 600 "$RUNNER_TEMP/nexusplus-release.jks"
@@ -123,11 +137,11 @@ keyPassword=$ANDROID_KEY_PASSWORD
 EOF
           chmod 600 android/key.properties
 
-      - name: Validate Secret Keys
+      - name: Validate Android build secrets
         shell: bash
         run: |
           set -euo pipefail
-          secrets=(
+          required=(
             SUPABASE_URL
             SUPABASE_ANON_KEY
             FIREBASE_API_KEY
@@ -137,81 +151,64 @@ EOF
             FIREBASE_MESSAGING_SENDER_ID
             FIREBASE_APP_ID
           )
-          for secret in "${secrets[@]}"; do
-            if [ -z "${!secret}" ]; then
-              echo "ERROR: Secret $secret missing!" >&2
-              exit 1
-            fi
+          for name in "${required[@]}"; do
+            test -n "${!name}" || { echo "ERROR: $name is missing" >&2; exit 1; }
           done
 
       - name: Typecheck
-        shell: bash
-        run: |
-          set -euo pipefail
-          pnpm run typecheck:all || pnpm tsc --noEmit
-
-      - name: Verify Android Native Source Structure
-        shell: bash
-        run: |
-          set -euo pipefail
-          required_files=(
-            android/settings.gradle
-            android/build.gradle
-            android/app/build.gradle
-            android/app/src/main/AndroidManifest.xml
-            android/app/src/main/cpp/CMakeLists.txt
-            android/app/src/main/cpp/nexus_vocal_remover.cpp
-            android/app/src/main/cpp/nexus_vocal_remover.h
-            android/app/src/main/cpp/nexus_vocal_remover_jni.cpp
-          )
-          for file in "${required_files[@]}"; do
-            if [ ! -f "$file" ]; then
-              echo "ERROR: File missing: $file" >&2
-              exit 1
-            fi
-          done
+        run: pnpm run typecheck:all
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.10.2'
+          gradle-version: 8.10.2
 
-      - name: Build Android APK
-        if: ${{ inputs.platform == 'android-apk' || inputs.platform == 'all' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
+      - name: Make Gradle wrapper executable
+        run: chmod +x android/gradlew
 
-      - name: Build Android AAB
-        if: ${{ inputs.platform == 'android-aab' || inputs.platform == 'all' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd android
-          chmod +x gradlew
-          ./gradlew bundleRelease --no-daemon --stacktrace
+      - name: Assemble debug APK
+        if: ${{ inputs.configuration == 'debug' }}
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK Artifact
-        if: ${{ inputs.platform == 'android-apk' || inputs.platform == 'all' }}
+      - name: Assemble release APK
+        if: ${{ inputs.configuration == 'release' && (inputs.platform == 'android-apk' || inputs.platform == 'all') }}
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Assemble release AAB
+        if: ${{ inputs.configuration == 'release' && (inputs.platform == 'android-aab' || inputs.platform == 'all') }}
+        working-directory: android
+        run: ./gradlew bundleRelease --no-daemon --stacktrace
+
+      - name: Upload debug APK
+        if: ${{ inputs.configuration == 'debug' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexusplus-android-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload release APK
+        if: ${{ inputs.configuration == 'release' && (inputs.platform == 'android-apk' || inputs.platform == 'all') }}
         uses: actions/upload-artifact@v4
         with:
           name: nexusplus-android-apk
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
-      - name: Upload AAB Artifact
-        if: ${{ inputs.platform == 'android-aab' || inputs.platform == 'all' }}
+      - name: Upload release AAB
+        if: ${{ inputs.configuration == 'release' && (inputs.platform == 'android-aab' || inputs.platform == 'all') }}
         uses: actions/upload-artifact@v4
         with:
           name: nexusplus-android-aab
           path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
 
-      - name: Cleanup Credentials
+      - name: Cleanup credentials
         if: ${{ always() }}
         shell: bash
         run: |
-          rm -f android/app/google-services.json android/key.properties "$RUNNER_TEMP/nexusplus-release.jks"
+          rm -f android/app/google-services.json
+          rm -f android/key.properties
+          rm -f "$RUNNER_TEMP/nexusplus-release.jks"
