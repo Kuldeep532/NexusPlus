@@ -72,12 +72,11 @@ jobs:
           run_install: false
       - name: Verify pnpm
         run: pnpm --version
-      - name: Synchronize lockfile and install dependencies
+      - name: Install dependencies with self-healing lockfile
         shell: bash
         run: |
           set -euo pipefail
-          pnpm install --lockfile-only --no-frozen-lockfile
-          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm install --no-frozen-lockfile
       - name: Install EAS CLI
         run: pnpm dlx eas-cli@latest --version
       - name: Validate Expo configuration
@@ -130,12 +129,11 @@ jobs:
           run_install: false
       - name: Verify pnpm
         run: pnpm --version
-      - name: Synchronize lockfile and install dependencies
+      - name: Install dependencies with self-healing lockfile
         shell: bash
         run: |
           set -euo pipefail
-          pnpm install --lockfile-only --no-frozen-lockfile
-          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm install --no-frozen-lockfile
       - name: Materialize Firebase configuration
         shell: bash
         env:
