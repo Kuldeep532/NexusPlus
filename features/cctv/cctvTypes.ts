@@ -1,5 +1,7 @@
 export type CctvProtocol = 'onvif' | 'rtsp' | 'http' | 'unknown';
 
+export type CctvDeviceKind = 'ip_camera' | 'network_camera' | 'dvr' | 'nvr';
+
 export interface CctvCapabilities {
   liveView: boolean;
   audio: boolean;
@@ -8,6 +10,7 @@ export interface CctvCapabilities {
   eraseData: boolean;
   passwordChange: boolean;
   discovery: boolean;
+  multiCamera: boolean;
 }
 
 export interface CctvCamera {
@@ -17,6 +20,7 @@ export interface CctvCamera {
   model?: string;
   manufacturer?: string;
   protocol: CctvProtocol;
+  deviceKind?: CctvDeviceKind;
   host?: string;
   port?: number;
   username: string;
