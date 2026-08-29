@@ -18,8 +18,8 @@ type SupabaseUser = {
 };
 
 type SupabaseSessionResponse = {
-  access_token: string;
-  refresh_token: string;
+  access_token?: string;
+  refresh_token?: string;
   expires_in?: number;
   expires_at?: number;
   user: SupabaseUser;
@@ -60,6 +60,7 @@ async function requestSession(path: string, body: unknown): Promise<SupabaseSess
 }
 
 function mapSession(response: SupabaseSessionResponse, fallbackProvider: 'google' | 'password') {
+  if (!response.access_token || !response.user?.id) throw new Error('AUTH_SESSION_NOT_CREATED');
   const metadata = response.user.user_metadata ?? {};
   const displayName = String(metadata.full_name ?? metadata.name ?? '').trim();
   const photoUrl = metadata.avatar_url ?? metadata.picture ?? null;
@@ -78,6 +79,7 @@ function mapSession(response: SupabaseSessionResponse, fallbackProvider: 'google
 }
 
 async function persistSession(response: SupabaseSessionResponse): Promise<void> {
+  if (!response.access_token || !response.user?.id) throw new Error('AUTH_SESSION_NOT_CREATED');
   await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(response));
 }
 
@@ -85,6 +87,25 @@ async function readStoredSession(): Promise<SupabaseSessionResponse | null> {
   try {
     const raw = await SecureStore.getItemAsync(SESSION_KEY);
     return raw ? JSON.parse(raw) as SupabaseSessionResponse : null;
+  } catch {
+    return null;
+  }
+}
+
+async function refreshStoredSession(stored: SupabaseSessionResponse): Promise<SupabaseSessionResponse | null> {
+  if (!stored.refresh_token) return null;
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ refresh_token: stored.refresh_token }),
+    });
+    if (!response.ok) return null;
+    const refreshed = await response.json() as SupabaseSessionResponse;
+    if (!refreshed.access_token || !refreshed.refresh_token || !refreshed.user?.id) return null;
+    await persistSession(refreshed);
+    return refreshed;
   } catch {
     return null;
   }
@@ -110,31 +131,34 @@ function randomState(): string {
 export async function getStoredAuthSession() {
   const stored = await readStoredSession();
   if (!stored?.access_token || !stored.user?.id) return null;
-  const provider = stored.user.user_metadata?.provider === 'email' ? 'password' : 'google';
-  return mapSession(stored, provider);
+
+  const expiresAt = stored.expires_at ? stored.expires_at * 1000 : Date.now() + (stored.expires_in ?? 3600) * 1000;
+  let active = stored;
+  if (expiresAt <= Date.now() + 60_000) {
+    const refreshed = await refreshStoredSession(stored);
+    if (!refreshed) {
+      await SecureStore.deleteItemAsync(SESSION_KEY);
+      return null;
+    }
+    active = refreshed;
+  }
+
+  const provider = active.user.user_metadata?.provider === 'email' ? 'password' : 'google';
+  return mapSession(active, provider);
 }
 
 export async function getSupabaseAccessToken(): Promise<string | null> {
   const stored = await readStoredSession();
   if (!stored?.access_token) return null;
 
-  const expiresAt = stored.expires_at ? stored.expires_at * 1000 : 0;
+  const expiresAt = stored.expires_at ? stored.expires_at * 1000 : Date.now() + (stored.expires_in ?? 3600) * 1000;
   if (expiresAt > Date.now() + 60_000) return stored.access_token;
-  if (!stored.refresh_token) return stored.access_token;
 
-  try {
-    const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify({ refresh_token: stored.refresh_token }),
-    });
-    if (!response.ok) return stored.access_token;
-    const refreshed = await response.json() as SupabaseSessionResponse;
-    await persistSession(refreshed);
-    return refreshed.access_token;
-  } catch {
-    return stored.access_token;
-  }
+  const refreshed = await refreshStoredSession(stored);
+  if (refreshed?.access_token) return refreshed.access_token;
+
+  await SecureStore.deleteItemAsync(SESSION_KEY);
+  return null;
 }
 
 export const supabaseAuthAdapter: SupabaseAuthAdapter = {
@@ -220,6 +244,11 @@ export const supabaseAuthAdapter: SupabaseAuthAdapter = {
       password: input.password,
       data: { full_name: input.name.trim() },
     });
+
+    if (!response.access_token) {
+      throw new Error('ACCOUNT_CREATED_CHECK_EMAIL');
+    }
+
     await persistSession(response);
     return mapSession(response, 'password');
   },
