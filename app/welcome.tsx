@@ -1,11 +1,9 @@
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { completeWelcome } from '@/features/app-shell/onboardingPreferences';
-
-const BRAND_LOGO = require('@/assets/generated-branding/nexus-plus-1024.png');
+import { NexusBrandMark } from '@/features/branding/NexusBrandMark';
 
 export default function WelcomeScreen() {
   const colors = useColors();
@@ -20,7 +18,9 @@ export default function WelcomeScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.hero}>
-        <Image source={BRAND_LOGO} contentFit="contain" style={styles.logo} accessibilityLabel="Nexus Plus logo" />
+        <View style={styles.logo} accessible accessibilityLabel="Nexus Plus logo">
+          <NexusBrandMark size={190} />
+        </View>
         <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Welcome to Nexus Plus</Text>
         <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>One secure home for accessible tools, utilities, reading, media and financial features.</Text>
       </View>
@@ -37,7 +37,7 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, paddingHorizontal: 22, justifyContent: 'space-between' },
   hero: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 40 },
-  logo: { width: 190, height: 190, marginBottom: 28 },
+  logo: { width: 190, height: 190, marginBottom: 28, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 30, lineHeight: 36, textAlign: 'center', fontFamily: 'Inter_700Bold', marginBottom: 10 },
   subtitle: { maxWidth: 350, fontSize: 13, lineHeight: 20, textAlign: 'center' },
   actions: { gap: 12, paddingBottom: 18 },
