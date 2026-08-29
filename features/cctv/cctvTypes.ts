@@ -2,6 +2,30 @@ export type CctvProtocol = 'onvif' | 'rtsp' | 'http' | 'unknown';
 
 export type CctvDeviceKind = 'ip_camera' | 'network_camera' | 'dvr' | 'nvr';
 
+export type CctvAuthFieldKind = 'name' | 'username' | 'password' | 'pin' | 'token' | 'passcode';
+
+export interface CctvAuthFieldDefinition {
+  id: CctvAuthFieldKind;
+  label: string;
+  required: boolean;
+  secret?: boolean;
+}
+
+export type CctvAuthenticationProfileId =
+  | 'name_username_password'
+  | 'username_password'
+  | 'pin'
+  | 'token'
+  | 'passcode'
+  | 'custom';
+
+export interface CctvAuthenticationProfile {
+  id: CctvAuthenticationProfileId;
+  fields: CctvAuthFieldDefinition[];
+  source: 'qr' | 'serial' | 'manual' | 'protocol';
+  confidence: 'verified' | 'detected' | 'default';
+}
+
 export interface CctvCapabilities {
   liveView: boolean;
   audio: boolean;
@@ -28,6 +52,7 @@ export interface CctvCamera {
   createdAt: number;
   updatedAt: number;
   capabilities: CctvCapabilities;
+  authenticationProfile?: CctvAuthenticationProfile;
 }
 
 export type CctvDiscoveryMode = 'qr' | 'serial' | 'manual';
