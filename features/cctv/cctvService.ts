@@ -1,5 +1,6 @@
 import * as Crypto from 'expo-crypto';
 import type { CctvCamera, CctvCapabilities, CctvDiscoveryMode, CctvDeviceKind } from './cctvTypes';
+import { detectAuthenticationProfile } from './cctvAuthProfile';
 
 export interface CctvDetectionInput {
   mode: CctvDiscoveryMode;
@@ -48,27 +49,35 @@ function parseSupportedQrPayload(payload: string): Partial<CctvCamera> {
 
 export async function detectCctvCamera(input: CctvDetectionInput): Promise<CctvCamera> {
   const qrInfo = input.mode === 'qr' && input.qrPayload ? parseSupportedQrPayload(input.qrPayload) : {};
+  const manufacturer = input.manufacturer?.trim() ?? qrInfo.manufacturer;
+  const model = input.model?.trim() ?? qrInfo.model;
+  const serialNumber = input.serialNumber?.trim() ?? qrInfo.serialNumber;
+  const protocol = qrInfo.protocol ?? 'unknown';
   const now = Date.now();
-  const identity = [
-    input.manufacturer ?? qrInfo.manufacturer ?? '',
-    input.serialNumber ?? qrInfo.serialNumber ?? input.model ?? qrInfo.model ?? 'camera',
-    input.username.trim().toLowerCase(),
-  ].join(':');
+  const identity = [manufacturer ?? '', serialNumber ?? model ?? 'camera', input.username.trim().toLowerCase()].join(':');
   const id = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, identity);
+  const authenticationProfile = detectAuthenticationProfile({
+    manufacturer,
+    model,
+    protocol,
+    qrPayload: input.qrPayload,
+    source: input.mode,
+  });
 
   return {
     id,
-    name: input.model?.trim() ?? qrInfo.model ?? input.serialNumber ?? 'CCTV Camera',
-    serialNumber: input.serialNumber ?? qrInfo.serialNumber,
-    model: input.model?.trim() ?? qrInfo.model,
-    manufacturer: input.manufacturer?.trim() ?? qrInfo.manufacturer,
-    protocol: qrInfo.protocol ?? 'unknown',
+    name: model ?? serialNumber ?? 'CCTV Camera',
+    serialNumber,
+    model,
+    manufacturer,
+    protocol,
     deviceKind: qrInfo.deviceKind,
     username: input.username.trim(),
     passwordRef: id,
     createdAt: now,
     updatedAt: now,
     capabilities: qrInfo.capabilities ?? DEFAULT_CAPABILITIES,
+    authenticationProfile,
   };
 }
 
