@@ -41,8 +41,7 @@ onlyBuiltDependencies:
   - msw
   - unrs-resolver
 
-# Keep the workspace lockfile focused on the production toolchain.
-# Platform-specific optional dependency pruning is handled by pnpm itself.
+# Keep native/platform overrides minimal and deterministic.
 overrides:
   '@esbuild-kit/esm-loader': npm:tsx@^4.21.0
   esbuild: 0.27.3
