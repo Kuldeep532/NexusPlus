@@ -1,0 +1,21 @@
+#!/usr/bin/env sh
+
+set -eu
+
+APP_HOME=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+
+if [ -n "${JAVA_HOME:-}" ] && [ -x "${JAVA_HOME}/bin/java" ]; then
+  JAVACMD="${JAVA_HOME}/bin/java"
+elif command -v java >/dev/null 2>&1; then
+  JAVACMD=$(command -v java)
+else
+  echo "ERROR: JAVA_HOME is not set and java is not available on PATH." >&2
+  exit 1
+fi
+
+if [ ! -f "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" ]; then
+  echo "ERROR: Gradle wrapper JAR is missing." >&2
+  exit 1
+fi
+
+exec "$JAVACMD" -classpath "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"
