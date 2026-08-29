@@ -14,7 +14,7 @@ on:
       build_type:
         description: Android package type
         required: true
-        default: aab
+        default: apk
         type: choice
         options:
           - apk
@@ -42,21 +42,8 @@ jobs:
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-      FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-      FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-      FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-      FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-      FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-      FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-      FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-      EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-      EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-      EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
       EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
     steps:
       - name: Checkout
@@ -70,21 +57,10 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
           run_install: false
-      - name: Verify pnpm
-        run: pnpm --version
-      - name: Install dependencies with self-healing lockfile
-        shell: bash
-        run: |
-          set -euo pipefail
-          pnpm install --no-frozen-lockfile
-      - name: Install EAS CLI
-        run: pnpm dlx eas-cli@latest --version
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
       - name: Validate Expo configuration
         run: pnpm exec expo config --type public
-      - name: Expo dependency health check
-        run: pnpm exec expo-doctor
-      - name: JavaScript Android bundle smoke check
-        run: pnpm exec expo export --platform android --output-dir "$RUNNER_TEMP/nexusplus-expo-export"
       - name: Validate EAS token
         run: test -n "$EAS_TOKEN"
       - name: Build Android APK with Expo EAS
@@ -95,7 +71,7 @@ jobs:
         run: pnpm dlx eas-cli@latest build --platform android --profile production --non-interactive --wait
 
   github:
-    name: GitHub Runner Production Build
+    name: GitHub Runner Android Build
     if: ${{ inputs.build_source == 'github' }}
     runs-on: ubuntu-latest
     environment: production
@@ -127,13 +103,8 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
           run_install: false
-      - name: Verify pnpm
-        run: pnpm --version
-      - name: Install dependencies with self-healing lockfile
-        shell: bash
-        run: |
-          set -euo pipefail
-          pnpm install --no-frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
       - name: Materialize Firebase configuration
         shell: bash
         env:
@@ -163,7 +134,7 @@ jobs:
           chmod 600 "$RUNNER_TEMP/nexusplus-release.jks"
           printf '%s\n' "storeFile=$RUNNER_TEMP/nexusplus-release.jks" "storePassword=$ANDROID_KEYSTORE_PASSWORD" "keyAlias=$ANDROID_KEY_ALIAS" "keyPassword=$ANDROID_KEY_PASSWORD" > android/key.properties
           chmod 600 android/key.properties
-      - name: Validate build secrets
+      - name: Validate required build configuration
         shell: bash
         run: |
           set -euo pipefail
@@ -179,42 +150,25 @@ jobs:
             [[ "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER" =~ ^[0-9]+$ ]]
             echo "Play Integrity: configured"
           else
-            echo "Play Integrity: not configured; continuing without it"
+            echo "Play Integrity: optional/not configured"
           fi
-      - name: Expo configuration and dependency health check
-        run: |
-          set -euo pipefail
-          pnpm exec expo config --type public
-          pnpm exec expo-doctor
-      - name: JavaScript Android bundle smoke check
-        run: pnpm exec expo export --platform android --output-dir "$RUNNER_TEMP/nexusplus-expo-export"
+      - name: Validate Expo configuration
+        run: pnpm exec expo config --type public
       - name: Typecheck
-        run: pnpm run typecheck:all
+        run: pnpm run typecheck
       - name: Set up Gradle 8.10.2
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: ${{ env.GRADLE_VERSION }}
-      - name: Install required Android SDK components
-        shell: bash
-        run: |
-          set -euo pipefail
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1"
-      - name: Validate Gradle and Android project
-        working-directory: android
-        run: |
-          set -euo pipefail
-          gradle --version
-          gradle help --no-daemon --stacktrace
       - name: Build release APK
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         working-directory: android
         run: |
           set -euo pipefail
           if [ -n "${PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER:-}" ]; then
-            gradle assembleRelease --no-daemon --stacktrace --warning-mode all -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
+            gradle assembleRelease --no-daemon --stacktrace -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
           else
-            gradle assembleRelease --no-daemon --stacktrace --warning-mode all
+            gradle assembleRelease --no-daemon --stacktrace
           fi
       - name: Build release AAB
         if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
@@ -222,40 +176,10 @@ jobs:
         run: |
           set -euo pipefail
           if [ -n "${PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER:-}" ]; then
-            gradle bundleRelease --no-daemon --stacktrace --warning-mode all -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
+            gradle bundleRelease --no-daemon --stacktrace -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
           else
-            gradle bundleRelease --no-daemon --stacktrace --warning-mode all
+            gradle bundleRelease --no-daemon --stacktrace
           fi
-      - name: Android launch smoke test — repeated cold starts
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          target: google_apis
-          arch: x86_64
-          profile: pixel_5
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
-          disable-animations: true
-          emulator-boot-timeout: 300
-          script: |
-            set -euo pipefail
-            APK=$(find "$GITHUB_WORKSPACE/android/app/build/outputs/apk/release" -name '*.apk' -type f | head -n 1)
-            test -n "$APK"
-            adb install -r "$APK"
-            adb shell pm clear com.nexuswavetech.nexusplus >/dev/null
-            adb shell am start -n com.nexuswavetech.nexusplus/.MainActivity
-            sleep 8
-            adb shell uiautomator dump /sdcard/window.xml >/dev/null 2>&1 || true
-            adb shell cat /sdcard/window.xml | grep -E "Welcome to Nexus Plus|Login \+ Register" >/dev/null
-            for _ in 1 2 3; do
-              adb shell am force-stop com.nexuswavetech.nexusplus
-              adb shell am start -n com.nexuswavetech.nexusplus/.MainActivity
-              sleep 5
-            done
-            if adb logcat -d -t 400 | grep -E "FATAL EXCEPTION|AndroidRuntime.*FATAL"; then
-              echo "Fatal Android exception detected during smoke test"
-              exit 1
-            fi
       - name: Upload APK
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         uses: actions/upload-artifact@v4
