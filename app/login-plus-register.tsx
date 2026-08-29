@@ -8,6 +8,14 @@ import { useAuth } from '@/features/auth/useAuth';
 
 type Mode = 'chooser' | 'login' | 'register';
 
+function friendlyAuthError(error: string | null): string | null {
+  if (!error) return null;
+  if (error === 'ACCOUNT_CREATED_CHECK_EMAIL') return 'Account created. Please verify your email, then log in.';
+  if (error === 'AUTH_SESSION_NOT_CREATED') return 'Authentication did not create a valid session. Please try again.';
+  if (error === 'SUPABASE_AUTH_NOT_CONFIGURED') return 'Authentication is temporarily unavailable. Please try again later.';
+  return error;
+}
+
 export default function LoginPlusRegisterScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -18,7 +26,9 @@ export default function LoginPlusRegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const complete = () => router.replace('/home');
+  const complete = () => {
+    if (auth.session) router.replace('/home');
+  };
 
   const signInGoogle = async () => {
     try { await auth.google(); complete(); } catch { /* Error is rendered below. */ }
@@ -30,6 +40,8 @@ export default function LoginPlusRegisterScreen() {
     try { await auth.register({ name, email, password }); complete(); } catch { /* Error is rendered below. */ }
   };
 
+  const displayError = friendlyAuthError(auth.error);
+
   return (
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}> 
       <Stack.Screen options={{ headerShown: false }} />
@@ -39,7 +51,7 @@ export default function LoginPlusRegisterScreen() {
         <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Sign in with Google through Supabase or use your Nexus Plus email account.</Text>
       </View>
 
-      {!!auth.error && <View accessible accessibilityRole="alert" style={[styles.errorBox, { backgroundColor: colors.destructive + '18', borderColor: colors.destructive }]}><Text style={[styles.errorText, { color: colors.destructive }]}>{auth.error}</Text></View>}
+      {!!displayError && <View accessible accessibilityRole="alert" style={[styles.errorBox, { backgroundColor: colors.destructive + '18', borderColor: colors.destructive }]}><Text style={[styles.errorText, { color: colors.destructive }]}>{displayError}</Text></View>}
 
       {mode === 'chooser' && <View style={styles.stack}>
         <Pressable accessibilityRole="button" accessibilityLabel="Login with Google" accessibilityHint="Opens Supabase web authentication with Google" disabled={auth.busy} onPress={() => void signInGoogle()} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: auth.busy ? 0.55 : 1 }]}>
