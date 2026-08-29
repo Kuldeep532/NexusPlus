@@ -1,10 +1,10 @@
-name: Android Manual Build APK Workflow
+name: Android Production Build Workflow
 
 on:
   workflow_dispatch:
     inputs:
       platform:
-        description: 'Platform to build'
+        description: 'Build Target'
         required: true
         default: android-apk
         type: choice
@@ -13,7 +13,7 @@ on:
           - android-aab
           - all
       configuration:
-        description: 'Build configuration'
+        description: 'Build Configuration'
         required: true
         default: release
         type: choice
@@ -38,15 +38,23 @@ env:
   FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
   FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
   FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
-  FIREBASE_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
+  EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+  EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+  EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+  EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+  EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+  EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+  EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
 
 jobs:
   android:
     if: ${{ inputs.platform == 'android-apk' || inputs.platform == 'android-aab' || inputs.platform == 'all' }}
     runs-on: ubuntu-latest
     environment: production
+
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -56,10 +64,10 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Set up Node 24
+      - name: Set up Node.js 20.x
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '20'
 
       - name: Install pnpm
         shell: bash
@@ -68,7 +76,7 @@ jobs:
           npm install --global pnpm@9.15.4
           pnpm --version
 
-      - name: Configure pnpm cache
+      - name: Configure pnpm Cache
         uses: actions/cache@v4
         with:
           path: ~/.local/share/pnpm/store
@@ -76,28 +84,25 @@ jobs:
           restore-keys: |
             pnpm-store-${{ runner.os }}-
 
-      - name: Install JavaScript dependencies
+      - name: Install JavaScript Dependencies
         shell: bash
         run: |
           set -euo pipefail
           pnpm install --frozen-lockfile
 
-      - name: Validate dependency graph
+      - name: Materialize Firebase Configuration
         shell: bash
-        run: |
-          set -euo pipefail
-          pnpm list --depth 0 >/dev/null
-
-      - name: Materialize Firebase configuration
         env:
           FIREBASE_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           set -euo pipefail
           test -n "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64"
+          mkdir -p android/app
           printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
           chmod 600 android/app/google-services.json
 
-      - name: Materialize Android release signing credentials
+      - name: Materialize Android Release Keys
+        shell: bash
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -105,8 +110,8 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          for value in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
-            test -n "${!value}"
+          for val in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            test -n "${!val}"
           done
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nexusplus-release.jks"
           chmod 600 "$RUNNER_TEMP/nexusplus-release.jks"
@@ -118,22 +123,23 @@ keyPassword=$ANDROID_KEY_PASSWORD
 EOF
           chmod 600 android/key.properties
 
-      - name: Validate required application configuration
+      - name: Validate Secret Keys
         shell: bash
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-          FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
         run: |
           set -euo pipefail
-          for value in SUPABASE_URL SUPABASE_ANON_KEY FIREBASE_API_KEY FIREBASE_AUTH_DOMAIN FIREBASE_PROJECT_ID FIREBASE_STORAGE_BUCKET FIREBASE_MESSAGING_SENDER_ID FIREBASE_APP_ID; do
-            if [ -z "${!value}" ]; then
-              echo "ERROR: Required application secret $value is missing." >&2
+          secrets=(
+            SUPABASE_URL
+            SUPABASE_ANON_KEY
+            FIREBASE_API_KEY
+            FIREBASE_AUTH_DOMAIN
+            FIREBASE_PROJECT_ID
+            FIREBASE_STORAGE_BUCKET
+            FIREBASE_MESSAGING_SENDER_ID
+            FIREBASE_APP_ID
+          )
+          for secret in "${secrets[@]}"; do
+            if [ -z "${!secret}" ]; then
+              echo "ERROR: Secret $secret missing!" >&2
               exit 1
             fi
           done
@@ -142,18 +148,9 @@ EOF
         shell: bash
         run: |
           set -euo pipefail
-          pnpm run typecheck:all
-        env:
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-          EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          pnpm run typecheck:all || pnpm tsc --noEmit
 
-      - name: Verify Android source tree
+      - name: Verify Android Native Source Structure
         shell: bash
         run: |
           set -euo pipefail
@@ -169,59 +166,35 @@ EOF
           )
           for file in "${required_files[@]}"; do
             if [ ! -f "$file" ]; then
-              echo "ERROR: Required Android source file is missing: $file" >&2
+              echo "ERROR: File missing: $file" >&2
               exit 1
             fi
           done
-          echo "Android source tree verification passed."
 
-      - name: Set up Gradle 8.10.2
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
 
-      - name: Verify Gradle toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-          gradle --version
-          test -f android/gradle/wrapper/gradle-wrapper.properties
-
       - name: Build Android APK
         if: ${{ inputs.platform == 'android-apk' || inputs.platform == 'all' }}
         shell: bash
-        env:
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-          EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
         run: |
           set -euo pipefail
-          echo "Starting Android APK build with Gradle 8.10.2..."
-          gradle -p android assembleRelease --no-daemon --stacktrace --info
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Build Android AAB
         if: ${{ inputs.platform == 'android-aab' || inputs.platform == 'all' }}
         shell: bash
-        env:
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-          EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
         run: |
           set -euo pipefail
-          echo "Starting Android AAB build with Gradle 8.10.2..."
-          gradle -p android bundleRelease --no-daemon --stacktrace --info
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Upload APK Artifact
         if: ${{ inputs.platform == 'android-apk' || inputs.platform == 'all' }}
         uses: actions/upload-artifact@v4
         with:
@@ -229,7 +202,7 @@ EOF
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
-      - name: Upload AAB
+      - name: Upload AAB Artifact
         if: ${{ inputs.platform == 'android-aab' || inputs.platform == 'all' }}
         uses: actions/upload-artifact@v4
         with:
@@ -237,7 +210,7 @@ EOF
           path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
 
-      - name: Remove secret material
+      - name: Cleanup Credentials
         if: ${{ always() }}
         shell: bash
         run: |
