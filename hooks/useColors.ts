@@ -1,23 +1,36 @@
 import { useColorScheme } from 'react-native';
-import colors from '@/constants/colors';
+import { useSyncExternalStore } from 'react';
+import { readThemeColor, type ThemeColor } from '@/features/app-shell/themePreferences';
+import { palettes, radius, type ColorTokens } from '@/constants/colors';
 
-/**
- * Returns the design tokens for the current color scheme.
- *
- * The returned object contains all color tokens for the active palette
- * plus scheme-independent values like `radius`.
- *
- * Falls back to the light palette when no dark key is defined in
- * constants/colors.ts (the scaffold ships light-only by default).
- * When a sibling web artifact's dark tokens are synced into a `dark`
- * key, this hook will automatically switch palettes based on the
- * device's appearance setting.
- */
-export function useColors() {
+let selectedTheme: ThemeColor = 'ocean-blue';
+let loaded = false;
+const listeners = new Set<() => void>();
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+function getSnapshot() { return selectedTheme; }
+function getServerSnapshot() { return 'ocean-blue' as ThemeColor; }
+
+export function refreshThemeColor(theme: ThemeColor) {
+  selectedTheme = theme;
+  loaded = true;
+  listeners.forEach((listener) => listener());
+}
+
+export function useColors(): ColorTokens & { radius: number } {
   const scheme = useColorScheme();
-  const palette =
-    scheme === 'dark' && 'dark' in colors
-      ? colors.dark
-      : colors.light;
-  return { ...palette, radius: colors.radius };
+  const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+
+  if (!loaded) {
+    void readThemeColor().then(refreshThemeColor);
+  }
+
+  const paletteName = theme === 'ocean-blue' ? 'oceanBlue' : theme === 'classic' ? 'classic' : 'light';
+  const palette = palettes[paletteName];
+  const effectiveScheme = theme === 'dark' ? 'dark' : theme === 'light' ? 'light' : scheme === 'dark' ? 'dark' : 'light';
+  const tokens = palette[effectiveScheme];
+  return { ...tokens, radius };
 }
