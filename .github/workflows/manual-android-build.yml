@@ -2,24 +2,6 @@ name: Android Production Build
 
 on:
   workflow_dispatch:
-    inputs:
-      platform:
-        description: Build target
-        required: true
-        default: android-apk
-        type: choice
-        options:
-          - android-apk
-          - android-aab
-          - all
-      configuration:
-        description: Build configuration
-        required: true
-        default: release
-        type: choice
-        options:
-          - debug
-          - release
 
 permissions:
   contents: read
@@ -45,12 +27,12 @@ env:
   PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER: ${{ secrets.PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER }}
 
 concurrency:
-  group: android-production-${{ github.ref }}-${{ inputs.platform }}
+  group: android-production-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   android:
-    name: Android Build
+    name: Android Production Build
     runs-on: ubuntu-latest
     environment: production
 
@@ -69,22 +51,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Enable pnpm
+      - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9.15.4
           run_install: false
 
-      - name: Install JavaScript dependencies
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Validate required project files
+      - name: Validate project files
         shell: bash
         run: |
           set -euo pipefail
-          required_files=(
+          files=(
             package.json
             pnpm-lock.yaml
             app.json
@@ -99,7 +80,7 @@ jobs:
             android/app/src/main/cpp/nexus_vocal_remover.h
             android/app/src/main/cpp/nexus_vocal_remover_jni.cpp
           )
-          for file in "${required_files[@]}"; do
+          for file in "${files[@]}"; do
             test -f "$file" || { echo "ERROR: missing $file" >&2; exit 1; }
           done
 
@@ -109,10 +90,16 @@ jobs:
           FIREBASE_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           set -euo pipefail
-          test -n "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" || { echo "ERROR: FIREBASE_GOOGLE_SERVICES_JSON_BASE64 is missing" >&2; exit 1; }
+          test -n "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" || {
+            echo "ERROR: FIREBASE_GOOGLE_SERVICES_JSON_BASE64 is missing" >&2
+            exit 1
+          }
           mkdir -p android/app
           printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
-          test -s android/app/google-services.json || { echo "ERROR: decoded google-services.json is empty" >&2; exit 1; }
+          test -s android/app/google-services.json || {
+            echo "ERROR: google-services.json decode failed or produced an empty file" >&2
+            exit 1
+          }
           chmod 600 android/app/google-services.json
 
       - name: Materialize Android signing configuration
@@ -128,7 +115,10 @@ jobs:
             test -n "${!name}" || { echo "ERROR: $name is missing" >&2; exit 1; }
           done
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nexusplus-release.jks"
-          test -s "$RUNNER_TEMP/nexusplus-release.jks" || { echo "ERROR: decoded keystore is empty" >&2; exit 1; }
+          test -s "$RUNNER_TEMP/nexusplus-release.jks" || {
+            echo "ERROR: Android keystore decode failed or produced an empty file" >&2
+            exit 1
+          }
           chmod 600 "$RUNNER_TEMP/nexusplus-release.jks"
           cat > android/key.properties <<EOF
 storeFile=$RUNNER_TEMP/nexusplus-release.jks
@@ -138,7 +128,7 @@ keyPassword=$ANDROID_KEY_PASSWORD
 EOF
           chmod 600 android/key.properties
 
-      - name: Validate Android build secrets
+      - name: Validate build secrets
         shell: bash
         run: |
           set -euo pipefail
@@ -159,7 +149,7 @@ EOF
       - name: Typecheck
         run: pnpm run typecheck:all
 
-      - name: Set up Gradle
+      - name: Set up Gradle 8.10.2
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.10.2
@@ -167,39 +157,22 @@ EOF
       - name: Make Gradle wrapper executable
         run: chmod +x android/gradlew
 
-      - name: Assemble debug APK
-        if: ${{ inputs.configuration == 'debug' }}
+      - name: Build release APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleRelease --no-daemon --stacktrace --warning-mode all
 
-      - name: Assemble release APK
-        if: ${{ inputs.configuration == 'release' && (inputs.platform == 'android-apk' || inputs.platform == 'all') }}
+      - name: Build release AAB
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        run: ./gradlew bundleRelease --no-daemon --stacktrace --warning-mode all
 
-      - name: Assemble release AAB
-        if: ${{ inputs.configuration == 'release' && (inputs.platform == 'android-aab' || inputs.platform == 'all') }}
-        working-directory: android
-        run: ./gradlew bundleRelease --no-daemon --stacktrace
-
-      - name: Upload debug APK
-        if: ${{ inputs.configuration == 'debug' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-
-      - name: Upload release APK
-        if: ${{ inputs.configuration == 'release' && (inputs.platform == 'android-apk' || inputs.platform == 'all') }}
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: nexusplus-android-apk
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
-      - name: Upload release AAB
-        if: ${{ inputs.configuration == 'release' && (inputs.platform == 'android-aab' || inputs.platform == 'all') }}
+      - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: nexusplus-android-aab
