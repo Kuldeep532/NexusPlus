@@ -3,7 +3,8 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColors } from '@/hooks/useColors';
+import { useColors, refreshThemeColor } from '@/hooks/useColors';
+import { readThemeColor, writeThemeColor, type ThemeColor } from '@/features/app-shell/themePreferences';
 import { readLaunchPreferences, writeLaunchPreferences, type LaunchTarget } from '@/features/app-shell/launchPreferences';
 
 const SETTINGS = [
@@ -13,16 +14,26 @@ const SETTINGS = [
   { title: 'Expense Tracker', description: 'Manage expense detection and financial privacy.', route: '/expense-tracker', icon: 'credit-card' as const },
 ];
 
+const THEME_OPTIONS: Array<{ value: ThemeColor; title: string; description: string }> = [
+  { value: 'ocean-blue', title: 'Ocean Blue', description: 'Ocean blue with devotional gold accents, following Light or Dark appearance.' },
+  { value: 'classic', title: 'Classic', description: 'The original Nexus Plus green palette, following Light or Dark appearance.' },
+  { value: 'light', title: 'Light Mode', description: 'Always use a clean light palette.' },
+  { value: 'dark', title: 'Dark Mode', description: 'Always use a comfortable dark palette.' },
+  { value: 'system', title: 'System Color', description: 'Automatically follows your device Light or Dark appearance.' },
+];
+
 export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [launchTarget, setLaunchTarget] = useState<LaunchTarget>('nexus-plus');
   const [showGeetaNexusOnHome, setShowGeetaNexusOnHome] = useState(true);
+  const [themeColor, setThemeColor] = useState<ThemeColor>('ocean-blue');
 
   useEffect(() => {
-    void readLaunchPreferences().then((preferences) => {
+    void Promise.all([readLaunchPreferences(), readThemeColor()]).then(([preferences, theme]) => {
       setLaunchTarget(preferences.launchTarget);
       setShowGeetaNexusOnHome(preferences.showGeetaNexusOnHome);
+      setThemeColor(theme);
     });
   }, []);
 
@@ -36,12 +47,31 @@ export default function SettingsScreen() {
     await writeLaunchPreferences({ launchTarget, showGeetaNexusOnHome: value });
   };
 
+  const updateThemeColor = async (theme: ThemeColor) => {
+    setThemeColor(theme);
+    refreshThemeColor(theme);
+    await writeThemeColor(theme);
+  };
+
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24 }]}>
         <View style={styles.headerRow}>
-          <View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Settings</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Control Nexus Plus and Geeta Nexus behavior.</Text></View>
+          <View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Settings</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Control Nexus Plus appearance and behavior.</Text></View>
           <Pressable accessibilityRole="button" accessibilityLabel="Open profile" onPress={() => router.push('/profile')} style={[styles.profileButton, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="user" size={21} color={colors.foreground} /></Pressable>
+        </View>
+
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Choose Theme Color</Text>
+          <Text style={[styles.body, { color: colors.mutedForeground }]}>One semantic palette is shared across every feature, so new screens inherit the selected colors automatically.</Text>
+          <View style={styles.modeList}>
+            {THEME_OPTIONS.map((option) => (
+              <Pressable key={option.value} accessibilityRole="radio" accessibilityState={{ selected: themeColor === option.value }} accessibilityLabel={`${option.title}. ${option.description}`} onPress={() => void updateThemeColor(option.value)} style={[styles.modeItem, { borderColor: themeColor === option.value ? colors.primary : colors.border, backgroundColor: themeColor === option.value ? colors.secondary : colors.card }]}>
+                <View style={[styles.radio, { borderColor: themeColor === option.value ? colors.primary : colors.mutedForeground }]}>{themeColor === option.value ? <View style={[styles.radioDot, { backgroundColor: colors.primary }]} /> : null}</View>
+                <View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{option.title}</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>{option.description}</Text></View>
+              </Pressable>
+            ))}
+          </View>
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
