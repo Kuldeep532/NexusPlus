@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useCctvCameras } from '@/features/cctv/useCctvCameras';
@@ -19,23 +19,31 @@ export default function CctvRecordingsScreen() {
   const [items, setItems] = useState<CctvRecordingItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = useCallback(async () => {
     if (!camera) return;
     setLoading(true);
     setError(null);
-    void loadCctvPlaybackPage(camera, { from: Date.now() - 24 * 60 * 60 * 1000, to: Date.now(), limit: 50, sort: 'newest' })
-      .then((page) => { if (!cancelled) setItems(page.items); })
-      .catch((cause: unknown) => {
-        if (!cancelled) {
-          setItems([]);
-          setError(cause instanceof Error ? cause.message : 'Recording service is unavailable.');
-        }
-      })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+    try {
+      const page = await loadCctvPlaybackPage(camera, {
+        from: Date.now() - 24 * 60 * 60 * 1000,
+        to: Date.now(),
+        limit: 50,
+        sort: 'newest',
+      });
+      setItems(page.items);
+    } catch (cause: unknown) {
+      setItems([]);
+      setError(cause instanceof Error ? cause.message : 'Recording service is unavailable.');
+    } finally {
+      setLoading(false);
+    }
   }, [camera]);
+
+  useEffect(() => {
+    void load();
+  }, [load, refreshKey]);
 
   return <View style={[styles.root, { backgroundColor: colors.background }]}>
     <Stack.Screen options={{ title: 'Recordings' }} />
@@ -53,7 +61,7 @@ export default function CctvRecordingsScreen() {
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Recording service unavailable</Text>
           <Text style={[styles.text, { color: colors.mutedForeground }]}>{error}</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Retry loading recordings" onPress={() => setCameraRefresh((value) => value + 1)} style={[styles.retry, { backgroundColor: colors.primary }]}><Text style={[styles.retryText, { color: colors.primaryForeground }]}>Retry</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Retry loading recordings" onPress={() => setRefreshKey((value) => value + 1)} style={[styles.retry, { backgroundColor: colors.primary }]}><Text style={[styles.retryText, { color: colors.primaryForeground }]}>Retry</Text></Pressable>
         </View>
       ) : items.length === 0 ? (
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.cardTitle, { color: colors.foreground }]}>No recordings available</Text><Text style={[styles.text, { color: colors.mutedForeground }]}>The verified camera adapter returned no recording items for the selected period.</Text></View>
@@ -65,10 +73,6 @@ export default function CctvRecordingsScreen() {
       ))}
     </ScrollView>
   </View>;
-}
-
-function setCameraRefresh(_value: (current: number) => number): void {
-  // Intentionally no-op placeholder; refresh support is added when the screen is migrated to a shared query controller.
 }
 
 const styles = StyleSheet.create({
