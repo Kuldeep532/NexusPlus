@@ -45,8 +45,7 @@
       ["expo-camera", { "cameraPermission": "Allow Nexus Plus to use your camera for selfies." }],
       ["expo-notifications", { "defaultChannel": "nexus-alarm" }],
       "expo-local-authentication",
-      "expo-secure-store",
-      "expo-screen-capture"
+      "expo-secure-store"
     ],
     "experiments": { "typedRoutes": true, "reactCompiler": true }
   }
