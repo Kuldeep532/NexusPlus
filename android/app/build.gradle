@@ -28,9 +28,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBuilds') ?: true).toBoolean()
-
 def enableShrinkResourcesInReleaseBuilds = (findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: true).toBoolean()
-
 def enablePngCrunchInReleaseBuilds = (findProperty('android.enablePngCrunchInReleaseBuilds') ?: true).toBoolean()
 
 android {
@@ -45,8 +43,6 @@ android {
         versionName '1.0.0'
         def integrityProject = project.findProperty('PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER') ?: '0'
         buildConfigField 'long', 'PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER', integrityProject
-        buildConfigField 'boolean', 'IS_NEW_ARCHITECTURE_ENABLED', 'true'
-        buildConfigField 'boolean', 'IS_HERMES_ENABLED', 'true'
         externalNativeBuild {
             cmake { cppFlags "-std=c++20" }
         }
