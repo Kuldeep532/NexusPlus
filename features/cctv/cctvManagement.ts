@@ -1,6 +1,6 @@
 import type { CctvCamera, CctvCapabilities, CctvDeviceKind } from './cctvTypes';
 import { listCctvCameraRecords, upsertCctvCamera } from './cctvRepository';
-import { deriveStableCameraId, cctvCredentialStore, sanitizeNetworkField } from './cctvBackend';
+import { deriveStableCameraId, cctvCredentialStore } from './cctvBackend';
 import { rebuildManagedDevices, type CctvManagedDevice } from './cctvDeviceRegistry';
 
 export interface CctvManagementState {
@@ -23,6 +23,10 @@ export async function getCctvManagementState(): Promise<CctvManagementState> {
   return { cameras, devices };
 }
 
+/**
+ * User-facing setup deliberately excludes host/port. Network addressing is an
+ * internal discovery concern and must be populated only by a verified LAN adapter.
+ */
 export async function saveManagedCamera(input: {
   name: string;
   username: string;
@@ -32,14 +36,11 @@ export async function saveManagedCamera(input: {
   serialNumber?: string;
   protocol: CctvCamera['protocol'];
   deviceKind?: CctvDeviceKind;
-  host?: string;
-  port?: number;
   capabilities: CctvCapabilities;
 }): Promise<CctvCamera> {
   const id = await deriveStableCameraId({
     manufacturer: input.manufacturer,
     serialNumber: input.serialNumber,
-    host: sanitizeNetworkField(input.host),
     username: input.username,
   });
   const now = Date.now();
@@ -51,8 +52,6 @@ export async function saveManagedCamera(input: {
     manufacturer: input.manufacturer?.trim() || undefined,
     protocol: input.protocol,
     deviceKind: input.deviceKind ?? 'ip_camera',
-    host: sanitizeNetworkField(input.host),
-    port: input.port,
     username: input.username.trim(),
     passwordRef: id,
     createdAt: now,
@@ -61,6 +60,6 @@ export async function saveManagedCamera(input: {
   };
   await upsertCctvCamera(camera);
   await cctvCredentialStore.save(camera.id, camera.username, input.password);
-  await rebuildManagedDevices([...(await listCctvCameraRecords()), camera]);
+  await rebuildManagedDevices(await listCctvCameraRecords());
   return camera;
 }
