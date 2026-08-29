@@ -13,9 +13,17 @@ else
   exit 1
 fi
 
-if [ ! -f "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" ]; then
-  echo "ERROR: Gradle wrapper JAR is missing." >&2
-  exit 1
+WRAPPER_JAR="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
+if [ -f "$WRAPPER_JAR" ]; then
+  exec "$JAVACMD" -classpath "$WRAPPER_JAR" org.gradle.wrapper.GradleWrapperMain "$@"
 fi
 
-exec "$JAVACMD" -classpath "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"
+# CI may use a managed/system Gradle distribution when the wrapper JAR is not
+# checked in. This keeps the launcher compatible with the repository's pinned
+# Gradle distribution metadata without requiring a binary artifact in Git.
+if command -v gradle >/dev/null 2>&1; then
+  exec gradle "$@"
+fi
+
+echo "ERROR: Gradle wrapper JAR is missing and gradle is not available on PATH." >&2
+exit 1
