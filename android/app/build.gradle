@@ -5,9 +5,18 @@ plugins {
     id 'com.google.gms.google-services'
 }
 
+def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
+
+def reactNativeDirPath = ["node", "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim()
+
+def expoCliPath = ["node", "--print", "require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })"].execute(null, rootDir).text.trim()
+
 react {
+    entryFile = file(["node", "-e", "require('expo/scripts/resolveAppEntry')", projectRoot, "android", "absolute"].execute(null, rootDir).text.trim())
+    reactNativeDir = new File(reactNativeDirPath).getParentFile().getAbsoluteFile()
+    cliFile = new File(expoCliPath)
+    bundleCommand = "export:embed"
     autolinkLibrariesWithApp()
-    entryFile = file('../../node_modules/expo-router/entry.js')
 }
 
 // Release signing is supplied only at CI runtime through android/key.properties.
@@ -17,6 +26,12 @@ def keystorePropertiesFile = rootProject.file('key.properties')
 if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.withInputStream { stream -> keystoreProperties.load(stream) }
 }
+
+def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBuilds') ?: true).toBoolean()
+
+def enableShrinkResourcesInReleaseBuilds = (findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: true).toBoolean()
+
+def enablePngCrunchInReleaseBuilds = (findProperty('android.enablePngCrunchInReleaseBuilds') ?: true).toBoolean()
 
 android {
     namespace 'com.nexuswavetech.nexusplus'
@@ -30,6 +45,8 @@ android {
         versionName '1.0.0'
         def integrityProject = project.findProperty('PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER') ?: '0'
         buildConfigField 'long', 'PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER', integrityProject
+        buildConfigField 'boolean', 'IS_NEW_ARCHITECTURE_ENABLED', 'true'
+        buildConfigField 'boolean', 'IS_HERMES_ENABLED', 'true'
         externalNativeBuild {
             cmake { cppFlags "-std=c++20" }
         }
@@ -67,8 +84,9 @@ android {
     buildTypes {
         debug { minifyEnabled false }
         release {
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled enableMinifyInReleaseBuilds
+            shrinkResources enableShrinkResourcesInReleaseBuilds
+            crunchPngs enablePngCrunchInReleaseBuilds
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
         }
@@ -82,5 +100,5 @@ dependencies {
     implementation 'androidx.biometric:biometric:1.1.0'
     implementation 'com.google.android.play:integrity:1.6.0'
     implementation 'com.tom-roush:pdfbox-android:2.0.27.0'
-    implementation 'com.facebook.react:react-android:0.81.5'
+    implementation 'com.facebook.react:react-android'
 }
