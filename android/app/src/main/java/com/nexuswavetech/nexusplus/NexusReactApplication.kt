@@ -10,9 +10,8 @@ import com.facebook.soloader.SoLoader
 
 /**
  * Minimal React Native host used by direct Gradle/GitHub Actions builds.
- * Expo/EAS remains the generated-project fallback; this host also registers
- * every checked-in native bridge explicitly so feature modules are available
- * at runtime instead of relying on implicit discovery.
+ * Only native bridges that are present in this checked-in Android module are
+ * registered here; Expo/EAS can continue to supply generated integrations.
  */
 class NexusReactApplication : Application(), ReactApplication {
     private val reactNativeHost = object : DefaultReactNativeHost(this) {
@@ -23,7 +22,6 @@ class NexusReactApplication : Application(), ReactApplication {
                 NexusFileUriPackage(),
                 NexusDocumentReaderPackage(),
                 NexusAlarmPackage(),
-                NexusAuthPackage(),
                 NexusIntegrityPackage(),
             )
 
