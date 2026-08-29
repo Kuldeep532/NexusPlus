@@ -15,12 +15,23 @@ async function hash(value: string): Promise<string> {
   return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, value);
 }
 
+function equalDigest(left: string, right: string): boolean {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return difference === 0;
+}
+
 export async function createEraseChallenge(cameraId: string): Promise<CctvEraseChallenge> {
-  const nonce = `${cameraId}:${Date.now()}:${Math.random()}`;
+  const normalizedCameraId = cameraId.trim();
+  if (!normalizedCameraId) throw new Error('Camera ID is required.');
+  const nonce = `${normalizedCameraId}:${Date.now()}:${Math.random()}`;
   const verificationHash = await hash(nonce);
   return {
     id: `${ERASE_CHALLENGE_PREFIX}${verificationHash.slice(0, 24)}`,
-    cameraId,
+    cameraId: normalizedCameraId,
     expiresAt: Date.now() + CHALLENGE_TTL_MS,
     verificationHash,
   };
@@ -31,10 +42,11 @@ export async function verifyCctvEraseAuthorization(
   password: string,
   challenge: CctvEraseChallenge,
 ): Promise<boolean> {
-  if (challenge.cameraId !== cameraId || challenge.expiresAt <= Date.now()) return false;
-  const credentials = await cctvCredentialStore.read(cameraId);
+  const normalizedCameraId = cameraId.trim();
+  if (!normalizedCameraId || !password || challenge.cameraId !== normalizedCameraId || challenge.expiresAt <= Date.now()) return false;
+  const credentials = await cctvCredentialStore.read(normalizedCameraId);
   if (!credentials) return false;
-  const supplied = await hash(`${cameraId}:${password}`);
-  const expected = await hash(`${cameraId}:${credentials.password}`);
-  return supplied === expected;
+  const supplied = await hash(`${normalizedCameraId}:${password}`);
+  const expected = await hash(`${normalizedCameraId}:${credentials.password}`);
+  return equalDigest(supplied, expected);
 }
