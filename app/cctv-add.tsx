@@ -20,7 +20,6 @@ export default function CctvAddScreen() {
   const [model, setModel] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [erasePassword, setErasePassword] = useState('');
   const [scanning, setScanning] = useState(true);
 
   const submit = async () => {
@@ -29,7 +28,15 @@ export default function CctvAddScreen() {
       return;
     }
     try {
-      const camera = await addCamera({ mode, qrPayload: qrPayload.trim() || undefined, serialNumber: serialNumber.trim() || undefined, manufacturer: manufacturer.trim() || undefined, model: model.trim() || undefined, username: username.trim(), password }, erasePassword ? erasePassword : '');
+      const camera = await addCamera({
+        mode,
+        qrPayload: qrPayload.trim() || undefined,
+        serialNumber: serialNumber.trim() || undefined,
+        manufacturer: manufacturer.trim() || undefined,
+        model: model.trim() || undefined,
+        username: username.trim(),
+        password,
+      });
       Alert.alert('Camera saved', `${camera.name} was saved locally on this phone.`);
       router.replace('/cctv-cameras');
     } catch {
@@ -63,13 +70,12 @@ export default function CctvAddScreen() {
           {(['qr', 'serial', 'manual'] as const).map((item) => <Pressable key={item} accessibilityRole="button" accessibilityState={{ selected: mode === item }} onPress={() => setMode(item)} style={[styles.mode, { borderColor: mode === item ? colors.primary : colors.border, backgroundColor: mode === item ? colors.secondary : colors.card }]}><Text style={[styles.modeText, { color: colors.foreground }]}>{item === 'qr' ? 'QR Scan' : item === 'serial' ? 'Serial Number' : 'Manual Detection'}</Text></Pressable>)}
         </View>
         {mode === 'qr' && scan}
-        <Field label="Serial Number" value={serialNumber} onChangeText={setSerialNumber} placeholder="Enter serial number" colors={colors} />
+        {mode === 'serial' && <Field label="Serial Number" value={serialNumber} onChangeText={setSerialNumber} placeholder="Enter serial number" colors={colors} />}
         <Field label="Manufacturer" value={manufacturer} onChangeText={setManufacturer} placeholder="Optional" colors={colors} />
         <Field label="Model" value={model} onChangeText={setModel} placeholder="Optional" colors={colors} />
         <Field label="Camera Username" value={username} onChangeText={setUsername} placeholder="Required" colors={colors} autoCapitalize="none" />
         <Field label="Camera Password" value={password} onChangeText={setPassword} placeholder="Required" colors={colors} secureTextEntry autoCapitalize="none" />
-        <Field label="Erase Protection Password" value={erasePassword} onChangeText={setErasePassword} placeholder="Recommended" colors={colors} secureTextEntry autoCapitalize="none" />
-        <Text style={[styles.note, { color: colors.mutedForeground }]}>Credentials are stored locally using secure storage. This stage does not upload camera data to any online database.</Text>
+        <Text style={[styles.note, { color: colors.mutedForeground }]}>Credentials are stored locally using secure storage. This backend never sends camera credentials to a remote service.</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Save CCTV camera locally" onPress={() => void submit()} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Feather name="save" size={18} color={colors.primaryForeground} /><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Save Camera Locally</Text></Pressable>
       </ScrollView>
     </View>
