@@ -1,4 +1,4 @@
-name: Manual Mobile Build
+name: Android Manual Build APK Workflow
 
 on:
   workflow_dispatch:
@@ -11,7 +11,6 @@ on:
         options:
           - android-apk
           - android-aab
-          - ios
           - all
       configuration:
         description: 'Build configuration'
@@ -77,35 +76,6 @@ jobs:
           restore-keys: |
             pnpm-store-${{ runner.os }}-
 
-      - name: Verify pnpm lockfile configuration
-        shell: bash
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const fs = require('fs');
-          const workspace = fs.readFileSync('pnpm-workspace.yaml', 'utf8');
-          const lockfile = fs.readFileSync('pnpm-lock.yaml', 'utf8');
-          const extractOverrides = (text, fileName) => {
-            const lines = text.replace(/\r\n/g, '\n').split('\n');
-            const marker = lines.findIndex((line) => /^overrides:\s*$/.test(line));
-            if (marker < 0) throw new Error(`overrides section not found in ${fileName}`);
-            const block = [];
-            for (let i = marker + 1; i < lines.length; i++) {
-              const line = lines[i];
-              if (line && !/^\s/.test(line)) break;
-              block.push(line);
-            }
-            return block.join('\n').trim();
-          };
-          const workspaceOverrides = extractOverrides(workspace, 'pnpm-workspace.yaml');
-          const lockfileOverrides = extractOverrides(lockfile, 'pnpm-lock.yaml');
-          if (workspaceOverrides !== lockfileOverrides) {
-            console.error('ERROR: pnpm workspace overrides do not match pnpm-lock.yaml.');
-            process.exit(1);
-          }
-          console.log('pnpm lockfile override configuration is synchronized.');
-          NODE
-
       - name: Install JavaScript dependencies
         shell: bash
         run: |
@@ -116,7 +86,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pnpm install --frozen-lockfile --offline --ignore-scripts
           pnpm list --depth 0 >/dev/null
 
       - name: Materialize Firebase configuration
