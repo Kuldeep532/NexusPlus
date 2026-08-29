@@ -18,10 +18,9 @@ function inferKind(camera: CctvCamera): CctvDeviceKind {
 }
 
 export async function getCctvManagementState(): Promise<CctvManagementState> {
-  const cameras = await listCctvCameraRecords();
-  const normalized = cameras.map((camera) => ({ ...camera, deviceKind: inferKind(camera) }));
-  const devices = await rebuildManagedDevices(normalized);
-  return { cameras: normalized, devices };
+  const cameras = (await listCctvCameraRecords()).map((camera) => ({ ...camera, deviceKind: inferKind(camera) }));
+  const devices = await rebuildManagedDevices(cameras);
+  return { cameras, devices };
 }
 
 export async function saveManagedCamera(input: {
@@ -51,7 +50,7 @@ export async function saveManagedCamera(input: {
     model: input.model?.trim() || undefined,
     manufacturer: input.manufacturer?.trim() || undefined,
     protocol: input.protocol,
-    deviceKind: input.deviceKind,
+    deviceKind: input.deviceKind ?? 'ip_camera',
     host: sanitizeNetworkField(input.host),
     port: input.port,
     username: input.username.trim(),
@@ -62,5 +61,6 @@ export async function saveManagedCamera(input: {
   };
   await upsertCctvCamera(camera);
   await cctvCredentialStore.save(camera.id, camera.username, input.password);
+  await rebuildManagedDevices([...(await listCctvCameraRecords()), camera]);
   return camera;
 }
