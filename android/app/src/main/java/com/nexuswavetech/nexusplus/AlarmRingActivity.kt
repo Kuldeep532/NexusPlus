@@ -2,7 +2,6 @@ package com.nexuswavetech.nexusplus
 
 import android.media.AudioAttributes
 import android.media.MediaPlayer
-import android.net.Uri
 import android.os.Bundle
 import android.view.WindowManager
 import android.widget.Button
@@ -28,28 +27,11 @@ class AlarmRingActivity : AppCompatActivity() {
     }
 
     private fun startPlayback() {
-        if (player != null) return
-        try {
-            val uri = Uri.parse("android.resource://$packageName/${R.raw.first_light_at_the_brook}")
-            player = MediaPlayer().apply {
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .build(),
-                )
-                setOnErrorListener { _, _, _ ->
-                    stopPlayback()
-                    true
-                }
-                setDataSource(this@AlarmRingActivity, uri)
-                isLooping = true
-                prepare()
-                start()
-            }
-        } catch (_: Exception) {
-            stopPlayback()
-        }
+        // The bundled alarm cue was removed because it was not present in the
+        // repository. Keep the alarm activity functional without a missing
+        // raw resource; notification/alarm audio can be provided by the JS
+        // alarm path when an actual asset is available.
+        player = null
     }
 
     private fun stopPlayback() {
