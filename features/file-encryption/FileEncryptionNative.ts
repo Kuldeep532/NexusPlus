@@ -1,10 +1,10 @@
 declare global {
   // eslint-disable-next-line no-var
-  var NexusFileEncryption?: {
+  var NexusFileEncryption: {
     isAvailable(): boolean;
     lockFile(inputUri: string, outputUri: string, password: string): Promise<string>;
     unlockFile(inputUri: string, outputUri: string, password: string): Promise<string>;
-  };
+  } | undefined;
 }
 
 export const FileEncryptionNative = {
