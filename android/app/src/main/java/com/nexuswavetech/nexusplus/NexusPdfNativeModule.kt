@@ -40,7 +40,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
                 destinationFileName = output.absolutePath
             }
             for (index in 0 until inputPaths.size()) {
-                merger.addSource(File(requireReadablePath(inputPaths.getString(index))))
+                merger.addSource(File(requireArrayString(inputPaths, index)))
             }
             merger.mergeDocuments(null)
             output.absolutePath
@@ -56,7 +56,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
             output.parentFile?.mkdirs()
             PDDocument().use { document ->
                 for (index in 0 until inputPaths.size()) {
-                    val imageFile = File(requireReadablePath(inputPaths.getString(index)))
+                    val imageFile = File(requireArrayString(inputPaths, index))
                     val bitmap = BitmapFactory.decodeFile(imageFile.absolutePath)
                         ?: throw IOException("Unable to decode image: ${imageFile.name}")
                     try {
@@ -128,6 +128,12 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
             output.absolutePath
         }.onSuccess { promise.resolve(it) }
             .onFailure { promise.reject("PDF_COMPRESS", it.message, it) }
+    }
+
+    private fun requireArrayString(values: ReadableArray, index: Int): String {
+        val value = values.getString(index)?.trim()
+        require(!value.isNullOrEmpty()) { "Input path at index $index is missing." }
+        return requireReadablePath(value)
     }
 
     private fun requireReadablePath(path: String): String {
