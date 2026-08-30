@@ -154,6 +154,39 @@ jobs:
           fi
       - name: Validate Expo configuration
         run: pnpm exec expo config --type public
+      - name: Consolidated prebuild diagnostics
+        shell: bash
+        run: |
+          set +e
+          failed=0
+
+          echo '=== 1. TypeScript ==='
+          pnpm run typecheck
+          rc=$?
+          [ $rc -eq 0 ] || failed=1
+
+          echo '=== 2. Expo configuration ==='
+          pnpm exec expo config --type public >/tmp/expo-config.json
+          rc=$?
+          cat /tmp/expo-config.json
+          [ $rc -eq 0 ] || failed=1
+
+          echo '=== 3. JavaScript/TypeScript bundle dry-run ==='
+          pnpm exec expo export --platform android --output-dir /tmp/nexusplus-bundle-check --clear
+          rc=$?
+          [ $rc -eq 0 ] || failed=1
+
+          echo '=== 4. Native Gradle preflight ==='
+          gradle --version
+          rc=$?
+          [ $rc -eq 0 ] || failed=1
+
+          echo '=== Consolidated diagnostics summary ==='
+          if [ $failed -ne 0 ]; then
+            echo 'One or more prebuild checks failed. Review all sections above before the Android release build.'
+            exit 1
+          fi
+          echo 'All consolidated prebuild diagnostics passed.'
       - name: Typecheck
         run: pnpm run typecheck
       - name: Set up Gradle 8.13
