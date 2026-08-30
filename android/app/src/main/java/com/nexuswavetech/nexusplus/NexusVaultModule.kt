@@ -1,5 +1,6 @@
 package com.nexuswavetech.nexusplus
 
+import android.app.Activity
 import android.content.Context
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -48,15 +49,14 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
                 "deviceCredentialAvailable" to deviceCredentialAvailable,
                 "securityLevel" to securityLevel,
             ))
-        } catch (error: Throwable) {
-            promise.reject("VAULT_CAPABILITY", "Unable to determine Vault authentication capability.", null)
+        } catch (_: Throwable) {
+            promise.reject("VAULT_CAPABILITY", "Unable to determine Vault authentication capability.")
         }
     }
 
     @ReactMethod
     fun authenticate(reason: String, mode: String, promise: Promise) {
-        val activity = currentActivity
-        if (activity == null) {
+        val activity: Activity = currentActivity ?: run {
             promise.resolve(mapOf("success" to false, "error" to "activity_unavailable"))
             return
         }
@@ -88,7 +88,7 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
             .setAllowedAuthenticators(authenticators)
             .build()
 
-        val prompt = BiometricPrompt(activity, executor, object : BiometricPrompt.AuthenticationCallback() {
+        val prompt = BiometricPrompt(activity as androidx.fragment.app.FragmentActivity, executor, object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                 promise.resolve(mapOf("success" to true))
             }
@@ -109,7 +109,7 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
             }
 
             override fun onAuthenticationFailed() {
-                // Keep the prompt open for another attempt; do not resolve the JS promise yet.
+                // Keep the prompt open for another attempt.
             }
         })
 
@@ -121,8 +121,8 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
         try {
             getOrCreateKey()
             promise.resolve(null)
-        } catch (error: Throwable) {
-            promise.reject("VAULT_KEY", "Unable to initialize secure Vault key.", null)
+        } catch (_: Throwable) {
+            promise.reject("VAULT_KEY", "Unable to initialize secure Vault key.")
         }
     }
 
@@ -130,8 +130,8 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
     fun isKeyAvailable(promise: Promise) {
         try {
             promise.resolve(getKey() != null)
-        } catch (error: Throwable) {
-            promise.reject("VAULT_KEY", "Unable to inspect secure Vault key.", null)
+        } catch (_: Throwable) {
+            promise.reject("VAULT_KEY", "Unable to inspect secure Vault key.")
         }
     }
 
@@ -141,8 +141,8 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
             val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
             if (keyStore.containsAlias(KEY_ALIAS)) keyStore.deleteEntry(KEY_ALIAS)
             promise.resolve(null)
-        } catch (error: Throwable) {
-            promise.reject("VAULT_KEY", "Unable to remove secure Vault key.", null)
+        } catch (_: Throwable) {
+            promise.reject("VAULT_KEY", "Unable to remove secure Vault key.")
         }
     }
 
@@ -165,8 +165,8 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
                 "iv" to Base64.getEncoder().encodeToString(cipher.iv),
                 "tag" to Base64.getEncoder().encodeToString(tag),
             ))
-        } catch (error: Throwable) {
-            promise.reject("VAULT_CRYPTO", "Vault encryption failed.", null)
+        } catch (_: Throwable) {
+            promise.reject("VAULT_CRYPTO", "Vault encryption failed.")
         }
     }
 
@@ -178,108 +178,35 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
             val ciphertextBytes = Base64.getDecoder().decode(ciphertext)
             val tagBytes = Base64.getDecoder().decode(tag)
             require(ivBytes.size == 12 && tagBytes.size == 16) { "Invalid Vault encryption parameters." }
-            require(ciphertextBytes.size <= MAX_METADATA_BYTES) { "Vault payload exceeds the supported size limit." }
+            val combined = ciphertextBytes + tagBytes
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(
-                Cipher.DECRYPT_MODE,
-                key,
-                GCMParameterSpec(128, ivBytes),
-            )
+            cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, ivBytes))
             cipher.updateAAD(aad.toByteArray(Charsets.UTF_8))
-            val encrypted = ciphertextBytes + tagBytes
-            val plaintext = cipher.doFinal(encrypted)
-            require(plaintext.size <= MAX_METADATA_BYTES) { "Vault payload exceeds the supported size limit." }
-            promise.resolve(String(plaintext, Charsets.UTF_8))
-        } catch (error: Throwable) {
-            promise.reject("VAULT_CRYPTO", "Vault decryption failed or authentication did not succeed.", null)
-        }
-    }
-
-    @ReactMethod
-    fun saveMetadata(value: String, promise: Promise) {
-        try {
-            val bytes = value.toByteArray(Charsets.UTF_8)
-            require(bytes.size <= MAX_METADATA_BYTES) { "Vault metadata exceeds the supported size limit." }
-            reactContext.openFileOutput(META_FILE, Context.MODE_PRIVATE).use { stream ->
-                stream.write(bytes)
-            }
-            promise.resolve(null)
-        } catch (error: Throwable) {
-            promise.reject("VAULT_STORAGE", "Unable to store Vault metadata.", null)
-        }
-    }
-
-    @ReactMethod
-    fun loadMetadata(promise: Promise) {
-        try {
-            val file = reactContext.getFileStreamPath(META_FILE)
-            if (!file.exists()) {
-                promise.resolve(null)
-                return
-            }
-            require(file.isFile && file.length() <= MAX_METADATA_BYTES) { "Vault metadata is invalid or too large." }
-            promise.resolve(reactContext.openFileInput(META_FILE).bufferedReader(Charsets.UTF_8).use { it.readText() })
-        } catch (error: Throwable) {
-            promise.reject("VAULT_STORAGE", "Unable to read Vault metadata.", null)
-        }
-    }
-
-    @ReactMethod
-    fun deleteMetadata(promise: Promise) {
-        try {
-            reactContext.deleteFile(META_FILE)
-            promise.resolve(null)
-        } catch (error: Throwable) {
-            promise.reject("VAULT_STORAGE", "Unable to remove Vault metadata.", null)
-        }
-    }
-
-    @ReactMethod
-    fun saveCredentialMode(mode: String, promise: Promise) {
-        try {
-            require(mode == "biometric-only" || mode == "device-auth") { "Invalid Vault credential mode." }
-            reactContext.openFileOutput(MODE_FILE, Context.MODE_PRIVATE).use { it.write(mode.toByteArray(Charsets.UTF_8)) }
-            promise.resolve(null)
-        } catch (error: Throwable) {
-            promise.reject("VAULT_STORAGE", "Unable to store Vault credential mode.", null)
-        }
-    }
-
-    @ReactMethod
-    fun loadCredentialMode(promise: Promise) {
-        try {
-            val file = reactContext.getFileStreamPath(MODE_FILE)
-            if (!file.exists()) {
-                promise.resolve("biometric-only")
-                return
-            }
-            require(file.isFile && file.length() <= 32) { "Vault credential mode is invalid." }
-            val mode = reactContext.openFileInput(MODE_FILE).bufferedReader(Charsets.UTF_8).use { it.readText() }
-            promise.resolve(if (mode == "device-auth") "device-auth" else "biometric-only")
-        } catch (error: Throwable) {
-            promise.reject("VAULT_STORAGE", "Unable to read Vault credential mode.", null)
+            val plaintext = cipher.doFinal(combined).toString(Charsets.UTF_8)
+            promise.resolve(plaintext)
+        } catch (_: Throwable) {
+            promise.reject("VAULT_CRYPTO", "Vault decryption failed.")
         }
     }
 
     private fun getKey(): SecretKey? {
         val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        return keyStore.getKey(KEY_ALIAS, null) as? SecretKey
+        return (keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry)?.secretKey
     }
 
     private fun getOrCreateKey(): SecretKey {
         getKey()?.let { return it }
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
-        val builder = KeyGenParameterSpec.Builder(
-            KEY_ALIAS,
-            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+        generator.init(
+            KeyGenParameterSpec.Builder(
+                KEY_ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+            )
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setUserAuthenticationRequired(false)
+                .build(),
         )
-            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-            .setKeySize(256)
-            .setRandomizedEncryptionRequired(true)
-            .setUserAuthenticationRequired(true)
-
-        generator.init(builder.build())
         return generator.generateKey()
     }
 }
