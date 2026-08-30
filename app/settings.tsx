@@ -14,6 +14,12 @@ const SETTINGS = [
   { title: 'Expense Tracker', description: 'Manage expense detection and financial privacy.', route: '/expense-tracker', icon: 'credit-card' as const },
 ];
 
+const LEGAL_SETTINGS = [
+  { title: 'Privacy Policy', description: 'How Nexus Plus handles data, permissions, analytics, APIs and security.', route: '/privacy-policy', icon: 'lock' as const },
+  { title: 'Terms & Conditions', description: 'Rules for safe, lawful and responsible use of Nexus Plus.', route: '/terms-and-conditions', icon: 'file-text' as const },
+  { title: 'About Nexus Wave Technologies', description: 'Our mission, accessibility vision and the story behind Nexus Plus.', route: '/about-us', icon: 'info' as const },
+];
+
 const THEME_OPTIONS: Array<{ value: ThemeColor; title: string; description: string }> = [
   { value: 'ocean-blue', title: 'Ocean Blue', description: 'Ocean blue with devotional gold accents, following Light or Dark appearance.' },
   { value: 'classic', title: 'Classic', description: 'The original Nexus Plus green palette, following Light or Dark appearance.' },
@@ -106,6 +112,11 @@ export default function SettingsScreen() {
         <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 20 }]}>Feature settings</Text>
         <View style={styles.list}>
           {SETTINGS.map((item) => <Pressable key={item.route} accessibilityRole="button" accessibilityLabel={`${item.title}. ${item.description}`} onPress={() => router.push(item.route as never)} style={[styles.item, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name={item.icon} size={19} color={colors.primary} /></View><View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{item.title}</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>{item.description}</Text></View><Feather name="chevron-right" size={19} color={colors.mutedForeground} accessibilityElementsHidden /></Pressable>)}
+        </View>
+
+        <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 22 }]}>Privacy & About</Text>
+        <View style={styles.list}>
+          {LEGAL_SETTINGS.map((item) => <Pressable key={item.route} accessibilityRole="button" accessibilityLabel={`${item.title}. ${item.description}`} onPress={() => router.push(item.route as never)} style={[styles.item, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name={item.icon} size={19} color={colors.primary} /></View><View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{item.title}</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>{item.description}</Text></View><Feather name="chevron-right" size={19} color={colors.mutedForeground} accessibilityElementsHidden /></Pressable>)}
         </View>
       </ScrollView>
     </View>
