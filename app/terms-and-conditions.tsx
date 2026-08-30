@@ -1,68 +1,27 @@
 import { LegalDocumentScreen } from '@/features/app-shell/LegalDocumentScreen';
 
 const sections = [
-  {
-    title: '1. Acceptance',
-    body: 'By installing, accessing, or using Nexus Plus, you agree to these Terms and Conditions and the Privacy Policy. If you do not agree, do not use the application. If you use a particular feature that has additional terms, those terms also apply to that feature.',
-  },
-  {
-    title: '2. About Nexus Plus',
-    body: 'Nexus Plus is a multi-utility application designed to provide accessible productivity, time assistance, media, document, security, financial-assistance, connected-device, and related digital tools. Features may change, be added, restricted, discontinued, or depend on device capabilities and third-party services.',
-  },
-  {
-    title: '3. Lawful and authorized use',
-    body: 'You must use Nexus Plus only for lawful purposes and only with content, accounts, devices, networks, cameras, files, and services that you are authorized to access. You must not use the application to invade another person’s privacy, bypass security controls, access systems without permission, distribute unlawful content, or interfere with third-party services.',
-  },
-  {
-    title: '4. Accounts and credentials',
-    body: 'You are responsible for maintaining the confidentiality of your account credentials and for activity performed through your account. Use a strong device lock and do not share passwords, recovery codes, API keys, camera credentials, or other secrets. We may restrict an account or device when necessary to protect users, infrastructure, or the integrity of the service.',
-  },
-  {
-    title: '5. Third-party APIs and services',
-    body: 'Nexus Plus may aggregate or connect to third-party APIs, AI providers, cloud platforms, notification systems, media sources, or other external services. Nexus Wave Technologies does not own or control those independent services. Their security, uptime, processing, retention, content, and terms are the responsibility of the respective providers. An API provider’s security is not a security guarantee made by Nexus Wave Technologies.',
-  },
-  {
-    title: '6. AI and automated results',
-    body: 'AI-generated or automated results may be incomplete, inaccurate, outdated, or unsuitable for a particular purpose. You must independently verify important information. Nexus Plus must not be treated as a substitute for professional legal, medical, financial, security, or other expert advice.',
-  },
-  {
-    title: '7. Financial and payment features',
-    body: 'Payment Announcer and Expense Tracker are assistance tools only. They do not constitute banking, payment processing, financial advice, transaction authorization, or proof of payment. You remain responsible for verifying transactions with your bank or payment provider and for protecting financial information.',
-  },
-  {
-    title: '8. Camera, CCTV and monitoring features',
-    body: 'Camera and CCTV capabilities must be used only with proper authorization. You are responsible for complying with privacy, recording, surveillance, property, and other applicable laws. Nexus Plus does not authorize you to monitor, record, or access any person or device without the required permission.',
-  },
-  {
-    title: '9. Intellectual property',
-    body: 'Nexus Plus software, branding, design, original content, and associated materials are protected by applicable intellectual-property laws. Except where a license expressly permits it, you may not copy, modify, redistribute, reverse engineer, or commercially exploit protected components. Third-party content and services remain subject to their respective licenses and terms.',
-  },
-  {
-    title: '10. Availability and changes',
-    body: 'We work to keep Nexus Plus reliable and accessible, but we do not guarantee uninterrupted availability, compatibility with every device, or continued availability of any particular API, provider, media source, or feature. Updates may change behavior, permissions, requirements, or supported devices.',
-  },
-  {
-    title: '11. Security disclaimer',
-    body: 'We use reasonable technical and organizational safeguards, but no software, device, network, API, cloud service, or authentication system can be guaranteed to be completely secure. You accept the responsibility to maintain a secure device, use supported software, protect credentials, and exercise appropriate caution with sensitive information.',
-  },
-  {
-    title: '12. Limitation of responsibility',
-    body: 'To the maximum extent permitted by applicable law, Nexus Wave Technologies is not responsible for losses caused by unauthorized access to your device or account, third-party services, third-party API behavior, inaccurate automated results, network failures, unsupported devices, misuse of the application, or content supplied by external providers. Nothing in these terms excludes rights or remedies that cannot lawfully be excluded.',
-  },
-  {
-    title: '13. Privacy',
-    body: 'Your use of Nexus Plus is also governed by the Nexus Plus Privacy Policy, which explains data handling, permissions, analytics, backend services, local storage, third-party providers, and security practices.',
-  },
-  {
-    title: '14. Termination',
-    body: 'You may stop using Nexus Plus at any time. We may suspend or restrict access where reasonably necessary for security, abuse prevention, legal compliance, service integrity, or violation of these terms. Termination does not automatically erase information held by independent third-party providers.',
-  },
-  {
-    title: '15. Contact',
-    body: 'Questions about these terms can be sent to info@nexusweb.co.in. Official website: nexusweb.co.in.',
-  },
+  { title: '1. Acceptance of Terms', body: 'Last Updated: August 30, 2026\n\nBy downloading, installing, accessing or using Nexus Plus, you agree to these Terms and Conditions and the Privacy Policy. If you do not agree, do not use the application.' },
+  { title: '2. About Nexus Plus', body: 'Nexus Plus is a multi-utility application developed by Nexus Wave Technologies. Depending on device capabilities and enabled services, features may include PC Remote Control, alarms and reminders, accessibility tools, documents and PDF utilities, media playback, security tools, Expense Tracker, Payment Announcer, camera/CCTV and connected-device tools, and AI-assisted utilities.' },
+  { title: '3. License and Intellectual Property', body: 'Nexus Wave Technologies grants you a personal, non-exclusive, non-transferable and revocable license to use Nexus Plus in accordance with these terms. Nexus Plus software, branding, design, original content and associated intellectual property remain the property of Nexus Wave Technologies or their respective licensors. Except where permitted by applicable law or an applicable license, you must not reverse engineer, decompile, modify, redistribute, sublicense or create derivative works from protected components.' },
+  { title: '4. Lawful and Authorized Use', body: 'Use Nexus Plus only for lawful purposes and only with accounts, computers, networks, cameras, files, devices and services that you own or are authorized to access. You must not use the app for unauthorized remote access, surveillance, credential theft, privacy invasion, security bypass, disruption of systems, unlawful monitoring, or interference with third-party services.' },
+  { title: '5. PC Remote Control', body: 'PC Remote Control is intended for your own computer or a computer for which you have explicit permission. You are responsible for pairing, credentials, local-network security, endpoint configuration and all activity performed through your authorized connection. Nexus Wave Technologies is not responsible for misuse or unauthorized access caused by your configuration or credentials.' },
+  { title: '6. Camera, CCTV and Connected Devices', body: 'Camera, CCTV and connected-device features must be used only with appropriate authorization and in compliance with applicable privacy, recording, surveillance, property and telecommunications laws. You are responsible for the devices and content you connect. Nexus Plus does not grant you permission to monitor or record another person.' },
+  { title: '7. Financial-Assistance Features', body: 'Expense Tracker and Payment Announcer are convenience tools. They are not banking services, payment processors, financial institutions, transaction authorization systems or financial advisers. Automated detection or announcements can be inaccurate. Always verify important financial information with your bank or payment provider. An app announcement is not proof that a transaction completed.' },
+  { title: '8. AI and Automated Results', body: 'AI-generated, automated, summarized, classified or otherwise machine-assisted results may be incomplete, inaccurate, outdated or inappropriate for your circumstances. Verify important information independently. Nexus Plus is not a substitute for professional legal, medical, financial, security or other expert advice.' },
+  { title: '9. Third-Party APIs and Services', body: 'Nexus Plus may connect to independent APIs, AI providers, cloud platforms, notification services, media sources and other third-party services. Where applicable, Nexus Plus acts as an application or aggregation layer. We do not own or control those independent providers. Their security, availability, processing, retention, content and terms are their responsibility. A provider’s security is not a security guarantee by Nexus Wave Technologies. Information sent to a provider may be subject to that provider’s own privacy policy and terms.' },
+  { title: '10. Accounts, Credentials and Security', body: 'You are responsible for maintaining the security of your account, device lock, credentials and connected-device secrets. Do not share passwords, recovery codes, API keys, camera credentials or payment credentials unnecessarily. We may restrict access where reasonably necessary for security, abuse prevention, legal compliance or service integrity.' },
+  { title: '11. Privacy and Permissions', body: 'Your use of Nexus Plus is also governed by the Privacy Policy, which explains information processing, Android permissions, local storage, authentication, Firebase services, third-party APIs, security safeguards, retention and deletion. Android permissions are requested for relevant features and may be revoked through device settings, subject to Android functionality.' },
+  { title: '12. Accessibility', body: 'Nexus Wave Technologies aims to make Nexus Plus accessible and usable with supported Android accessibility technologies. Accessibility features may depend on Android, device hardware, screen readers, installed services and individual feature implementation. We continuously improve accessibility but cannot guarantee perfect compatibility with every device or assistive technology.' },
+  { title: '13. Availability and Updates', body: 'Nexus Plus is provided on an “as is” and “as available” basis to the maximum extent permitted by law. We strive for reliability but do not guarantee uninterrupted operation, error-free behavior, compatibility with every device, or continued availability of a particular feature or third-party service. We may update, change, restrict or discontinue features to improve quality, security, compliance or compatibility.' },
+  { title: '14. User Content and Responsibility', body: 'You remain responsible for information, files, media, commands, credentials and other content you enter, upload, capture, transmit or use through Nexus Plus. You represent that you have the rights and permissions necessary to use such content and services. Do not upload unlawful, infringing or unauthorized material.' },
+  { title: '15. Security Disclaimer', body: 'We use reasonable technical safeguards, but no application, device, network, API, cloud service or authentication mechanism can be guaranteed completely secure. Security also depends on your device, operating system, network, credentials and third-party providers. Keep supported software updated and use appropriate device and account security.' },
+  { title: '16. Limitation of Liability', body: 'To the maximum extent permitted by applicable law, Nexus Wave Technologies is not liable for indirect, incidental, special or consequential losses arising from use or inability to use the app, third-party services, inaccurate automated results, network or hardware failures, unsupported devices, unauthorized access caused by user configuration, or misuse of the application. Nothing in these terms excludes a right or remedy that cannot lawfully be excluded.' },
+  { title: '17. Account Deletion and Termination', body: 'You may stop using Nexus Plus at any time and may request deletion of your account and associated account data through the account controls provided in the app, where available, or by contacting info@nexusweb.co.in. Deletion may require identity/account verification and may be limited by legal, fraud-prevention or security obligations. Data held independently by third-party providers is governed by their policies. We may suspend or restrict accounts where reasonably necessary for security, abuse prevention, legal compliance or violation of these terms.' },
+  { title: '18. Changes to These Terms', body: 'We may revise these Terms when the app, services, providers or legal requirements change. The current version and Last Updated date will be shown in the app and, where appropriate, on our official website. Continued use after an update constitutes acceptance to the extent permitted by applicable law.' },
+  { title: '19. Contact Us', body: 'Nexus Wave Technologies\nWebsite: nexusweb.co.in\nEmail: info@nexusweb.co.in\n\nFor support or legal requests, do not include passwords, API keys, payment credentials or other secrets.' },
 ];
 
 export default function TermsAndConditionsScreen() {
-  return <LegalDocumentScreen title="Terms & Conditions" subtitle="The rules for safe, lawful, responsible, and transparent use of Nexus Plus." sections={sections} />;
+  return <LegalDocumentScreen title="Terms & Conditions" subtitle="Clear rules for safe, lawful, accessible and responsible use of Nexus Plus." sections={sections} />;
 }
