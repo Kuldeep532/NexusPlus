@@ -1,10 +1,11 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/features/auth/useAuth';
+import { deleteNexusPlusAccount } from '@/features/auth/accountDeletion';
 
 export default function ProfileScreen() {
   const colors = useColors();
@@ -17,6 +18,28 @@ export default function ProfileScreen() {
   const signOut = async () => {
     await auth.signOut();
     router.replace('/login-plus-register');
+  };
+
+  const deleteAccount = () => {
+    Alert.alert(
+      'Permanently delete account?',
+      'This permanently deletes your Nexus Plus account and account data from our backend. This action cannot be undone. Data held independently by third-party providers is governed by their policies.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete permanently', style: 'destructive', onPress: () => void confirmDeleteAccount() },
+      ],
+    );
+  };
+
+  const confirmDeleteAccount = async () => {
+    try {
+      await deleteNexusPlusAccount();
+      await auth.signOut();
+      Alert.alert('Account deleted', 'Your Nexus Plus account has been permanently deleted.', [{ text: 'OK', onPress: () => router.replace('/login-plus-register') }]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'We could not delete your account.';
+      Alert.alert('Account deletion failed', `Your account was not deleted. ${message}`);
+    }
   };
 
   return (
@@ -44,6 +67,7 @@ export default function ProfileScreen() {
 
         <Pressable accessibilityRole="button" accessibilityLabel="Open Settings" onPress={() => router.push('/settings')} style={[styles.action, { backgroundColor: colors.secondary, borderColor: colors.border }]}><Feather name="settings" size={18} color={colors.foreground} /><Text style={[styles.actionText, { color: colors.foreground }]}>Settings</Text></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Sign out" accessibilityState={{ disabled: auth.busy }} disabled={auth.busy} onPress={() => void signOut()} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="log-out" size={18} color={colors.foreground} /><Text style={[styles.actionText, { color: colors.foreground }]}>{auth.busy ? 'Signing out…' : 'Sign out'}</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Delete account permanently" accessibilityHint="Permanently deletes your Nexus Plus account and cannot be undone" disabled={auth.busy} onPress={deleteAccount} style={[styles.deleteAction, { borderColor: colors.destructive }]}><Feather name="trash-2" size={18} color={colors.destructive} /><Text style={[styles.actionText, { color: colors.destructive }]}>Delete account permanently</Text></Pressable>
       </ScrollView>
     </View>
   );
@@ -54,5 +78,5 @@ function ProfileRow({ title, value, colors }: { title: string; value: string; co
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 }, content: { paddingHorizontal: 18 }, topBar: { height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }, headerTitle: { fontSize: 18, fontFamily: 'Inter_700Bold' }, accountHero: { alignItems: 'center', paddingVertical: 22 }, avatar: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center' }, initials: { fontSize: 30, fontFamily: 'Inter_700Bold' }, name: { marginTop: 14, fontSize: 21, fontFamily: 'Inter_700Bold' }, email: { marginTop: 4, fontSize: 12 }, provider: { marginTop: 8, fontSize: 11, fontFamily: 'Inter_700Bold' }, card: { borderWidth: 1, borderRadius: 18, padding: 16 }, sectionTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', marginBottom: 6 }, row: { paddingVertical: 11, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#999' }, rowTitle: { fontSize: 12, fontFamily: 'Inter_700Bold', marginBottom: 3 }, body: { fontSize: 11, lineHeight: 16 }, action: { minHeight: 48, borderWidth: 1, borderRadius: 14, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, actionText: { fontSize: 12, fontFamily: 'Inter_700Bold' },
+  root: { flex: 1 }, content: { paddingHorizontal: 18 }, topBar: { height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }, headerTitle: { fontSize: 18, fontFamily: 'Inter_700Bold' }, accountHero: { alignItems: 'center', paddingVertical: 22 }, avatar: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center' }, initials: { fontSize: 30, fontFamily: 'Inter_700Bold' }, name: { marginTop: 14, fontSize: 21, fontFamily: 'Inter_700Bold' }, email: { marginTop: 4, fontSize: 12 }, provider: { marginTop: 8, fontSize: 11, fontFamily: 'Inter_700Bold' }, card: { borderWidth: 1, borderRadius: 18, padding: 16 }, sectionTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', marginBottom: 6 }, row: { paddingVertical: 11, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#999' }, rowTitle: { fontSize: 12, fontFamily: 'Inter_700Bold', marginBottom: 3 }, body: { fontSize: 11, lineHeight: 16 }, action: { minHeight: 48, borderWidth: 1, borderRadius: 14, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, deleteAction: { minHeight: 48, borderWidth: 1, borderRadius: 14, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, actionText: { fontSize: 12, fontFamily: 'Inter_700Bold' },
 });
