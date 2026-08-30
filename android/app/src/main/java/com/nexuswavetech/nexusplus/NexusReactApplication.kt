@@ -55,6 +55,6 @@ class NexusReactApplication : Application(), ReactApplication {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        ApplicationLifecycleDispatcher.onConfigurationChanged(this)
+        ApplicationLifecycleDispatcher.onConfigurationChanged(this, newConfig)
     }
 }
