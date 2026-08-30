@@ -43,9 +43,10 @@ export default function RootLayout() {
     const inTabs = firstSegment === '(tabs)';
     const inGeeta = firstSegment === 'geeta-nexus';
     const inHome = firstSegment === 'home';
+    const inLegal = firstSegment === 'privacy-policy' || firstSegment === 'terms-and-conditions' || firstSegment === 'about-us';
 
     if (!auth.session) {
-      if (inWelcome || inAuth) return;
+      if (inWelcome || inAuth || inLegal) return;
 
       void hasCompletedWelcome().then((completed) => {
         if (!completed) {
@@ -57,7 +58,7 @@ export default function RootLayout() {
       return;
     }
 
-    if (inAuth || inWelcome || (!firstSegment && !inTabs && !inGeeta && !inHome)) {
+    if (inAuth || inWelcome || (!firstSegment && !inTabs && !inGeeta && !inHome && !inLegal)) {
       void getLaunchRoute().then((route) => router.replace(route));
     }
   }, [auth.loading, auth.session, router, segments]);
