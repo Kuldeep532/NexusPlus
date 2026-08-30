@@ -15,7 +15,6 @@ import com.tom_roush.pdfbox.pdmodel.encryption.AccessPermission
 import com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy
 import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 
@@ -41,7 +40,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
                 destinationFileName = output.absolutePath
             }
             for (index in 0 until inputPaths.size()) {
-                merger.addSource(requireReadablePath(inputPaths.getString(index)))
+                merger.addSource(File(requireReadablePath(inputPaths.getString(index))))
             }
             merger.mergeDocuments(null)
             output.absolutePath
@@ -55,8 +54,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
             require(inputPaths.size() > 0) { "At least one image input is required." }
             val output = File(outputPath)
             output.parentFile?.mkdirs()
-            val document = PDDocument()
-            try {
+            PDDocument().use { document ->
                 for (index in 0 until inputPaths.size()) {
                     val imageFile = File(requireReadablePath(inputPaths.getString(index)))
                     val bitmap = BitmapFactory.decodeFile(imageFile.absolutePath)
@@ -75,8 +73,6 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
                     }
                 }
                 FileOutputStream(output).use { document.save(it) }
-            } finally {
-                document.close()
             }
             output.absolutePath
         }.onSuccess { promise.resolve(it) }
@@ -89,15 +85,14 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
             require(password.length >= 8) { "PDF password must be at least 8 characters." }
             val output = File(outputPath)
             output.parentFile?.mkdirs()
-            PDDocument.load(requireReadablePath(inputPath)).use { document ->
+            PDDocument.load(File(requireReadablePath(inputPath))).use { document ->
                 val permissions = AccessPermission().apply {
-                    isCanPrint = true
-                    isCanExtractContent = false
-                    isCanModify = false
+                    setCanPrint(true)
+                    setCanExtractContent(false)
+                    setCanModify(false)
                 }
                 val policy = StandardProtectionPolicy(password, password, permissions).apply {
                     encryptionKeyLength = 256
-                    this.permissions = permissions
                 }
                 document.protect(policy)
                 FileOutputStream(output).use { document.save(it) }
@@ -113,7 +108,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
             require(password.isNotEmpty()) { "PDF password is required." }
             val output = File(outputPath)
             output.parentFile?.mkdirs()
-            PDDocument.load(requireReadablePath(inputPath), password).use { document ->
+            PDDocument.load(File(requireReadablePath(inputPath)), password).use { document ->
                 document.setAllSecurityToBeRemoved(true)
                 FileOutputStream(output).use { document.save(it) }
             }
@@ -127,7 +122,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
         runCatching {
             val output = File(outputPath)
             output.parentFile?.mkdirs()
-            PDDocument.load(requireReadablePath(inputPath)).use { document ->
+            PDDocument.load(File(requireReadablePath(inputPath))).use { document ->
                 FileOutputStream(output).use { document.save(it) }
             }
             output.absolutePath
