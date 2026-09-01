@@ -22,16 +22,8 @@ class NexusReactApplication : Application(), ReactApplication {
         object : DefaultReactNativeHost(this) {
             override fun getPackages(): List<ReactPackage> =
                 PackageList(this).packages.toMutableList().apply {
-                    add(NexusAlarmPackage())
-                    add(NexusDocumentReaderPackage())
-                    add(NexusFileUriPackage())
-                    add(NexusIntegrityPackage())
-                    add(NexusMediaPackage())
-                    add(NexusPdfNativePackage())
-                    add(NexusSystemSettingsPackage())
-                    add(NexusVaultPackage())
-                    add(NexusVideoEditorPackage())
-                    add(NexusVocalRemoverPackage())
+                    // Register native packages lazily through explicit feature use instead of
+                    // constructing every custom module during the initial app bootstrap.
                 }
 
             override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"
