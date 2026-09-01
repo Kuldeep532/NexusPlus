@@ -18,53 +18,69 @@ Notifications.setNotificationHandler({
 
 async function saveToken(token: string): Promise<void> {
   if (!SUPABASE_URL || !ANON_KEY) return;
-  const accessToken = await getSupabaseAccessToken();
-  if (!accessToken) return;
 
-  await fetch(`${SUPABASE_URL}/rest/v1/push_tokens?on_conflict=token`, {
-    method: 'POST',
-    headers: {
-      apikey: ANON_KEY,
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-      Prefer: 'resolution=merge-duplicates,return=minimal',
-    },
-    body: JSON.stringify({
-      token,
-      platform: Platform.OS,
-      app_version: '1.0.0',
-      updated_at: new Date().toISOString(),
-    }),
-  });
+  try {
+    const accessToken = await getSupabaseAccessToken();
+    if (!accessToken) return;
+
+    await fetch(`${SUPABASE_URL}/rest/v1/push_tokens?on_conflict=token`, {
+      method: 'POST',
+      headers: {
+        apikey: ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({
+        token,
+        platform: Platform.OS,
+        app_version: '1.0.0',
+        updated_at: new Date().toISOString(),
+      }),
+    });
+  } catch (error) {
+    if (__DEV__) console.warn('[Nexus Plus] Could not save push token:', error);
+  }
 }
 
 export async function registerForFirebaseNotifications(): Promise<string | null> {
   if (Platform.OS !== 'android' || !isFirebaseConfigured()) return null;
 
-  await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-    name: 'Nexus Plus Notifications',
-    importance: Notifications.AndroidImportance.HIGH,
-    vibrationPattern: [0, 250, 250, 250],
-    sound: 'default',
-  });
+  try {
+    await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
+      name: 'Nexus Plus Notifications',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      sound: 'default',
+    });
 
-  const current = await Notifications.getPermissionsAsync();
-  let status = current.status;
-  if (status !== 'granted') {
-    const requested = await Notifications.requestPermissionsAsync();
-    status = requested.status;
+    const current = await Notifications.getPermissionsAsync();
+    let status = current.status;
+    if (status !== 'granted') {
+      const requested = await Notifications.requestPermissionsAsync();
+      status = requested.status;
+    }
+    if (status !== 'granted') return null;
+
+    const nativeToken = await Notifications.getDevicePushTokenAsync();
+    if (nativeToken.type !== 'fcm') return null;
+    await saveToken(nativeToken.data);
+    return nativeToken.data;
+  } catch (error) {
+    // Notification/FCM setup must never prevent the main app from starting.
+    if (__DEV__) console.warn('[Nexus Plus] Firebase notification setup failed:', error);
+    return null;
   }
-  if (status !== 'granted') return null;
-
-  const nativeToken = await Notifications.getDevicePushTokenAsync();
-  if (nativeToken.type !== 'fcm') return null;
-  await saveToken(nativeToken.data);
-  return nativeToken.data;
 }
 
 export function attachFirebaseTokenRefreshListener(): () => void {
-  const subscription = Notifications.addPushTokenListener((event) => {
-    if (event.type === 'fcm') void saveToken(event.data);
-  });
-  return () => subscription.remove();
+  try {
+    const subscription = Notifications.addPushTokenListener((event) => {
+      if (event.type === 'fcm') void saveToken(event.data);
+    });
+    return () => subscription.remove();
+  } catch (error) {
+    if (__DEV__) console.warn('[Nexus Plus] Could not attach FCM token listener:', error);
+    return () => undefined;
+  }
 }
