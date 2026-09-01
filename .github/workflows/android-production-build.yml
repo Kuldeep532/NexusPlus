@@ -82,12 +82,21 @@ jobs:
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
       FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
       FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
       FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
       FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
       FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+      EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+      EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+      EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+      EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
       PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER: ${{ secrets.PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER }}
     steps:
       - name: Checkout
@@ -119,6 +128,28 @@ jobs:
           mkdir -p android/app
           printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
           test -s android/app/google-services.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('android/app/google-services.json')
+          data = json.loads(p.read_text())
+          project = data.get('project_info', {})
+          clients = data.get('client', [])
+          package_name = 'com.nexuswavetech.nexusplus'
+          matches = []
+          for client in clients:
+              info = client.get('client_info', {})
+              android = client.get('android_client_info', {})
+              if android.get('package_name') == package_name:
+                  matches.append(info.get('mobilesdk_app_id'))
+          if not matches:
+              raise SystemExit('Firebase google-services.json has no client for com.nexuswavetech.nexusplus')
+          if project.get('project_id') != '${{ secrets.FIREBASE_PROJECT_ID }}':
+              raise SystemExit('Firebase project_id does not match FIREBASE_PROJECT_ID')
+          if '${{ secrets.FIREBASE_APP_ID }}' not in matches:
+              raise SystemExit('Firebase mobilesdk_app_id does not match FIREBASE_APP_ID')
+          print('Firebase JSON: valid, package matched, project matched, app matched')
+          PY
           chmod 600 android/app/google-services.json
       - name: Materialize Android signing configuration
         shell: bash
@@ -150,6 +181,10 @@ jobs:
           test -n "$FIREBASE_STORAGE_BUCKET"
           test -n "$FIREBASE_MESSAGING_SENDER_ID"
           test -n "$FIREBASE_APP_ID"
+          test -n "$EXPO_PUBLIC_FIREBASE_API_KEY"
+          test -n "$EXPO_PUBLIC_FIREBASE_PROJECT_ID"
+          test -n "$EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"
+          test -n "$EXPO_PUBLIC_FIREBASE_APP_ID"
           if [ -n "${PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER:-}" ]; then
             [[ "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER" =~ ^[0-9]+$ ]]
             echo "Play Integrity: configured"
@@ -163,31 +198,22 @@ jobs:
         run: |
           set +e
           failed=0
-
           echo '=== 1. TypeScript ==='
           pnpm run typecheck
           rc=$?
           [ $rc -eq 0 ] || failed=1
-
           echo '=== 2. Expo configuration ==='
           pnpm exec expo config --type public >/tmp/expo-config.json
           rc=$?
           cat /tmp/expo-config.json
           [ $rc -eq 0 ] || failed=1
-
           echo '=== 3. JavaScript/TypeScript bundle dry-run ==='
           pnpm exec expo export --platform android --output-dir /tmp/nexusplus-bundle-check --clear
           rc=$?
           [ $rc -eq 0 ] || failed=1
-
-          echo '=== 4. Native Gradle preflight ==='
-          gradle --version
-          rc=$?
-          [ $rc -eq 0 ] || failed=1
-
           echo '=== Consolidated diagnostics summary ==='
           if [ $failed -ne 0 ]; then
-            echo 'One or more prebuild checks failed. Review all sections above before the Android release build.'
+            echo 'One or more prebuild checks failed.'
             exit 1
           fi
           echo 'All consolidated prebuild diagnostics passed.'
@@ -200,14 +226,11 @@ jobs:
       - name: Build Debug/Development APK
         if: ${{ inputs.build_type == 'development' }}
         working-directory: android
-        run: |
-          set -euo pipefail
-          gradle assembleDebug --no-daemon
+        run: gradle assembleDebug --no-daemon
       - name: Build release APK
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         working-directory: android
         run: |
-          set -euo pipefail
           if [ -n "${PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER:-}" ]; then
             gradle assembleRelease --no-daemon -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
           else
@@ -217,11 +240,10 @@ jobs:
         if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
         working-directory: android
         run: |
-          set -euo pipefail
           if [ -n "${PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER:-}" ]; then
             gradle bundleRelease --no-daemon -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
           else
-             gradle bundleRelease --no-daemon
+            gradle bundleRelease --no-daemon
           fi
       - name: Upload Development APK
         if: ${{ inputs.build_type == 'development' }}
