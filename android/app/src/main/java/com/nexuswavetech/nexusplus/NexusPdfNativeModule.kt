@@ -21,18 +21,19 @@ import java.io.IOException
 class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
     override fun getName(): String = "NexusPdfNative"
 
-    init {
-        PDFBoxResourceLoader.init(reactContext)
-    }
-
     @ReactMethod
     fun isAvailable(promise: Promise) {
-        promise.resolve(true)
+        runCatching {
+            ensurePdfBoxInitialized()
+            true
+        }.onSuccess { promise.resolve(it) }
+            .onFailure { promise.reject("PDF_INIT", it.message, it) }
     }
 
     @ReactMethod
     fun merge(inputPaths: ReadableArray, outputPath: String, promise: Promise) {
         runCatching {
+            ensurePdfBoxInitialized()
             require(inputPaths.size() > 0) { "At least one PDF input is required." }
             val output = File(outputPath)
             output.parentFile?.mkdirs()
@@ -51,6 +52,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
     @ReactMethod
     fun imageToPdf(inputPaths: ReadableArray, outputPath: String, quality: Int, promise: Promise) {
         runCatching {
+            ensurePdfBoxInitialized()
             require(inputPaths.size() > 0) { "At least one image input is required." }
             val output = File(outputPath)
             output.parentFile?.mkdirs()
@@ -82,6 +84,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
     @ReactMethod
     fun protect(inputPath: String, outputPath: String, password: String, promise: Promise) {
         runCatching {
+            ensurePdfBoxInitialized()
             require(password.length >= 8) { "PDF password must be at least 8 characters." }
             val output = File(outputPath)
             output.parentFile?.mkdirs()
@@ -105,6 +108,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
     @ReactMethod
     fun unlock(inputPath: String, outputPath: String, password: String, promise: Promise) {
         runCatching {
+            ensurePdfBoxInitialized()
             require(password.isNotEmpty()) { "PDF password is required." }
             val output = File(outputPath)
             output.parentFile?.mkdirs()
@@ -120,6 +124,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
     @ReactMethod
     fun compress(inputPath: String, outputPath: String, quality: Int, promise: Promise) {
         runCatching {
+            ensurePdfBoxInitialized()
             val output = File(outputPath)
             output.parentFile?.mkdirs()
             PDDocument.load(File(requireReadablePath(inputPath))).use { document ->
@@ -128,6 +133,10 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
             output.absolutePath
         }.onSuccess { promise.resolve(it) }
             .onFailure { promise.reject("PDF_COMPRESS", it.message, it) }
+    }
+
+    private fun ensurePdfBoxInitialized() {
+        PDFBoxResourceLoader.init(reactContext)
     }
 
     private fun requireArrayString(values: ReadableArray, index: Int): String {
