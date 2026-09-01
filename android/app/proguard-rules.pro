@@ -30,11 +30,12 @@
 # symbol visibility settings in CMake.
 -keep class com.nexuswavetech.nexusplus.encryption.FileEncryptionNative { *; }
 
-# R8 sees PDFBox's optional JPEG2000 decoder reference even when the optional
-# decoder is not packaged. It is not used by the current PDF workflows, so
-# suppress that optional-linkage warning rather than keeping a nonexistent
-# implementation in the APK.
+# PDFBox's JPEG2000 integration has optional Gemalto classes. The current
+# pdfbox-android dependency can reference these classes without packaging the
+# optional implementation. They are not used by the current PDF workflows,
+# so suppress both optional-linkage warnings during R8 shrinking.
 -dontwarn com.gemalto.jp2.JP2Decoder
+-dontwarn com.gemalto.jp2.JP2Encoder
 
 # Keep JSON/serialization annotations when libraries discover fields/methods
 # reflectively, without disabling obfuscation globally.
