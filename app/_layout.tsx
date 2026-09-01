@@ -10,11 +10,12 @@ import { PersistentMediaProvider } from '@/media-player/PersistentMediaControlle
 import { GlobalMiniPlayer } from '@/features/media/GlobalMiniPlayer';
 import { RemoteConfigOverlay } from '@/features/supabase/RemoteConfigOverlay';
 import { attachFirebaseTokenRefreshListener, registerForFirebaseNotifications } from '@/features/notifications/pushNotifications';
+import DebugErrorBoundary from '../DebugErrorBoundary';
 
 void SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 350, fade: true });
 
-export default function RootLayout() {
+function RootLayoutContent() {
   const auth = useAuth();
   const colors = useColors();
   const router = useRouter();
@@ -72,6 +73,14 @@ export default function RootLayout() {
         </View>
       </RemoteConfigOverlay>
     </PersistentMediaProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <DebugErrorBoundary>
+      <RootLayoutContent />
+    </DebugErrorBoundary>
   );
 }
 
