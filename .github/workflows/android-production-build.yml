@@ -20,6 +20,7 @@ on:
           - apk
           - aab
           - both
+          - development
 
 permissions:
   contents: read
@@ -63,6 +64,9 @@ jobs:
         run: pnpm exec expo config --type public
       - name: Validate EAS token
         run: test -n "$EAS_TOKEN"
+      - name: Build Android Development Build with Expo EAS
+        if: ${{ inputs.build_type == 'development' }}
+        run: pnpm dlx eas-cli@latest build --platform android --profile development --non-interactive --wait
       - name: Build Android APK with Expo EAS
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         run: pnpm dlx eas-cli@latest build --platform android --profile preview --non-interactive --wait
@@ -193,6 +197,12 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: ${{ env.GRADLE_VERSION }}
+      - name: Build Debug/Development APK
+        if: ${{ inputs.build_type == 'development' }}
+        working-directory: android
+        run: |
+          set -euo pipefail
+          gradle assembleDebug --no-daemon
       - name: Build release APK
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         working-directory: android
@@ -211,8 +221,15 @@ jobs:
           if [ -n "${PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER:-}" ]; then
             gradle bundleRelease --no-daemon -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
           else
-            gradle bundleRelease --no-daemon
+             gradle bundleRelease --no-daemon
           fi
+      - name: Upload Development APK
+        if: ${{ inputs.build_type == 'development' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexusplus-android-dev-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
       - name: Upload APK
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         uses: actions/upload-artifact@v4
