@@ -130,23 +130,34 @@ jobs:
           test -s android/app/google-services.json
           python - <<'PY'
           import json
+          import os
           from pathlib import Path
           p = Path('android/app/google-services.json')
           data = json.loads(p.read_text())
           project = data.get('project_info', {})
           clients = data.get('client', [])
           package_name = 'com.nexuswavetech.nexusplus'
+          expected_project_id = os.environ['FIREBASE_PROJECT_ID']
+          expected_app_id = os.environ['FIREBASE_APP_ID']
           matches = []
           for client in clients:
               info = client.get('client_info', {})
-              android = client.get('android_client_info', {})
+              android = info.get('android_client_info', {})
               if android.get('package_name') == package_name:
-                  matches.append(info.get('mobilesdk_app_id'))
+                  app_id = info.get('mobilesdk_app_id')
+                  if app_id:
+                      matches.append(app_id)
           if not matches:
-              raise SystemExit('Firebase google-services.json has no client for com.nexuswavetech.nexusplus')
-          if project.get('project_id') != '${{ secrets.FIREBASE_PROJECT_ID }}':
+              raise SystemExit(
+                  f'Firebase google-services.json has no client for {package_name}. '
+                  f'Available Android clients: ' + ', '.join(
+                      str(c.get('client_info', {}).get('android_client_info', {}).get('package_name', '<missing>'))
+                      for c in clients
+                  )
+              )
+          if project.get('project_id') != expected_project_id:
               raise SystemExit('Firebase project_id does not match FIREBASE_PROJECT_ID')
-          if '${{ secrets.FIREBASE_APP_ID }}' not in matches:
+          if expected_app_id not in matches:
               raise SystemExit('Firebase mobilesdk_app_id does not match FIREBASE_APP_ID')
           print('Firebase JSON: valid, package matched, project matched, app matched')
           PY
