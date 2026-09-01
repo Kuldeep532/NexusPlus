@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "scheme": "nexus-plus",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "android": {
       "package": "com.nexuswavetech.nexusplus",
       "intentFilters": [
