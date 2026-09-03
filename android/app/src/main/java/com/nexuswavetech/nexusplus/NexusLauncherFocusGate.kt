@@ -1,0 +1,96 @@
+package com.nexuswavetech.nexusplus
+
+import android.content.Context
+import java.util.Calendar
+
+/**
+ * Nexus-specific opening guard. This is intentionally launcher-local and on-device.
+ * It does not use Digital Wellbeing, UsageStats, a server, an account, or an external API.
+ */
+object NexusLauncherFocusGate {
+    private const val PREFS = "nexus_launcher_focus_gate"
+    private const val KEY_ENABLED = "enabled"
+    private const val KEY_BLOCKED = "blocked_packages"
+    private const val KEY_WINDOWS = "focus_windows"
+    private const val WINDOW_SEPARATOR = "|"
+    private const val FIELD_SEPARATOR = ","
+
+    data class Decision(
+        val blocked: Boolean,
+        val label: String,
+        val message: String,
+    )
+
+    /**
+     * Focus windows are encoded as HH-HH, for example 09-13. A window can cross midnight.
+     */
+    fun setEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()
+    }
+
+    fun isEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ENABLED, false)
+
+    fun setBlockedPackages(context: Context, packages: Set<String>) {
+        prefs(context).edit().putString(KEY_BLOCKED, packages.joinToString(WINDOW_SEPARATOR)).apply()
+    }
+
+    fun getBlockedPackages(context: Context): Set<String> =
+        prefs(context).getString(KEY_BLOCKED, "")
+            ?.split(WINDOW_SEPARATOR)
+            ?.filter { it.isNotBlank() }
+            ?.toSet()
+            .orEmpty()
+
+    fun setFocusWindows(context: Context, windows: List<Pair<Int, Int>>) {
+        val value = windows
+            .filter { it.first in 0..23 && it.second in 0..23 }
+            .joinToString(WINDOW_SEPARATOR) { "${it.first}$FIELD_SEPARATOR${it.second}" }
+        prefs(context).edit().putString(KEY_WINDOWS, value).apply()
+    }
+
+    fun getFocusWindows(context: Context): List<Pair<Int, Int>> =
+        prefs(context).getString(KEY_WINDOWS, "")
+            ?.split(WINDOW_SEPARATOR)
+            ?.mapNotNull { encoded ->
+                val parts = encoded.split(FIELD_SEPARATOR)
+                if (parts.size != 2) return@mapNotNull null
+                val start = parts[0].toIntOrNull() ?: return@mapNotNull null
+                val end = parts[1].toIntOrNull() ?: return@mapNotNull null
+                if (start !in 0..23 || end !in 0..23) null else start to end
+            }
+            .orEmpty()
+
+    fun evaluate(context: Context, packageName: String, currentMillis: Long = System.currentTimeMillis()): Decision {
+        if (!isEnabled(context)) return allow()
+        if (packageName.isBlank() || packageName == context.packageName) return allow()
+        if (packageName !in getBlockedPackages(context)) return allow()
+        if (isInsideFocusWindow(getFocusWindows(context), currentMillis)) {
+            return Decision(
+                blocked = true,
+                label = "Nexus Focus Gate",
+                message = "This app is outside your current focus window. Nexus Launcher is keeping the boundary you set.",
+            )
+        }
+        return allow()
+    }
+
+    private fun isInsideFocusWindow(windows: List<Pair<Int, Int>>, currentMillis: Long): Boolean {
+        if (windows.isEmpty()) return false
+        val hour = Calendar.getInstance().apply { timeInMillis = currentMillis }
+            .get(Calendar.HOUR_OF_DAY)
+        return windows.any { (start, end) ->
+            if (start == end) {
+                hour == start
+            } else if (start < end) {
+                hour in start until end
+            } else {
+                hour >= start || hour < end
+            }
+        }
+    }
+
+    private fun allow(): Decision = Decision(false, "", "")
+
+    private fun prefs(context: Context) =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+}
