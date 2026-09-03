@@ -11,12 +11,13 @@ type LauncherPrefs = {
   mode: LauncherMode;
   weather: boolean;
   googleSearch: boolean;
+  focusGate: boolean;
 };
 
 export default function NexusLauncherSettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const [prefs, setPrefs] = useState<LauncherPrefs>({ mode: 'APP_DRAWER_PLUS_HOME', weather: true, googleSearch: true });
+  const [prefs, setPrefs] = useState<LauncherPrefs>({ mode: 'APP_DRAWER_PLUS_HOME', weather: true, googleSearch: true, focusGate: false });
 
   const updatePrefs = (patch: Partial<LauncherPrefs>) => setPrefs((current) => ({ ...current, ...patch }));
   const openSystemHomeSettings = async () => { await Linking.openSettings(); };
@@ -52,6 +53,13 @@ export default function NexusLauncherSettingsScreen() {
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Focus Gate</Text>
+          <Text style={[styles.body, { color: colors.mutedForeground }]}>Nexus-only opening protection. During your private focus window, selected distracting apps show a deliberate pause before they can open. Phone, Messages, Settings and other essential apps are never included automatically.</Text>
+          <View style={[styles.row, { marginTop: 8 }]}><View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Enable Nexus Focus Gate</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>The setting is stored locally on this phone.</Text></View><Switch value={prefs.focusGate} onValueChange={(value) => updatePrefs({ focusGate: value })} accessibilityLabel="Enable Nexus Focus Gate" /></View>
+          <Text style={[styles.helper, { color: colors.mutedForeground }]}>The native launcher currently uses a default 09:00–13:00 focus window. Fine-grained schedules and app selection will be expanded in the next launcher stage.</Text>
+        </View>
+
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Optional Home features</Text>
           <View style={styles.row}><View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Weather</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>Show weather when the launcher has a supported local source.</Text></View><Switch value={prefs.weather} onValueChange={(value) => updatePrefs({ weather: value })} accessibilityLabel="Show weather" /></View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
@@ -60,7 +68,7 @@ export default function NexusLauncherSettingsScreen() {
 
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Privacy-first behavior</Text>
-          <Text style={[styles.body, { color: colors.mutedForeground }]}>The launcher does not need an external API for its core Home, App Drawer, default-launcher or local recommendation features.</Text>
+          <Text style={[styles.body, { color: colors.mutedForeground }]}>The launcher does not need an external API for its core Home, App Drawer, default-launcher, Focus Gate or local recommendation features.</Text>
         </View>
       </ScrollView>
     </View>
