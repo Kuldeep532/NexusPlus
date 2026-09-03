@@ -6,6 +6,8 @@ import { useColors } from '@/hooks/useColors';
 import { ASSISTANT_LIMITS, ASSISTANT_MODELS, ASSISTANT_VOICES } from '@/features/nexus-assistant/assistantConfig';
 import { addMessage, ensureSession, initAssistantStore, listMessages, type ChatMessage } from '@/features/nexus-assistant/assistantStore';
 import { downloadAssistantModel, downloadAssistantVoice } from '@/features/nexus-assistant/modelManager';
+import { getLocalInferenceEngine } from '@/features/nexus-assistant/localInference';
+import { streamAssistantReply } from '@/features/nexus-assistant/stage2Agent';
 
 const SESSION_ID = 'default';
 
@@ -15,14 +17,20 @@ export default function NexusAssistantScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState('Local assistant is ready.');
+  const [status, setStatus] = useState('Checking local inference engine…');
   const [assetBusy, setAssetBusy] = useState<string | null>(null);
+  const [streaming, setStreaming] = useState('');
+  const [engineReady, setEngineReady] = useState(false);
 
   useEffect(() => {
     void (async () => {
       await initAssistantStore();
       await ensureSession(SESSION_ID, 'Nexus Assistant');
       setMessages(await listMessages(SESSION_ID));
+      const engine = await getLocalInferenceEngine();
+      const available = await engine.isAvailable();
+      setEngineReady(available);
+      setStatus(available ? 'Local inference engine ready.' : 'Native local inference engine is not available in this build yet.');
     })().catch(() => setStatus('Local chat storage could not be opened.'));
   }, []);
 
@@ -31,13 +39,33 @@ export default function NexusAssistantScreen() {
     if (!text || busy) return;
     setBusy(true);
     setInput('');
+    setStreaming('');
     try {
       await addMessage(SESSION_ID, 'user', text);
-      // Stage 1 intentionally does not execute inference. Native local-agent runtime is added next.
-      await addMessage(SESSION_ID, 'assistant', 'Nexus Assistant local inference engine will answer here in the next stage. Your message was saved locally on this device.');
       setMessages(await listMessages(SESSION_ID));
-    } catch {
-      setStatus('Could not save this message locally.');
+      if (!engineReady) {
+        const fallback = 'Nexus Assistant local inference is not available in this build yet. Your message has been saved locally on this device.';
+        await addMessage(SESSION_ID, 'assistant', fallback);
+        setMessages(await listMessages(SESSION_ID));
+        setStatus('Message saved locally; native local inference is waiting for the Stage 2 native runtime.');
+        return;
+      }
+      const model = ASSISTANT_MODELS[0];
+      await streamAssistantReply({
+        sessionId: SESSION_ID,
+        modelId: model.id,
+        modelPath: model.url,
+        userText: text,
+        onStatus: setStatus,
+        onToken: (chunk) => setStreaming((value) => value + chunk),
+      });
+      setMessages(await listMessages(SESSION_ID));
+      setStreaming('');
+      setStatus('Local response complete.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Local inference failed.');
+      setMessages(await listMessages(SESSION_ID));
+      setStreaming('');
     } finally {
       setBusy(false);
     }
@@ -75,34 +103,39 @@ export default function NexusAssistantScreen() {
         <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="cpu" size={23} color={colors.primary} /></View>
         <View style={styles.copy}>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Nexus Assistant</Text>
-          <Text style={[styles.body, { color: colors.mutedForeground }]}>Private, on-device-first agent with downloadable local models.</Text>
+          <Text style={[styles.body, { color: colors.mutedForeground }]}>Private, on-device-first agent with streamed local responses.</Text>
         </View>
       </View>
 
       <View accessibilityLiveRegion="polite" style={[styles.status, { borderColor: colors.border, backgroundColor: colors.card }]}>
-        <Text style={[styles.statusTitle, { color: colors.foreground }]}>Privacy</Text>
+        <Text style={[styles.statusTitle, { color: colors.foreground }]}>Privacy & runtime</Text>
         <Text style={[styles.note, { color: colors.mutedForeground }]}>{status}</Text>
-        <Text style={[styles.note, { color: colors.mutedForeground }]}>Chat history uses SQLite on the phone. This stage sends chat text to no remote AI service.</Text>
+        <Text style={[styles.note, { color: colors.mutedForeground }]}>Local chat mode stores conversation in SQLite and does not use a remote AI provider.</Text>
       </View>
 
       <View style={styles.chat} accessibilityLiveRegion="polite">
-        {messages.length === 0 ? <Text style={[styles.note, { color: colors.mutedForeground }]}>Start a private local conversation.</Text> : messages.map((message) => (
+        {messages.map((message) => (
           <View key={message.id} style={[styles.message, { backgroundColor: message.role === 'user' ? colors.secondary : colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.role, { color: colors.foreground }]}>{message.role === 'user' ? 'You' : 'Nexus Assistant'}</Text>
+            <Text style={[styles.role, { color: colors.foreground }]}>{message.role === 'user' ? 'You' : message.role === 'system' ? 'System' : 'Nexus Assistant'}</Text>
             <Text selectable style={[styles.body, { color: colors.foreground }]}>{message.content}</Text>
           </View>
         ))}
+        {streaming ? <View style={[styles.message, { backgroundColor: colors.card, borderColor: colors.primary }]}>
+          <Text style={[styles.role, { color: colors.foreground }]}>Nexus Assistant · live</Text>
+          <Text selectable style={[styles.body, { color: colors.foreground }]}>{streaming}</Text>
+        </View> : null}
+        {messages.length === 0 && !streaming ? <Text style={[styles.note, { color: colors.mutedForeground }]}>Start a private local conversation.</Text> : null}
       </View>
 
       <TextInput accessibilityLabel="Message Nexus Assistant" multiline value={input} onChangeText={setInput} placeholder="Ask Nexus Assistant…" placeholderTextColor={colors.mutedForeground} style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]} />
       <Pressable accessibilityRole="button" accessibilityLabel="Send message" disabled={busy} onPress={() => void send()} style={[styles.button, { backgroundColor: colors.primary, opacity: busy ? 0.6 : 1 }]}>
         {busy ? <ActivityIndicator color={colors.primaryForeground} /> : <Feather name="send" size={18} color={colors.primaryForeground} />}
-        <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{busy ? 'Saving…' : 'Send'}</Text>
+        <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{busy ? 'Running locally…' : 'Send'}</Text>
       </Pressable>
 
       <View style={[styles.assetCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
         <Text style={[styles.section, { color: colors.foreground }]}>Optional local downloads</Text>
-        <Text style={[styles.note, { color: colors.mutedForeground }]}>APK target: under {ASSISTANT_LIMITS.maxApkSizeMb} MB. Model and voice weights are downloaded only when you choose them.</Text>
+        <Text style={[styles.note, { color: colors.mutedForeground }]}>APK target: under {ASSISTANT_LIMITS.maxApkSizeMb} MB. Model and voice weights stay outside the APK.</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Download Nexus Small Chat model" disabled={!!assetBusy} onPress={() => void downloadModel()} style={[styles.secondaryButton, { borderColor: colors.border, opacity: assetBusy ? 0.6 : 1 }]}>
           <Feather name="download" size={17} color={colors.foreground} />
           <Text style={[styles.buttonText, { color: colors.foreground }]}>{assetBusy === ASSISTANT_MODELS[0].id ? 'Downloading model…' : 'Download local chat model'}</Text>
