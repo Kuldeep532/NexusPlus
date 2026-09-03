@@ -7,23 +7,31 @@ export type ProviderResult = {
   provider: AssistantProvider;
 };
 
-function rankEndpoint(endpoints: GatewayEndpoint[], terms: string[]): GatewayEndpoint | null {
-  return endpoints
-    .map((endpoint) => {
-      const haystack = `${endpoint.id} ${endpoint.path} ${endpoint.feature ?? ''} ${endpoint.description ?? ''}`.toLowerCase();
-      return {
-        endpoint,
-        score: terms.reduce((score, term) => score + (haystack.includes(term) ? 1 : 0), 0),
-      };
-    })
-    .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score)[0]?.endpoint ?? null;
+function rankEndpoint(endpoints: GatewayEndpoint[], provider: AssistantProvider): GatewayEndpoint | null {
+  const ranked = endpoints.map((endpoint) => {
+    const haystack = `${endpoint.id} ${endpoint.path} ${endpoint.feature ?? ''} ${endpoint.description ?? ''}`.toLowerCase();
+    let score = 0;
+    if (provider === 'openai') {
+      if (haystack.includes('openai')) score += 8;
+      if (haystack.includes('responses')) score += 3;
+      if (haystack.includes('chat')) score += 2;
+      if (haystack.includes('completion')) score += 2;
+    } else {
+      if (haystack.includes('gemini')) score += 8;
+      if (haystack.includes('google')) score += 3;
+      if (haystack.includes('generate')) score += 2;
+      if (haystack.includes('completion') || haystack.includes('message')) score += 2;
+    }
+    return { endpoint, score };
+  }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score);
+  return ranked[0]?.endpoint ?? null;
 }
 
 function readText(payload: any): string | null {
   const text = payload?.choices?.[0]?.message?.content
-    ?? payload?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text).filter(Boolean).join('')
+    ?? payload?.choices?.[0]?.text
     ?? payload?.output_text
+    ?? payload?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text).filter(Boolean).join('')
     ?? payload?.text
     ?? payload?.output
     ?? payload?.response?.text
@@ -36,36 +44,26 @@ async function askProvider(provider: AssistantProvider, input: {
   history?: Array<{ role: 'user' | 'assistant'; text: string }>;
 }): Promise<ProviderResult | null> {
   const endpoints = await discoverGatewayEndpoints();
-  const endpoint = provider === 'openai'
-    ? rankEndpoint(endpoints, ['openai', 'responses', 'chat', 'completion'])
-    : rankEndpoint(endpoints, ['gemini', 'google', 'generate', 'completion', 'message']);
+  const endpoint = rankEndpoint(endpoints, provider);
   if (!endpoint) return null;
 
-  const messages = (input.history ?? []).map((item) => ({
-    role: item.role,
-    content: item.text,
-  }));
+  const messages = (input.history ?? []).map((item) => ({ role: item.role, content: item.text }));
   messages.push({ role: 'user', content: input.message });
 
   const payload = await callGateway<any>(endpoint.path, {
     method: endpoint.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
-    body: provider === 'openai'
-      ? {
-          messages,
-          input: input.message,
-          model: endpoint.id || undefined,
-          temperature: 0.4,
-          max_tokens: 900,
-        }
-      : {
-          message: input.message,
-          prompt: input.message,
-          contents: messages.map((item) => ({
-            role: item.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: item.content }],
-          })),
-          generationConfig: { temperature: 0.4, maxOutputTokens: 900 },
-        },
+    body: {
+      model: endpoint.id || undefined,
+      messages,
+      input: input.message,
+      prompt: input.message,
+      contents: messages.map((item) => ({
+        role: item.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: item.content }],
+      })),
+      generationConfig: { temperature: 0.4, maxOutputTokens: 900 },
+      max_tokens: 900,
+    },
   });
 
   const text = readText(payload);
@@ -89,7 +87,8 @@ export async function askCloudWithFallback(input: {
   }
 
   try {
-    return await askProvider('gemini', input);
+    const gemini = await askProvider('gemini', input);
+    return gemini;
   } catch {
     return null;
   }
