@@ -6,20 +6,25 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 
-/** React Native bridge for the launcher-only Focus Gate settings. */
-class NexusLauncherFocusGateModule(private val reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
+/** React Native bridge for the shared local Nexus Focus Gate policy. */
+class NexusLauncherFocusGateModule(
+    private val reactContext: ReactApplicationContext,
+) : ReactContextBaseJavaModule(reactContext) {
     override fun getName(): String = "NexusLauncherFocusGate"
 
     @ReactMethod
     fun getState(promise: Promise) {
-        try {
+        runCatching {
             val map = Arguments.createMap()
             map.putBoolean("enabled", NexusLauncherFocusGate.isEnabled(reactContext))
+            map.putBoolean("launcherDefault", NexusLauncherFocusGate.isLauncherDefault(reactContext))
             map.putInt("cooldownMinutes", NexusLauncherFocusGate.getCooldownMinutes(reactContext))
             map.putInt("savedToday", NexusLauncherFocusGate.getSavedDistractionsToday(reactContext))
+
             val blocked = Arguments.createArray()
             NexusLauncherFocusGate.getBlockedPackages(reactContext).forEach(blocked::pushString)
             map.putArray("blockedPackages", blocked)
+
             val windows = Arguments.createArray()
             NexusLauncherFocusGate.getFocusWindows(reactContext).forEach { (start, end) ->
                 val item = Arguments.createMap()
@@ -29,7 +34,7 @@ class NexusLauncherFocusGateModule(private val reactContext: ReactApplicationCon
             }
             map.putArray("focusWindows", windows)
             promise.resolve(map)
-        } catch (error: Throwable) {
+        }.onFailure { error ->
             promise.reject("FOCUS_GATE_STATE", error.message ?: "Unable to read Focus Gate state.", null)
         }
     }
@@ -58,7 +63,9 @@ class NexusLauncherFocusGateModule(private val reactContext: ReactApplicationCon
     @ReactMethod
     fun setFocusWindow(startHour: Int, endHour: Int, promise: Promise) {
         runCatching {
-            require(startHour in 0..23 && endHour in 0..23) { "Focus hours must be between 0 and 23." }
+            require(startHour in 0..23 && endHour in 0..23) {
+                "Focus hours must be between 0 and 23."
+            }
             NexusLauncherFocusGate.setFocusWindows(reactContext, listOf(startHour to endHour))
             promise.resolve(true)
         }.onFailure { error ->
@@ -69,10 +76,50 @@ class NexusLauncherFocusGateModule(private val reactContext: ReactApplicationCon
     @ReactMethod
     fun setBlockedPackages(packages: Array<String>, promise: Promise) {
         runCatching {
-            NexusLauncherFocusGate.setBlockedPackages(reactContext, packages.filter { it.isNotBlank() }.take(100).toSet())
+            NexusLauncherFocusGate.setBlockedPackages(
+                reactContext,
+                packages.map(String::trim).filter(String::isNotBlank).take(100).toSet(),
+            )
             promise.resolve(true)
         }.onFailure { error ->
             promise.reject("FOCUS_GATE_APPS", error.message ?: "Unable to update protected apps.", null)
+        }
+    }
+
+    @ReactMethod
+    fun evaluatePackage(packageName: String, promise: Promise) {
+        runCatching {
+            val decision = NexusLauncherFocusGate.evaluateInNexusPlus(reactContext, packageName)
+            val map = Arguments.createMap()
+            map.putBoolean("blocked", decision.blocked)
+            map.putString("label", decision.label)
+            map.putString("message", decision.message)
+            map.putBoolean("canGrantCooldown", decision.canGrantCooldown)
+            map.putInt("remainingMinutes", decision.remainingMinutes)
+            promise.resolve(map)
+        }.onFailure { error ->
+            promise.reject("FOCUS_GATE_EVALUATE", error.message ?: "Unable to evaluate protection.", null)
+        }
+    }
+
+    @ReactMethod
+    fun allowTemporarily(packageName: String, promise: Promise) {
+        runCatching {
+            require(packageName.isNotBlank()) { "Package name cannot be blank." }
+            NexusLauncherFocusGate.allowTemporarily(reactContext, packageName)
+            promise.resolve(true)
+        }.onFailure { error ->
+            promise.reject("FOCUS_GATE_COOLDOWN_GRANT", error.message ?: "Unable to grant a temporary pause.", null)
+        }
+    }
+
+    @ReactMethod
+    fun recordSavedDistraction(promise: Promise) {
+        runCatching {
+            NexusLauncherFocusGate.recordSavedDistraction(reactContext)
+            promise.resolve(NexusLauncherFocusGate.getSavedDistractionsToday(reactContext))
+        }.onFailure { error ->
+            promise.reject("FOCUS_GATE_PROGRESS", error.message ?: "Unable to update wellness progress.", null)
         }
     }
 }
