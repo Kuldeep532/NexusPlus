@@ -99,6 +99,7 @@ class NexusLauncherActivity : Activity() {
         }
         root.addView(subtitle, wrap(dp(8)))
 
+        renderAssistantHub()
         renderPinnedApps()
 
         val mode = NexusLauncherPreferences.getMode(this)
@@ -115,16 +116,78 @@ class NexusLauncherActivity : Activity() {
             setOnClickListener { requestHomeRole() }
         }
         root.addView(defaultButton, fullWidth(dp(12)))
+    }
 
-        val info = textView(
-            "Pinned apps stay on your Home screen. Long-press customization is added in a later stage.",
-            13f,
-            Color.rgb(108, 108, 108),
+    private fun renderAssistantHub() {
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(16), dp(18), dp(16))
+            setBackgroundColor(Color.WHITE)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            contentDescription = "Nexus Assistant and essential features"
+        }
+
+        val heading = textView("Nexus Assistant", 21f, Color.BLACK).apply {
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            contentDescription = "Nexus Assistant"
+        }
+        card.addView(heading, fullWidthWrap(0))
+
+        val description = textView(
+            "Your assistant and key Nexus tools, available directly from Home.",
+            14f,
+            Color.rgb(82, 82, 82),
         ).apply {
-            gravity = Gravity.CENTER
             contentDescription = text
         }
-        root.addView(info, fullWidthWrap(dp(24)))
+        card.addView(description, fullWidthWrap(dp(6)))
+
+        val chat = actionButton("Ask Nexus Assistant", filled = true).apply {
+            contentDescription = "Open Nexus Assistant"
+            setOnClickListener { openNexusAssistant() }
+        }
+        card.addView(chat, fullWidth(dp(12)))
+
+        val features = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        features.addView(featureShortcut("Battery", "Battery status") { openNexusFeature("battery-status") }, compactWidth())
+        features.addView(featureShortcut("Device", "Device information") { openNexusFeature("device-info") }, compactWidth())
+        features.addView(featureShortcut("Reminder", "Create reminder") { openNexusFeature("create-reminder") }, compactWidth())
+        card.addView(features, fullWidthWrap(dp(10)))
+
+        root.addView(card, fullWidthWrap(dp(22)))
+    }
+
+    private fun featureShortcut(label: String, description: String, action: () -> Unit): TextView =
+        textView(label, 13f, Color.rgb(30, 30, 30)).apply {
+            gravity = Gravity.CENTER
+            setPadding(dp(8), dp(12), dp(8), dp(12))
+            isClickable = true
+            isFocusable = true
+            contentDescription = description
+            setBackgroundColor(Color.rgb(240, 240, 240))
+            setOnClickListener { action() }
+        }
+
+    private fun compactWidth(): LinearLayout.LayoutParams =
+        LinearLayout.LayoutParams(0, dp(48), 1f).apply {
+            marginEnd = dp(6)
+        }
+
+    private fun openNexusAssistant() {
+        val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return
+        intent.putExtra("nexus_launcher_destination", "assistant")
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        startActivity(intent)
+    }
+
+    private fun openNexusFeature(feature: String) {
+        val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return
+        intent.putExtra("nexus_launcher_destination", feature)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        startActivity(intent)
     }
 
     private fun renderPinnedApps() {
