@@ -11,6 +11,7 @@ const registry: HomeFeatureDefinition[] = [
   { id: 'file-manager', title: 'File Manager', description: 'Browse, organize, preview and secure local files.', route: '/file-manager', icon: 'folder', category: 'utility', featured: true, order: 75 },
   { id: 'cctv-manager', title: 'CCTV Manager', description: 'Manage local CCTV cameras, DVRs and NVRs.', route: '/cctv-cameras', icon: 'video', category: 'security', featured: true, order: 77 },
   { id: 'reminders', title: 'My Reminders', description: 'Plan, schedule and manage accessible voice reminders.', route: '/reminders', icon: 'bell', category: 'productivity', order: 78 },
+  { id: 'nexus-assistant', title: 'Nexus Assistant', description: 'Private on-device chat with safe device and app actions.', route: '/nexus-assistant', icon: 'cpu', category: 'productivity', featured: true, order: 79 },
   { id: 'time-announcer', title: 'Time Announcer', description: 'Configure time announcements.', route: '/time-announcer', icon: 'volume-2', category: 'utility' },
   { id: 'clock', title: 'Clock', description: 'Announce and work with the current time.', route: '/time-announcer', icon: 'clock', category: 'utility' },
   { id: 'battery-announcer', title: 'Battery Announcer', description: 'Announce battery state.', route: '/battery-announcer', icon: 'battery', category: 'utility' },
