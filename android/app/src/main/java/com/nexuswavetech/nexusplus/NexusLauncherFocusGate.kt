@@ -16,16 +16,21 @@ object NexusLauncherFocusGate {
     private const val KEY_COOLDOWNS = "cooldowns"
     private const val KEY_SAVED_TODAY = "saved_today"
     private const val KEY_SAVED_DAY = "saved_day"
+    private const val KEY_ACTIVE_SESSION_STARTS = "active_session_starts"
+    private const val KEY_MENTOR_PASSES = "mentor_passes"
 
     private const val WINDOW_SEPARATOR = "|"
     private const val FIELD_SEPARATOR = ","
     private const val COOLDOWN_SEPARATOR = ";"
+    private const val SESSION_SEPARATOR = ";"
+    private const val SESSION_TIMEOUT_MILLIS = 30 * 60_000L
 
     data class Decision(
         val blocked: Boolean,
         val label: String,
         val message: String,
         val canGrantCooldown: Boolean = false,
+        val remainingMinutes: Int = 0,
     )
 
     fun setEnabled(context: Context, enabled: Boolean) {
@@ -80,6 +85,10 @@ object NexusLauncherFocusGate {
         saveCooldowns(context, cooldowns)
     }
 
+    fun allowTemporarily(context: Context, packageName: String, now: Long = System.currentTimeMillis()) {
+        grantCooldown(context, packageName, now)
+    }
+
     fun isCooldownActive(context: Context, packageName: String, now: Long = System.currentTimeMillis()): Boolean {
         val until = loadCooldowns(context)[packageName] ?: return false
         if (until > now) return true
@@ -96,12 +105,38 @@ object NexusLauncherFocusGate {
         if (isCooldownActive(context, packageName, currentMillis)) return allow()
         if (!isInsideFocusWindow(getFocusWindows(context), currentMillis)) return allow()
 
+        val remaining = remainingMinutesInFocusWindow(getFocusWindows(context), currentMillis)
         return Decision(
             blocked = true,
             label = "Nexus Focus Gate",
             message = "You chose to protect this app during your focus window.",
             canGrantCooldown = true,
+            remainingMinutes = remaining,
         )
+    }
+
+    fun startProtectedSession(context: Context, packageName: String, now: Long = System.currentTimeMillis()) {
+        if (packageName.isBlank()) return
+        val sessions = loadSessions(context).toMutableMap()
+        sessions[packageName] = now
+        saveSessions(context, sessions)
+    }
+
+    fun finishProtectedSessionAndCheck(context: Context, packageName: String, now: Long = System.currentTimeMillis()): Boolean {
+        val sessions = loadSessions(context).toMutableMap()
+        val started = sessions[packageName] ?: return false
+        sessions.remove(packageName)
+        saveSessions(context, sessions)
+        return now - started >= SESSION_TIMEOUT_MILLIS
+    }
+
+    fun recordMentorPass(context: Context, packageName: String) {
+        val prefs = prefs(context)
+        val day = dayKey()
+        val existing = prefs.getString(KEY_MENTOR_PASSES, "") ?: ""
+        val today = existing.split("|").filter { it.startsWith("$day,") }
+        val next = (today + "$day,$packageName").takeLast(200)
+        prefs.edit().putString(KEY_MENTOR_PASSES, next.joinToString("|")).apply()
     }
 
     fun recordSavedDistraction(context: Context) {
@@ -137,6 +172,21 @@ object NexusLauncherFocusGate {
         }
     }
 
+    private fun remainingMinutesInFocusWindow(windows: List<Pair<Int, Int>>, currentMillis: Long): Int {
+        val calendar = Calendar.getInstance().apply { timeInMillis = currentMillis }
+        val hour = calendar.get(Calendar.HOUR_OF_DAY)
+        val minute = calendar.get(Calendar.MINUTE)
+        val window = windows.firstOrNull { isInsideFocusWindow(listOf(it), currentMillis) } ?: return 0
+        val currentTotal = hour * 60 + minute
+        val endTotal = window.second * 60
+        val minutes = if (window.first < window.second) {
+            endTotal - currentTotal
+        } else {
+            if (currentTotal < endTotal) endTotal - currentTotal else 24 * 60 - currentTotal + endTotal
+        }
+        return minutes.coerceAtLeast(0)
+    }
+
     private fun loadCooldowns(context: Context): Map<String, Long> =
         prefs(context).getString(KEY_COOLDOWNS, "")
             ?.split(COOLDOWN_SEPARATOR)
@@ -152,6 +202,23 @@ object NexusLauncherFocusGate {
     private fun saveCooldowns(context: Context, cooldowns: Map<String, Long>) {
         val value = cooldowns.entries.joinToString(COOLDOWN_SEPARATOR) { "${it.key}$FIELD_SEPARATOR${it.value}" }
         prefs(context).edit().putString(KEY_COOLDOWNS, value).apply()
+    }
+
+    private fun loadSessions(context: Context): Map<String, Long> =
+        prefs(context).getString(KEY_ACTIVE_SESSION_STARTS, "")
+            ?.split(SESSION_SEPARATOR)
+            ?.mapNotNull { encoded ->
+                val parts = encoded.split(FIELD_SEPARATOR, limit = 2)
+                if (parts.size != 2) return@mapNotNull null
+                val start = parts[1].toLongOrNull() ?: return@mapNotNull null
+                parts[0] to start
+            }
+            ?.toMap()
+            .orEmpty()
+
+    private fun saveSessions(context: Context, sessions: Map<String, Long>) {
+        val value = sessions.entries.joinToString(SESSION_SEPARATOR) { "${it.key}$FIELD_SEPARATOR${it.value}" }
+        prefs(context).edit().putString(KEY_ACTIVE_SESSION_STARTS, value).apply()
     }
 
     private fun dayKey(): String {
