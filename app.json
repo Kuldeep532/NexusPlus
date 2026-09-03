@@ -6,9 +6,10 @@
     "orientation": "portrait",
     "scheme": "nexus-plus",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "android": {
       "package": "com.nexuswavetech.nexusplus",
+      "permissions": ["android.permission.RECORD_AUDIO"],
       "intentFilters": [
         {
           "action": "VIEW",
