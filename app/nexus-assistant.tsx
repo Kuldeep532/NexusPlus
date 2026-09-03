@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { ASSISTANT_LIMITS, ASSISTANT_MODELS, ASSISTANT_VOICES } from '@/features/nexus-assistant/assistantConfig';
@@ -10,6 +10,7 @@ import { getLocalInferenceEngine } from '@/features/nexus-assistant/localInferen
 import { streamAssistantReply } from '@/features/nexus-assistant/stage2Agent';
 import { planCapability, formatCapabilityConfirmation, type CapabilityProposal } from '@/features/nexus-assistant/agentPlanner';
 import { runStage3Agent } from '@/features/nexus-assistant/stage3Agent';
+import { askGeminiThroughGateway, getWeatherThroughGateway, looksLikeWeatherRequest } from '@/features/nexus-assistant/stage5Cloud';
 
 const SESSION_ID = 'default';
 
@@ -19,11 +20,14 @@ export default function NexusAssistantScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState('Checking local inference engine…');
+  const [status, setStatus] = useState('Checking Nexus Assistant…');
   const [assetBusy, setAssetBusy] = useState<string | null>(null);
   const [streaming, setStreaming] = useState('');
   const [engineReady, setEngineReady] = useState(false);
   const [pendingProposal, setPendingProposal] = useState<CapabilityProposal | null>(null);
+  const [voiceInput, setVoiceInput] = useState(false);
+  const [liveMode, setLiveMode] = useState(false);
+  const hasText = input.trim().length > 0;
 
   useEffect(() => {
     void (async () => {
@@ -33,9 +37,14 @@ export default function NexusAssistantScreen() {
       const engine = await getLocalInferenceEngine();
       const available = await engine.isAvailable();
       setEngineReady(available);
-      setStatus(available ? 'Local inference engine ready.' : 'Native local inference engine is not available in this build yet.');
+      setStatus(available ? 'Local assistant ready. Cloud enrichment is available through the Gateway.' : 'Assistant ready. Local inference engine is not available in this build.');
     })().catch(() => setStatus('Local chat storage could not be opened.'));
   }, []);
+
+  const history = useMemo(() => messages.slice(-12).map((message) => ({
+    role: message.role === 'assistant' ? 'assistant' as const : 'user' as const,
+    text: message.content,
+  })), [messages]);
 
   const refreshMessages = async () => setMessages(await listMessages(SESSION_ID));
 
@@ -60,11 +69,35 @@ export default function NexusAssistantScreen() {
         return;
       }
 
+      if (looksLikeWeatherRequest(text)) {
+        setStatus('Getting weather through Nexus Gateway…');
+        const weather = await getWeatherThroughGateway({ location: text });
+        if (weather) {
+          await addMessage(SESSION_ID, 'assistant', weather.text);
+          await refreshMessages();
+          setStatus('Weather response received from the Gateway.');
+          return;
+        }
+      }
+
+      try {
+        setStatus('Getting Gemini response through Nexus Gateway…');
+        const gemini = await askGeminiThroughGateway({ message: text, history });
+        if (gemini) {
+          await addMessage(SESSION_ID, 'assistant', gemini.text);
+          await refreshMessages();
+          setStatus('Gemini response received through the Gateway.');
+          return;
+        }
+      } catch {
+        // Fall through to local inference when the gateway/Gemini route is unavailable.
+      }
+
       if (!engineReady) {
-        const fallback = 'Nexus Assistant local inference is not available in this build yet. Your message has been saved locally on this device.';
+        const fallback = 'Nexus Assistant could not reach the Gateway and local inference is not available in this build. Your message is stored locally on this device.';
         await addMessage(SESSION_ID, 'assistant', fallback);
         await refreshMessages();
-        setStatus('Message saved locally; native local inference is unavailable in this build.');
+        setStatus('No inference provider available; message remains local.');
         return;
       }
 
@@ -81,12 +114,22 @@ export default function NexusAssistantScreen() {
       setStreaming('');
       setStatus('Local response complete.');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Local inference failed.');
+      setStatus(error instanceof Error ? error.message : 'Assistant request failed.');
       await refreshMessages();
       setStreaming('');
     } finally {
       setBusy(false);
     }
+  };
+
+  const toggleVoiceInput = () => {
+    setVoiceInput((value) => !value);
+    setStatus(voiceInput ? 'Voice input disabled.' : 'Voice input enabled. Native speech capture is wired in the voice stage.');
+  };
+
+  const toggleLiveMode = () => {
+    setLiveMode((value) => !value);
+    setStatus(liveMode ? 'Live Mode closed.' : 'Live Mode opened. Full-duplex speech is completed in the voice stage.');
   };
 
   const confirmPendingAction = async () => {
@@ -148,14 +191,14 @@ export default function NexusAssistantScreen() {
         <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="cpu" size={23} color={colors.primary} /></View>
         <View style={styles.copy}>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Nexus Assistant</Text>
-          <Text style={[styles.body, { color: colors.mutedForeground }]}>Private, on-device-first agent with safe app and device actions.</Text>
+          <Text style={[styles.body, { color: colors.mutedForeground }]}>Gemini Gateway + local AI + agent actions.</Text>
         </View>
       </View>
 
       <View accessibilityLiveRegion="polite" style={[styles.status, { borderColor: colors.border, backgroundColor: colors.card }]}>
-        <Text style={[styles.statusTitle, { color: colors.foreground }]}>Privacy & runtime</Text>
+        <Text style={[styles.statusTitle, { color: colors.foreground }]}>Runtime</Text>
         <Text style={[styles.note, { color: colors.mutedForeground }]}>{status}</Text>
-        <Text style={[styles.note, { color: colors.mutedForeground }]}>Local chat mode stores conversation in SQLite. Registered actions execute locally and confirmation is required for consequential actions.</Text>
+        <Text style={[styles.note, { color: colors.mutedForeground }]}>Local chats remain in SQLite. Cloud Gemini/weather calls use the existing authenticated Nexus Gateway.</Text>
       </View>
 
       <View style={styles.chat} accessibilityLiveRegion="polite">
@@ -169,7 +212,6 @@ export default function NexusAssistantScreen() {
           <Text style={[styles.role, { color: colors.foreground }]}>Nexus Assistant · live</Text>
           <Text selectable style={[styles.body, { color: colors.foreground }]}>{streaming}</Text>
         </View> : null}
-        {messages.length === 0 && !streaming ? <Text style={[styles.note, { color: colors.mutedForeground }]}>Start a private local conversation.</Text> : null}
       </View>
 
       {pendingProposal ? <View accessibilityLiveRegion="polite" style={[styles.proposal, { borderColor: colors.primary, backgroundColor: colors.card }]}>
@@ -185,11 +227,26 @@ export default function NexusAssistantScreen() {
         </View>
       </View> : null}
 
+      {liveMode ? <View accessibilityLiveRegion="polite" style={[styles.liveCard, { borderColor: colors.primary, backgroundColor: colors.card }]}>
+        <Text style={[styles.proposalTitle, { color: colors.foreground }]}>Open Live Mode</Text>
+        <Text style={[styles.body, { color: colors.mutedForeground }]}>Hands-free conversation mode is enabled. Native streaming speech input/output is completed in the voice stage.</Text>
+      </View> : null}
+
       <TextInput accessibilityLabel="Message Nexus Assistant" multiline value={input} onChangeText={setInput} placeholder="Ask Nexus Assistant…" placeholderTextColor={colors.mutedForeground} style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]} />
-      <Pressable accessibilityRole="button" accessibilityLabel="Send message" disabled={busy} onPress={() => void send()} style={[styles.button, { backgroundColor: colors.primary, opacity: busy ? 0.6 : 1 }]}>
-        {busy ? <ActivityIndicator color={colors.primaryForeground} /> : <Feather name="send" size={18} color={colors.primaryForeground} />}
-        <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{busy ? 'Working locally…' : 'Send'}</Text>
-      </Pressable>
+      <View style={styles.controls}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Voice Input" onPress={toggleVoiceInput} style={[styles.controlButton, { borderColor: voiceInput ? colors.primary : colors.border, backgroundColor: voiceInput ? colors.secondary : colors.card }]}>
+          <Feather name="mic" size={19} color={colors.foreground} />
+          <Text style={[styles.controlText, { color: colors.foreground }]}>Voice Input</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={liveMode ? 'Close Live Mode' : 'Open Live Mode'} onPress={toggleLiveMode} style={[styles.controlButton, { borderColor: liveMode ? colors.primary : colors.border, backgroundColor: liveMode ? colors.secondary : colors.card }]}>
+          <Feather name="radio" size={19} color={colors.foreground} />
+          <Text style={[styles.controlText, { color: colors.foreground }]}>{liveMode ? 'Close Live Mode' : 'Open Live Mode'}</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={hasText ? 'Send message' : 'Voice Input'} disabled={busy} onPress={() => void (hasText ? send() : toggleVoiceInput())} style={[styles.sendControl, { backgroundColor: colors.primary, opacity: busy ? 0.6 : 1 }]}>
+          {busy ? <ActivityIndicator color={colors.primaryForeground} /> : <Feather name={hasText ? 'send' : 'mic'} size={19} color={colors.primaryForeground} />}
+          <Text style={[styles.controlText, { color: colors.primaryForeground }]}>{hasText ? 'Send' : 'Voice Input'}</Text>
+        </Pressable>
+      </View>
 
       <View style={[styles.assetCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
         <Text style={[styles.section, { color: colors.foreground }]}>Optional local downloads</Text>
@@ -223,13 +280,17 @@ const styles = StyleSheet.create({
   message: { borderWidth: 1, borderRadius: 15, padding: 12 },
   role: { fontSize: 11, fontFamily: 'Inter_700Bold', marginBottom: 4 },
   input: { minHeight: 100, borderWidth: 1, borderRadius: 16, padding: 14, textAlignVertical: 'top', fontSize: 14 },
-  button: { minHeight: 52, borderRadius: 16, marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  controls: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  controlButton: { flex: 1, minHeight: 48, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, paddingHorizontal: 8 },
+  sendControl: { flex: 1, minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, paddingHorizontal: 8 },
+  controlText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
   buttonText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
   proposal: { borderWidth: 1, borderRadius: 16, padding: 14, marginBottom: 12, gap: 8 },
   proposalTitle: { fontSize: 15, fontFamily: 'Inter_700Bold' },
   proposalActions: { flexDirection: 'row', gap: 8, marginTop: 6 },
   confirmButton: { flex: 1, minHeight: 46, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   cancelButton: { flex: 1, minHeight: 46, borderWidth: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  liveCard: { borderWidth: 1, borderRadius: 16, padding: 14, marginBottom: 12 },
   assetCard: { borderWidth: 1, borderRadius: 16, padding: 14, marginTop: 18, gap: 8 },
   section: { fontSize: 15, fontFamily: 'Inter_700Bold' },
   secondaryButton: { minHeight: 48, borderWidth: 1, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 12, marginTop: 6 },
