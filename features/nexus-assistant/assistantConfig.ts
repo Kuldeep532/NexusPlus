@@ -4,11 +4,12 @@ export type AssistantModel = {
   description: string;
   sizeMb: number;
   url: string;
+  format: 'gguf' | 'onnx';
+  kind: 'chat' | 'asr' | 'tts' | 'vad' | 'kws';
   sha256?: string;
 };
 
-// Models are downloaded on demand; none of these weights are packaged in the APK.
-// SmolLM2 360M is selected for the first local profile because its Q4_K_M GGUF is about 271 MB.
+// Heavy model assets are always downloaded on demand and never packaged in the APK.
 export const ASSISTANT_MODELS: AssistantModel[] = [
   {
     id: 'smollm2-360m-q4km',
@@ -16,6 +17,17 @@ export const ASSISTANT_MODELS: AssistantModel[] = [
     description: 'Small English-focused local chat model for low-resource devices.',
     sizeMb: 271,
     url: 'https://huggingface.co/QuantFactory/SmolLM2-360M-Instruct-GGUF/resolve/main/SmolLM2-360M-Instruct-Q4_K_M.gguf',
+    format: 'gguf',
+    kind: 'chat',
+  },
+  {
+    id: 'piper-en-us-lessac-high',
+    title: 'Piper US English Female',
+    description: 'High-quality Piper-compatible English TTS voice for local speech output.',
+    sizeMb: 115,
+    url: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/high/en_US-lessac-high.onnx',
+    format: 'onnx',
+    kind: 'tts',
   },
 ];
 
@@ -40,8 +52,14 @@ export const ASSISTANT_VOICES: AssistantVoice[] = [
 ];
 
 export const ASSISTANT_LIMITS = {
-  maxApkSizeMb: 150,
-  // Downloaded assets live outside the APK and can be deleted independently by the user.
+  maxApkSizeMb: 195,
   maxBundledModelMb: 0,
   maxBundledVoiceMb: 0,
 };
+
+export const ONNX_MODEL_POLICY = {
+  runtime: 'onnx-runtime',
+  storage: 'app-document-storage',
+  offlineInference: true,
+  deleteable: true,
+} as const;
