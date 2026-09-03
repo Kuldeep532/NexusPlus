@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { ASSISTANT_LIMITS, ASSISTANT_MODELS, ASSISTANT_VOICES } from '@/features/nexus-assistant/assistantConfig';
@@ -8,6 +8,8 @@ import { addMessage, ensureSession, initAssistantStore, listMessages, type ChatM
 import { downloadAssistantModel, downloadAssistantVoice } from '@/features/nexus-assistant/modelManager';
 import { getLocalInferenceEngine } from '@/features/nexus-assistant/localInference';
 import { streamAssistantReply } from '@/features/nexus-assistant/stage2Agent';
+import { planCapability, formatCapabilityConfirmation, type CapabilityProposal } from '@/features/nexus-assistant/agentPlanner';
+import { runStage3Agent } from '@/features/nexus-assistant/stage3Agent';
 
 const SESSION_ID = 'default';
 
@@ -21,6 +23,7 @@ export default function NexusAssistantScreen() {
   const [assetBusy, setAssetBusy] = useState<string | null>(null);
   const [streaming, setStreaming] = useState('');
   const [engineReady, setEngineReady] = useState(false);
+  const [pendingProposal, setPendingProposal] = useState<CapabilityProposal | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -34,22 +37,37 @@ export default function NexusAssistantScreen() {
     })().catch(() => setStatus('Local chat storage could not be opened.'));
   }, []);
 
+  const refreshMessages = async () => setMessages(await listMessages(SESSION_ID));
+
   const send = async () => {
     const text = input.trim();
     if (!text || busy) return;
     setBusy(true);
     setInput('');
     setStreaming('');
+    setPendingProposal(null);
     try {
       await addMessage(SESSION_ID, 'user', text);
-      setMessages(await listMessages(SESSION_ID));
+      await refreshMessages();
+
+      const proposal = planCapability(text);
+      if (proposal) {
+        setPendingProposal(proposal);
+        const confirmation = formatCapabilityConfirmation(proposal);
+        await addMessage(SESSION_ID, 'assistant', confirmation);
+        await refreshMessages();
+        setStatus('Action prepared. Confirm it explicitly before Nexus Assistant executes it.');
+        return;
+      }
+
       if (!engineReady) {
         const fallback = 'Nexus Assistant local inference is not available in this build yet. Your message has been saved locally on this device.';
         await addMessage(SESSION_ID, 'assistant', fallback);
-        setMessages(await listMessages(SESSION_ID));
-        setStatus('Message saved locally; native local inference is waiting for the Stage 2 native runtime.');
+        await refreshMessages();
+        setStatus('Message saved locally; native local inference is unavailable in this build.');
         return;
       }
+
       const model = ASSISTANT_MODELS[0];
       await streamAssistantReply({
         sessionId: SESSION_ID,
@@ -59,16 +77,43 @@ export default function NexusAssistantScreen() {
         onStatus: setStatus,
         onToken: (chunk) => setStreaming((value) => value + chunk),
       });
-      setMessages(await listMessages(SESSION_ID));
+      await refreshMessages();
       setStreaming('');
       setStatus('Local response complete.');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Local inference failed.');
-      setMessages(await listMessages(SESSION_ID));
+      await refreshMessages();
       setStreaming('');
     } finally {
       setBusy(false);
     }
+  };
+
+  const confirmPendingAction = async () => {
+    if (!pendingProposal || busy) return;
+    setBusy(true);
+    try {
+      await runStage3Agent({
+        sessionId: SESSION_ID,
+        userText: pendingProposal.capability.id === 'open-url' ? `open ${pendingProposal.args.url ?? ''}` : pendingProposal.capability.title,
+        confirmed: true,
+        onStatus: setStatus,
+      });
+      setPendingProposal(null);
+      await refreshMessages();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Action failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cancelPendingAction = async () => {
+    if (!pendingProposal) return;
+    setPendingProposal(null);
+    setStatus('Action cancelled. No capability was executed.');
+    await addMessage(SESSION_ID, 'assistant', 'Action cancelled. No device or app action was executed.');
+    await refreshMessages();
   };
 
   const downloadModel = async () => {
@@ -103,14 +148,14 @@ export default function NexusAssistantScreen() {
         <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="cpu" size={23} color={colors.primary} /></View>
         <View style={styles.copy}>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Nexus Assistant</Text>
-          <Text style={[styles.body, { color: colors.mutedForeground }]}>Private, on-device-first agent with streamed local responses.</Text>
+          <Text style={[styles.body, { color: colors.mutedForeground }]}>Private, on-device-first agent with safe app and device actions.</Text>
         </View>
       </View>
 
       <View accessibilityLiveRegion="polite" style={[styles.status, { borderColor: colors.border, backgroundColor: colors.card }]}>
         <Text style={[styles.statusTitle, { color: colors.foreground }]}>Privacy & runtime</Text>
         <Text style={[styles.note, { color: colors.mutedForeground }]}>{status}</Text>
-        <Text style={[styles.note, { color: colors.mutedForeground }]}>Local chat mode stores conversation in SQLite and does not use a remote AI provider.</Text>
+        <Text style={[styles.note, { color: colors.mutedForeground }]}>Local chat mode stores conversation in SQLite. Registered actions execute locally and confirmation is required for consequential actions.</Text>
       </View>
 
       <View style={styles.chat} accessibilityLiveRegion="polite">
@@ -127,10 +172,23 @@ export default function NexusAssistantScreen() {
         {messages.length === 0 && !streaming ? <Text style={[styles.note, { color: colors.mutedForeground }]}>Start a private local conversation.</Text> : null}
       </View>
 
+      {pendingProposal ? <View accessibilityLiveRegion="polite" style={[styles.proposal, { borderColor: colors.primary, backgroundColor: colors.card }]}>
+        <Text style={[styles.proposalTitle, { color: colors.foreground }]}>Action confirmation</Text>
+        <Text style={[styles.body, { color: colors.foreground }]}>{formatCapabilityConfirmation(pendingProposal)}</Text>
+        <View style={styles.proposalActions}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Confirm Nexus Assistant action" disabled={busy} onPress={() => void confirmPendingAction()} style={[styles.confirmButton, { backgroundColor: colors.primary }]}>
+            <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Confirm action</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Cancel Nexus Assistant action" disabled={busy} onPress={() => void cancelPendingAction()} style={[styles.cancelButton, { borderColor: colors.border }]}>
+            <Text style={[styles.buttonText, { color: colors.foreground }]}>Cancel</Text>
+          </Pressable>
+        </View>
+      </View> : null}
+
       <TextInput accessibilityLabel="Message Nexus Assistant" multiline value={input} onChangeText={setInput} placeholder="Ask Nexus Assistant…" placeholderTextColor={colors.mutedForeground} style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]} />
       <Pressable accessibilityRole="button" accessibilityLabel="Send message" disabled={busy} onPress={() => void send()} style={[styles.button, { backgroundColor: colors.primary, opacity: busy ? 0.6 : 1 }]}>
         {busy ? <ActivityIndicator color={colors.primaryForeground} /> : <Feather name="send" size={18} color={colors.primaryForeground} />}
-        <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{busy ? 'Running locally…' : 'Send'}</Text>
+        <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{busy ? 'Working locally…' : 'Send'}</Text>
       </Pressable>
 
       <View style={[styles.assetCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
@@ -167,6 +225,11 @@ const styles = StyleSheet.create({
   input: { minHeight: 100, borderWidth: 1, borderRadius: 16, padding: 14, textAlignVertical: 'top', fontSize: 14 },
   button: { minHeight: 52, borderRadius: 16, marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   buttonText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
+  proposal: { borderWidth: 1, borderRadius: 16, padding: 14, marginBottom: 12, gap: 8 },
+  proposalTitle: { fontSize: 15, fontFamily: 'Inter_700Bold' },
+  proposalActions: { flexDirection: 'row', gap: 8, marginTop: 6 },
+  confirmButton: { flex: 1, minHeight: 46, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  cancelButton: { flex: 1, minHeight: 46, borderWidth: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   assetCard: { borderWidth: 1, borderRadius: 16, padding: 14, marginTop: 18, gap: 8 },
   section: { fontSize: 15, fontFamily: 'Inter_700Bold' },
   secondaryButton: { minHeight: 48, borderWidth: 1, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 12, marginTop: 6 },
