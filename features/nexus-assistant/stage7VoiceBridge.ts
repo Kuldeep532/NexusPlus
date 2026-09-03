@@ -29,14 +29,20 @@ async function ensureMicrophonePermission(): Promise<boolean> {
   return result === PermissionsAndroid.RESULTS.GRANTED;
 }
 
-export function createStage7VoiceBridge(onStatus?: (status: VoiceRuntimeStatus) => void, onTranscript?: (text: string) => void): Stage6VoiceBridge {
+export function createStage7VoiceBridge(
+  onStatus?: (status: VoiceRuntimeStatus) => void,
+  onTranscript?: (text: string) => void,
+): { bridge: Stage6VoiceBridge; dispose: () => void } {
   if (!nativeVoice) {
     return {
-      async isAvailable() { return false; },
-      async startListening() { throw new Error('VOICE_NATIVE_MODULE_UNAVAILABLE'); },
-      async stopListening() {},
-      async stopOutput() {},
-      async speak() { throw new Error('VOICE_NATIVE_MODULE_UNAVAILABLE'); },
+      bridge: {
+        async isAvailable() { return false; },
+        async startListening() { throw new Error('VOICE_NATIVE_MODULE_UNAVAILABLE'); },
+        async stopListening() {},
+        async stopOutput() {},
+        async speak() { throw new Error('VOICE_NATIVE_MODULE_UNAVAILABLE'); },
+      },
+      dispose() {},
     };
   }
 
@@ -47,24 +53,27 @@ export function createStage7VoiceBridge(onStatus?: (status: VoiceRuntimeStatus) 
   });
 
   return {
-    async isAvailable() {
-      return (await ensureMicrophonePermission()) && nativeVoice.isAvailable();
+    bridge: {
+      async isAvailable() {
+        return (await ensureMicrophonePermission()) && nativeVoice.isAvailable();
+      },
+      async startListening() {
+        if (!(await ensureMicrophonePermission())) throw new Error('MIC_PERMISSION_REQUIRED');
+        await nativeVoice.startListening();
+      },
+      async stopListening() {
+        await nativeVoice.stopListening();
+        onStatus?.({ state: 'idle' });
+      },
+      async stopOutput() {
+        await nativeVoice.stopOutput();
+      },
+      async speak(text: string) {
+        await nativeVoice.speak(text);
+      },
     },
-    async startListening() {
-      if (!(await ensureMicrophonePermission())) throw new Error('MIC_PERMISSION_REQUIRED');
-      await nativeVoice.startListening();
-    },
-    async stopListening() {
-      await nativeVoice.stopListening();
-      onStatus?.({ state: 'idle' });
-    },
-    async stopOutput() {
-      await nativeVoice.stopOutput();
-    },
-    async speak(text: string) {
-      await nativeVoice.speak(text);
+    dispose() {
+      subscription.remove();
     },
   };
-
-  void subscription;
 }
