@@ -22,8 +22,7 @@ class NexusReactApplication : Application(), ReactApplication {
         object : DefaultReactNativeHost(this) {
             override fun getPackages(): List<ReactPackage> =
                 PackageList(this).packages.toMutableList().apply {
-                    // Custom native packages are discovered/autolinked by the Expo/React Native build.
-                    // Do not eagerly construct every custom module during initial bootstrap.
+                    add(NexusAssistantVoicePackage())
                 }
 
             override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"
