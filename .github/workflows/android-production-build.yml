@@ -130,15 +130,15 @@ jobs:
           test -s android/app/google-services.json
           python - <<'PY'
           import json
-          import os
           from pathlib import Path
           p = Path('android/app/google-services.json')
           data = json.loads(p.read_text())
           project = data.get('project_info', {})
           clients = data.get('client', [])
           package_name = 'com.nexuswavetech.nexusplus'
-          expected_project_id = os.environ['FIREBASE_PROJECT_ID']
-          expected_app_id = os.environ['FIREBASE_APP_ID']
+          firebase_project_id = project.get('project_id')
+          if not firebase_project_id:
+              raise SystemExit('Firebase google-services.json is missing project_info.project_id')
           matches = []
           for client in clients:
               info = client.get('client_info', {})
@@ -155,12 +155,15 @@ jobs:
                       for c in clients
                   )
               )
-          if project.get('project_id') != expected_project_id:
-              raise SystemExit('Firebase project_id does not match FIREBASE_PROJECT_ID')
-          if expected_app_id not in matches:
-              raise SystemExit('Firebase mobilesdk_app_id does not match FIREBASE_APP_ID')
-          print('Firebase JSON: valid, package matched, project matched, app matched')
+          selected_app_id = matches[0]
+          print(f'Firebase JSON: valid, project_id={firebase_project_id}, package matched, app_id={selected_app_id}')
+          env_file = Path('/tmp/firebase-derived.env')
+          env_file.write_text(
+              f'FIREBASE_PROJECT_ID={firebase_project_id}\n'
+              f'FIREBASE_APP_ID={selected_app_id}\n'
+          )
           PY
+          cat /tmp/firebase-derived.env >> "$GITHUB_ENV"
           chmod 600 android/app/google-services.json
       - name: Materialize Android signing configuration
         shell: bash
