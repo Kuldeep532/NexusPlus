@@ -1,13 +1,14 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors, refreshThemeColor } from '@/hooks/useColors';
 import { readThemeColor, writeThemeColor, type ThemeColor } from '@/features/app-shell/themePreferences';
 import { readLaunchPreferences, writeLaunchPreferences, type LaunchTarget } from '@/features/app-shell/launchPreferences';
 
 const SETTINGS = [
+  { title: 'Nexus Launcher', description: 'Set up Nexus Launcher, choose its home layout and manage launcher preferences.', action: 'launcher' as const, icon: 'grid' as const },
   { title: 'Language & preferences', description: 'Language, accessibility and general preferences.', route: '/language-and-preference', icon: 'globe' as const },
   { title: 'Biometric Vault', description: 'Manage secure biometric protection.', route: '/biometric-vault', icon: 'shield' as const },
   { title: 'Payment Announcer', description: 'Configure secure payment announcements.', route: '/payment-announcer', icon: 'volume-2' as const },
@@ -59,12 +60,28 @@ export default function SettingsScreen() {
     await writeThemeColor(theme);
   };
 
+  const openLauncherSetup = () => {
+    const url = 'nexus-plus://launcher/setup';
+    // Native launcher can be opened through the OS Home-role/settings flow. The URL is
+    // handled as a best-effort deep link; no API is required and failure is non-fatal.
+    router.push({ pathname: '/nexus-launcher-settings', params: { source: 'settings' } });
+  };
+
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24 }]}>
         <View style={styles.headerRow}>
           <View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Settings</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Control Nexus Plus appearance and behavior.</Text></View>
           <Pressable accessibilityRole="button" accessibilityLabel="Open profile" onPress={() => router.push('/profile')} style={[styles.profileButton, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="user" size={21} color={colors.foreground} /></Pressable>
+        </View>
+
+        <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 12 }]}>Launcher</Text>
+        <View style={styles.list}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Nexus Launcher. Set up Nexus Launcher, choose its home layout and manage launcher preferences." onPress={openLauncherSetup} style={[styles.item, styles.featuredItem, { backgroundColor: colors.card, borderColor: colors.primary }]}>
+            <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="grid" size={19} color={colors.primary} /></View>
+            <View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Nexus Launcher</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>Set up Nexus Launcher, choose Home Screen + App Drawer or Home Screen Only, and manage launcher preferences.</Text></View>
+            <Feather name="chevron-right" size={19} color={colors.mutedForeground} accessibilityElementsHidden />
+          </Pressable>
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -111,7 +128,7 @@ export default function SettingsScreen() {
 
         <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 20 }]}>Feature settings</Text>
         <View style={styles.list}>
-          {SETTINGS.map((item) => <Pressable key={item.route} accessibilityRole="button" accessibilityLabel={`${item.title}. ${item.description}`} onPress={() => router.push(item.route as never)} style={[styles.item, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name={item.icon} size={19} color={colors.primary} /></View><View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{item.title}</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>{item.description}</Text></View><Feather name="chevron-right" size={19} color={colors.mutedForeground} accessibilityElementsHidden /></Pressable>)}
+          {SETTINGS.slice(1).map((item) => <Pressable key={item.route} accessibilityRole="button" accessibilityLabel={`${item.title}. ${item.description}`} onPress={() => router.push(item.route as never)} style={[styles.item, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name={item.icon} size={19} color={colors.primary} /></View><View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{item.title}</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>{item.description}</Text></View><Feather name="chevron-right" size={19} color={colors.mutedForeground} accessibilityElementsHidden /></Pressable>)}
         </View>
 
         <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 22 }]}>Privacy & About</Text>
@@ -124,5 +141,5 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 }, content: { paddingHorizontal: 18 }, headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 }, copy: { flex: 1, marginRight: 12 }, title: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 6 }, subtitle: { fontSize: 12, lineHeight: 18 }, profileButton: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, card: { marginTop: 18, borderRadius: 18, borderWidth: 1, padding: 16 }, sectionTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', marginBottom: 8 }, row: { flexDirection: 'row', alignItems: 'center' }, rowTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', marginBottom: 3 }, body: { fontSize: 11, lineHeight: 16 }, list: { gap: 10 }, modeList: { gap: 10, marginTop: 8 }, modeItem: { minHeight: 72, borderRadius: 15, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center' }, radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' }, radioDot: { width: 10, height: 10, borderRadius: 5 }, item: { minHeight: 70, borderRadius: 17, borderWidth: 1, padding: 13, flexDirection: 'row', alignItems: 'center' }, icon: { width: 43, height: 43, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  root: { flex: 1 }, content: { paddingHorizontal: 18 }, headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 }, copy: { flex: 1, marginRight: 12 }, title: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 6 }, subtitle: { fontSize: 12, lineHeight: 18 }, card: { marginTop: 18, borderRadius: 18, borderWidth: 1, padding: 16 }, sectionTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', marginBottom: 8 }, row: { flexDirection: 'row', alignItems: 'center' }, rowTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', marginBottom: 3 }, body: { fontSize: 11, lineHeight: 16 }, list: { gap: 10 }, modeList: { gap: 10, marginTop: 8 }, modeItem: { minHeight: 72, borderRadius: 15, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center' }, radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' }, radioDot: { width: 10, height: 10, borderRadius: 5 }, item: { minHeight: 70, borderRadius: 17, borderWidth: 1, padding: 13, flexDirection: 'row', alignItems: 'center' }, featuredItem: { borderWidth: 1.5 }, icon: { width: 43, height: 43, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
 });
