@@ -16,11 +16,19 @@ react {
     autolinkLibrariesWithApp()
 }
 
+// Release signing is supplied only at CI runtime through android/key.properties.
+// No keystore or passwords are committed to the repository.
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('key.properties')
 if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    keystoreProperties.with {
+        load(new FileInputStream(keystorePropertiesFile))
+    }
 }
+
+def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBuilds') ?: true).toBoolean()
+def enableShrinkResourcesInReleaseBuilds = (findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: true).toBoolean()
+def enablePngCrunchInReleaseBuilds = (findProperty('android.enablePngCrunchInReleaseBuilds') ?: true).toBoolean()
 
 android {
     namespace 'com.nexuswavetech.nexusplus'
@@ -31,43 +39,55 @@ android {
         minSdk 26
         targetSdk 35
         versionCode 1
-        versionName '1.0'
+        versionName '1.0.0'
+        def integrityProject = project.findProperty('PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER') ?: '0'
+        buildConfigField 'long', 'PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER', integrityProject
+        externalNativeBuild {
+            cmake { cppFlags '-std=c++20' }
+        }
     }
 
     buildFeatures {
         buildConfig true
     }
 
-    packagingOptions {
-        jniLibs {
-            useLegacyPackaging = true
-        }
-    }
-
     externalNativeBuild {
         cmake {
             path file('src/main/cpp/CMakeLists.txt')
+            version '3.22.1'
         }
     }
 
     signingConfigs {
         release {
             if (keystorePropertiesFile.exists()) {
-                storeFile file(keystoreProperties['MYAPP_UPLOAD_STORE_FILE'])
-                storePassword keystoreProperties['MYAPP_UPLOAD_STORE_PASSWORD']
-                keyAlias keystoreProperties['MYAPP_UPLOAD_KEY_ALIAS']
-                keyPassword keystoreProperties['MYAPP_UPLOAD_KEY_PASSWORD']
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
             }
         }
     }
 
+    packaging {
+        jniLibs { useLegacyPackaging = false }
+        resources {
+            excludes += [
+                'META-INF/DEPENDENCIES', 'META-INF/LICENSE*', 'META-INF/NOTICE*', 'META-INF/*.version'
+            ]
+        }
+    }
+
     buildTypes {
-        release {
-            signingConfig signingConfigs.release
+        debug {
             minifyEnabled false
         }
-        debug {
-            debuggable true
+        release {
+            minifyEnabled enableMinifyInReleaseBuilds
+            shrinkResources enableShrinkResourcesInReleaseBuilds
+            crunchPngs enablePngCrunchInReleaseBuilds
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
 }
