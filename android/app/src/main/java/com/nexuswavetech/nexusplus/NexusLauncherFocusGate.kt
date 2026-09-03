@@ -12,6 +12,9 @@ object NexusLauncherFocusGate {
     private const val KEY_ENABLED = "enabled"
     private const val KEY_BLOCKED = "blocked_packages"
     private const val KEY_WINDOWS = "focus_windows"
+    private const val KEY_COOLDOWN_MINUTES = "cooldown_minutes"
+    private const val KEY_BYPASS_UNTIL = "bypass_until"
+    private const val KEY_BYPASS_PACKAGE = "bypass_package"
     private const val WINDOW_SEPARATOR = "|"
     private const val FIELD_SEPARATOR = ","
 
@@ -19,11 +22,9 @@ object NexusLauncherFocusGate {
         val blocked: Boolean,
         val label: String,
         val message: String,
+        val remainingMinutes: Int = 0,
     )
 
-    /**
-     * Focus windows are encoded as HH-HH, for example 09-13. A window can cross midnight.
-     */
     fun setEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()
     }
@@ -60,15 +61,43 @@ object NexusLauncherFocusGate {
             }
             .orEmpty()
 
+    fun setCooldownMinutes(context: Context, minutes: Int) {
+        prefs(context).edit().putInt(KEY_COOLDOWN_MINUTES, minutes.coerceIn(1, 60)).apply()
+    }
+
+    fun getCooldownMinutes(context: Context): Int =
+        prefs(context).getInt(KEY_COOLDOWN_MINUTES, 10).coerceIn(1, 60)
+
+    fun clearBypass(context: Context) {
+        prefs(context).edit().remove(KEY_BYPASS_UNTIL).remove(KEY_BYPASS_PACKAGE).apply()
+    }
+
+    fun allowTemporarily(context: Context, packageName: String, minutes: Int = getCooldownMinutes(context)) {
+        val safeMinutes = minutes.coerceIn(1, 60)
+        val until = System.currentTimeMillis() + safeMinutes * 60_000L
+        prefs(context).edit()
+            .putLong(KEY_BYPASS_UNTIL, until)
+            .putString(KEY_BYPASS_PACKAGE, packageName)
+            .apply()
+    }
+
     fun evaluate(context: Context, packageName: String, currentMillis: Long = System.currentTimeMillis()): Decision {
         if (!isEnabled(context)) return allow()
         if (packageName.isBlank() || packageName == context.packageName) return allow()
         if (packageName !in getBlockedPackages(context)) return allow()
+
+        val bypassPackage = prefs(context).getString(KEY_BYPASS_PACKAGE, null)
+        val bypassUntil = prefs(context).getLong(KEY_BYPASS_UNTIL, 0L)
+        if (bypassPackage == packageName && bypassUntil > currentMillis) return allow()
+        if (bypassUntil > 0L && bypassUntil <= currentMillis) clearBypass(context)
+
         if (isInsideFocusWindow(getFocusWindows(context), currentMillis)) {
+            val calendar = Calendar.getInstance().apply { timeInMillis = currentMillis }
             return Decision(
                 blocked = true,
                 label = "Nexus Focus Gate",
-                message = "This app is outside your current focus window. Nexus Launcher is keeping the boundary you set.",
+                message = "This app is protected during your current focus window. You can pause the gate for a few minutes when you have a real reason to open it.",
+                remainingMinutes = minutesUntilNextWindowEnd(getFocusWindows(context), calendar),
             )
         }
         return allow()
@@ -79,14 +108,21 @@ object NexusLauncherFocusGate {
         val hour = Calendar.getInstance().apply { timeInMillis = currentMillis }
             .get(Calendar.HOUR_OF_DAY)
         return windows.any { (start, end) ->
-            if (start == end) {
-                hour == start
-            } else if (start < end) {
-                hour in start until end
-            } else {
-                hour >= start || hour < end
-            }
+            if (start == end) hour == start
+            else if (start < end) hour in start until end
+            else hour >= start || hour < end
         }
+    }
+
+    private fun minutesUntilNextWindowEnd(windows: List<Pair<Int, Int>>, calendar: Calendar): Int {
+        val nowMinute = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+        val candidates = windows.map { (start, end) ->
+            val endMinute = if (start < end) end * 60 else if (nowMinute >= start * 60) (end + 24) * 60 else end * 60
+            var delta = endMinute - nowMinute
+            if (delta <= 0) delta += 24 * 60
+            delta
+        }
+        return candidates.minOrNull()?.coerceAtLeast(1) ?: 0
     }
 
     private fun allow(): Decision = Decision(false, "", "")
