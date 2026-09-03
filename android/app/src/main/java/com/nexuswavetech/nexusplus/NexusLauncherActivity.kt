@@ -4,7 +4,6 @@ import android.app.Activity
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
@@ -23,14 +22,12 @@ import java.util.Locale
 /**
  * Nexus Launcher: minimal native home surface with a package-backed app drawer.
  *
- * This activity stays separate from the Expo/React app entry point. Installing or
- * updating Nexus Plus never silently changes the device default launcher.
+ * Launcher work remains isolated from the existing Expo/React application entry point.
  */
 class NexusLauncherActivity : Activity() {
     private lateinit var root: LinearLayout
     private lateinit var status: TextView
     private lateinit var defaultButton: TextView
-    private lateinit var appDrawerButton: TextView
     private var drawerOpen = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -102,19 +99,15 @@ class NexusLauncherActivity : Activity() {
         }
         root.addView(subtitle, wrap(dp(8)))
 
-        val open = actionButton("Open Nexus Plus", filled = true).apply {
-            contentDescription = "Open Nexus Plus app"
-            setOnClickListener { openNexusPlus() }
-        }
-        root.addView(open, fullWidth(dp(28)))
+        renderPinnedApps()
 
         val mode = NexusLauncherPreferences.getMode(this)
         if (mode == NexusLauncherPreferences.MODE_APP_DRAWER_PLUS_HOME) {
-            appDrawerButton = actionButton("App Drawer", filled = false).apply {
+            val drawer = actionButton("App Drawer", filled = false).apply {
                 contentDescription = "Open App Drawer"
                 setOnClickListener { openAppDrawer() }
             }
-            root.addView(appDrawerButton, fullWidth(dp(12)))
+            root.addView(drawer, fullWidth(dp(16)))
         }
 
         defaultButton = actionButton("Set as Default Launcher", filled = false).apply {
@@ -124,7 +117,7 @@ class NexusLauncherActivity : Activity() {
         root.addView(defaultButton, fullWidth(dp(12)))
 
         val info = textView(
-            "App Drawer uses installed Android launchable apps. A to Z sorting is enabled by default; custom order is stored for the next personalization stage.",
+            "Pinned apps stay on your Home screen. Long-press customization is added in a later stage.",
             13f,
             Color.rgb(108, 108, 108),
         ).apply {
@@ -132,6 +125,27 @@ class NexusLauncherActivity : Activity() {
             contentDescription = text
         }
         root.addView(info, fullWidthWrap(dp(24)))
+    }
+
+    private fun renderPinnedApps() {
+        val pinned = NexusLauncherPreferences.getPinnedPackages(this)
+        if (pinned.isEmpty()) return
+
+        val heading = textView("Pinned apps", 15f, Color.rgb(72, 72, 72)).apply {
+            gravity = Gravity.CENTER
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            contentDescription = "Pinned apps"
+        }
+        root.addView(heading, fullWidthWrap(dp(28)))
+
+        pinned.forEach { packageName ->
+            findLaunchableApp(packageName)?.let { app ->
+                val row = createAppRow(app).apply {
+                    contentDescription = "Open pinned ${app.label}"
+                }
+                root.addView(row, fullWidth(dp(8)))
+            }
+        }
     }
 
     private fun renderDrawer() {
@@ -220,6 +234,9 @@ class NexusLauncherActivity : Activity() {
         }
     }
 
+    private fun findLaunchableApp(packageName: String): AppEntry? =
+        loadLaunchableApps().firstOrNull { it.packageName == packageName }
+
     private fun createAppRow(app: AppEntry): TextView =
         textView(app.label, 17f, Color.rgb(25, 25, 25)).apply {
             gravity = Gravity.CENTER_VERTICAL
@@ -229,7 +246,6 @@ class NexusLauncherActivity : Activity() {
             minHeight = dp(58)
             isClickable = true
             isFocusable = true
-            contentDescription = "Open ${app.label}"
             setBackgroundColor(Color.WHITE)
             setOnClickListener { launchApp(app) }
             accessibilityDelegate = object : View.AccessibilityDelegate() {
@@ -268,7 +284,7 @@ class NexusLauncherActivity : Activity() {
             "Nexus Launcher • Preview mode"
         }
         status.contentDescription = status.text
-        if (!drawerOpen) {
+        if (!drawerOpen && ::defaultButton.isInitialized) {
             defaultButton.visibility = if (isDefault) View.GONE else View.VISIBLE
         }
     }
@@ -287,9 +303,7 @@ class NexusLauncherActivity : Activity() {
             }
         }
 
-        runCatching {
-            startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
-        }
+        runCatching { startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) }
     }
 
     private fun isDefaultHome(): Boolean {
@@ -329,7 +343,7 @@ class NexusLauncherActivity : Activity() {
         }
 
     private fun fullWidth(topMargin: Int): LinearLayout.LayoutParams =
-        LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(52)).apply {
+        LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(58)).apply {
             this.topMargin = topMargin
         }
 
@@ -366,6 +380,7 @@ object NexusLauncherPreferences {
     private const val KEY_GOOGLE_SEARCH = "google_search_enabled"
     private const val KEY_SORT_CUSTOM = "sort_custom"
     private const val KEY_CUSTOM_ORDER = "custom_order"
+    private const val KEY_PINNED_PACKAGES = "pinned_packages"
 
     const val MODE_APP_DRAWER_PLUS_HOME = "APP_DRAWER_PLUS_HOME"
     const val MODE_HOME_ONLY = "HOME_ONLY"
@@ -413,18 +428,33 @@ object NexusLauncherPreferences {
 
     fun toggleSortMode(context: Context) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        prefs.edit().putBoolean(KEY_SORT_CUSTOM, !prefs.getBoolean(KEY_SORT_CUSTOM, false)).apply()
+        val custom = prefs.getBoolean(KEY_SORT_CUSTOM, false)
+        prefs.edit().putBoolean(KEY_SORT_CUSTOM, !custom).apply()
     }
 
     fun getCustomOrder(context: Context): List<String> =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(KEY_CUSTOM_ORDER, null)
-            ?.split('\u001F')
+            ?.split("|")
             ?.filter { it.isNotBlank() }
             ?: emptyList()
 
     fun setCustomOrder(context: Context, packages: List<String>) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putString(KEY_CUSTOM_ORDER, packages.joinToString("\u001F")).apply()
+            .edit().putString(KEY_CUSTOM_ORDER, packages.distinct().joinToString("|"))
+            .apply()
+    }
+
+    fun getPinnedPackages(context: Context): List<String> =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_PINNED_PACKAGES, null)
+            ?.split("|")
+            ?.filter { it.isNotBlank() }
+            ?: emptyList()
+
+    fun setPinnedPackages(context: Context, packages: List<String>) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putString(KEY_PINNED_PACKAGES, packages.distinct().joinToString("|"))
+            .apply()
     }
 }
