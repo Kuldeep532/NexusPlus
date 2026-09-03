@@ -25,6 +25,7 @@ class NexusReactApplication : Application(), ReactApplication {
                     add(NexusAssistantVoicePackage())
                     add(NexusAssistantOnnxPackage())
                     add(NexusLauncherFocusGatePackage())
+                    add(NexusProtectedAppLauncherPackage())
                 }
 
             override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"
