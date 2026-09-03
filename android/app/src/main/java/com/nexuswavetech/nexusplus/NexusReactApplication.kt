@@ -23,6 +23,7 @@ class NexusReactApplication : Application(), ReactApplication {
             override fun getPackages(): List<ReactPackage> =
                 PackageList(this).packages.toMutableList().apply {
                     add(NexusAssistantVoicePackage())
+                    add(NexusAssistantOnnxPackage())
                 }
 
             override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"
