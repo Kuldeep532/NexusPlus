@@ -1,6 +1,7 @@
 package com.nexuswavetech.nexusplus
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
@@ -99,6 +100,7 @@ class NexusLauncherActivity : Activity() {
         }
         root.addView(subtitle, wrap(dp(8)))
 
+        renderFocusGateCard()
         renderAssistantHub()
         renderPinnedApps()
 
@@ -117,6 +119,91 @@ class NexusLauncherActivity : Activity() {
         }
         root.addView(defaultButton, fullWidth(dp(12)))
     }
+
+    private fun renderFocusGateCard() {
+        val enabled = NexusLauncherFocusGate.isEnabled(this)
+        val windows = NexusLauncherFocusGate.getFocusWindows(this)
+        val blockedCount = NexusLauncherFocusGate.getBlockedPackages(this).size
+        val summary = when {
+            !enabled -> "Focus Gate is off"
+            windows.isEmpty() -> "Focus Gate is on • set a focus window"
+            else -> "Focus Gate is on • $blockedCount protected apps"
+        }
+
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(16), dp(18), dp(16))
+            setBackgroundColor(Color.WHITE)
+            contentDescription = "Nexus Focus Gate. $summary"
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        }
+        card.addView(
+            textView("Nexus Focus Gate", 20f, Color.BLACK).apply {
+                setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            },
+            fullWidthWrap(0),
+        )
+        card.addView(textView(summary, 14f, Color.rgb(82, 82, 82)), fullWidthWrap(dp(6)))
+
+        val configure = actionButton(if (enabled) "Adjust Focus Gate" else "Turn on Focus Gate", filled = true).apply {
+            contentDescription = if (enabled) "Adjust Nexus Focus Gate" else "Turn on Nexus Focus Gate"
+            setOnClickListener { showFocusGateDialog() }
+        }
+        card.addView(configure, fullWidth(dp(12)))
+        root.addView(card, fullWidthWrap(dp(18)))
+    }
+
+    private fun showFocusGateDialog() {
+        val packages = loadFocusCandidates()
+        val blocked = NexusLauncherFocusGate.getBlockedPackages(this).toMutableSet()
+        val names = packages.map { it.label }.toTypedArray()
+        val checked = BooleanArray(packages.size) { index -> packages[index].packageName in blocked }
+
+        val builder = AlertDialog.Builder(this)
+            .setTitle("Nexus Focus Gate")
+            .setMultiChoiceItems(names, checked) { _, which, isChecked ->
+                val pkg = packages.getOrNull(which)?.packageName ?: return@setMultiChoiceItems
+                if (isChecked) blocked += pkg else blocked -= pkg
+            }
+            .setView(buildFocusWindowEditor())
+            .setPositiveButton("Save") { _, _ ->
+                NexusLauncherFocusGate.setEnabled(this, true)
+                NexusLauncherFocusGate.setBlockedPackages(this, blocked)
+                if (NexusLauncherFocusGate.getFocusWindows(this).isEmpty()) {
+                    NexusLauncherFocusGate.setFocusWindows(this, listOf(9 to 13))
+                }
+                renderLauncher()
+            }
+            .setNeutralButton(if (NexusLauncherFocusGate.isEnabled(this)) "Turn Off" else "Keep Off") { _, _ ->
+                NexusLauncherFocusGate.setEnabled(this, false)
+                renderLauncher()
+            }
+            .setNegativeButton("Cancel", null)
+        builder.show()
+    }
+
+    private fun buildFocusWindowEditor(): TextView =
+        textView(
+            "Default focus window: 09:00–13:00. A protected app is allowed again outside the window. This setting stays only on this phone.",
+            13f,
+            Color.rgb(76, 76, 76),
+        ).apply {
+            setPadding(dp(20), dp(12), dp(20), dp(8))
+            contentDescription = text
+        }
+
+    private fun loadFocusCandidates(): List<AppEntry> = loadLaunchableApps()
+        .filterNot { app ->
+            val lower = app.packageName.lowercase(Locale.getDefault())
+            lower.contains("android") ||
+                lower.contains("settings") ||
+                lower.contains("phone") ||
+                lower.contains("dialer") ||
+                lower.contains("contacts") ||
+                lower.contains("messag") ||
+                lower.contains("camera")
+        }
+        .take(24)
 
     private fun renderAssistantHub() {
         val card = LinearLayout(this).apply {
@@ -321,11 +408,33 @@ class NexusLauncherActivity : Activity() {
         }
 
     private fun launchApp(app: AppEntry) {
+        val decision = NexusLauncherFocusGate.evaluate(this, app.packageName)
+        if (decision.blocked) {
+            showFocusGateWarning(app, decision.message)
+            return
+        }
+        NexusLauncherRecommendationEngine.recordLaunch(this, app.packageName)
         val intent = Intent().apply {
             setClassName(app.packageName, app.className)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
         }
         runCatching { startActivity(intent) }
+    }
+
+    private fun showFocusGateWarning(app: AppEntry, message: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Nexus Focus Gate")
+            .setMessage("${app.label}: $message")
+            .setPositiveButton("Stay Focused", null)
+            .setNegativeButton("Open Anyway") { _, _ ->
+                NexusLauncherRecommendationEngine.recordLaunch(this, app.packageName)
+                val intent = Intent().apply {
+                    setClassName(app.packageName, app.className)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+                }
+                runCatching { startActivity(intent) }
+            }
+            .show()
     }
 
     private fun openAppDrawer() {
@@ -380,12 +489,6 @@ class NexusLauncherActivity : Activity() {
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         val resolve = packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)
         return resolve?.activityInfo?.packageName == packageName
-    }
-
-    private fun openNexusPlus() {
-        val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-        startActivity(intent)
     }
 
     private fun textView(value: String, size: Float, color: Int): TextView =
