@@ -45,6 +45,7 @@
         <activity
             android:name=".NexusLauncherActivity"
             android:exported="true"
+            android:label="Nexus Launcher"
             android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
