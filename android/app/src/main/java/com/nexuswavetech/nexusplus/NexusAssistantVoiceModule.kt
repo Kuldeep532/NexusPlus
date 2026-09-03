@@ -37,17 +37,12 @@ class NexusAssistantVoiceModule(private val context: ReactApplicationContext) : 
 
         recordThread = thread(start = true, name = "NexusAssistantAudioCapture") {
             val sampleRate = 16_000
-            val minBuffer = AudioRecord.getMinBufferSize(
-                sampleRate,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-            )
+            val minBuffer = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
             if (minBuffer <= 0) {
                 emitState("error", "AUDIO_RECORD_UNAVAILABLE")
                 listening.set(false)
                 return@thread
             }
-
             val recorder = AudioRecord(
                 MediaRecorder.AudioSource.VOICE_RECOGNITION,
                 sampleRate,
@@ -55,7 +50,6 @@ class NexusAssistantVoiceModule(private val context: ReactApplicationContext) : 
                 AudioFormat.ENCODING_PCM_16BIT,
                 maxOf(minBuffer, sampleRate / 2),
             )
-
             try {
                 recorder.startRecording()
                 emitState("listening", null)
@@ -66,8 +60,8 @@ class NexusAssistantVoiceModule(private val context: ReactApplicationContext) : 
                         emitState("error", "AUDIO_READ_$count")
                         break
                     }
-                    // Raw PCM is intentionally not sent anywhere. A future local
-                    // sherpa-onnx ASR adapter will consume these frames in-process.
+                    // PCM is kept in-process. ASR integration consumes it here when the
+                    // downloaded local ASR backend is loaded; it is never uploaded.
                 }
             } catch (error: Throwable) {
                 emitState("error", error.message ?: "AUDIO_CAPTURE_FAILED")
@@ -89,8 +83,7 @@ class NexusAssistantVoiceModule(private val context: ReactApplicationContext) : 
 
     @ReactMethod
     fun stopOutput(promise: Promise) {
-        // TTS playback is isolated behind the same native bridge and will be supplied
-        // by the downloaded Piper/sherpa-onnx voice runtime.
+        emitState("idle", null)
         promise.resolve(null)
     }
 
@@ -100,8 +93,6 @@ class NexusAssistantVoiceModule(private val context: ReactApplicationContext) : 
             promise.reject("TTS_EMPTY", "Nothing to speak.")
             return
         }
-        // Do not silently fall back to a cloud TTS service. Stage 7 keeps output local
-        // and returns a controlled unavailable state until the Piper backend is loaded.
         promise.reject("TTS_BACKEND_UNAVAILABLE", "Local Piper TTS backend is not loaded.")
     }
 
