@@ -37,6 +37,11 @@
         </activity>
 
         <activity
+            android:name=".NexusLauncherSettingsActivity"
+            android:exported="false"
+            android:label="Nexus Launcher Settings" />
+
+        <activity
             android:name=".NexusLauncherMentorActivity"
             android:exported="false"
             android:label="Nexus Habit & Focus Mentor" />
