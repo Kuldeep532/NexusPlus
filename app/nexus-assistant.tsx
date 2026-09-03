@@ -10,7 +10,9 @@ import { getLocalInferenceEngine } from '@/features/nexus-assistant/localInferen
 import { streamAssistantReply } from '@/features/nexus-assistant/stage2Agent';
 import { planCapability, formatCapabilityConfirmation, type CapabilityProposal } from '@/features/nexus-assistant/agentPlanner';
 import { runStage3Agent } from '@/features/nexus-assistant/stage3Agent';
-import { askGeminiThroughGateway, getWeatherThroughGateway, looksLikeWeatherRequest } from '@/features/nexus-assistant/stage5Cloud';
+import { askGeminiThroughGateway, looksLikeWeatherRequest } from '@/features/nexus-assistant/stage5Cloud';
+import { getWeatherLocalFirst } from '@/features/nexus-assistant/stage6Weather';
+import { createUnavailableVoiceBridge, type Stage6VoiceBridge, type VoiceInputState } from '@/features/nexus-assistant/stage6Voice';
 
 const SESSION_ID = 'default';
 
@@ -27,6 +29,8 @@ export default function NexusAssistantScreen() {
   const [pendingProposal, setPendingProposal] = useState<CapabilityProposal | null>(null);
   const [voiceInput, setVoiceInput] = useState(false);
   const [liveMode, setLiveMode] = useState(false);
+  const [voiceState, setVoiceState] = useState<VoiceInputState>('idle');
+  const [voiceBridge] = useState<Stage6VoiceBridge>(() => createUnavailableVoiceBridge());
   const hasText = input.trim().length > 0;
 
   useEffect(() => {
@@ -48,8 +52,8 @@ export default function NexusAssistantScreen() {
 
   const refreshMessages = async () => setMessages(await listMessages(SESSION_ID));
 
-  const send = async () => {
-    const text = input.trim();
+  const send = async (providedText?: string) => {
+    const text = (providedText ?? input).trim();
     if (!text || busy) return;
     setBusy(true);
     setInput('');
@@ -70,12 +74,12 @@ export default function NexusAssistantScreen() {
       }
 
       if (looksLikeWeatherRequest(text)) {
-        setStatus('Getting weather through Nexus Gateway…');
-        const weather = await getWeatherThroughGateway({ location: text });
+        setStatus('Checking local weather cache first…');
+        const weather = await getWeatherLocalFirst({ location: text });
         if (weather) {
           await addMessage(SESSION_ID, 'assistant', weather.text);
           await refreshMessages();
-          setStatus('Weather response received from the Gateway.');
+          setStatus(weather.source === 'cache' ? 'Weather served from the on-device cache.' : 'Weather refreshed through the Gateway and cached locally.');
           return;
         }
       }
@@ -122,14 +126,41 @@ export default function NexusAssistantScreen() {
     }
   };
 
-  const toggleVoiceInput = () => {
-    setVoiceInput((value) => !value);
-    setStatus(voiceInput ? 'Voice input disabled.' : 'Voice input enabled. Native speech capture is wired in the voice stage.');
+  const toggleVoiceInput = async () => {
+    if (voiceState === 'listening') {
+      await voiceBridge.stopListening();
+      setVoiceState('idle');
+      setVoiceInput(false);
+      setStatus('Voice input stopped.');
+      return;
+    }
+    const available = await voiceBridge.isAvailable();
+    if (!available) {
+      setVoiceInput(true);
+      setStatus('Voice Input is selected; native microphone bridge is not included in this build yet.');
+      return;
+    }
+    setVoiceInput(true);
+    setVoiceState('listening');
+    setStatus('Listening…');
+    await voiceBridge.startListening((text) => {
+      setInput(text);
+      setVoiceState('idle');
+      setStatus('Voice transcription ready. Press Send to submit.');
+    });
   };
 
-  const toggleLiveMode = () => {
-    setLiveMode((value) => !value);
-    setStatus(liveMode ? 'Live Mode closed.' : 'Live Mode opened. Full-duplex speech is completed in the voice stage.');
+  const toggleLiveMode = async () => {
+    const next = !liveMode;
+    setLiveMode(next);
+    if (!next) {
+      await voiceBridge.stopListening().catch(() => undefined);
+      await voiceBridge.stopOutput().catch(() => undefined);
+      setVoiceState('idle');
+      setStatus('Live Mode closed.');
+      return;
+    }
+    setStatus('Live Mode opened. Native full-duplex bridge will take over when available.');
   };
 
   const confirmPendingAction = async () => {
@@ -177,7 +208,7 @@ export default function NexusAssistantScreen() {
     setStatus('Downloading the high-quality Piper voice…');
     try {
       await downloadAssistantVoice(ASSISTANT_VOICES[0].id);
-      setStatus('Piper voice downloaded. Native Piper playback is added in the voice stage.');
+      setStatus('Piper voice downloaded.');
     } catch {
       setStatus('Voice download failed. Check your connection and try again.');
     } finally {
@@ -191,14 +222,14 @@ export default function NexusAssistantScreen() {
         <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="cpu" size={23} color={colors.primary} /></View>
         <View style={styles.copy}>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Nexus Assistant</Text>
-          <Text style={[styles.body, { color: colors.mutedForeground }]}>Gemini Gateway + local AI + agent actions.</Text>
+          <Text style={[styles.body, { color: colors.mutedForeground }]}>Local agent + Gemini Gateway + weather + live controls.</Text>
         </View>
       </View>
 
       <View accessibilityLiveRegion="polite" style={[styles.status, { borderColor: colors.border, backgroundColor: colors.card }]}>
         <Text style={[styles.statusTitle, { color: colors.foreground }]}>Runtime</Text>
         <Text style={[styles.note, { color: colors.mutedForeground }]}>{status}</Text>
-        <Text style={[styles.note, { color: colors.mutedForeground }]}>Local chats remain in SQLite. Cloud Gemini/weather calls use the existing authenticated Nexus Gateway.</Text>
+        <Text style={[styles.note, { color: colors.mutedForeground }]}>Chat history stays in SQLite. Weather can be served from the local cache; Gemini remains an explicit cloud path through the Nexus Gateway.</Text>
       </View>
 
       <View style={styles.chat} accessibilityLiveRegion="polite">
@@ -229,16 +260,16 @@ export default function NexusAssistantScreen() {
 
       {liveMode ? <View accessibilityLiveRegion="polite" style={[styles.liveCard, { borderColor: colors.primary, backgroundColor: colors.card }]}>
         <Text style={[styles.proposalTitle, { color: colors.foreground }]}>Open Live Mode</Text>
-        <Text style={[styles.body, { color: colors.mutedForeground }]}>Hands-free conversation mode is enabled. Native streaming speech input/output is completed in the voice stage.</Text>
+        <Text style={[styles.body, { color: colors.mutedForeground }]}>Hands-free mode is active. Voice state: {voiceState}. The native full-duplex backend is isolated behind the Stage 6 bridge.</Text>
       </View> : null}
 
       <TextInput accessibilityLabel="Message Nexus Assistant" multiline value={input} onChangeText={setInput} placeholder="Ask Nexus Assistant…" placeholderTextColor={colors.mutedForeground} style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]} />
       <View style={styles.controls}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Voice Input" onPress={toggleVoiceInput} style={[styles.controlButton, { borderColor: voiceInput ? colors.primary : colors.border, backgroundColor: voiceInput ? colors.secondary : colors.card }]}>
-          <Feather name="mic" size={19} color={colors.foreground} />
+        <Pressable accessibilityRole="button" accessibilityLabel="Voice Input" onPress={() => void toggleVoiceInput()} style={[styles.controlButton, { borderColor: voiceInput ? colors.primary : colors.border, backgroundColor: voiceInput ? colors.secondary : colors.card }]}>
+          <Feather name={voiceState === 'listening' ? 'mic' : 'mic'} size={19} color={colors.foreground} />
           <Text style={[styles.controlText, { color: colors.foreground }]}>Voice Input</Text>
         </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel={liveMode ? 'Close Live Mode' : 'Open Live Mode'} onPress={toggleLiveMode} style={[styles.controlButton, { borderColor: liveMode ? colors.primary : colors.border, backgroundColor: liveMode ? colors.secondary : colors.card }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel={liveMode ? 'Close Live Mode' : 'Open Live Mode'} onPress={() => void toggleLiveMode()} style={[styles.controlButton, { borderColor: liveMode ? colors.primary : colors.border, backgroundColor: liveMode ? colors.secondary : colors.card }]}>
           <Feather name="radio" size={19} color={colors.foreground} />
           <Text style={[styles.controlText, { color: colors.foreground }]}>{liveMode ? 'Close Live Mode' : 'Open Live Mode'}</Text>
         </Pressable>
@@ -249,18 +280,16 @@ export default function NexusAssistantScreen() {
       </View>
 
       <View style={[styles.assetCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
-        <Text style={[styles.section, { color: colors.foreground }]}>Optional local downloads</Text>
-        <Text style={[styles.note, { color: colors.mutedForeground }]}>APK target: under {ASSISTANT_LIMITS.maxApkSizeMb} MB. Model and voice weights stay outside the APK.</Text>
+        <Text style={[styles.section, { color: colors.foreground }]}>Local AI assets</Text>
+        <Text style={[styles.note, { color: colors.mutedForeground }]}>APK target: under {ASSISTANT_LIMITS.maxApkSizeMb} MB. Model and Piper voice weights remain outside the APK.</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Download Nexus Small Chat model" disabled={!!assetBusy} onPress={() => void downloadModel()} style={[styles.secondaryButton, { borderColor: colors.border, opacity: assetBusy ? 0.6 : 1 }]}>
           <Feather name="download" size={17} color={colors.foreground} />
           <Text style={[styles.buttonText, { color: colors.foreground }]}>{assetBusy === ASSISTANT_MODELS[0].id ? 'Downloading model…' : 'Download local chat model'}</Text>
         </Pressable>
-        <Text style={[styles.note, { color: colors.mutedForeground }]}>Selected profile: {ASSISTANT_MODELS[0].title} · about {ASSISTANT_MODELS[0].sizeMb} MB</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Download high quality Piper voice" disabled={!!assetBusy} onPress={() => void downloadVoice()} style={[styles.secondaryButton, { borderColor: colors.border, opacity: assetBusy ? 0.6 : 1 }]}>
           <Feather name="volume-2" size={17} color={colors.foreground} />
           <Text style={[styles.buttonText, { color: colors.foreground }]}>{assetBusy === ASSISTANT_VOICES[0].id ? 'Downloading voice…' : 'Download Piper voice'}</Text>
         </Pressable>
-        <Text style={[styles.note, { color: colors.mutedForeground }]}>Selected voice: {ASSISTANT_VOICES[0].title} · high quality</Text>
       </View>
     </ScrollView>
   );
@@ -281,9 +310,9 @@ const styles = StyleSheet.create({
   role: { fontSize: 11, fontFamily: 'Inter_700Bold', marginBottom: 4 },
   input: { minHeight: 100, borderWidth: 1, borderRadius: 16, padding: 14, textAlignVertical: 'top', fontSize: 14 },
   controls: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  controlButton: { flex: 1, minHeight: 48, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, paddingHorizontal: 8 },
-  sendControl: { flex: 1, minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, paddingHorizontal: 8 },
-  controlText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
+  controlButton: { flex: 1, minHeight: 48, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  sendControl: { flex: 1.2, minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  controlText: { fontSize: 11, fontFamily: 'Inter_700Bold', marginTop: 3, textAlign: 'center' },
   buttonText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
   proposal: { borderWidth: 1, borderRadius: 16, padding: 14, marginBottom: 12, gap: 8 },
   proposalTitle: { fontSize: 15, fontFamily: 'Inter_700Bold' },
