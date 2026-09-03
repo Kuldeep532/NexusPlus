@@ -71,9 +71,7 @@ class NexusLauncherActivity : Activity() {
             contentDescription = if (drawerOpen) "Nexus Launcher app drawer" else "Nexus Launcher home"
         }
 
-        status = textView("Launcher status", 14f, Color.rgb(88, 88, 88)).apply {
-            gravity = Gravity.CENTER
-        }
+        status = textView("Launcher status", 14f, Color.rgb(88, 88, 88)).apply { gravity = Gravity.CENTER }
         root.addView(status, fullWidthWrap(dp(2)))
 
         if (drawerOpen) renderDrawer() else renderHome()
@@ -90,26 +88,23 @@ class NexusLauncherActivity : Activity() {
         }
         root.addView(title, wrap(dp(28)))
 
-        val subtitle = textView("Simple. Private. Focused.", 17f, Color.rgb(72, 72, 72)).apply {
+        root.addView(textView("Simple. Private. Focused.", 17f, Color.rgb(72, 72, 72)).apply {
             gravity = Gravity.CENTER
             contentDescription = "Simple, Private, Focused"
-        }
-        root.addView(subtitle, wrap(dp(8)))
+        }, wrap(dp(8)))
 
         renderFocusGateCard()
         renderAssistantHub()
         renderPinnedApps()
 
-        val mode = NexusLauncherPreferences.getMode(this)
-        if (mode == NexusLauncherPreferences.MODE_APP_DRAWER_PLUS_HOME) {
-            val drawer = actionButton("App Drawer", filled = false).apply {
+        if (NexusLauncherPreferences.getMode(this) == NexusLauncherPreferences.MODE_APP_DRAWER_PLUS_HOME) {
+            root.addView(actionButton("App Drawer", false).apply {
                 contentDescription = "Open App Drawer"
                 setOnClickListener { openAppDrawer() }
-            }
-            root.addView(drawer, fullWidth(dp(16)))
+            }, fullWidth(dp(16)))
         }
 
-        defaultButton = actionButton("Set as Default Launcher", filled = false).apply {
+        defaultButton = actionButton("Set as Default Launcher", false).apply {
             contentDescription = "Set Nexus Launcher as Default Launcher"
             setOnClickListener { requestHomeRole() }
         }
@@ -121,6 +116,7 @@ class NexusLauncherActivity : Activity() {
         val windows = NexusLauncherFocusGate.getFocusWindows(this)
         val blockedCount = NexusLauncherFocusGate.getBlockedPackages(this).size
         val cooldown = NexusLauncherFocusGate.getCooldownMinutes(this)
+        val saved = NexusLauncherFocusGate.getSavedDistractionsToday(this)
         val summary = when {
             !enabled -> "Focus Gate is off"
             windows.isEmpty() -> "Focus Gate is on • set a focus window"
@@ -131,19 +127,16 @@ class NexusLauncherActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(16), dp(18), dp(16))
             setBackgroundColor(Color.WHITE)
-            contentDescription = "Nexus Focus Gate. $summary"
+            contentDescription = "Nexus Focus Gate. $summary. Today you saved yourself $saved times."
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         }
-        card.addView(textView("Nexus Focus Gate", 20f, Color.BLACK).apply {
-            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
-        }, fullWidthWrap(0))
+        card.addView(textView("Nexus Focus Gate", 20f, Color.BLACK).apply { setTypeface(Typeface.DEFAULT, Typeface.BOLD) }, fullWidthWrap(0))
         card.addView(textView(summary, 14f, Color.rgb(82, 82, 82)), fullWidthWrap(dp(6)))
-
-        val configure = actionButton(if (enabled) "Adjust Focus Gate" else "Turn on Focus Gate", filled = true).apply {
+        card.addView(textView("Today: $saved distraction${if (saved == 1) "" else "s"} avoided", 13f, Color.rgb(72, 88, 77)), fullWidthWrap(dp(6)))
+        card.addView(actionButton(if (enabled) "Adjust Focus Gate" else "Turn on Focus Gate", true).apply {
             contentDescription = if (enabled) "Adjust Nexus Focus Gate" else "Turn on Nexus Focus Gate"
             setOnClickListener { showFocusGateDialog() }
-        }
-        card.addView(configure, fullWidth(dp(12)))
+        }, fullWidth(dp(12)))
         root.addView(card, fullWidthWrap(dp(18)))
     }
 
@@ -151,23 +144,21 @@ class NexusLauncherActivity : Activity() {
         val packages = loadFocusCandidates()
         val blocked = NexusLauncherFocusGate.getBlockedPackages(this).toMutableSet()
         val names = packages.map { it.label }.toTypedArray()
-        val checked = BooleanArray(packages.size) { index -> packages[index].packageName in blocked }
+        val checked = BooleanArray(packages.size) { packages[it].packageName in blocked }
 
-        val builder = AlertDialog.Builder(this)
+        AlertDialog.Builder(this)
             .setTitle("Nexus Focus Gate")
             .setMultiChoiceItems(names, checked) { _, which, isChecked ->
                 val pkg = packages.getOrNull(which)?.packageName ?: return@setMultiChoiceItems
                 if (isChecked) blocked += pkg else blocked -= pkg
             }
-            .setView(buildFocusWindowEditor())
+            .setView(buildFocusSettingsView())
             .setPositiveButton("Save") { _, _ ->
                 NexusLauncherFocusGate.setEnabled(this, blocked.isNotEmpty())
                 NexusLauncherFocusGate.setBlockedPackages(this, blocked)
-                NexusLauncherFocusGate.setFocusWindows(
-                    this,
-                    if (NexusLauncherFocusGate.getFocusWindows(this).isEmpty()) listOf(9 to 13)
-                    else NexusLauncherFocusGate.getFocusWindows(this),
-                )
+                if (NexusLauncherFocusGate.getFocusWindows(this).isEmpty()) {
+                    NexusLauncherFocusGate.setFocusWindows(this, listOf(9 to 13))
+                }
                 renderLauncher()
             }
             .setNeutralButton(if (NexusLauncherFocusGate.isEnabled(this)) "Turn Off" else "Keep Off") { _, _ ->
@@ -175,26 +166,24 @@ class NexusLauncherActivity : Activity() {
                 renderLauncher()
             }
             .setNegativeButton("Cancel", null)
-        builder.show()
+            .show()
     }
 
-    private fun buildFocusWindowEditor(): TextView = textView(
-        "Current default: 09:00–13:00. Protected apps are paused only inside your focus window. Outside it, they open normally. The rule stays only on this phone.",
-        13f,
-        Color.rgb(76, 76, 76),
-    ).apply {
+    private fun buildFocusSettingsView(): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
         setPadding(dp(20), dp(12), dp(20), dp(8))
-        contentDescription = text
+        addView(textView("Focus window and pause settings", 15f, Color.BLACK).apply { setTypeface(Typeface.DEFAULT, Typeface.BOLD) })
+        val windows = NexusLauncherFocusGate.getFocusWindows(this@NexusLauncherActivity)
+        val windowText = if (windows.isEmpty()) "09:00–13:00" else windows.joinToString(", ") { (s, e) -> "%02d:00–%02d:00".format(s, e) }
+        addView(textView("Window: $windowText", 13f, Color.DKGRAY), fullWidthWrap(dp(4)))
+        addView(textView("Pause: ${NexusLauncherFocusGate.getCooldownMinutes(this@NexusLauncherActivity)} minutes. Use the React Native Nexus Launcher settings for exact hour/cooldown controls.", 13f, Color.DKGRAY), fullWidthWrap(dp(4)))
     }
 
-    private fun loadFocusCandidates(): List<AppEntry> = loadLaunchableApps()
-        .filterNot { app ->
-            val lower = app.packageName.lowercase(Locale.getDefault())
-            lower.contains("android") || lower.contains("settings") ||
-                lower.contains("phone") || lower.contains("dialer") ||
-                lower.contains("contacts") || lower.contains("messag") || lower.contains("camera")
-        }
-        .take(32)
+    private fun loadFocusCandidates(): List<AppEntry> = loadLaunchableApps().filterNot { app ->
+        val lower = app.packageName.lowercase(Locale.getDefault())
+        lower.contains("android") || lower.contains("settings") || lower.contains("phone") ||
+            lower.contains("dialer") || lower.contains("contacts") || lower.contains("messag") || lower.contains("camera")
+    }.take(32)
 
     private fun renderAssistantHub() {
         val card = LinearLayout(this).apply {
@@ -208,18 +197,12 @@ class NexusLauncherActivity : Activity() {
             setTypeface(Typeface.DEFAULT, Typeface.BOLD)
             contentDescription = "Nexus Assistant"
         }, fullWidthWrap(0))
-        card.addView(textView(
-            "Your assistant and key Nexus tools, available directly from Home.", 14f, Color.rgb(82, 82, 82)
-        ).apply { contentDescription = text }, fullWidthWrap(dp(6)))
-        val chat = actionButton("Ask Nexus Assistant", filled = true).apply {
+        card.addView(textView("Your assistant and key Nexus tools, available directly from Home.", 14f, Color.rgb(82, 82, 82)).apply { contentDescription = text }, fullWidthWrap(dp(6)))
+        card.addView(actionButton("Ask Nexus Assistant", true).apply {
             contentDescription = "Open Nexus Assistant"
             setOnClickListener { openNexusAssistant() }
-        }
-        card.addView(chat, fullWidth(dp(12)))
-        val features = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-        }
+        }, fullWidth(dp(12)))
+        val features = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
         features.addView(featureShortcut("Battery", "Battery status") { openNexusFeature("battery-status") }, compactWidth())
         features.addView(featureShortcut("Device", "Device information") { openNexusFeature("device-info") }, compactWidth())
         features.addView(featureShortcut("Reminder", "Create reminder") { openNexusFeature("create-reminder") }, compactWidth())
@@ -227,20 +210,17 @@ class NexusLauncherActivity : Activity() {
         root.addView(card, fullWidthWrap(dp(22)))
     }
 
-    private fun featureShortcut(label: String, description: String, action: () -> Unit): TextView =
-        textView(label, 13f, Color.rgb(30, 30, 30)).apply {
-            gravity = Gravity.CENTER
-            setPadding(dp(8), dp(12), dp(8), dp(12))
-            isClickable = true
-            isFocusable = true
-            contentDescription = description
-            setBackgroundColor(Color.rgb(240, 240, 240))
-            setOnClickListener { action() }
-        }
-
-    private fun compactWidth(): LinearLayout.LayoutParams = LinearLayout.LayoutParams(0, dp(48), 1f).apply {
-        marginEnd = dp(6)
+    private fun featureShortcut(label: String, description: String, action: () -> Unit): TextView = textView(label, 13f, Color.rgb(30, 30, 30)).apply {
+        gravity = Gravity.CENTER
+        setPadding(dp(8), dp(12), dp(8), dp(12))
+        isClickable = true
+        isFocusable = true
+        contentDescription = description
+        setBackgroundColor(Color.rgb(240, 240, 240))
+        setOnClickListener { action() }
     }
+
+    private fun compactWidth(): LinearLayout.LayoutParams = LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(6) }
 
     private fun openNexusAssistant() {
         val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return
@@ -259,16 +239,14 @@ class NexusLauncherActivity : Activity() {
     private fun renderPinnedApps() {
         val pinned = NexusLauncherPreferences.getPinnedPackages(this)
         if (pinned.isEmpty()) return
-        val heading = textView("Pinned apps", 15f, Color.rgb(72, 72, 72)).apply {
+        root.addView(textView("Pinned apps", 15f, Color.rgb(72, 72, 72)).apply {
             gravity = Gravity.CENTER
             setTypeface(Typeface.DEFAULT, Typeface.BOLD)
             contentDescription = "Pinned apps"
-        }
-        root.addView(heading, fullWidthWrap(dp(28)))
+        }, fullWidthWrap(dp(28)))
         pinned.forEach { packageName ->
             findLaunchableApp(packageName)?.let { app ->
-                val row = createAppRow(app).apply { contentDescription = "Open pinned ${app.label}" }
-                root.addView(row, fullWidth(dp(8)))
+                root.addView(createAppRow(app).apply { contentDescription = "Open pinned ${app.label}" }, fullWidth(dp(8)))
             }
         }
     }
@@ -279,28 +257,16 @@ class NexusLauncherActivity : Activity() {
             setTypeface(Typeface.DEFAULT, Typeface.BOLD)
             contentDescription = "App Drawer"
         }, wrap(dp(24)))
-        val sort = actionButton(
-            if (NexusLauncherPreferences.isCustomSort(this)) "Sort: Custom" else "Sort: A to Z", filled = false
-        ).apply {
+        root.addView(actionButton(if (NexusLauncherPreferences.isCustomSort(this)) "Sort: Custom" else "Sort: A to Z", false).apply {
             contentDescription = if (NexusLauncherPreferences.isCustomSort(this)) "App Drawer sorted by custom order" else "App Drawer sorted A to Z"
-            setOnClickListener {
-                NexusLauncherPreferences.toggleSortMode(this@NexusLauncherActivity)
-                renderLauncher()
-            }
-        }
-        root.addView(sort, fullWidth(dp(12)))
-        val scroll = ScrollView(this).apply {
-            isFillViewport = true
-            contentDescription = "Installed applications"
-        }
-        val list = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(12), 0, dp(20))
-        }
+            setOnClickListener { NexusLauncherPreferences.toggleSortMode(this@NexusLauncherActivity); renderLauncher() }
+        }, fullWidth(dp(12)))
+        val scroll = ScrollView(this).apply { isFillViewport = true; contentDescription = "Installed applications" }
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(12), 0, dp(20)) }
         loadLaunchableApps().forEach { app -> list.addView(createAppRow(app), fullWidth(dp(8))) }
         scroll.addView(list)
         root.addView(scroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { topMargin = dp(4) })
-        root.addView(actionButton("Back to Home", filled = false).apply {
+        root.addView(actionButton("Back to Home", false).apply {
             contentDescription = "Return to Nexus Launcher home"
             setOnClickListener { drawerOpen = false; renderLauncher() }
         }, fullWidth(dp(8)))
@@ -309,19 +275,15 @@ class NexusLauncherActivity : Activity() {
     private fun loadLaunchableApps(): List<AppEntry> {
         val manager = packageManager
         val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        val apps = manager.queryIntentActivities(launcherIntent, PackageManager.MATCH_ALL)
-            .map { resolveInfo ->
-                val activityInfo = resolveInfo.activityInfo
-                AppEntry(
-                    label = resolveInfo.loadLabel(manager)?.toString()?.trim()?.ifBlank { activityInfo.packageName }
-                        ?: activityInfo.packageName,
-                    packageName = activityInfo.packageName,
-                    className = activityInfo.name,
-                    icon = resolveInfo.loadIcon(manager),
-                )
-            }
-            .distinctBy { "${it.packageName}/${it.className}" }
-            .filterNot { it.packageName == packageName }
+        val apps = manager.queryIntentActivities(launcherIntent, PackageManager.MATCH_ALL).map { resolveInfo ->
+            val activityInfo = resolveInfo.activityInfo
+            AppEntry(
+                label = resolveInfo.loadLabel(manager)?.toString()?.trim()?.ifBlank { activityInfo.packageName } ?: activityInfo.packageName,
+                packageName = activityInfo.packageName,
+                className = activityInfo.name,
+                icon = resolveInfo.loadIcon(manager),
+            )
+        }.distinctBy { "${it.packageName}/${it.className}" }.filterNot { it.packageName == packageName }
         val customOrder = NexusLauncherPreferences.getCustomOrder(this)
         return if (customOrder.isEmpty()) apps.sortedBy { it.label.lowercase(Locale.getDefault()) }
         else {
@@ -353,28 +315,26 @@ class NexusLauncherActivity : Activity() {
     }
 
     private fun launchApp(app: AppEntry) {
+        if (!isDefaultHome()) {
+            startAppActivity(app)
+            return
+        }
         val decision = NexusLauncherFocusGate.evaluate(this, app.packageName)
         if (decision.blocked) {
-            showFocusGateWarning(app, decision)
+            showFocusMentor(app)
             return
         }
         NexusLauncherRecommendationEngine.recordLaunch(this, app.packageName)
         startAppActivity(app)
     }
 
-    private fun showFocusGateWarning(app: AppEntry, decision: NexusLauncherFocusGate.Decision) {
-        val timeHint = if (decision.remainingMinutes > 0) {
-            " About ${decision.remainingMinutes} minutes remain in the current focus window."
-        } else ""
-        AlertDialog.Builder(this)
-            .setTitle("Nexus Focus Gate")
-            .setMessage("${app.label}: ${decision.message}$timeHint")
-            .setPositiveButton("Stay Focused", null)
-            .setNegativeButton("Pause for ${NexusLauncherFocusGate.getCooldownMinutes(this)} min") { _, _ ->
-                NexusLauncherFocusGate.allowTemporarily(this, app.packageName)
-                startAppActivity(app)
-            }
-            .show()
+    private fun showFocusMentor(app: AppEntry) {
+        val intent = Intent(this, NexusLauncherMentorActivity::class.java).apply {
+            putExtra("blocked_package", app.packageName)
+            putExtra("blocked_label", app.label)
+            addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
+        }
+        startActivity(intent)
     }
 
     private fun startAppActivity(app: AppEntry) {
@@ -385,15 +345,11 @@ class NexusLauncherActivity : Activity() {
         runCatching { startActivity(intent) }
     }
 
-    private fun openAppDrawer() {
-        drawerOpen = true
-        renderLauncher()
-    }
+    private fun openAppDrawer() { drawerOpen = true; renderLauncher() }
 
     private fun refreshStatus() {
         val isDefault = isDefaultHome()
-        val mode = NexusLauncherPreferences.getMode(this)
-        val modeLabel = if (mode == NexusLauncherPreferences.MODE_HOME_ONLY) "Home Screen Only" else "App Drawer + Home Screen"
+        val modeLabel = if (NexusLauncherPreferences.getMode(this) == NexusLauncherPreferences.MODE_HOME_ONLY) "Home Screen Only" else "App Drawer + Home Screen"
         status.text = if (isDefault) "Nexus Launcher is your Home • $modeLabel" else "Nexus Launcher • Preview mode"
         status.contentDescription = status.text
         if (!drawerOpen && ::defaultButton.isInitialized) defaultButton.visibility = if (isDefault) View.GONE else View.VISIBLE
@@ -421,18 +377,13 @@ class NexusLauncherActivity : Activity() {
     }
 
     private fun textView(value: String, size: Float, color: Int): TextView = TextView(this).apply {
-        text = value
-        textSize = size
-        setTextColor(color)
-        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        text = value; textSize = size; setTextColor(color); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
     }
 
     private fun actionButton(label: String, filled: Boolean): TextView = textView(label, 16f, if (filled) Color.WHITE else Color.rgb(30, 30, 30)).apply {
-        gravity = Gravity.CENTER
-        setPadding(dp(16), 0, dp(16), 0)
+        gravity = Gravity.CENTER; setPadding(dp(16), 0, dp(16), 0)
         setBackgroundColor(if (filled) Color.rgb(28, 28, 28) else Color.rgb(226, 226, 226))
-        isClickable = true
-        isFocusable = true
+        isClickable = true; isFocusable = true
     }
 
     private fun fullWidth(topMargin: Int): LinearLayout.LayoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(58)).apply { this.topMargin = topMargin }
@@ -441,7 +392,6 @@ class NexusLauncherActivity : Activity() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     data class AppEntry(val label: String, val packageName: String, val className: String, val icon: Drawable)
-
     companion object { private const val REQUEST_HOME_ROLE = 7102 }
 }
 
