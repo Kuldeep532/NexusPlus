@@ -1,11 +1,13 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors, refreshThemeColor } from '@/hooks/useColors';
 import { readThemeColor, writeThemeColor, type ThemeColor } from '@/features/app-shell/themePreferences';
 import { readLaunchPreferences, writeLaunchPreferences, type LaunchTarget } from '@/features/app-shell/launchPreferences';
+
+type LauncherState = 'setup' | 'open-settings';
 
 const SETTINGS = [
   { title: 'Nexus Launcher', description: 'Set up Nexus Launcher, choose its home layout and manage launcher preferences.', action: 'launcher' as const, icon: 'grid' as const },
@@ -35,6 +37,7 @@ export default function SettingsScreen() {
   const [launchTarget, setLaunchTarget] = useState<LaunchTarget>('nexus-plus');
   const [showGeetaNexusOnHome, setShowGeetaNexusOnHome] = useState(true);
   const [themeColor, setThemeColor] = useState<ThemeColor>('ocean-blue');
+  const [launcherState, setLauncherState] = useState<LauncherState>('setup');
 
   useEffect(() => {
     void Promise.all([readLaunchPreferences(), readThemeColor()]).then(([preferences, theme]) => {
@@ -42,6 +45,9 @@ export default function SettingsScreen() {
       setShowGeetaNexusOnHome(preferences.showGeetaNexusOnHome);
       setThemeColor(theme);
     });
+    // The native launcher is deliberately selected by the user through Android's Home role.
+    // We persist the setup/opening state only after the native launcher confirms it is enabled.
+    void Linking.getInitialURL().then(() => undefined);
   }, []);
 
   const updateLaunchTarget = async (target: LaunchTarget) => {
@@ -60,12 +66,14 @@ export default function SettingsScreen() {
     await writeThemeColor(theme);
   };
 
-  const openLauncherSetup = () => {
-    const url = 'nexus-plus://launcher/setup';
-    // Native launcher can be opened through the OS Home-role/settings flow. The URL is
-    // handled as a best-effort deep link; no API is required and failure is non-fatal.
-    router.push({ pathname: '/nexus-launcher-settings', params: { source: 'settings' } });
+  const openLauncherSettings = () => {
+    router.push({ pathname: '/nexus-launcher-settings', params: { source: launcherState } });
   };
+
+  const launcherTitle = launcherState === 'open-settings' ? 'Open Nexus Launcher Settings' : 'Set up Nexus Launcher';
+  const launcherDescription = launcherState === 'open-settings'
+    ? 'Open the dedicated Nexus Launcher settings screen.'
+    : 'Set up Nexus Launcher, choose its Home layout and manage launcher preferences.';
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -77,9 +85,9 @@ export default function SettingsScreen() {
 
         <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 12 }]}>Launcher</Text>
         <View style={styles.list}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Nexus Launcher. Set up Nexus Launcher, choose its home layout and manage launcher preferences." onPress={openLauncherSetup} style={[styles.item, styles.featuredItem, { backgroundColor: colors.card, borderColor: colors.primary }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Nexus Launcher. ${launcherDescription}`} onPress={openLauncherSettings} style={[styles.item, styles.featuredItem, { backgroundColor: colors.card, borderColor: colors.primary }]}>
             <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="grid" size={19} color={colors.primary} /></View>
-            <View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Nexus Launcher</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>Set up Nexus Launcher, choose Home Screen + App Drawer or Home Screen Only, and manage launcher preferences.</Text></View>
+            <View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{launcherTitle}</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>{launcherDescription}</Text></View>
             <Feather name="chevron-right" size={19} color={colors.mutedForeground} accessibilityElementsHidden />
           </Pressable>
         </View>
