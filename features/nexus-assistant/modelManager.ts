@@ -1,5 +1,6 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { ASSISTANT_MODELS, ASSISTANT_VOICES, type AssistantModel, type AssistantVoice } from './assistantConfig';
+import { downloadAssistantAsset } from './stage8AssetManager';
 
 const modelsDir = new Directory(Paths.document, 'nexus-assistant', 'models');
 const voicesDir = new Directory(Paths.document, 'nexus-assistant', 'voices');
@@ -16,30 +17,34 @@ export function getAssistantVoices(): AssistantVoice[] {
   return [...ASSISTANT_VOICES];
 }
 
+/** Legacy chat-model entry point retained for callers already using the Stage 1 API. */
 export async function downloadAssistantModel(modelId: string): Promise<string> {
   const model = ASSISTANT_MODELS.find((item) => item.id === modelId);
   if (!model) throw new Error('Unknown Nexus Assistant model.');
-  ensureDir(modelsDir);
-  const target = new File(modelsDir, `${model.id}.gguf`);
-  const file = await File.downloadFileAsync(model.url, target, { idempotent: true });
-  return file.uri;
+  if (model.kind !== 'chat') throw new Error('Requested asset is not a chat model.');
+  return downloadAssistantAsset('chat-smollm2-360m-q4km');
 }
 
 export async function deleteAssistantModel(modelId: string): Promise<void> {
-  const file = new File(modelsDir, `${modelId}.gguf`);
-  if (file.exists) file.delete();
+  ensureDir(modelsDir);
+  const candidates = [`${modelId}.gguf`, `${modelId}.tar.bz2`, `${modelId}.onnx`];
+  for (const name of candidates) {
+    const file = new File(modelsDir, name);
+    if (file.exists) file.delete();
+  }
 }
 
+/** Legacy voice entry point retained for callers already using the Stage 1 API. */
 export async function downloadAssistantVoice(voiceId: string): Promise<string> {
   const voice = ASSISTANT_VOICES.find((item) => item.id === voiceId);
   if (!voice) throw new Error('Unknown Nexus Assistant voice.');
-  ensureDir(voicesDir);
-  const target = new File(voicesDir, `${voice.id}.onnx`);
-  const file = await File.downloadFileAsync(voice.url, target, { idempotent: true });
-  return file.uri;
+  return downloadAssistantAsset('tts-piper-en-us-lessac-medium');
 }
 
 export async function deleteAssistantVoice(voiceId: string): Promise<void> {
-  const file = new File(voicesDir, `${voiceId}.onnx`);
-  if (file.exists) file.delete();
+  ensureDir(voicesDir);
+  for (const extension of ['.onnx', '.tar.bz2', '.json']) {
+    const file = new File(voicesDir, `${voiceId}${extension}`);
+    if (file.exists) file.delete();
+  }
 }
