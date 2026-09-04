@@ -10,7 +10,7 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 
-/** IPv4/UDP DNS proxy for the Nexus VPN tunnel address. */
+/** Local DNS protection path. Blocking is fail-closed for matched adult domains; forwarding failures fail open. */
 object NexusVpnDnsPacketHandler {
     private const val MAX_DNS_PAYLOAD = 4096
 
@@ -43,6 +43,8 @@ object NexusVpnDnsPacketHandler {
         } else {
             val forwarded = querySystemDns(service, query)
             if (forwarded == null) {
+                // Protection must never become the reason ordinary internet access fails.
+                // Do not synthesize SERVFAIL; simply leave this request to the host resolver path.
                 NexusVpnPacketStats.recordDnsFailed()
                 NexusVpnDnsStats.recordFailed()
                 return
@@ -61,11 +63,15 @@ object NexusVpnDnsPacketHandler {
             inspected.sourcePort,
             dnsResponse,
         )
-        FileOutputStream(interfaceFd.fileDescriptor).use { output ->
-            output.write(response)
-            output.flush()
+        runCatching {
+            FileOutputStream(interfaceFd.fileDescriptor).use { output ->
+                output.write(response)
+                output.flush()
+            }
+            NexusVpnPacketStats.recordOut()
+        }.onFailure {
+            NexusVpnPacketStats.recordDropped()
         }
-        NexusVpnPacketStats.recordOut()
     }
 
     private fun querySystemDns(service: VpnService, payload: ByteArray): ByteArray? {
@@ -78,8 +84,15 @@ object NexusVpnDnsPacketHandler {
             val result = runCatching {
                 DatagramSocket().use { socket ->
                     if (!service.protect(socket)) return@runCatching null
-                    socket.soTimeout = 1800
-                    socket.send(DatagramPacket(payload, payload.size, InetAddress.getByAddress(server.address), NexusVpnPacketInspector.DNS_PORT))
+                    socket.soTimeout = 1200
+                    socket.send(
+                        DatagramPacket(
+                            payload,
+                            payload.size,
+                            InetAddress.getByAddress(server.address),
+                            NexusVpnPacketInspector.DNS_PORT,
+                        ),
+                    )
                     val buffer = ByteArray(MAX_DNS_PAYLOAD)
                     val response = DatagramPacket(buffer, buffer.size)
                     socket.receive(response)
@@ -142,9 +155,7 @@ object NexusVpnDnsPacketHandler {
 
     private fun ipv4Checksum(packet: ByteArray): Int {
         var sum = 0L
-        for (offset in 0 until 20 step 2) {
-            if (offset != 10) sum += u16(packet, offset)
-        }
+        for (offset in 0 until 20 step 2) if (offset != 10) sum += u16(packet, offset)
         return fold(sum)
     }
 
@@ -154,11 +165,7 @@ object NexusVpnDnsPacketHandler {
         sum += NexusVpnPacketInspector.UDP_PROTOCOL + u16(packet, 24)
         for (offset in 20 until packet.size step 2) {
             if (offset == 26) continue
-            sum += if (offset + 1 < packet.size) {
-                u16(packet, offset)
-            } else {
-                (packet[offset].toInt() and 0xff) shl 8
-            }
+            sum += if (offset + 1 < packet.size) u16(packet, offset) else (packet[offset].toInt() and 0xff) shl 8
         }
         val result = fold(sum)
         return if (result == 0) 0xffff else result
