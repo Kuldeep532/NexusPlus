@@ -34,6 +34,19 @@
             </intent-filter>
         </service>
 
+        <service
+            android:name=".NexusSafetyAccessibilityService"
+            android:enabled="true"
+            android:exported="false"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/nexus_safety_accessibility" />
+        </service>
+
         <activity
             android:name=".NexusLauncherActivity"
             android:exported="true"
