@@ -1,0 +1,11 @@
+Nexus offline dataset placeholder
+
+Dataset: StevenBlack social-only
+Upstream project: https://github.com/StevenBlack/hosts
+Expected raw source: https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/social-only/hosts
+Category: social
+
+Upload the downloaded raw `hosts` file next to this file when social protection is enabled.
+Then record the exact snapshot date, source revision if available, SHA-256, and domain count here.
+
+Do not replace this metadata file with the raw dataset.
