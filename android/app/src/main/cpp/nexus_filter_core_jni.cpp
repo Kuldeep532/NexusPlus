@@ -1,4 +1,5 @@
 #include <jni.h>
+#include <string>
 #include "nexus_filter_core.hpp"
 
 extern "C" JNIEXPORT jint JNICALL
@@ -8,6 +9,16 @@ Java_com_nexuswavetech_nexusplus_NexusNativeSecurityModule_nativeClassifyText(JN
     if (chars == nullptr) return static_cast<jint>(nexus::filter::Verdict::kAllow);
     const auto decision = nexus::filter::classify_text(chars);
     env->ReleaseStringUTFChars(text, chars);
+    return static_cast<jint>(decision.verdict);
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_nexuswavetech_nexusplus_NexusNativeSecurityModule_nativeClassifyDomain(JNIEnv* env, jobject, jstring domain) {
+    if (domain == nullptr) return static_cast<jint>(nexus::filter::Verdict::kAllow);
+    const char* chars = env->GetStringUTFChars(domain, nullptr);
+    if (chars == nullptr) return static_cast<jint>(nexus::filter::Verdict::kAllow);
+    const auto decision = nexus::filter::classify_domain(chars);
+    env->ReleaseStringUTFChars(domain, chars);
     return static_cast<jint>(decision.verdict);
 }
 
