@@ -10,15 +10,9 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 
-/** Local DNS protection path using Cloudflare Families, with host-DNS fail-open fallback. */
+/** Local DNS protection path using Cloudflare Families with host-DNS fallback. */
 object NexusVpnDnsPacketHandler {
     private const val MAX_DNS_PAYLOAD = 4096
-    private val cloudflareFamilyResolvers = listOf(
-        "1.1.1.3",
-        "1.0.0.3",
-        "2606:4700:4700::1113",
-        "2606:4700:4700::1003",
-    )
 
     fun handle(service: VpnService, interfaceFd: ParcelFileDescriptor, packet: ByteArray, length: Int) {
         val inspected = NexusVpnPacketInspector.inspect(packet, length)
@@ -30,6 +24,7 @@ object NexusVpnDnsPacketHandler {
             NexusVpnPacketStats.recordNonDns()
             return
         }
+
         val payloadLength = minOf(inspected.payloadLength, MAX_DNS_PAYLOAD)
         if (payloadLength < 12) {
             NexusVpnPacketStats.recordDropped()
@@ -41,7 +36,10 @@ object NexusVpnDnsPacketHandler {
             NexusVpnPacketStats.recordDropped()
             return
         }
-        val blocked = NexusVpnDnsPolicy.shouldBlock(hostname)
+
+        val blocked = NexusVpnDnsPolicy.shouldBlock(hostname) ||
+            runCatching { NexusNativeAdultDomainPolicy.isBlocked(hostname) }.getOrDefault(false)
+
         val dnsResponse = if (blocked) {
             NexusVpnPacketStats.recordDnsBlocked()
             NexusVpnDnsStats.recordBlocked()
@@ -79,13 +77,21 @@ object NexusVpnDnsPacketHandler {
     }
 
     private fun queryCloudflareFamily(service: VpnService, payload: ByteArray): ByteArray? {
-        for (resolver in cloudflareFamilyResolvers) {
+        // Cloudflare Families: malware + adult-content filtering.
+        // Keep these sockets outside the VPN tunnel to avoid recursive interception.
+        for (resolver in listOf("1.1.1.3", "1.0.0.3")) {
             val result = runCatching {
                 DatagramSocket().use { socket ->
                     if (!service.protect(socket)) return@runCatching null
                     socket.soTimeout = 1200
-                    val address = InetAddress.getByName(resolver)
-                    socket.send(DatagramPacket(payload, payload.size, address, NexusVpnPacketInspector.DNS_PORT))
+                    socket.send(
+                        DatagramPacket(
+                            payload,
+                            payload.size,
+                            InetAddress.getByName(resolver),
+                            NexusVpnPacketInspector.DNS_PORT,
+                        ),
+                    )
                     val buffer = ByteArray(MAX_DNS_PAYLOAD)
                     val response = DatagramPacket(buffer, buffer.size)
                     socket.receive(response)
