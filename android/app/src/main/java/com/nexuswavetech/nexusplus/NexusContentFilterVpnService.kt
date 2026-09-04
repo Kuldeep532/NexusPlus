@@ -23,8 +23,18 @@ class NexusContentFilterVpnService : VpnService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) { stopProtection(); stopSelf(); return START_NOT_STICKY }
-        if (!NexusVpnPolicy.hasConsent(this)) { NexusVpnPolicy.setEnabled(this, false); stopProtection(); stopSelf(); return START_NOT_STICKY }
-        if (prepare(this) != null) { NexusVpnPolicy.setEnabled(this, false); stopProtection(); stopSelf(); return START_NOT_STICKY }
+        if (!NexusVpnPolicy.hasConsent(this)) {
+            NexusVpnPolicy.setEnabled(this, false)
+            stopProtection()
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        if (prepare(this) != null) {
+            NexusVpnPolicy.setEnabled(this, false)
+            stopProtection()
+            stopSelf()
+            return START_NOT_STICKY
+        }
         NexusVpnPolicy.setEnabled(this, true)
         startForeground(NOTIFICATION_ID, buildNotification())
         establishVpn()
@@ -47,23 +57,33 @@ class NexusContentFilterVpnService : VpnService() {
                 .setBlocking(false)
                 .establish()
         }.getOrNull()
-        if (established == null) { NexusVpnPolicy.setEnabled(this, false); running.set(false); stopSelf(); return }
+        if (established == null) {
+            NexusVpnPolicy.setEnabled(this, false)
+            running.set(false)
+            stopSelf()
+            return
+        }
         vpnInterface = established
         startPacketLoop(established)
     }
 
     private fun startPacketLoop(interfaceFd: ParcelFileDescriptor) {
         packetThread?.interrupt()
-        packetThread = thread(name = "NexusVpnDnsLoop", isDaemon = true) {
+        packetThread = thread(name = "NexusVpnPacketLoop", isDaemon = true) {
             val input = runCatching { FileInputStream(interfaceFd.fileDescriptor) }.getOrNull()
-            if (input == null) { NexusVpnPolicy.setEnabled(this, false); stopProtection(); return@thread }
+            if (input == null) {
+                NexusVpnPacketStats.recordDropped()
+                NexusVpnPolicy.setEnabled(this, false)
+                stopProtection()
+                return@thread
+            }
             val buffer = ByteArray(MAX_PACKET_SIZE)
             try {
                 while (running.get() && NexusVpnPolicy.isEnabled(this)) {
                     val read = input.read(buffer)
                     if (read <= 0) break
                     NexusVpnPacketStats.recordIn()
-                    NexusVpnDnsPacketHandler.handle(this, interfaceFd, buffer, read)
+                    dispatchPacket(interfaceFd, buffer, read)
                 }
             } catch (_: Throwable) {
                 NexusVpnPacketStats.recordDropped()
@@ -71,6 +91,18 @@ class NexusContentFilterVpnService : VpnService() {
                 runCatching { input.close() }
                 running.set(false)
             }
+        }
+    }
+
+    private fun dispatchPacket(interfaceFd: ParcelFileDescriptor, packet: ByteArray, length: Int) {
+        when (NexusVpnPacketInspector.inspect(packet, length).kind) {
+            NexusVpnPacketInspector.Kind.DNS_UDP ->
+                NexusVpnDnsPacketHandler.handle(this, interfaceFd, packet, length)
+            NexusVpnPacketInspector.Kind.NON_DNS_UDP,
+            NexusVpnPacketInspector.Kind.TCP,
+            NexusVpnPacketInspector.Kind.OTHER_IPV4,
+                -> NexusVpnPacketStats.recordNonDns()
+            NexusVpnPacketInspector.Kind.INVALID -> NexusVpnPacketStats.recordDropped()
         }
     }
 
