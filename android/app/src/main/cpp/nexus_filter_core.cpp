@@ -38,39 +38,41 @@ std::string lower(std::string_view in) {
     return out;
 }
 
-bool isDomainBoundaryPrefix(std::string_view host, std::string_view domain) {
+bool hasDomainSuffix(std::string_view host, std::string_view domain) {
     if (host == domain) return true;
     return host.size() > domain.size() &&
            host.compare(host.size() - domain.size(), domain.size(), domain) == 0 &&
            host[host.size() - domain.size() - 1] == '.';
 }
-} // namespace
 
-namespace nexus::filter {
-Decision classify_text(std::string_view input) noexcept {
-    auto normalized = lower(input);
+bool isHighRiskLabel(std::string_view host) {
     TokenTrie trie;
     trie.insert(decode(0, 4));
     trie.insert(decode(8, 4));
     trie.insert(decode(12, 4));
     trie.insert(decode(16, 3));
     trie.insert(decode(19, 3));
-    return trie.contains_in(normalized)
+    return trie.contains_in(host);
+}
+} // namespace
+
+namespace nexus::filter {
+Decision classify_text(std::string_view input) noexcept {
+    const auto normalized = lower(input);
+    return isHighRiskLabel(normalized)
         ? Decision{Verdict::kProtected, 100}
         : Decision{Verdict::kAllow, 0};
 }
 
 Decision classify_domain(std::string_view input) noexcept {
-    auto normalized = lower(input);
+    const auto normalized = lower(input);
     if (normalized.empty()) return Decision{Verdict::kAllow, 0};
-    TokenTrie trie;
-    trie.insert(decode(0, 4));
-    trie.insert(decode(8, 4));
-    trie.insert(decode(12, 4));
-    trie.insert(decode(16, 3));
-    trie.insert(decode(19, 3));
-    if (trie.contains_in(normalized)) return Decision{Verdict::kProtected, 100};
-    return Decision{Verdict::kAllow, 0};
+    // The native token layer is deliberately conservative. Generated domain data,
+    // when supplied by the release build, is checked at the domain-policy layer.
+    // Never convert a weak substring match into a broad domain block.
+    return isHighRiskLabel(normalized)
+        ? Decision{Verdict::kProtected, 100}
+        : Decision{Verdict::kAllow, 0};
 }
 
 bool runtime_integrity_ok() noexcept {
@@ -79,7 +81,7 @@ bool runtime_integrity_ok() noexcept {
     std::string line;
     while (std::getline(status, line)) {
         if (line.rfind("TracerPid:", 0) != 0) continue;
-        auto sep = line.find_first_of(" \t");
+        const auto sep = line.find_first_of(" \t");
         if (sep == std::string::npos) return true;
         try {
             return std::stoul(line.substr(sep + 1)) == 0U;
