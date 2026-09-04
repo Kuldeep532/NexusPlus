@@ -46,43 +46,51 @@ function RootLayoutContent() {
     const inLegal = firstSegment === 'privacy-policy' || firstSegment === 'terms-and-conditions' || firstSegment === 'about-us';
 
     let cancelled = false;
-    void SafetyGate?.getState?.().then((safety) => {
-      if (cancelled || !safety) return;
-
-      // The Safe Environment gate is intentionally before Welcome/Auth.
-      // No login or protected Nexus Plus route is reachable until Android reports
-      // that the user has explicitly enabled the Nexus Safety Accessibility Service.
-      if (!safety.ready) {
-        if (!inSafetySetup && !inLegal) router.replace('/safe-device-setup');
+    const enforceSafetyGate = async () => {
+      if (!SafetyGate?.getState) {
+        if (!cancelled && !inSafetySetup && !inLegal) router.replace('/safe-device-setup');
         return;
       }
 
-      if (!auth.session) {
-        if (inSafetySetup) {
-          void hasCompletedWelcome().then((completed) => {
-            if (cancelled) return;
-            router.replace(completed ? '/login-plus-register' : '/welcome');
-          });
+      try {
+        const safety = await SafetyGate.getState();
+        if (cancelled) return;
+
+        // Fail closed: if the native safety module exists but does not report a
+        // verified ready state, login and protected Nexus routes stay locked.
+        if (!safety?.ready) {
+          if (!inSafetySetup && !inLegal) router.replace('/safe-device-setup');
           return;
         }
 
-        const inWelcome = firstSegment === 'welcome';
-        const inAuth = firstSegment === 'login-plus-register';
-        if (inWelcome || inAuth || inLegal) return;
+        if (!auth.session) {
+          if (inSafetySetup) {
+            const completed = await hasCompletedWelcome();
+            if (cancelled) return;
+            router.replace(completed ? '/login-plus-register' : '/welcome');
+            return;
+          }
 
-        void hasCompletedWelcome().then((completed) => {
+          const inWelcome = firstSegment === 'welcome';
+          const inAuth = firstSegment === 'login-plus-register';
+          if (inWelcome || inAuth || inLegal) return;
+
+          const completed = await hasCompletedWelcome();
           if (cancelled) return;
           router.replace(completed ? '/login-plus-register' : '/welcome');
-        });
-        return;
-      }
+          return;
+        }
 
-      if (inSafetySetup || firstSegment === 'login-plus-register' || firstSegment === 'welcome' || (!firstSegment && !inLegal)) {
-        void getLaunchRoute().then((route) => {
+        if (inSafetySetup || firstSegment === 'login-plus-register' || firstSegment === 'welcome' || (!firstSegment && !inLegal)) {
+          const route = await getLaunchRoute();
           if (!cancelled) router.replace(route);
-        });
+        }
+      } catch {
+        if (!cancelled && !inSafetySetup && !inLegal) router.replace('/safe-device-setup');
       }
-    });
+    };
+
+    void enforceSafetyGate();
 
     return () => {
       cancelled = true;
