@@ -10,9 +10,15 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 
-/** Local DNS protection path. Blocking is fail-closed for matched adult domains; forwarding failures fail open. */
+/** Local DNS protection path using Cloudflare Families, with host-DNS fail-open fallback. */
 object NexusVpnDnsPacketHandler {
     private const val MAX_DNS_PAYLOAD = 4096
+    private val cloudflareFamilyResolvers = listOf(
+        "1.1.1.3",
+        "1.0.0.3",
+        "2606:4700:4700::1113",
+        "2606:4700:4700::1003",
+    )
 
     fun handle(service: VpnService, interfaceFd: ParcelFileDescriptor, packet: ByteArray, length: Int) {
         val inspected = NexusVpnPacketInspector.inspect(packet, length)
@@ -35,16 +41,15 @@ object NexusVpnDnsPacketHandler {
             NexusVpnPacketStats.recordDropped()
             return
         }
-        val blocked = NexusVpnDnsPolicy.shouldBlock(hostname)
+        val blocked = NexusVpnDnsPolicy.shouldBlock(hostname) ||
+            runCatching { NexusNativeAdultDomainPolicy.isBlocked(hostname) }.getOrDefault(false)
         val dnsResponse = if (blocked) {
             NexusVpnPacketStats.recordDnsBlocked()
             NexusVpnDnsStats.recordBlocked()
             buildNxDomainResponse(query)
         } else {
-            val forwarded = querySystemDns(service, query)
+            val forwarded = queryCloudflareFamily(service, query) ?: querySystemDns(service, query)
             if (forwarded == null) {
-                // Protection must never become the reason ordinary internet access fails.
-                // Do not synthesize SERVFAIL; simply leave this request to the host resolver path.
                 NexusVpnPacketStats.recordDnsFailed()
                 NexusVpnDnsStats.recordFailed()
                 return
@@ -72,6 +77,25 @@ object NexusVpnDnsPacketHandler {
         }.onFailure {
             NexusVpnPacketStats.recordDropped()
         }
+    }
+
+    private fun queryCloudflareFamily(service: VpnService, payload: ByteArray): ByteArray? {
+        for (resolver in cloudflareFamilyResolvers) {
+            val result = runCatching {
+                DatagramSocket().use { socket ->
+                    if (!service.protect(socket)) return@runCatching null
+                    socket.soTimeout = 1200
+                    val address = InetAddress.getByName(resolver)
+                    socket.send(DatagramPacket(payload, payload.size, address, NexusVpnPacketInspector.DNS_PORT))
+                    val buffer = ByteArray(MAX_DNS_PAYLOAD)
+                    val response = DatagramPacket(buffer, buffer.size)
+                    socket.receive(response)
+                    response.data.copyOf(response.length)
+                }
+            }.getOrNull()
+            if (result != null) return result
+        }
+        return null
     }
 
     private fun querySystemDns(service: VpnService, payload: ByteArray): ByteArray? {
