@@ -10,11 +10,12 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 
 /**
- * Stage 2: local loopback VPN foundation.
+ * Stage 2: user-consented local VPN foundation.
  *
- * The service establishes a local TUN interface after Android grants VPN
- * consent. Packet parsing/DNS forwarding is deliberately kept in the native
- * engine boundary so the policy remains on-device.
+ * Android permits only one active VPN connection per user at a time. This
+ * service therefore remains optional and does not attempt to replace or stack
+ * another VPN provider. Packet classification/forwarding is intentionally not
+ * performed here until the complete packet engine is available.
  */
 class NexusContentFilterVpnService : VpnService() {
     private var vpnInterface: android.os.ParcelFileDescriptor? = null
@@ -25,20 +26,23 @@ class NexusContentFilterVpnService : VpnService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         startForeground(NOTIFICATION_ID, buildNotification())
         establishVpn()
         return START_STICKY
     }
 
     override fun onDestroy() {
-        vpnInterface?.close()
-        vpnInterface = null
+        closeVpn()
         super.onDestroy()
     }
 
     override fun onRevoke() {
-        vpnInterface?.close()
-        vpnInterface = null
+        closeVpn()
         stopSelf()
     }
 
@@ -54,6 +58,11 @@ class NexusContentFilterVpnService : VpnService() {
             .addRoute("0.0.0.0", 0)
             .addDnsServer("10.231.0.1")
             .establish()
+    }
+
+    private fun closeVpn() {
+        vpnInterface?.close()
+        vpnInterface = null
     }
 
     private fun createNotificationChannel() {
