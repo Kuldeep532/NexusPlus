@@ -10,7 +10,8 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 
-/** Minimal IPv4/UDP DNS proxy for the Nexus VPN tunnel address. */
+/** IPv4/UDP DNS proxy for the Nexus VPN tunnel. Non-DNS traffic is intentionally
+ * excluded until a tested forwarding engine exists. */
 object NexusVpnDnsPacketHandler {
     private const val DNS_PORT = 53
     private const val UDP_PROTOCOL = 17
@@ -21,12 +22,12 @@ object NexusVpnDnsPacketHandler {
         val version = (packet[0].toInt() ushr 4) and 0x0f
         val ihl = (packet[0].toInt() and 0x0f) * 4
         if (version != 4 || ihl < 20 || length < ihl + 8) { NexusVpnPacketStats.recordDropped(); return }
-        if ((packet[9].toInt() and 0xff) != UDP_PROTOCOL) { NexusVpnPacketStats.recordDropped(); return }
+        if ((packet[9].toInt() and 0xff) != UDP_PROTOCOL) { NexusVpnPacketStats.recordNonDns(); return }
 
         val udp = ihl
         val sourcePort = u16(packet, udp)
         val destPort = u16(packet, udp + 2)
-        if (destPort != DNS_PORT) { NexusVpnPacketStats.recordDropped(); return }
+        if (destPort != DNS_PORT) { NexusVpnPacketStats.recordNonDns(); return }
         val udpLength = u16(packet, udp + 4)
         if (udpLength < 8) { NexusVpnPacketStats.recordDropped(); return }
         val payloadOffset = udp + 8
@@ -34,9 +35,7 @@ object NexusVpnDnsPacketHandler {
         if (payloadLength < 12) { NexusVpnPacketStats.recordDropped(); return }
 
         val query = packet.copyOfRange(payloadOffset, payloadOffset + payloadLength)
-        val hostname = decodeQuestionName(query)
-        if (hostname == null) { NexusVpnPacketStats.recordDropped(); return }
-
+        val hostname = decodeQuestionName(query) ?: run { NexusVpnPacketStats.recordDropped(); return }
         val blocked = NexusVpnDnsPolicy.shouldBlock(hostname)
         val dnsResponse = if (blocked) {
             NexusVpnPacketStats.recordDnsBlocked()
@@ -45,8 +44,8 @@ object NexusVpnDnsPacketHandler {
         } else {
             val forwarded = querySystemDns(service, query)
             if (forwarded == null) {
+                NexusVpnPacketStats.recordDnsFailed()
                 NexusVpnDnsStats.recordFailed()
-                NexusVpnPacketStats.recordDropped()
                 return
             }
             NexusVpnPacketStats.recordDnsForwarded()
@@ -102,8 +101,7 @@ object NexusVpnDnsPacketHandler {
 
     private fun buildNxDomainResponse(query: ByteArray): ByteArray {
         val response = query.copyOf()
-        val flags = u16(response, 2)
-        writeU16(response, 2, flags or 0x8000 or 0x0080 or 0x0003)
+        writeU16(response, 2, (u16(response, 2) or 0x8000 or 0x0080 or 0x0003) and 0xffff)
         writeU16(response, 6, 0); writeU16(response, 8, 0); writeU16(response, 10, 0)
         return response
     }
