@@ -17,31 +17,48 @@ object NexusVpnDnsPacketHandler {
     private const val MAX_DNS_PAYLOAD = 4096
 
     fun handle(service: VpnService, interfaceFd: ParcelFileDescriptor, packet: ByteArray, length: Int) {
-        if (length < 20) return
+        if (length < 20) { NexusVpnPacketStats.recordDropped(); return }
         val version = (packet[0].toInt() ushr 4) and 0x0f
         val ihl = (packet[0].toInt() and 0x0f) * 4
-        if (version != 4 || ihl < 20 || length < ihl + 8) return
-        if ((packet[9].toInt() and 0xff) != UDP_PROTOCOL) return
+        if (version != 4 || ihl < 20 || length < ihl + 8) { NexusVpnPacketStats.recordDropped(); return }
+        if ((packet[9].toInt() and 0xff) != UDP_PROTOCOL) { NexusVpnPacketStats.recordDropped(); return }
 
         val udp = ihl
         val sourcePort = u16(packet, udp)
         val destPort = u16(packet, udp + 2)
-        if (destPort != DNS_PORT) return
+        if (destPort != DNS_PORT) { NexusVpnPacketStats.recordDropped(); return }
         val udpLength = u16(packet, udp + 4)
-        if (udpLength < 8) return
+        if (udpLength < 8) { NexusVpnPacketStats.recordDropped(); return }
         val payloadOffset = udp + 8
         val payloadLength = minOf(udpLength - 8, length - payloadOffset, MAX_DNS_PAYLOAD)
-        if (payloadLength < 12) return
+        if (payloadLength < 12) { NexusVpnPacketStats.recordDropped(); return }
 
         val query = packet.copyOfRange(payloadOffset, payloadOffset + payloadLength)
-        val hostname = decodeQuestionName(query) ?: return
-        val dnsResponse = if (NexusVpnDnsPolicy.shouldBlock(hostname)) buildNxDomainResponse(query)
-        else querySystemDns(service, query) ?: buildServFailResponse(query)
+        val hostname = decodeQuestionName(query)
+        if (hostname == null) { NexusVpnPacketStats.recordDropped(); return }
+
+        val blocked = NexusVpnDnsPolicy.shouldBlock(hostname)
+        val dnsResponse = if (blocked) {
+            NexusVpnPacketStats.recordDnsBlocked()
+            NexusVpnDnsStats.recordBlocked()
+            buildNxDomainResponse(query)
+        } else {
+            val forwarded = querySystemDns(service, query)
+            if (forwarded == null) {
+                NexusVpnDnsStats.recordFailed()
+                NexusVpnPacketStats.recordDropped()
+                return
+            }
+            NexusVpnPacketStats.recordDnsForwarded()
+            NexusVpnDnsStats.recordForwarded()
+            forwarded
+        }
 
         val sourceAddress = packet.copyOfRange(16, 20)
         val destinationAddress = packet.copyOfRange(12, 16)
         val response = buildIpv4UdpResponse(sourceAddress, destinationAddress, destPort, sourcePort, dnsResponse)
         FileOutputStream(interfaceFd.fileDescriptor).use { it.write(response); it.flush() }
+        NexusVpnPacketStats.recordOut()
     }
 
     private fun querySystemDns(service: VpnService, payload: ByteArray): ByteArray? {
@@ -87,14 +104,6 @@ object NexusVpnDnsPacketHandler {
         val response = query.copyOf()
         val flags = u16(response, 2)
         writeU16(response, 2, flags or 0x8000 or 0x0080 or 0x0003)
-        writeU16(response, 6, 0); writeU16(response, 8, 0); writeU16(response, 10, 0)
-        return response
-    }
-
-    private fun buildServFailResponse(query: ByteArray): ByteArray {
-        val response = query.copyOf()
-        val flags = u16(response, 2)
-        writeU16(response, 2, flags or 0x8000 or 0x0080 or 0x0002)
         writeU16(response, 6, 0); writeU16(response, 8, 0); writeU16(response, 10, 0)
         return response
     }
