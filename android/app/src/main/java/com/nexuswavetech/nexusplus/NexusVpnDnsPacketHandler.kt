@@ -41,8 +41,7 @@ object NexusVpnDnsPacketHandler {
             NexusVpnPacketStats.recordDropped()
             return
         }
-        val blocked = NexusVpnDnsPolicy.shouldBlock(hostname) ||
-            runCatching { NexusNativeAdultDomainPolicy.isBlocked(hostname) }.getOrDefault(false)
+        val blocked = NexusVpnDnsPolicy.shouldBlock(hostname)
         val dnsResponse = if (blocked) {
             NexusVpnPacketStats.recordDnsBlocked()
             NexusVpnDnsStats.recordBlocked()
