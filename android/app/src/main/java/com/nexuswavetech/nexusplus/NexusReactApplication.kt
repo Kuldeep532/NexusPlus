@@ -2,7 +2,6 @@ package com.nexuswavetech.nexusplus
 
 import android.app.Application
 import android.content.res.Configuration
-
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
@@ -12,7 +11,6 @@ import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.load
 import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.react.soloader.OpenSourceMergedSoMapping
 import com.facebook.soloader.SoLoader
-
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
 
@@ -24,6 +22,9 @@ class NexusReactApplication : Application(), ReactApplication {
                 PackageList(this).packages.toMutableList().apply {
                     add(NexusAssistantVoicePackage())
                     add(NexusAssistantOnnxPackage())
+                    add(NexusNativeSecurityPackage())
+                    add(NexusSafetyGatePackage())
+                    add(NexusVpnPackage())
                 }
 
             override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"
@@ -39,9 +40,7 @@ class NexusReactApplication : Application(), ReactApplication {
     override fun onCreate() {
         super.onCreate()
         SoLoader.init(this, OpenSourceMergedSoMapping)
-        if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
-            load()
-        }
+        if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) load()
         ApplicationLifecycleDispatcher.onApplicationCreate(this)
     }
 
