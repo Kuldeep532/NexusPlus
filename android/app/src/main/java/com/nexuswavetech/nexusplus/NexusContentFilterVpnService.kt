@@ -95,14 +95,15 @@ class NexusContentFilterVpnService : VpnService() {
     }
 
     private fun dispatchPacket(interfaceFd: ParcelFileDescriptor, packet: ByteArray, length: Int) {
-        when (NexusVpnPacketInspector.inspect(packet, length).kind) {
-            NexusVpnPacketInspector.Kind.DNS_UDP ->
+        when (NexusVpnTrafficDecision.decide(NexusVpnPacketInspector.inspect(packet, length).kind)) {
+            NexusVpnTrafficDecision.Action.HANDLE_DNS ->
                 NexusVpnDnsPacketHandler.handle(this, interfaceFd, packet, length)
-            NexusVpnPacketInspector.Kind.NON_DNS_UDP,
-            NexusVpnPacketInspector.Kind.TCP,
-            NexusVpnPacketInspector.Kind.OTHER_IPV4,
-                -> NexusVpnPacketStats.recordNonDns()
-            NexusVpnPacketInspector.Kind.INVALID -> NexusVpnPacketStats.recordDropped()
+            NexusVpnTrafficDecision.Action.FORWARD_TCP,
+            NexusVpnTrafficDecision.Action.FORWARD_UDP,
+            NexusVpnTrafficDecision.Action.IGNORE_OTHER_IPV4 ->
+                NexusVpnPacketStats.recordNonDns()
+            NexusVpnTrafficDecision.Action.DROP_INVALID ->
+                NexusVpnPacketStats.recordDropped()
         }
     }
 
