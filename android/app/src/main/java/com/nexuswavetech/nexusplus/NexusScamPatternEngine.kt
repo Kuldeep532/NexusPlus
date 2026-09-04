@@ -8,7 +8,6 @@ object NexusScamPatternEngine {
     private val credentialRequests = setOf("otp", "one time password", "cvv", "pin", "password", "mpin", "upi pin", "card number")
     private val paymentRequests = setOf("send money", "pay now", "transfer money", "collect request", "upi collect", "gift card", "crypto")
     private val impersonation = setOf("account will be blocked", "kyc expired", "kyc suspended", "bank account blocked", "police case", "income tax notice", "customs fee", "parcel held", "electricity disconnected")
-    private val scamDomains = setOf("bit.ly", "tinyurl.com", "t.co", "rb.gy", "cutt.ly", "is.gd")
     private val trustedBankHosts = setOf(
         "sbi.co.in", "hdfcbank.com", "icicibank.com", "axisbank.com", "kotak.com",
         "bankofbaroda.in", "pnbindia.in", "canarabank.com", "unionbankofindia.co.in",
@@ -24,13 +23,9 @@ object NexusScamPatternEngine {
         val asksCredential = credentialRequests.any(normalized::contains)
         val asksPayment = paymentRequests.any(normalized::contains)
         val impersonates = impersonation.any(normalized::contains)
-        val shortenedLink = scamDomains.any(normalized::contains)
         val suspiciousLink = containsSuspiciousLink(normalized)
 
-        val score = listOf(
-            hasUrgency, asksCredential, asksPayment, impersonates,
-            shortenedLink || suspiciousLink
-        ).count { it }
+        val score = listOf(hasUrgency, asksCredential, asksPayment, impersonates, suspiciousLink).count { it }
 
         return when {
             score >= 3 -> Decision.BLOCK
@@ -40,15 +35,13 @@ object NexusScamPatternEngine {
         }
     }
 
-    private fun containsTrustedBankDomain(text: String): Boolean =
-        trustedBankHosts.any { host -> text.contains(host) }
+    private fun containsTrustedBankDomain(text: String): Boolean = trustedBankHosts.any { text.contains(it) }
 
     private fun containsSuspiciousLink(text: String): Boolean {
         val urlRegex = Regex("https?://[^\\s]+", RegexOption.IGNORE_CASE)
         return urlRegex.findAll(text).any { match ->
             val url = match.value.lowercase(Locale.ROOT)
-            url.contains("@") || url.count { it == '.' } >= 5 ||
-                listOf("verify", "secure", "login", "kyc", "refund", "reward").count(url::contains) >= 2
+            url.contains("@") || listOf("verify", "secure", "login", "kyc", "refund", "reward").count(url::contains) >= 3
         }
     }
 
