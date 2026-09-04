@@ -12,13 +12,13 @@ object NexusVpnPacketStats {
     private val nonDns = AtomicLong(0)
     private val dropped = AtomicLong(0)
 
-    fun packetIn() { packetsIn.incrementAndGet() }
-    fun packetOut() { packetsOut.incrementAndGet() }
-    fun dnsBlocked(@Suppress("UNUSED_PARAMETER") hostname: String) { dnsBlocked.incrementAndGet() }
-    fun dnsForwarded(@Suppress("UNUSED_PARAMETER") hostname: String) { dnsForwarded.incrementAndGet() }
-    fun dnsFailed(@Suppress("UNUSED_PARAMETER") hostname: String) { dnsFailed.incrementAndGet() }
-    fun nonDns() { nonDns.incrementAndGet() }
-    fun dropped() { dropped.incrementAndGet() }
+    fun recordIn() { packetsIn.incrementAndGet() }
+    fun recordOut() { packetsOut.incrementAndGet() }
+    fun recordDnsBlocked() { dnsBlocked.incrementAndGet() }
+    fun recordDnsForwarded() { dnsForwarded.incrementAndGet() }
+    fun recordDnsFailed() { dnsFailed.incrementAndGet() }
+    fun recordNonDns() { nonDns.incrementAndGet() }
+    fun recordDropped() { dropped.incrementAndGet() }
 
     fun snapshot(): Map<String, Long> = mapOf(
         "packetsIn" to packetsIn.get(),
