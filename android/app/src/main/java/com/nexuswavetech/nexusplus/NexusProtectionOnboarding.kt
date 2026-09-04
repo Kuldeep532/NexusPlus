@@ -15,8 +15,6 @@ object NexusProtectionOnboarding {
     }
 
     fun openAccessibility(context: Context) = NexusSafetyGate.openAccessibilitySettings(context)
-
     fun prepareVpn(context: Context): Intent? = VpnService.prepare(context)
-
     fun markAcknowledged(context: Context) = NexusSafetyGate.acknowledge(context)
 }
