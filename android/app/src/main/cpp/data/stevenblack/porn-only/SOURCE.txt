@@ -1,0 +1,11 @@
+Nexus offline dataset placeholder
+
+Dataset: StevenBlack porn-only
+Upstream project: https://github.com/StevenBlack/hosts
+Expected raw source: https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/porn-only/hosts
+Category: porn
+
+Upload the downloaded raw `hosts` file next to this file.
+Then record the exact snapshot date, source revision if available, SHA-256, and domain count here.
+
+Do not replace this metadata file with the raw dataset.

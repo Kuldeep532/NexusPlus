@@ -10,38 +10,97 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 
-/** Minimal IPv4/UDP DNS proxy for the Nexus VPN tunnel address. */
+/** Local DNS protection path using Cloudflare Families with host-DNS fallback. */
 object NexusVpnDnsPacketHandler {
-    private const val DNS_PORT = 53
-    private const val UDP_PROTOCOL = 17
     private const val MAX_DNS_PAYLOAD = 4096
 
     fun handle(service: VpnService, interfaceFd: ParcelFileDescriptor, packet: ByteArray, length: Int) {
-        if (length < 20) return
-        val version = (packet[0].toInt() ushr 4) and 0x0f
-        val ihl = (packet[0].toInt() and 0x0f) * 4
-        if (version != 4 || ihl < 20 || length < ihl + 8) return
-        if ((packet[9].toInt() and 0xff) != UDP_PROTOCOL) return
+        val inspected = NexusVpnPacketInspector.inspect(packet, length)
+        if (inspected.kind == NexusVpnPacketInspector.Kind.INVALID) {
+            NexusVpnPacketStats.recordDropped()
+            return
+        }
+        if (inspected.kind != NexusVpnPacketInspector.Kind.DNS_UDP) {
+            NexusVpnPacketStats.recordNonDns()
+            return
+        }
 
-        val udp = ihl
-        val sourcePort = u16(packet, udp)
-        val destPort = u16(packet, udp + 2)
-        if (destPort != DNS_PORT) return
-        val udpLength = u16(packet, udp + 4)
-        if (udpLength < 8) return
-        val payloadOffset = udp + 8
-        val payloadLength = minOf(udpLength - 8, length - payloadOffset, MAX_DNS_PAYLOAD)
-        if (payloadLength < 12) return
+        val payloadLength = minOf(inspected.payloadLength, MAX_DNS_PAYLOAD)
+        if (payloadLength < 12) {
+            NexusVpnPacketStats.recordDropped()
+            return
+        }
 
-        val query = packet.copyOfRange(payloadOffset, payloadOffset + payloadLength)
-        val hostname = decodeQuestionName(query) ?: return
-        val dnsResponse = if (NexusVpnDnsPolicy.shouldBlock(hostname)) buildNxDomainResponse(query)
-        else querySystemDns(service, query) ?: buildServFailResponse(query)
+        val query = packet.copyOfRange(inspected.payloadOffset, inspected.payloadOffset + payloadLength)
+        val hostname = decodeQuestionName(query) ?: run {
+            NexusVpnPacketStats.recordDropped()
+            return
+        }
+
+        val blocked = NexusVpnDnsPolicy.shouldBlock(hostname) ||
+            runCatching { NexusNativeAdultDomainPolicy.isBlocked(hostname) }.getOrDefault(false)
+
+        val dnsResponse = if (blocked) {
+            NexusVpnPacketStats.recordDnsBlocked()
+            NexusVpnDnsStats.recordBlocked()
+            buildNxDomainResponse(query)
+        } else {
+            val forwarded = queryCloudflareFamily(service, query) ?: querySystemDns(service, query)
+            if (forwarded == null) {
+                NexusVpnPacketStats.recordDnsFailed()
+                NexusVpnDnsStats.recordFailed()
+                return
+            }
+            NexusVpnPacketStats.recordDnsForwarded()
+            NexusVpnDnsStats.recordForwarded()
+            forwarded
+        }
 
         val sourceAddress = packet.copyOfRange(16, 20)
         val destinationAddress = packet.copyOfRange(12, 16)
-        val response = buildIpv4UdpResponse(sourceAddress, destinationAddress, destPort, sourcePort, dnsResponse)
-        FileOutputStream(interfaceFd.fileDescriptor).use { it.write(response); it.flush() }
+        val response = buildIpv4UdpResponse(
+            sourceAddress,
+            destinationAddress,
+            inspected.destinationPort,
+            inspected.sourcePort,
+            dnsResponse,
+        )
+        runCatching {
+            FileOutputStream(interfaceFd.fileDescriptor).use { output ->
+                output.write(response)
+                output.flush()
+            }
+            NexusVpnPacketStats.recordOut()
+        }.onFailure {
+            NexusVpnPacketStats.recordDropped()
+        }
+    }
+
+    private fun queryCloudflareFamily(service: VpnService, payload: ByteArray): ByteArray? {
+        // Cloudflare Families: malware + adult-content filtering.
+        // Keep these sockets outside the VPN tunnel to avoid recursive interception.
+        for (resolver in listOf("1.1.1.3", "1.0.0.3")) {
+            val result = runCatching {
+                DatagramSocket().use { socket ->
+                    if (!service.protect(socket)) return@runCatching null
+                    socket.soTimeout = 1200
+                    socket.send(
+                        DatagramPacket(
+                            payload,
+                            payload.size,
+                            InetAddress.getByName(resolver),
+                            NexusVpnPacketInspector.DNS_PORT,
+                        ),
+                    )
+                    val buffer = ByteArray(MAX_DNS_PAYLOAD)
+                    val response = DatagramPacket(buffer, buffer.size)
+                    socket.receive(response)
+                    response.data.copyOf(response.length)
+                }
+            }.getOrNull()
+            if (result != null) return result
+        }
+        return null
     }
 
     private fun querySystemDns(service: VpnService, payload: ByteArray): ByteArray? {
@@ -54,8 +113,15 @@ object NexusVpnDnsPacketHandler {
             val result = runCatching {
                 DatagramSocket().use { socket ->
                     if (!service.protect(socket)) return@runCatching null
-                    socket.soTimeout = 1800
-                    socket.send(DatagramPacket(payload, payload.size, InetAddress.getByAddress(server.address), DNS_PORT))
+                    socket.soTimeout = 1200
+                    socket.send(
+                        DatagramPacket(
+                            payload,
+                            payload.size,
+                            InetAddress.getByAddress(server.address),
+                            NexusVpnPacketInspector.DNS_PORT,
+                        ),
+                    )
                     val buffer = ByteArray(MAX_DNS_PAYLOAD)
                     val response = DatagramPacket(buffer, buffer.size)
                     socket.receive(response)
@@ -85,27 +151,32 @@ object NexusVpnDnsPacketHandler {
 
     private fun buildNxDomainResponse(query: ByteArray): ByteArray {
         val response = query.copyOf()
-        val flags = u16(response, 2)
-        writeU16(response, 2, flags or 0x8000 or 0x0080 or 0x0003)
-        writeU16(response, 6, 0); writeU16(response, 8, 0); writeU16(response, 10, 0)
+        writeU16(response, 2, (u16(response, 2) or 0x8000 or 0x0080 or 0x0003) and 0xffff)
+        writeU16(response, 6, 0)
+        writeU16(response, 8, 0)
+        writeU16(response, 10, 0)
         return response
     }
 
-    private fun buildServFailResponse(query: ByteArray): ByteArray {
-        val response = query.copyOf()
-        val flags = u16(response, 2)
-        writeU16(response, 2, flags or 0x8000 or 0x0080 or 0x0002)
-        writeU16(response, 6, 0); writeU16(response, 8, 0); writeU16(response, 10, 0)
-        return response
-    }
-
-    private fun buildIpv4UdpResponse(src: ByteArray, dst: ByteArray, srcPort: Int, dstPort: Int, dns: ByteArray): ByteArray {
+    private fun buildIpv4UdpResponse(
+        src: ByteArray,
+        dst: ByteArray,
+        srcPort: Int,
+        dstPort: Int,
+        dns: ByteArray,
+    ): ByteArray {
         val total = 28 + dns.size
         val packet = ByteArray(total)
-        packet[0] = 0x45; packet[8] = 64; packet[9] = UDP_PROTOCOL.toByte()
-        writeU16(packet, 2, total); src.copyInto(packet, 12); dst.copyInto(packet, 16)
+        packet[0] = 0x45
+        packet[8] = 64
+        packet[9] = NexusVpnPacketInspector.UDP_PROTOCOL.toByte()
+        writeU16(packet, 2, total)
+        src.copyInto(packet, 12)
+        dst.copyInto(packet, 16)
         writeU16(packet, 10, ipv4Checksum(packet))
-        writeU16(packet, 20, srcPort); writeU16(packet, 22, dstPort); writeU16(packet, 24, 8 + dns.size)
+        writeU16(packet, 20, srcPort)
+        writeU16(packet, 22, dstPort)
+        writeU16(packet, 24, 8 + dns.size)
         dns.copyInto(packet, 28)
         writeU16(packet, 26, udpChecksum(packet, src, dst))
         return packet
@@ -119,7 +190,8 @@ object NexusVpnDnsPacketHandler {
 
     private fun udpChecksum(packet: ByteArray, src: ByteArray, dst: ByteArray): Int {
         var sum = 0L
-        sum += u16(src, 0) + u16(src, 2) + u16(dst, 0) + u16(dst, 2) + UDP_PROTOCOL + u16(packet, 24)
+        sum += u16(src, 0) + u16(src, 2) + u16(dst, 0) + u16(dst, 2)
+        sum += NexusVpnPacketInspector.UDP_PROTOCOL + u16(packet, 24)
         for (offset in 20 until packet.size step 2) {
             if (offset == 26) continue
             sum += if (offset + 1 < packet.size) u16(packet, offset) else (packet[offset].toInt() and 0xff) shl 8
@@ -128,7 +200,17 @@ object NexusVpnDnsPacketHandler {
         return if (result == 0) 0xffff else result
     }
 
-    private fun u16(b: ByteArray, o: Int): Int = ((b[o].toInt() and 0xff) shl 8) or (b[o + 1].toInt() and 0xff)
-    private fun writeU16(b: ByteArray, o: Int, v: Int) { b[o] = (v ushr 8).toByte(); b[o + 1] = v.toByte() }
-    private fun fold(value: Long): Int { var s = value; while ((s ushr 16) != 0L) s = (s and 0xffff) + (s ushr 16); return s.toInt().inv() and 0xffff }
+    private fun u16(b: ByteArray, o: Int): Int =
+        ((b[o].toInt() and 0xff) shl 8) or (b[o + 1].toInt() and 0xff)
+
+    private fun writeU16(b: ByteArray, o: Int, v: Int) {
+        b[o] = (v ushr 8).toByte()
+        b[o + 1] = v.toByte()
+    }
+
+    private fun fold(value: Long): Int {
+        var sum = value
+        while ((sum ushr 16) != 0L) sum = (sum and 0xffff) + (sum ushr 16)
+        return sum.toInt().inv() and 0xffff
+    }
 }

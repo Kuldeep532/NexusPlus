@@ -19,6 +19,8 @@ class NexusVpnModule(private val reactContext: ReactApplicationContext) : ReactC
             "prepared" to prepared,
             "consent" to NexusVpnPolicy.hasConsent(reactContext),
             "enabled" to NexusVpnPolicy.isEnabled(reactContext),
+            "adultProtection" to true,
+            "normalInternetRouting" to "untouched",
         ))
     }
 

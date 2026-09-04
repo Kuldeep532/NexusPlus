@@ -1,0 +1,10 @@
+Nexus Protection — StevenBlack gambling extension metadata
+
+Dataset: gambling-only
+Upstream project: https://github.com/StevenBlack/hosts
+Upstream extension: https://github.com/StevenBlack/hosts/tree/master/extensions/gambling
+
+Purpose: domain-based blocking of the curated gambling extension.
+
+Snapshot/hash/count: populated by the Nexus build pipeline after the raw hosts file is uploaded.
+Do not replace this metadata file manually.

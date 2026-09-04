@@ -1,0 +1,12 @@
+Nexus Protection — StevenBlack fakenews extension metadata
+
+Dataset: fakenews-only
+Upstream project: https://github.com/StevenBlack/hosts
+Upstream extension: https://github.com/StevenBlack/hosts/tree/master/extensions/fakenews
+Generated combined products are maintained by StevenBlack's updateHostsFile.py.
+
+Purpose: domain-based blocking of the curated fakenews extension.
+Important: this dataset does NOT determine whether an individual article is factually true or false.
+
+Snapshot/hash/count: populated by the Nexus build pipeline after the raw hosts file is uploaded.
+Do not replace this metadata file manually.
