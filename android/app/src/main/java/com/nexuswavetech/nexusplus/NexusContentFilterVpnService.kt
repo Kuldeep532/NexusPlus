@@ -62,9 +62,11 @@ class NexusContentFilterVpnService : VpnService() {
                 while (running.get() && NexusVpnPolicy.isEnabled(this)) {
                     val read = input.read(buffer)
                     if (read <= 0) break
+                    NexusVpnPacketStats.recordIn()
                     NexusVpnDnsPacketHandler.handle(this, interfaceFd, buffer, read)
                 }
             } catch (_: Throwable) {
+                NexusVpnPacketStats.recordDropped()
             } finally {
                 runCatching { input.close() }
                 running.set(false)
