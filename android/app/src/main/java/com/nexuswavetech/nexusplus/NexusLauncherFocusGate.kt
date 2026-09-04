@@ -9,14 +9,13 @@ import java.util.Calendar
 /**
  * Local protection policy shared by the Nexus Launcher and Nexus Plus UI.
  *
- * This class is deliberately launcher-agnostic: callers may ask for a decision
- * even when Nexus Launcher is not the current HOME app. The launcher-only guard
- * remains available through evaluateFromLauncher(), while Nexus Plus can use the
- * same persisted policy through evaluateInNexusPlus().
+ * Protection is opt-in through an explicit consent step. Once consented,
+ * the policy protects only configured/addictive apps and never essential apps.
  */
 object NexusLauncherFocusGate {
     private const val PREFS = "nexus_launcher_focus_gate"
     private const val KEY_ENABLED = "enabled"
+    private const val KEY_CONSENT = "protection_consent"
     private const val KEY_BLOCKED = "blocked_packages"
     private const val KEY_WINDOWS = "focus_windows"
     private const val KEY_COOLDOWN_MINUTES = "cooldown_minutes"
@@ -31,6 +30,35 @@ object NexusLauncherFocusGate {
     private const val FIELD_SEPARATOR = ","
     private const val COOLDOWN_SEPARATOR = ";"
 
+    /** Known essential package families are always allowed. */
+    private val ESSENTIAL_PACKAGE_MARKERS = setOf(
+        "android.settings",
+        "com.android.settings",
+        "com.google.android.settings",
+        "com.google.android.dialer",
+        "com.android.dialer",
+        "com.google.android.contacts",
+        "com.android.contacts",
+        "com.google.android.apps.messaging",
+        "com.android.mms",
+        "com.android.camera",
+        "com.google.android.apps.camera",
+        "com.google.android.apps.nbu.paisa.user",
+        "com.phonepe.app",
+        "net.one97.paytm",
+        "com.whatsapp",
+        "in.gov.uidai",
+        "com.app.ayushman",
+        "com.nic.app",
+    )
+
+    /** Package-level defaults for clearly addictive/social/short-video apps. */
+    val DEFAULT_PROTECTED_PACKAGES: Set<String> = setOf(
+        "com.instagram.android",
+        "com.facebook.katana",
+        "com.zhiliaoapp.musically",
+    )
+
     data class Decision(
         val blocked: Boolean,
         val label: String,
@@ -38,6 +66,17 @@ object NexusLauncherFocusGate {
         val canGrantCooldown: Boolean = false,
         val remainingMinutes: Int = 0,
     )
+
+    fun hasProtectionConsent(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_CONSENT, false)
+
+    /** Records the explicit user consent required before protection can activate. */
+    fun grantProtectionConsent(context: Context) {
+        prefs(context).edit()
+            .putBoolean(KEY_CONSENT, true)
+            .putBoolean(KEY_ENABLED, true)
+            .apply()
+    }
 
     fun isLauncherDefault(context: Context): Boolean {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
@@ -53,17 +92,24 @@ object NexusLauncherFocusGate {
             ?.packageName == context.packageName
     }
 
+    /**
+     * Kept for backwards compatibility. UI should not expose an off switch after
+     * protection consent; this setter remains internal-compatible for older calls.
+     */
     fun setEnabled(context: Context, enabled: Boolean) {
-        prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()
+        if (enabled) {
+            grantProtectionConsent(context)
+        }
     }
 
     fun isEnabled(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_ENABLED, false)
+        hasProtectionConsent(context) && prefs(context).getBoolean(KEY_ENABLED, false)
 
     fun setBlockedPackages(context: Context, packages: Set<String>) {
-        val normalized = packages
+        val normalized = (packages + DEFAULT_PROTECTED_PACKAGES)
             .map(String::trim)
             .filter(String::isNotBlank)
+            .filterNot(::isEssentialPackage)
             .distinct()
             .take(100)
         prefs(context).edit()
@@ -72,13 +118,15 @@ object NexusLauncherFocusGate {
     }
 
     fun getBlockedPackages(context: Context): Set<String> =
-        prefs(context)
+        (prefs(context)
             .getString(KEY_BLOCKED, "")
             ?.split(WINDOW_SEPARATOR)
             ?.map(String::trim)
             ?.filter(String::isNotBlank)
             ?.toSet()
-            .orEmpty()
+            .orEmpty() + DEFAULT_PROTECTED_PACKAGES)
+            .filterNot(::isEssentialPackage)
+            .toSet()
 
     fun setFocusWindows(context: Context, windows: List<Pair<Int, Int>>) {
         val normalized = windows
@@ -123,7 +171,7 @@ object NexusLauncherFocusGate {
         packageName: String,
         now: Long = System.currentTimeMillis(),
     ) {
-        if (packageName.isBlank()) return
+        if (packageName.isBlank() || isEssentialPackage(packageName)) return
         val cooldowns = loadCooldowns(context).toMutableMap()
         cooldowns[packageName] = now + getCooldownMinutes(context) * 60_000L
         saveCooldowns(context, cooldowns)
@@ -149,43 +197,26 @@ object NexusLauncherFocusGate {
         return false
     }
 
-    /** Existing launcher behaviour: only protect when Nexus Launcher is HOME. */
     fun evaluateFromLauncher(
         context: Context,
         packageName: String,
         currentMillis: Long = System.currentTimeMillis(),
-    ): Decision = evaluateInternal(
-        context = context,
-        packageName = packageName,
-        currentMillis = currentMillis,
-        requireLauncherDefault = true,
-    )
+    ): Decision = evaluateInternal(context, packageName, currentMillis, true)
 
-    /** New Nexus Plus behaviour: policy works even when another launcher is HOME. */
     fun evaluateInNexusPlus(
         context: Context,
         packageName: String,
         currentMillis: Long = System.currentTimeMillis(),
-    ): Decision = evaluateInternal(
-        context = context,
-        packageName = packageName,
-        currentMillis = currentMillis,
-        requireLauncherDefault = false,
-    )
+    ): Decision = evaluateInternal(context, packageName, currentMillis, false)
 
-    /** Backward-compatible entry point used by the launcher. */
     fun evaluate(
         context: Context,
         packageName: String,
         currentMillis: Long = System.currentTimeMillis(),
     ): Decision = evaluateFromLauncher(context, packageName, currentMillis)
 
-    fun startProtectedSession(
-        context: Context,
-        packageName: String,
-        now: Long = System.currentTimeMillis(),
-    ) {
-        if (packageName.isBlank()) return
+    fun startProtectedSession(context: Context, packageName: String, now: Long = System.currentTimeMillis()) {
+        if (packageName.isBlank() || isEssentialPackage(packageName)) return
         val sessions = loadSessions(context).toMutableMap()
         sessions[packageName] = now
         saveSessions(context, sessions)
@@ -244,7 +275,8 @@ object NexusLauncherFocusGate {
         requireLauncherDefault: Boolean,
     ): Decision {
         if (requireLauncherDefault && !isLauncherDefault(context)) return allow()
-        if (!isEnabled(context) || packageName.isBlank() || packageName == context.packageName) {
+        if (!hasProtectionConsent(context) || !isEnabled(context)) return allow()
+        if (packageName.isBlank() || packageName == context.packageName || isEssentialPackage(packageName)) {
             return allow()
         }
         if (packageName !in getBlockedPackages(context)) return allow()
@@ -259,6 +291,9 @@ object NexusLauncherFocusGate {
             remainingMinutes = remainingMinutesInFocusWindow(getFocusWindows(context), currentMillis),
         )
     }
+
+    private fun isEssentialPackage(packageName: String): Boolean =
+        ESSENTIAL_PACKAGE_MARKERS.any { packageName == it || packageName.startsWith("$it.") }
 
     private fun isInsideFocusWindow(windows: List<Pair<Int, Int>>, now: Long): Boolean {
         if (windows.isEmpty()) return false
@@ -278,57 +313,37 @@ object NexusLauncherFocusGate {
         val window = windows.firstOrNull { isInsideFocusWindow(listOf(it), now) } ?: return 0
         val end = window.second * 60
         return (
-            if (window.first < window.second) {
-                end - totalMinutes
-            } else if (totalMinutes < end) {
-                end - totalMinutes
-            } else {
-                1440 - totalMinutes + end
-            }
+            if (window.first < window.second) end - totalMinutes
+            else if (totalMinutes < end) end - totalMinutes
+            else 1440 - totalMinutes + end
         ).coerceAtLeast(0)
     }
 
     private fun loadCooldowns(context: Context): Map<String, Long> =
-        prefs(context)
-            .getString(KEY_COOLDOWNS, "")
-            ?.split(COOLDOWN_SEPARATOR)
-            ?.mapNotNull { entry ->
-                val parts = entry.split(FIELD_SEPARATOR, limit = 2)
-                if (parts.size != 2) return@mapNotNull null
-                val until = parts[1].toLongOrNull() ?: return@mapNotNull null
-                parts[0] to until
-            }
-            ?.toMap()
-            .orEmpty()
+        prefs(context).getString(KEY_COOLDOWNS, "")?.split(COOLDOWN_SEPARATOR)?.mapNotNull { entry ->
+            val parts = entry.split(FIELD_SEPARATOR, limit = 2)
+            if (parts.size != 2) return@mapNotNull null
+            val until = parts[1].toLongOrNull() ?: return@mapNotNull null
+            parts[0] to until
+        }?.toMap().orEmpty()
 
     private fun saveCooldowns(context: Context, values: Map<String, Long>) {
         prefs(context).edit()
-            .putString(
-                KEY_COOLDOWNS,
-                values.entries.joinToString(COOLDOWN_SEPARATOR) { "${it.key}$FIELD_SEPARATOR${it.value}" },
-            )
+            .putString(KEY_COOLDOWNS, values.entries.joinToString(COOLDOWN_SEPARATOR) { "${it.key}$FIELD_SEPARATOR${it.value}" })
             .apply()
     }
 
     private fun loadSessions(context: Context): Map<String, Long> =
-        prefs(context)
-            .getString(KEY_ACTIVE_SESSION_STARTS, "")
-            ?.split(COOLDOWN_SEPARATOR)
-            ?.mapNotNull { entry ->
-                val parts = entry.split(FIELD_SEPARATOR, limit = 2)
-                if (parts.size != 2) return@mapNotNull null
-                val started = parts[1].toLongOrNull() ?: return@mapNotNull null
-                parts[0] to started
-            }
-            ?.toMap()
-            .orEmpty()
+        prefs(context).getString(KEY_ACTIVE_SESSION_STARTS, "")?.split(COOLDOWN_SEPARATOR)?.mapNotNull { entry ->
+            val parts = entry.split(FIELD_SEPARATOR, limit = 2)
+            if (parts.size != 2) return@mapNotNull null
+            val started = parts[1].toLongOrNull() ?: return@mapNotNull null
+            parts[0] to started
+        }?.toMap().orEmpty()
 
     private fun saveSessions(context: Context, values: Map<String, Long>) {
         prefs(context).edit()
-            .putString(
-                KEY_ACTIVE_SESSION_STARTS,
-                values.entries.joinToString(COOLDOWN_SEPARATOR) { "${it.key}$FIELD_SEPARATOR${it.value}" },
-            )
+            .putString(KEY_ACTIVE_SESSION_STARTS, values.entries.joinToString(COOLDOWN_SEPARATOR) { "${it.key}$FIELD_SEPARATOR${it.value}" })
             .apply()
     }
 
@@ -339,6 +354,5 @@ object NexusLauncherFocusGate {
 
     private fun allow(): Decision = Decision(blocked = false, label = "", message = "")
 
-    private fun prefs(context: Context) =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 }
