@@ -26,6 +26,7 @@ class NexusReactApplication : Application(), ReactApplication {
                     add(NexusSafetyGatePackage())
                     add(NexusVpnPackage())
                     add(NexusVpnDiagnosticsPackage())
+                    add(NexusSafeSearchPolicyPackage())
                 }
 
             override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"
