@@ -8,23 +8,39 @@ class NexusVpnTrafficDecisionTest {
     fun dnsIsHandledLocally() {
         assertEquals(
             NexusVpnTrafficDecision.Action.HANDLE_DNS,
-            NexusVpnTrafficDecision.decide(NexusVpnPacketInspector.Kind.DNS_UDP),
+            NexusVpnTrafficDecision.decide(NexusVpnPacketInspector.Kind.DNS_UDP, forwardingReady = false),
         )
     }
 
     @Test
-    fun tcpIsReservedForForwardingEngine() {
+    fun tcpStaysOutOfTunnelUntilForwardingEngineIsReady() {
+        assertEquals(
+            NexusVpnTrafficDecision.Action.IGNORE_OTHER_IPV4,
+            NexusVpnTrafficDecision.decide(NexusVpnPacketInspector.Kind.TCP, forwardingReady = false),
+        )
+    }
+
+    @Test
+    fun tcpCanBeForwardedAfterExplicitReadiness() {
         assertEquals(
             NexusVpnTrafficDecision.Action.FORWARD_TCP,
-            NexusVpnTrafficDecision.decide(NexusVpnPacketInspector.Kind.TCP),
+            NexusVpnTrafficDecision.decide(NexusVpnPacketInspector.Kind.TCP, forwardingReady = true),
         )
     }
 
     @Test
-    fun nonDnsUdpIsReservedForForwardingEngine() {
+    fun nonDnsUdpStaysOutOfTunnelUntilForwardingEngineIsReady() {
+        assertEquals(
+            NexusVpnTrafficDecision.Action.IGNORE_OTHER_IPV4,
+            NexusVpnTrafficDecision.decide(NexusVpnPacketInspector.Kind.NON_DNS_UDP, forwardingReady = false),
+        )
+    }
+
+    @Test
+    fun nonDnsUdpCanBeForwardedAfterExplicitReadiness() {
         assertEquals(
             NexusVpnTrafficDecision.Action.FORWARD_UDP,
-            NexusVpnTrafficDecision.decide(NexusVpnPacketInspector.Kind.NON_DNS_UDP),
+            NexusVpnTrafficDecision.decide(NexusVpnPacketInspector.Kind.NON_DNS_UDP, forwardingReady = true),
         )
     }
 
@@ -32,7 +48,7 @@ class NexusVpnTrafficDecisionTest {
     fun malformedPacketsAreDropped() {
         assertEquals(
             NexusVpnTrafficDecision.Action.DROP_INVALID,
-            NexusVpnTrafficDecision.decide(NexusVpnPacketInspector.Kind.INVALID),
+            NexusVpnTrafficDecision.decide(NexusVpnPacketInspector.Kind.INVALID, forwardingReady = false),
         )
     }
 }
