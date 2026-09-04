@@ -10,7 +10,6 @@ import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import androidx.core.app.NotificationCompat
 import java.io.FileInputStream
-import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
@@ -39,12 +38,14 @@ class NexusContentFilterVpnService : VpnService() {
         }
 
         if (!NexusVpnPolicy.hasConsent(this)) {
+            NexusVpnPolicy.setEnabled(this, false)
             stopProtection()
             stopSelf()
             return START_NOT_STICKY
         }
 
         if (prepare(this) != null) {
+            NexusVpnPolicy.setEnabled(this, false)
             stopProtection()
             stopSelf()
             return START_NOT_STICKY
@@ -56,6 +57,7 @@ class NexusContentFilterVpnService : VpnService() {
     }
 
     override fun onDestroy() {
+        NexusVpnPolicy.setEnabled(this, false)
         stopProtection()
         super.onDestroy()
     }
@@ -84,6 +86,7 @@ class NexusContentFilterVpnService : VpnService() {
         }.getOrNull()
 
         if (established == null) {
+            NexusVpnPolicy.setEnabled(this, false)
             running.set(false)
             stopSelf()
             return
@@ -98,22 +101,22 @@ class NexusContentFilterVpnService : VpnService() {
         packetThread = thread(name = "NexusVpnDnsLoop", isDaemon = true) {
             val input = runCatching { FileInputStream(interfaceFd.fileDescriptor) }.getOrNull()
             if (input == null) {
+                NexusVpnPolicy.setEnabled(this, false)
                 stopProtection()
                 return@thread
             }
 
-            val buffer = ByteBuffer.allocate(MAX_PACKET_SIZE)
+            val buffer = ByteArray(MAX_PACKET_SIZE)
             try {
                 while (running.get() && NexusVpnPolicy.isEnabled(this)) {
-                    buffer.clear()
-                    val read = input.read(buffer.array())
+                    val read = input.read(buffer)
                     if (read <= 0) break
                     if (read > MAX_PACKET_SIZE) break
 
                     // The current safe mode only classifies DNS packets. Other
                     // routed protocols are not intercepted because the VPN does
                     // not yet contain a complete forwarding implementation.
-                    NexusVpnDnsPacketHandler.handle(this, interfaceFd, buffer.array(), read)
+                    NexusVpnDnsPacketHandler.handle(this, interfaceFd, buffer, read)
                 }
             } catch (_: Throwable) {
                 // Closing the descriptor restores networking automatically.
