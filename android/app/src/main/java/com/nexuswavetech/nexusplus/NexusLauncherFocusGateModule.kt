@@ -17,6 +17,7 @@ class NexusLauncherFocusGateModule(
         runCatching {
             val map = Arguments.createMap()
             map.putBoolean("enabled", NexusLauncherFocusGate.isEnabled(reactContext))
+            map.putBoolean("protectionConsent", NexusLauncherFocusGate.hasProtectionConsent(reactContext))
             map.putBoolean("launcherDefault", NexusLauncherFocusGate.isLauncherDefault(reactContext))
             map.putInt("cooldownMinutes", NexusLauncherFocusGate.getCooldownMinutes(reactContext))
             map.putInt("savedToday", NexusLauncherFocusGate.getSavedDistractionsToday(reactContext))
@@ -120,6 +121,21 @@ class NexusLauncherFocusGateModule(
             promise.resolve(NexusLauncherFocusGate.getSavedDistractionsToday(reactContext))
         }.onFailure { error ->
             promise.reject("FOCUS_GATE_PROGRESS", error.message ?: "Unable to update wellness progress.", null)
+        }
+    }
+
+    @ReactMethod
+    fun getWellnessMetrics(promise: Promise) {
+        runCatching {
+            val snapshot = NexusWellnessMetrics.snapshot(reactContext)
+            val map = Arguments.createMap()
+            map.putInt("scrollAttempts", snapshot.scrollAttempts)
+            map.putInt("blockedEvents", snapshot.blockedEvents)
+            map.putInt("alternativeSessions", snapshot.alternativeSessions)
+            map.putString("lastEvent", snapshot.lastEvent)
+            promise.resolve(map)
+        }.onFailure { error ->
+            promise.reject("WELLNESS_METRICS", error.message ?: "Unable to read local wellness metrics.", null)
         }
     }
 }
