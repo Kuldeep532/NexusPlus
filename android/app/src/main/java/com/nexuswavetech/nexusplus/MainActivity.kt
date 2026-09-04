@@ -8,6 +8,7 @@ import android.os.Bundle
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
+import com.facebook.react.defaults.DefaultNewReactActivityDelegate
 import com.facebook.react.defaults.DefaultReactActivityDelegate
 import expo.modules.ReactActivityDelegateWrapper
 
@@ -15,6 +16,11 @@ class MainActivity : ReactActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.Theme_NexusPlus)
         super.onCreate(null)
+
+        if (!NexusSafeDeviceGate.isProtectedShellReady(this)) {
+            startActivity(Intent(this, NexusSafeDeviceGateActivity::class.java))
+        }
+
         publishIncomingIntent(intent)
     }
 
@@ -34,6 +40,9 @@ class MainActivity : ReactActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (!NexusSafeDeviceGate.isProtectedShellReady(this)) {
+            startActivity(Intent(this, NexusSafeDeviceGateActivity::class.java))
+        }
         publishIncomingIntent(intent)
     }
 
@@ -50,10 +59,7 @@ class MainActivity : ReactActivity() {
         val uri: Uri = intent.data ?: return
         val scheme = uri.scheme?.lowercase() ?: return
 
-        // Auth callbacks are consumed by the JS auth flow. Do not treat them as media.
         if (scheme == "nexus-plus" && uri.host == "auth") return
-
-        // Only accept provider-backed or HTTPS media URIs. Never ingest file:// paths.
         if (scheme != "content" && scheme != "https") return
 
         val mime = intent.type ?: contentResolver.getType(uri) ?: return
