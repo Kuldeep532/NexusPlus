@@ -5,8 +5,6 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-
     <application
         android:name=".NexusReactApplication"
         android:allowBackup="false"
@@ -19,11 +17,7 @@
             android:exported="false"
             android:showWhenLocked="true"
             android:turnScreenOn="true" />
-
-        <receiver
-            android:name=".AlarmReceiver"
-            android:exported="false" />
-
+        <receiver android:name=".AlarmReceiver" android:exported="false" />
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
@@ -35,16 +29,31 @@
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
         </receiver>
-
         <service
             android:name=".NexusMediaPlaybackService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
-
+        <service
+            android:name=".NexusContentFilterVpnService"
+            android:enabled="true"
+            android:exported="false"
+            android:permission="android.permission.BIND_VPN_SERVICE">
+            <intent-filter><action android:name="android.net.VpnService" /></intent-filter>
+        </service>
+        <service
+            android:name=".NexusSafetyAccessibilityService"
+            android:enabled="true"
+            android:exported="false"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/nexus_safety_accessibility" />
+        </service>
+        <activity android:name=".NexusSafeDeviceGateActivity" android:exported="false" android:label="Nexus Safe Device Setup" />
         <activity
             android:name=".NexusLauncherActivity"
             android:exported="true"
+            android:label="Nexus Launcher"
             android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -52,7 +61,8 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
-
+        <activity android:name=".NexusLauncherSettingsActivity" android:exported="false" android:label="Nexus Launcher Settings" />
+        <activity android:name=".NexusLauncherMentorActivity" android:exported="false" android:label="Nexus Habit & Focus Mentor" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
