@@ -63,7 +63,7 @@ class NexusLauncherMentorActivity : Activity() {
             contentDescription = text
         }, fullWidthWrap(dp(10)))
         root.addView(textView(
-            "This fast challenge is intentionally impractical. You may choose a positive activity instead.",
+            "The fast challenge is intentionally impractical. A positive activity is available instead.",
             15f, Color.rgb(45, 45, 45)
         ).apply {
             gravity = Gravity.CENTER
