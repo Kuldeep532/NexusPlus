@@ -3,9 +3,9 @@ package com.nexuswavetech.nexusplus
 /**
  * Pure routing decision for packets read from the Android TUN interface.
  *
- * Forwarding is deliberately disabled until a protocol-correct userspace
- * transport engine is available. This object makes that safety boundary
- * explicit and testable instead of silently dropping traffic inside handlers.
+ * Non-DNS forwarding is allowed only after a protocol-correct userspace
+ * forwarding engine explicitly reports ready. This prevents the tunnel from
+ * silently black-holing normal application traffic.
  */
 object NexusVpnTrafficDecision {
     enum class Action {
@@ -16,10 +16,15 @@ object NexusVpnTrafficDecision {
         DROP_INVALID,
     }
 
-    fun decide(kind: NexusVpnPacketInspector.Kind): Action = when (kind) {
+    fun decide(
+        kind: NexusVpnPacketInspector.Kind,
+        forwardingReady: Boolean = NexusVpnForwardingState.isReady(),
+    ): Action = when (kind) {
         NexusVpnPacketInspector.Kind.DNS_UDP -> Action.HANDLE_DNS
-        NexusVpnPacketInspector.Kind.TCP -> Action.FORWARD_TCP
-        NexusVpnPacketInspector.Kind.NON_DNS_UDP -> Action.FORWARD_UDP
+        NexusVpnPacketInspector.Kind.TCP ->
+            if (forwardingReady) Action.FORWARD_TCP else Action.IGNORE_OTHER_IPV4
+        NexusVpnPacketInspector.Kind.NON_DNS_UDP ->
+            if (forwardingReady) Action.FORWARD_UDP else Action.IGNORE_OTHER_IPV4
         NexusVpnPacketInspector.Kind.OTHER_IPV4 -> Action.IGNORE_OTHER_IPV4
         NexusVpnPacketInspector.Kind.INVALID -> Action.DROP_INVALID
     }
