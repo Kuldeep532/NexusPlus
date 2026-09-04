@@ -21,11 +21,9 @@ class NexusLauncherFocusGateModule(
             map.putBoolean("launcherDefault", NexusLauncherFocusGate.isLauncherDefault(reactContext))
             map.putInt("cooldownMinutes", NexusLauncherFocusGate.getCooldownMinutes(reactContext))
             map.putInt("savedToday", NexusLauncherFocusGate.getSavedDistractionsToday(reactContext))
-
             val blocked = Arguments.createArray()
             NexusLauncherFocusGate.getBlockedPackages(reactContext).forEach(blocked::pushString)
             map.putArray("blockedPackages", blocked)
-
             val windows = Arguments.createArray()
             NexusLauncherFocusGate.getFocusWindows(reactContext).forEach { (start, end) ->
                 val item = Arguments.createMap()
@@ -51,6 +49,16 @@ class NexusLauncherFocusGateModule(
     }
 
     @ReactMethod
+    fun grantProtectionConsent(promise: Promise) {
+        runCatching {
+            NexusLauncherFocusGate.grantProtectionConsent(reactContext)
+            promise.resolve(true)
+        }.onFailure { error ->
+            promise.reject("FOCUS_GATE_CONSENT", error.message ?: "Unable to save protection consent.", null)
+        }
+    }
+
+    @ReactMethod
     fun setCooldownMinutes(minutes: Int, promise: Promise) {
         runCatching {
             require(minutes in 1..60) { "Cooldown must be between 1 and 60 minutes." }
@@ -64,9 +72,7 @@ class NexusLauncherFocusGateModule(
     @ReactMethod
     fun setFocusWindow(startHour: Int, endHour: Int, promise: Promise) {
         runCatching {
-            require(startHour in 0..23 && endHour in 0..23) {
-                "Focus hours must be between 0 and 23."
-            }
+            require(startHour in 0..23 && endHour in 0..23) { "Focus hours must be between 0 and 23." }
             NexusLauncherFocusGate.setFocusWindows(reactContext, listOf(startHour to endHour))
             promise.resolve(true)
         }.onFailure { error ->
@@ -97,6 +103,7 @@ class NexusLauncherFocusGateModule(
             map.putString("message", decision.message)
             map.putBoolean("canGrantCooldown", decision.canGrantCooldown)
             map.putInt("remainingMinutes", decision.remainingMinutes)
+            map.putLong("lockedUntil", decision.lockedUntil)
             promise.resolve(map)
         }.onFailure { error ->
             promise.reject("FOCUS_GATE_EVALUATE", error.message ?: "Unable to evaluate protection.", null)
