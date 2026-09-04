@@ -48,6 +48,11 @@
         </service>
 
         <activity
+            android:name=".NexusSafeDeviceGateActivity"
+            android:exported="false"
+            android:label="Nexus Safe Device Setup" />
+
+        <activity
             android:name=".NexusLauncherActivity"
             android:exported="true"
             android:label="Nexus Launcher"
