@@ -13,9 +13,10 @@ object NexusVpnDnsPolicy {
         val normalized = hostname.trim().trim('.').lowercase(Locale.ROOT)
         if (normalized.isBlank()) return false
 
-        // Never use broad text-safe-context matching to whitelist a domain name.
-        // Educational/medical websites normally have their own neutral domains and
-        // should pass unless their actual hostname contains a high-confidence adult label.
+        // The native policy is an additional local check. Safe educational/medical
+        // domains are not blanket-whitelisted; only their actual hostnames are passed.
+        if (NexusNativeAdultDomainPolicy.isBlocked(normalized)) return true
+
         val labels = normalized.split('.').filter(String::isNotBlank)
         return labels.any { label -> blockedLabels.any { blocked ->
             label == blocked || label.startsWith("$blocked-") || label.endsWith("-$blocked")
