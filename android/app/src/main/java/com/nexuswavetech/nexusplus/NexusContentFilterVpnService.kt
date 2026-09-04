@@ -47,6 +47,7 @@ class NexusContentFilterVpnService : VpnService() {
 
     @Synchronized private fun establishVpn() {
         if (vpnInterface != null || !running.compareAndSet(false, true)) return
+        NexusVpnForwardingState.setReady(false)
         val established = runCatching {
             Builder()
                 .setSession("Nexus Content Protection")
@@ -58,6 +59,7 @@ class NexusContentFilterVpnService : VpnService() {
                 .establish()
         }.getOrNull()
         if (established == null) {
+            NexusVpnForwardingState.setReady(false)
             NexusVpnPolicy.setEnabled(this, false)
             running.set(false)
             stopSelf()
@@ -95,19 +97,19 @@ class NexusContentFilterVpnService : VpnService() {
     }
 
     private fun dispatchPacket(interfaceFd: ParcelFileDescriptor, packet: ByteArray, length: Int) {
-        when (NexusVpnTrafficDecision.decide(NexusVpnPacketInspector.inspect(packet, length).kind)) {
+        when (NexusVpnTrafficDecision.decide(NexusVpnPacketInspector.inspect(packet, length))) {
             NexusVpnTrafficDecision.Action.HANDLE_DNS ->
                 NexusVpnDnsPacketHandler.handle(this, interfaceFd, packet, length)
             NexusVpnTrafficDecision.Action.FORWARD_TCP,
             NexusVpnTrafficDecision.Action.FORWARD_UDP,
-            NexusVpnTrafficDecision.Action.IGNORE_OTHER_IPV4 ->
-                NexusVpnPacketStats.recordNonDns()
-            NexusVpnTrafficDecision.Action.DROP_INVALID ->
-                NexusVpnPacketStats.recordDropped()
+            NexusVpnTrafficDecision.Action.IGNORE_OTHER_IPV4,
+                -> NexusVpnPacketStats.recordNonDns()
+            NexusVpnTrafficDecision.Action.DROP_INVALID -> NexusVpnPacketStats.recordDropped()
         }
     }
 
     @Synchronized private fun stopProtection() {
+        NexusVpnForwardingState.setReady(false)
         running.set(false)
         packetThread?.interrupt()
         packetThread = null
