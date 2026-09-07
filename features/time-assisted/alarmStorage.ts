@@ -15,11 +15,13 @@ function normalize(value: unknown): PersistedAlarm[] {
   return value.flatMap((item) => {
     if (!item || typeof item !== 'object') return [];
     const candidate = item as Partial<PersistedAlarm>;
-    if (typeof candidate.id !== 'string' || candidate.id.length === 0 || candidate.id.length > 128) return [];
-    if (!Number.isInteger(candidate.hour) || candidate.hour < 0 || candidate.hour > 23) return [];
-    if (!Number.isInteger(candidate.minute) || candidate.minute < 0 || candidate.minute > 59) return [];
-    if (typeof candidate.enabled !== 'boolean' || typeof candidate.soundId !== 'string' || candidate.soundId.length > 128) return [];
-    return [{ id: candidate.id, hour: candidate.hour, minute: candidate.minute, enabled: candidate.enabled, soundId: candidate.soundId }];
+    const { id, hour, minute, enabled, soundId } = candidate;
+    if (typeof id !== 'string' || id.length === 0 || id.length > 128) return [];
+    if (typeof hour !== 'number' || !Number.isInteger(hour) || hour < 0 || hour > 23) return [];
+    if (typeof minute !== 'number' || !Number.isInteger(minute) || minute < 0 || minute > 59) return [];
+    if (typeof enabled !== 'boolean') return [];
+    if (typeof soundId !== 'string' || soundId.length > 128) return [];
+    return [{ id, hour, minute, enabled, soundId }];
   });
 }
 
