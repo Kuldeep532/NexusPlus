@@ -1,0 +1,16 @@
+{
+  "name": "nexus-computer-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "nexus-computer-agent": "./nexus-agent.mjs"
+  },
+  "scripts": {
+    "start": "node nexus-agent.mjs",
+    "check": "node --check nexus-agent.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
