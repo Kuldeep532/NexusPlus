@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { File, Directory, Paths } from 'expo-file-system';
 import { UNIQUE_VOICE_CATALOG, type VoiceCatalogItem } from './voiceCatalog';
+import { acquireVoiceDownloadSlot } from './voiceDownloadGuard';
 
 const STORAGE_KEY = 'nexus-plus.voice-library.v4';
 const LEGACY_STORAGE_KEYS = ['nexus-plus.voice-library.v3', 'nexus-plus.voice-library.v2'];
@@ -71,6 +72,7 @@ async function installVoice(voice: VoiceCatalogItem, onProgress?: (progress: Voi
     const existing = (await getInstalledVoices()).find((item) => item.id === voice.id);
     if (existing) return existing;
   }
+  acquireVoiceDownloadSlot();
   safeDelete(modelTemp); safeDelete(configTemp);
   try {
     const modelDownload = await File.createDownloadTask(voice.modelUrl, modelTemp, {}, ({ totalBytesWritten, totalBytesExpectedToWrite }) => onProgress?.({ voiceId: voice.id, stage: 'model', downloadedBytes: totalBytesWritten, totalBytes: totalBytesExpectedToWrite || voice.modelSizeBytes || 0 })).downloadAsync();
