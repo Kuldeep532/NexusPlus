@@ -2,11 +2,24 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { File, Directory, Paths } from 'expo-file-system';
 import { UNIQUE_VOICE_CATALOG, type VoiceCatalogItem } from './voiceCatalog';
 import { acquireVoiceDownloadSlot, releaseVoiceDownloadSlot } from './voiceDownloadGuard';
+import { finishSupabaseVoiceDownload, tryStartSupabaseVoiceDownload, type DownloadGateDeviceInfo } from './supabaseDownloadGate';
 
 const STORAGE_KEY = 'nexus-plus.voice-library.v4';
 const LEGACY_STORAGE_KEYS = ['nexus-plus.voice-library.v3', 'nexus-plus.voice-library.v2'];
 const ROOT = new Directory(Paths.document, 'voice-library');
 const operationLocks = new Map<string, Promise<InstalledVoice>>();
+
+type SupabaseDownloadSession = { userId: string; accessToken: string };
+let supabaseDownloadSessionProvider: (() => Promise<SupabaseDownloadSession | null>) | null = null;
+let deviceInfoProvider: (() => DownloadGateDeviceInfo | undefined) | null = null;
+
+export function configureSupabaseVoiceDownloadGate(
+  provider: (() => Promise<SupabaseDownloadSession | null>) | null,
+  getDeviceInfo?: (() => DownloadGateDeviceInfo | undefined) | null,
+): void {
+  supabaseDownloadSessionProvider = provider;
+  deviceInfoProvider = getDeviceInfo ?? null;
+}
 
 export type InstalledVoice = VoiceCatalogItem & { installedAt: number; modelPath: string; configPath: string };
 export type VoiceDownloadProgress = { voiceId: string; stage: 'model' | 'config'; downloadedBytes: number; totalBytes: number };
@@ -65,6 +78,10 @@ export async function isVoiceInstalled(voiceId: string): Promise<boolean> {
   return !!voice && validFile(modelFile(voice), voice.modelSizeBytes) && validFile(configFile(voice), voice.configSizeBytes);
 }
 
+async function releaseSupabaseSession(session: SupabaseDownloadSession): Promise<void> {
+  try { await finishSupabaseVoiceDownload(session.userId, session.accessToken); } catch { /* never mask the original download error */ }
+}
+
 async function installVoice(voice: VoiceCatalogItem, onProgress?: (progress: VoiceDownloadProgress) => void): Promise<InstalledVoice> {
   ROOT.create({ idempotent: true, intermediates: true });
   const model = modelFile(voice); const config = configFile(voice); const modelTemp = tempModelFile(voice); const configTemp = tempConfigFile(voice);
@@ -72,8 +89,17 @@ async function installVoice(voice: VoiceCatalogItem, onProgress?: (progress: Voi
     const existing = (await getInstalledVoices()).find((item) => item.id === voice.id);
     if (existing) return existing;
   }
+
   acquireVoiceDownloadSlot(voice.id);
+  let supabaseSession: SupabaseDownloadSession | null = null;
   try {
+    if (supabaseDownloadSessionProvider) {
+      supabaseSession = await supabaseDownloadSessionProvider();
+      if (supabaseSession) {
+        await tryStartSupabaseVoiceDownload(supabaseSession.userId, supabaseSession.accessToken, deviceInfoProvider?.());
+      }
+    }
+
     safeDelete(modelTemp); safeDelete(configTemp);
     const modelDownload = await File.createDownloadTask(voice.modelUrl, modelTemp, {}, ({ totalBytesWritten, totalBytesExpectedToWrite }) => onProgress?.({ voiceId: voice.id, stage: 'model', downloadedBytes: totalBytesWritten, totalBytes: totalBytesExpectedToWrite || voice.modelSizeBytes || 0 })).downloadAsync();
     if (!modelDownload?.exists || !validFile(modelDownload, voice.modelSizeBytes)) throw new Error(`Voice model ${voice.name} failed integrity verification.`);
@@ -86,7 +112,10 @@ async function installVoice(voice: VoiceCatalogItem, onProgress?: (progress: Voi
     await writeInstalled([...current.filter((item) => item.id !== voice.id), installed]);
     return installed;
   } catch (error) { safeDelete(modelTemp); safeDelete(configTemp); throw error instanceof Error ? error : new Error(`Voice ${voice.name} download failed.`); }
-  finally { releaseVoiceDownloadSlot(voice.id); }
+  finally {
+    releaseVoiceDownloadSlot(voice.id);
+    if (supabaseSession) await releaseSupabaseSession(supabaseSession);
+  }
 }
 
 export async function downloadVoice(voice: VoiceCatalogItem, onProgress?: (progress: VoiceDownloadProgress) => void): Promise<InstalledVoice> {
