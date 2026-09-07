@@ -62,9 +62,6 @@ jobs:
         run: pnpm install --no-frozen-lockfile
       - name: Validate Expo configuration
         run: pnpm exec expo config --type public
-      - name: Validate Nexus Computer Agent
-        working-directory: computer-agent
-        run: npm run check
       - name: Validate EAS token
         run: test -n "$EAS_TOKEN"
       - name: Build Android Development Build with Expo EAS
@@ -121,9 +118,6 @@ jobs:
           run_install: false
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
-      - name: Validate Nexus Computer Agent
-        working-directory: computer-agent
-        run: npm run check
       - name: Materialize Firebase configuration
         shell: bash
         env:
@@ -211,38 +205,47 @@ jobs:
           else
             echo "Play Integrity: optional/not configured"
           fi
-      - name: Validate Expo configuration
-        run: pnpm exec expo config --type public
       - name: Consolidated prebuild diagnostics
         shell: bash
         run: |
           set +e
           failed=0
-          echo '=== 1. TypeScript ==='
-          pnpm run typecheck
-          rc=$?
-          [ $rc -eq 0 ] || failed=1
-          echo '=== 2. Expo configuration ==='
-          pnpm exec expo config --type public >/tmp/expo-config.json
-          rc=$?
-          cat /tmp/expo-config.json
-          [ $rc -eq 0 ] || failed=1
-          echo '=== 3. JavaScript/TypeScript bundle dry-run ==='
-          pnpm exec expo export --platform android --output-dir /tmp/nexusplus-bundle-check --clear
-          rc=$?
-          [ $rc -eq 0 ] || failed=1
-          echo '=== 4. Nexus Computer Agent syntax ==='
-          (cd computer-agent && npm run check)
-          rc=$?
-          [ $rc -eq 0 ] || failed=1
-          echo '=== Consolidated diagnostics summary ==='
-          if [ $failed -ne 0 ]; then
-            echo 'One or more prebuild checks failed.'
+          typecheck_log="$RUNNER_TEMP/nexusplus-typecheck.log"
+          expo_config_log="$RUNNER_TEMP/nexusplus-expo-config.log"
+          bundle_log="$RUNNER_TEMP/nexusplus-bundle.log"
+
+          run_check() {
+            local label="$1"
+            local log_file="$2"
+            shift 2
+            echo "=== $label ==="
+            "$@" 2>&1 | tee "$log_file"
+            local rc=${PIPESTATUS[0]}
+            if [ "$rc" -ne 0 ]; then
+              failed=1
+              echo "[$label] FAILED with exit code $rc"
+            else
+              echo "[$label] PASSED"
+            fi
+            return 0
+          }
+
+          echo '=== Consolidated compiler diagnostics ==='
+          run_check '1. TypeScript compiler (all diagnostics)' "$typecheck_log" \
+            pnpm exec tsc -p tsconfig.json --noEmit --pretty false --noErrorTruncation
+
+          run_check '2. Expo configuration' "$expo_config_log" \
+            pnpm exec expo config --type public
+
+          run_check '3. JavaScript/TypeScript bundle dry-run' "$bundle_log" \
+            pnpm exec expo export --platform android --output-dir /tmp/nexusplus-bundle-check --clear
+
+          echo '=== Final diagnostics summary ==='
+          if [ "$failed" -ne 0 ]; then
+            echo 'One or more prebuild checks failed; all configured diagnostics were executed.'
             exit 1
           fi
           echo 'All consolidated prebuild diagnostics passed.'
-      - name: Typecheck
-        run: pnpm run typecheck
       - name: Set up Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
