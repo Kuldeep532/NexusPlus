@@ -10,6 +10,11 @@ const languageFilters = ['All', ...Array.from(new Set(VOICE_CATALOG.map((voice) 
 
 type Filter = 'all' | 'female' | 'male' | 'downloaded';
 
+function userSafeError(error: unknown, action: 'download' | 'remove'): string {
+  if (action === 'download') return error instanceof Error && error.message ? `Voice download could not be completed. ${error.message}` : 'Voice download could not be completed. Please check your connection and try again.';
+  return error instanceof Error && error.message ? `Voice removal could not be completed. ${error.message}` : 'Voice removal could not be completed. Please try again.';
+}
+
 export default function VoicesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -19,9 +24,12 @@ export default function VoicesScreen() {
   const [filter, setFilter] = useState<Filter>('all');
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [progress, setProgress] = useState<Record<string, number>>({});
+  const [status, setStatus] = useState('');
 
   useEffect(() => {
-    void getInstalledVoices().then(setInstalled);
+    void getInstalledVoices()
+      .then(setInstalled)
+      .catch(() => setStatus('Downloaded voice information could not be read. Your existing files were not modified.'));
   }, []);
 
   const installedIds = useMemo(() => new Set(installed.map((voice) => voice.id)), [installed]);
@@ -38,23 +46,32 @@ export default function VoicesScreen() {
 
   const install = async (voice: VoiceCatalogItem) => {
     setBusy((state) => ({ ...state, [voice.id]: true }));
+    setStatus(`Downloading ${voice.name}…`);
     try {
       await downloadVoice(voice, (state) => {
         const total = state.totalBytes || 1;
         setProgress((current) => ({ ...current, [state.voiceId]: Math.min(100, Math.round((state.downloadedBytes / total) * 100)) }));
       });
       setInstalled(await getInstalledVoices());
+      setStatus(`${voice.name} downloaded successfully.`);
+    } catch (error) {
+      setStatus(userSafeError(error, 'download'));
+      setProgress((state) => ({ ...state, [voice.id]: 0 }));
     } finally {
       setBusy((state) => ({ ...state, [voice.id]: false }));
-      setProgress((state) => ({ ...state, [voice.id]: 100 }));
     }
   };
 
   const uninstall = async (voice: VoiceCatalogItem) => {
     setBusy((state) => ({ ...state, [voice.id]: true }));
+    setStatus(`Removing ${voice.name}…`);
     try {
       await removeVoice(voice.id);
       setInstalled(await getInstalledVoices());
+      setProgress((state) => ({ ...state, [voice.id]: 0 }));
+      setStatus(`${voice.name} removed.`);
+    } catch (error) {
+      setStatus(userSafeError(error, 'remove'));
     } finally {
       setBusy((state) => ({ ...state, [voice.id]: false }));
     }
@@ -74,6 +91,10 @@ export default function VoicesScreen() {
           {VOICE_CATALOG_COUNT}+ voices. Download any number of languages and voices. Large voice models stay outside the APK and are stored locally after download.
         </Text>
       </View>
+
+      {status ? <View accessibilityLiveRegion="polite" accessible accessibilityRole="text" style={[styles.status, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.statusText, { color: colors.foreground }]}>{status}</Text>
+      </View> : null}
 
       <View style={[styles.summary, { backgroundColor: colors.card, borderColor: colors.border }]} accessible accessibilityRole="text" accessibilityLabel={`${installed.length} voices downloaded. ${VOICE_CATALOG_COUNT} voices available.`}>
         <View><Text style={[styles.summaryNumber, { color: colors.foreground }]}>{installed.length}</Text><Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>Downloaded</Text></View>
@@ -130,7 +151,7 @@ export default function VoicesScreen() {
               <View style={styles.copy} accessible accessibilityRole="text" accessibilityLabel={`${voice.name}, ${voice.languageName}, ${voice.gender}, ${voice.quality} quality. ${isInstalled ? 'Downloaded' : 'Not downloaded'}`}>
                 <Text style={[styles.voiceName, { color: colors.foreground }]}>{voice.name}</Text>
                 <Text style={[styles.voiceDetail, { color: colors.mutedForeground }]}>{voice.languageName} · {voice.language} · {voice.gender} · {voice.quality} quality</Text>
-                {isBusy && <Text style={[styles.progressText, { color: colors.primary }]}>{percent}% downloaded</Text>}
+                {isBusy && <Text accessibilityLiveRegion="polite" style={[styles.progressText, { color: colors.primary }]}>{percent}% downloaded</Text>}
               </View>
               <Pressable
                 accessibilityRole="button"
@@ -158,6 +179,8 @@ const styles = StyleSheet.create({
   kicker: { fontSize: 10, letterSpacing: 1.8, fontFamily: 'Inter_700Bold', marginBottom: 8 },
   title: { fontSize: 29, fontFamily: 'Inter_700Bold', marginBottom: 6 },
   subtitle: { fontSize: 12, lineHeight: 18, fontFamily: 'Inter_400Regular' },
+  status: { marginHorizontal: 20, marginBottom: 12, padding: 12, borderRadius: 12, borderWidth: 1 },
+  statusText: { fontSize: 11, lineHeight: 16 },
   summary: { marginHorizontal: 20, borderRadius: 16, borderWidth: 1, padding: 15, flexDirection: 'row', justifyContent: 'space-around', marginBottom: 14 },
   summaryNumber: { fontSize: 22, fontFamily: 'Inter_700Bold', textAlign: 'center' },
   summaryLabel: { marginTop: 3, fontSize: 10, textAlign: 'center' },
