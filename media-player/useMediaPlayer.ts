@@ -59,7 +59,7 @@ export function useMediaPlayer(initialQueue: MediaItemModel[] = []) {
     void setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'mixWithOthers' });
     if (!current || current.kind !== 'audio') return;
 
-    const player = createAudioPlayer({ uri: current.uri }, { downloadFirst: false });
+    const player = createAudioPlayer({ uri: current.uri });
     audioRef.current = player;
     player.volume = state.volume;
     player.setPlaybackRate(state.rate);
