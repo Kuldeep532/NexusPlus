@@ -6,6 +6,8 @@ import { palettes, radius, type ColorTokens } from '@/constants/colors';
 let selectedTheme: ThemeColor = 'ocean-blue';
 const listeners = new Set<() => void>();
 
+type PaletteTokens = ColorTokens & { radius: number };
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   return () => listeners.delete(listener);
@@ -18,7 +20,7 @@ export function refreshThemeColor(theme: ThemeColor) {
   listeners.forEach((listener) => listener());
 }
 
-export function useColors(): ColorTokens & { radius: number } {
+export function useColors(): PaletteTokens {
   const scheme = useColorScheme();
   const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
@@ -33,5 +35,10 @@ export function useColors(): ColorTokens & { radius: number } {
   const paletteName = theme === 'ocean-blue' ? 'oceanBlue' : theme === 'classic' ? 'classic' : 'light';
   const palette = palettes[paletteName];
   const effectiveScheme = theme === 'dark' ? 'dark' : theme === 'light' ? 'light' : scheme === 'dark' ? 'dark' : 'light';
-  return { ...palette[effectiveScheme], radius };
+
+  // All palettes intentionally share the same semantic token keys, but their
+  // literal values differ by theme. Widen the palette at this API boundary so
+  // callers depend on stable semantic tokens rather than literal color unions.
+  const tokens = palette[effectiveScheme];
+  return { ...tokens, radius } as PaletteTokens;
 }
