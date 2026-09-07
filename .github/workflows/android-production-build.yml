@@ -60,6 +60,17 @@ jobs:
           run_install: false
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
+      - name: Full source prebuild scan
+        shell: bash
+        run: |
+          set +e
+          node scripts/prebuild-check.mjs 2>&1 | tee "$RUNNER_TEMP/nexusplus-source-scan.log"
+          rc=${PIPESTATUS[0]}
+          echo "=== Source scan complete ==="
+          if [ "$rc" -ne 0 ]; then
+            echo "Source scan failed. EAS build will NOT start."
+            exit "$rc"
+          fi
       - name: Validate Expo configuration
         run: pnpm exec expo config --type public
       - name: Validate EAS token
@@ -210,7 +221,7 @@ jobs:
         run: |
           set +e
           failed=0
-          typecheck_log="$RUNNER_TEMP/nexusplus-typecheck.log"
+          source_scan_log="$RUNNER_TEMP/nexusplus-source-scan.log"
           expo_config_log="$RUNNER_TEMP/nexusplus-expo-config.log"
           bundle_log="$RUNNER_TEMP/nexusplus-bundle.log"
 
@@ -230,9 +241,9 @@ jobs:
             return 0
           }
 
-          echo '=== Consolidated compiler diagnostics ==='
-          run_check '1. TypeScript compiler (all diagnostics)' "$typecheck_log" \
-            pnpm exec tsc -p tsconfig.json --noEmit --pretty false --noErrorTruncation
+          echo '=== Full source diagnostics ==='
+          run_check '1. Full JavaScript/TypeScript source scan' "$source_scan_log" \
+            node scripts/prebuild-check.mjs
 
           run_check '2. Expo configuration' "$expo_config_log" \
             pnpm exec expo config --type public
