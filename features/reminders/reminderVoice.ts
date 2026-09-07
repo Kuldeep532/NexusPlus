@@ -17,46 +17,76 @@ function getPiperBridge(): NexusPiperBridge | undefined {
   return (globalThis as typeof globalThis & { NexusPiper?: NexusPiperBridge }).NexusPiper;
 }
 
+function safeStopPlayer(): void {
+  try { player?.pause(); } catch { /* optional cleanup */ }
+  try { player?.remove(); } catch { /* optional cleanup */ }
+  player = null;
+}
+
+function safeAudioPath(path: unknown): path is string {
+  if (typeof path !== 'string' || !path.trim()) return false;
+  try {
+    const file = new (require('expo-file-system').File)(path);
+    return file.exists && file.size > 0;
+  } catch {
+    return false;
+  }
+}
+
 export async function resolveReminderVoice(language: string, voiceId?: string): Promise<ReminderVoiceResolution> {
-  const installed = await getInstalledVoices();
-  const exact = voiceId ? installed.find((voice) => voice.id === voiceId) : undefined;
-  const languageMatch = installed.find((voice) => voice.language.toLowerCase().startsWith(language.slice(0, 2).toLowerCase()));
-  return { mode: getPiperBridge()?.synthesize && (exact || languageMatch) ? 'piper' : 'system', voice: exact || languageMatch };
+  try {
+    const installed = await getInstalledVoices();
+    const exact = voiceId ? installed.find((voice) => voice.id === voiceId) : undefined;
+    const languageMatch = installed.find((voice) => voice.language.toLowerCase().startsWith(language.slice(0, 2).toLowerCase()));
+    return { mode: getPiperBridge()?.synthesize && (exact || languageMatch) ? 'piper' : 'system', voice: exact || languageMatch };
+  } catch {
+    return { mode: 'system' };
+  }
 }
 
 export async function speakReminder(text: string, language: string, voiceId?: string): Promise<ReminderVoiceResolution> {
-  Speech.stop();
+  const normalizedText = text.trim();
+  if (!normalizedText) return { mode: 'system' };
+
+  try { Speech.stop(); } catch { /* system TTS may already be idle */ }
   const resolution = await resolveReminderVoice(language, voiceId);
   const bridge = getPiperBridge();
 
   if (resolution.mode === 'piper' && bridge?.synthesize && resolution.voice) {
     try {
       const wavPath = await bridge.synthesize({
-        text,
+        text: normalizedText,
         modelPath: resolution.voice.modelPath,
         configPath: resolution.voice.configPath,
       });
-      player?.remove();
-      player = createAudioPlayer(wavPath);
-      player.volume = 1;
-      player.play();
+      if (!safeAudioPath(wavPath)) throw new Error('INVALID_PIPER_AUDIO');
+      safeStopPlayer();
+      const nextPlayer = createAudioPlayer(wavPath);
+      nextPlayer.volume = 1;
+      player = nextPlayer;
+      nextPlayer.play();
       return resolution;
     } catch {
+      safeStopPlayer();
       // The downloaded model remains available; use system TTS for reliability.
     }
   }
 
-  const voices = await Speech.getAvailableVoicesAsync();
-  const preferred = voices
-    .filter((voice) => voice.language?.toLowerCase().startsWith(language.slice(0, 2).toLowerCase()))
-    .sort((a, b) => Number(b.quality === 'Enhanced') - Number(a.quality === 'Enhanced'))[0];
+  try {
+    const voices = await Speech.getAvailableVoicesAsync();
+    const preferred = voices
+      .filter((voice) => voice.language?.toLowerCase().startsWith(language.slice(0, 2).toLowerCase()))
+      .sort((a, b) => Number(b.quality === 'Enhanced') - Number(a.quality === 'Enhanced'))[0];
 
-  Speech.speak(text, {
-    language,
-    voice: preferred?.identifier,
-    rate: 0.92,
-    pitch: 1,
-    volume: 1,
-  });
+    Speech.speak(normalizedText, {
+      language,
+      voice: preferred?.identifier,
+      rate: 0.92,
+      pitch: 1,
+      volume: 1,
+    });
+  } catch {
+    // Reminder delivery should not fail because optional audio output is unavailable.
+  }
   return { mode: 'system' };
 }
