@@ -37,7 +37,7 @@ export async function renameEntryTo(entry: FileManagerEntry, newName: string): P
 }
 
 export async function getEntryDetails(entry: FileManagerEntry) {
-  const info = await FileSystem.getInfoAsync(entry.uri, { size: true });
+  const info = await FileSystem.getInfoAsync(entry.uri);
   return {
     ...entry,
     exists: info.exists,
