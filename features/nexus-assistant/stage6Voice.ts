@@ -7,13 +7,15 @@ export type LiveBoardState = {
   assistantText: string;
 };
 
+export type VoiceTranscriptHandler = (text: string) => void;
+
 /**
- * Stage 6 UI/native boundary. The actual Android microphone/STT/TTS implementation
- * is intentionally isolated behind this contract so the chat screen stays testable.
+ * Native voice boundary used by Nexus Assistant. Implementations may deliver
+ * transcripts through the startListening callback and/or through runtime events.
  */
 export type Stage6VoiceBridge = {
   isAvailable(): Promise<boolean>;
-  startListening(onTranscript: (text: string) => void): Promise<void>;
+  startListening(onTranscript?: VoiceTranscriptHandler): Promise<void>;
   stopListening(): Promise<void>;
   stopOutput(): Promise<void>;
   speak(text: string): Promise<void>;
