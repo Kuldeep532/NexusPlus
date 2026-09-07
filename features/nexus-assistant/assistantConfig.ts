@@ -12,10 +12,34 @@ export type AssistantModel = {
   requiredFiles?: string[];
 };
 
+/**
+ * One primary downloadable local chat model is exposed to the user.
+ * Speech recognition remains a separate small model because ASR and text
+ * generation are different inference tasks.
+ */
+export const NEXUS_CORE_MODEL_ID = 'smollm2-360m-q4km';
+export const NEXUS_ASR_MODEL_ID = 'moonshine-tiny-en-quantized-2026-02-27';
+
 export const ASSISTANT_MODELS: AssistantModel[] = [
-  { id: 'smollm2-360m-q4km', title: 'Nexus Small Chat', description: 'Small English-focused local chat model.', sizeMb: 271, url: 'https://huggingface.co/QuantFactory/SmolLM2-360M-Instruct-GGUF/resolve/main/SmolLM2-360M-Instruct.Q4_K_M.gguf', format: 'gguf', kind: 'chat' },
-  { id: 'moonshine-tiny-en-quantized-2026-02-27', title: 'Moonshine Tiny English ASR', description: 'Local English speech recognition package for Voice Input and Live Mode.', sizeMb: 57, url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-moonshine-tiny-en-quantized-2026-02-27.tar.bz2', format: 'archive', kind: 'asr', requiredFiles: ['tokens.txt'] },
-  { id: 'silero-vad', title: 'Silero VAD', description: 'Local voice activity detection asset.', sizeMb: 2, url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx', format: 'onnx', kind: 'vad' },
+  {
+    id: NEXUS_CORE_MODEL_ID,
+    title: 'Nexus Core AI',
+    description: 'Primary local chat model for Assistant, books, files, summaries, explanations and general AI tasks.',
+    sizeMb: 271,
+    url: 'https://huggingface.co/QuantFactory/SmolLM2-360M-Instruct-GGUF/resolve/main/SmolLM2-360M-Instruct.Q4_K_M.gguf',
+    format: 'gguf',
+    kind: 'chat',
+  },
+  {
+    id: NEXUS_ASR_MODEL_ID,
+    title: 'Nexus Speech Transcriber',
+    description: 'Local English speech transcription model used to turn voice and extracted video audio into text.',
+    sizeMb: 57,
+    url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-moonshine-tiny-en-quantized-2026-02-27.tar.bz2',
+    format: 'archive',
+    kind: 'asr',
+    requiredFiles: ['tokens.txt'],
+  },
 ];
 
 export type AssistantVoice = {
