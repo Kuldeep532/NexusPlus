@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import type { FileManagerEntry } from '../FileManagerTypes';
 
-export function FileManagerRecentPanel({ entries, onOpen }: { entries: FileManagerEntry[]; onOpen: (entry: FileManagerEntry) => void }) {
+export function FileManagerRecentPanel({ entries = [], onOpen = () => undefined }: { entries?: FileManagerEntry[]; onOpen?: (entry: FileManagerEntry) => void }) {
   const colors = useColors();
   const recent = useMemo(() => [...entries].sort((a, b) => b.modifiedAt - a.modifiedAt).slice(0, 12), [entries]);
   return (
