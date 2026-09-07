@@ -30,11 +30,10 @@ export async function copyEntry(uri: string, destinationUri: string): Promise<vo
 export async function moveEntry(uri: string, destinationUri: string): Promise<void> { await FileSystem.moveAsync({ from: uri, to: destinationUri }); }
 export async function inspectEntry(uri: string): Promise<FileManagerEntry> { return entryFromInfo(uri, await FileSystem.getInfoAsync(uri)); }
 
-export function getStorageStats(): FileManagerStorageStats {
-  const total = Math.max(Number(awaitableLegacyValue(FileSystem.getTotalDiskCapacityAsync)), 1);
-  const free = Math.max(Number(awaitableLegacyValue(FileSystem.getFreeDiskStorageAsync)), 0);
+export async function getStorageStats(): Promise<FileManagerStorageStats> {
+  const [totalRaw, freeRaw] = await Promise.all([FileSystem.getTotalDiskCapacityAsync(), FileSystem.getFreeDiskStorageAsync()]);
+  const total = Math.max(Number(totalRaw), 1);
+  const free = Math.max(Number(freeRaw), 0);
   const used = Math.max(total - free, 0);
   return { total, free, used, ratio: Math.min(used / total, 1) };
 }
-
-function awaitableLegacyValue<T>(promiseFactory: () => Promise<T>): T | Promise<T> { return promiseFactory(); }
