@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false,
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    ".git",
+    ".expo",
+    "android/build",
+    "android/app/build",
+    "coverage",
+    "dist",
+    "build"
+  ]
+}
