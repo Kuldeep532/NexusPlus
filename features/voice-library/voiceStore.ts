@@ -1,224 +1,101 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { File, Directory, Paths } from 'expo-file-system';
-import { VOICE_CATALOG, type VoiceCatalogItem } from './voiceCatalog';
+import { UNIQUE_VOICE_CATALOG, type VoiceCatalogItem } from './voiceCatalog';
 
-const STORAGE_KEY = 'nexus-plus.voice-library.v3';
-const LEGACY_STORAGE_KEY = 'nexus-plus.voice-library.v2';
+const STORAGE_KEY = 'nexus-plus.voice-library.v4';
+const LEGACY_STORAGE_KEYS = ['nexus-plus.voice-library.v3', 'nexus-plus.voice-library.v2'];
 const ROOT = new Directory(Paths.document, 'voice-library');
 const operationLocks = new Map<string, Promise<InstalledVoice>>();
 
-export type InstalledVoice = VoiceCatalogItem & {
-  installedAt: number;
-  modelPath: string;
-  configPath: string;
-};
+export type InstalledVoice = VoiceCatalogItem & { installedAt: number; modelPath: string; configPath: string };
+export type VoiceDownloadProgress = { voiceId: string; stage: 'model' | 'config'; downloadedBytes: number; totalBytes: number };
 
-export type VoiceDownloadProgress = {
-  voiceId: string;
-  stage: 'model' | 'config';
-  downloadedBytes: number;
-  totalBytes: number;
-};
-
-function modelFile(voice: VoiceCatalogItem): File {
-  return new File(ROOT, `${voice.id}.onnx`);
-}
-
-function configFile(voice: VoiceCatalogItem): File {
-  return new File(ROOT, `${voice.id}.onnx.json`);
-}
-
-function tempModelFile(voice: VoiceCatalogItem): File {
-  return new File(ROOT, `${voice.id}.onnx.download`);
-}
-
-function tempConfigFile(voice: VoiceCatalogItem): File {
-  return new File(ROOT, `${voice.id}.onnx.json.download`);
-}
-
-function safeDelete(file: File): void {
-  try {
-    if (file.exists) file.delete();
-  } catch {
-    // Best-effort cleanup only. Preserve the primary operation error.
-  }
-}
-
-function isExpectedSize(file: File, expected?: number): boolean {
-  if (!file.exists) return false;
-  if (!expected || expected <= 0) return file.size > 0;
-  return file.size === expected;
-}
-
-function validInstalledRecord(item: unknown): item is InstalledVoice {
-  if (!item || typeof item !== 'object') return false;
-  const value = item as Partial<InstalledVoice>;
-  return typeof value.id === 'string'
-    && typeof value.modelPath === 'string'
-    && typeof value.configPath === 'string'
-    && typeof value.installedAt === 'number';
+const findVoice = (voiceId: string) => UNIQUE_VOICE_CATALOG.find((item) => item.id === voiceId);
+const modelFile = (voice: VoiceCatalogItem) => new File(ROOT, `${voice.id}.onnx`);
+const configFile = (voice: VoiceCatalogItem) => new File(ROOT, `${voice.id}.onnx.json`);
+const tempModelFile = (voice: VoiceCatalogItem) => new File(ROOT, `${voice.id}.onnx.download`);
+const tempConfigFile = (voice: VoiceCatalogItem) => new File(ROOT, `${voice.id}.onnx.json.download`);
+function safeDelete(file: File) { try { if (file.exists) file.delete(); } catch {} }
+function validFile(file: File, expected?: number) { return file.exists && (!expected || expected <= 0 ? file.size > 0 : file.size === expected); }
+function validRecord(value: unknown): value is InstalledVoice {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as Partial<InstalledVoice>;
+  return typeof item.id === 'string' && typeof item.modelPath === 'string' && typeof item.configPath === 'string' && typeof item.installedAt === 'number';
 }
 
 async function readInstalled(): Promise<InstalledVoice[]> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed: unknown = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed.filter(validInstalledRecord);
+    const current = await AsyncStorage.getItem(STORAGE_KEY);
+    if (current) {
+      const parsed: unknown = JSON.parse(current);
+      if (Array.isArray(parsed)) return parsed.filter(validRecord);
     }
-
-    // Migrate the previous metadata key so app updates do not make valid
-    // downloaded voices disappear from the library.
-    const legacyRaw = await AsyncStorage.getItem(LEGACY_STORAGE_KEY);
-    if (!legacyRaw) return [];
-    const legacyParsed: unknown = JSON.parse(legacyRaw);
-    if (!Array.isArray(legacyParsed)) return [];
-    const legacy = legacyParsed.filter(validInstalledRecord);
-    if (legacy.length) await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(legacy));
-    return legacy;
-  } catch {
-    return [];
-  }
+    for (const key of LEGACY_STORAGE_KEYS) {
+      const legacy = await AsyncStorage.getItem(key);
+      if (!legacy) continue;
+      const parsed: unknown = JSON.parse(legacy);
+      if (!Array.isArray(parsed)) continue;
+      const migrated = parsed.filter(validRecord).filter((item) => !!findVoice(item.id));
+      if (migrated.length) await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+      return migrated;
+    }
+  } catch {}
+  return [];
 }
 
-async function writeInstalled(items: InstalledVoice[]): Promise<void> {
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-}
+async function writeInstalled(items: InstalledVoice[]) { await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }
 
 export async function getInstalledVoices(): Promise<InstalledVoice[]> {
-  return readInstalled();
+  const records = await readInstalled();
+  const repaired: InstalledVoice[] = [];
+  for (const record of records) {
+    const voice = findVoice(record.id);
+    if (!voice) continue;
+    if (validFile(modelFile(voice), voice.modelSizeBytes) && validFile(configFile(voice), voice.configSizeBytes)) {
+      repaired.push({ ...record, ...voice, modelPath: modelFile(voice).uri, configPath: configFile(voice).uri });
+    }
+  }
+  if (repaired.length !== records.length) { try { await writeInstalled(repaired); } catch {} }
+  return repaired;
 }
 
 export async function isVoiceInstalled(voiceId: string): Promise<boolean> {
-  const voice = VOICE_CATALOG.find((item) => item.id === voiceId);
-  if (!voice) return false;
-  return isExpectedSize(modelFile(voice), voice.modelSizeBytes)
-    && isExpectedSize(configFile(voice), voice.configSizeBytes);
+  const voice = findVoice(voiceId);
+  return !!voice && validFile(modelFile(voice), voice.modelSizeBytes) && validFile(configFile(voice), voice.configSizeBytes);
 }
 
 async function installVoice(voice: VoiceCatalogItem, onProgress?: (progress: VoiceDownloadProgress) => void): Promise<InstalledVoice> {
   ROOT.create({ idempotent: true, intermediates: true });
-
-  const model = modelFile(voice);
-  const config = configFile(voice);
-  const modelTemp = tempModelFile(voice);
-  const configTemp = tempConfigFile(voice);
-
+  const model = modelFile(voice); const config = configFile(voice); const modelTemp = tempModelFile(voice); const configTemp = tempConfigFile(voice);
   if (await isVoiceInstalled(voice.id)) {
-    const current = await readInstalled();
-    const existing = current.find((item) => item.id === voice.id);
+    const existing = (await getInstalledVoices()).find((item) => item.id === voice.id);
     if (existing) return existing;
-
-    // Repair metadata from an older/broken app-state write without forcing a
-    // multi-hundred-megabyte re-download when both files are valid.
-    const repaired: InstalledVoice = {
-      ...voice,
-      installedAt: Date.now(),
-      modelPath: model.uri,
-      configPath: config.uri,
-    };
-    await writeInstalled([...current.filter((item) => item.id !== voice.id), repaired]);
-    return repaired;
   }
-
-  safeDelete(modelTemp);
-  safeDelete(configTemp);
-
+  safeDelete(modelTemp); safeDelete(configTemp);
   try {
-    const modelTask = File.createDownloadTask(voice.modelUrl, modelTemp, {}, ({ totalBytesWritten, totalBytesExpectedToWrite }) => {
-      onProgress?.({
-        voiceId: voice.id,
-        stage: 'model',
-        downloadedBytes: totalBytesWritten,
-        totalBytes: totalBytesExpectedToWrite || voice.modelSizeBytes || 0,
-      });
-    });
-    const downloadedModel = await modelTask.downloadAsync();
-    if (!downloadedModel?.exists || !isExpectedSize(downloadedModel, voice.modelSizeBytes)) {
-      throw new Error(`Voice model ${voice.name} failed integrity verification.`);
-    }
-
-    const configTask = File.createDownloadTask(voice.configUrl, configTemp, {}, ({ totalBytesWritten, totalBytesExpectedToWrite }) => {
-      onProgress?.({
-        voiceId: voice.id,
-        stage: 'config',
-        downloadedBytes: totalBytesWritten,
-        totalBytes: totalBytesExpectedToWrite || voice.configSizeBytes || 0,
-      });
-    });
-    const downloadedConfig = await configTask.downloadAsync();
-    if (!downloadedConfig?.exists || !isExpectedSize(downloadedConfig, voice.configSizeBytes)) {
-      throw new Error(`Voice configuration for ${voice.name} failed integrity verification.`);
-    }
-
-    // Publish only after both parts are verified, so runtime never sees a
-    // partially installed voice pair.
-    safeDelete(model);
-    safeDelete(config);
-    modelTemp.move(model);
-    configTemp.move(config);
-
-    if (!isExpectedSize(model, voice.modelSizeBytes) || !isExpectedSize(config, voice.configSizeBytes)) {
-      safeDelete(model);
-      safeDelete(config);
-      throw new Error(`Voice ${voice.name} could not be finalized safely.`);
-    }
-
-    const installed: InstalledVoice = {
-      ...voice,
-      installedAt: Date.now(),
-      modelPath: model.uri,
-      configPath: config.uri,
-    };
-    const current = await readInstalled();
+    const modelDownload = await File.createDownloadTask(voice.modelUrl, modelTemp, {}, ({ totalBytesWritten, totalBytesExpectedToWrite }) => onProgress?.({ voiceId: voice.id, stage: 'model', downloadedBytes: totalBytesWritten, totalBytes: totalBytesExpectedToWrite || voice.modelSizeBytes || 0 })).downloadAsync();
+    if (!modelDownload?.exists || !validFile(modelDownload, voice.modelSizeBytes)) throw new Error(`Voice model ${voice.name} failed integrity verification.`);
+    const configDownload = await File.createDownloadTask(voice.configUrl, configTemp, {}, ({ totalBytesWritten, totalBytesExpectedToWrite }) => onProgress?.({ voiceId: voice.id, stage: 'config', downloadedBytes: totalBytesWritten, totalBytes: totalBytesExpectedToWrite || voice.configSizeBytes || 0 })).downloadAsync();
+    if (!configDownload?.exists || !validFile(configDownload, voice.configSizeBytes)) throw new Error(`Voice configuration for ${voice.name} failed integrity verification.`);
+    safeDelete(model); safeDelete(config); modelTemp.move(model); configTemp.move(config);
+    if (!validFile(model, voice.modelSizeBytes) || !validFile(config, voice.configSizeBytes)) throw new Error(`Voice ${voice.name} could not be finalized safely.`);
+    const installed = { ...voice, installedAt: Date.now(), modelPath: model.uri, configPath: config.uri } as InstalledVoice;
+    const current = await getInstalledVoices();
     await writeInstalled([...current.filter((item) => item.id !== voice.id), installed]);
-    onProgress?.({
-      voiceId: voice.id,
-      stage: 'config',
-      downloadedBytes: voice.configSizeBytes || config.size,
-      totalBytes: voice.configSizeBytes || config.size,
-    });
     return installed;
-  } catch (error) {
-    safeDelete(modelTemp);
-    safeDelete(configTemp);
-    const current = await readInstalled();
-    const retained = current.filter((item) => item.id !== voice.id);
-    if (retained.length !== current.length) {
-      try { await writeInstalled(retained); } catch { /* preserve primary failure */ }
-    }
-    throw error instanceof Error ? error : new Error(`Voice ${voice.name} download failed.`);
-  }
+  } catch (error) { safeDelete(modelTemp); safeDelete(configTemp); throw error instanceof Error ? error : new Error(`Voice ${voice.name} download failed.`); }
 }
 
-export async function downloadVoice(
-  voice: VoiceCatalogItem,
-  onProgress?: (progress: VoiceDownloadProgress) => void,
-): Promise<InstalledVoice> {
-  const active = operationLocks.get(voice.id);
-  if (active) return active;
-
-  const operation = installVoice(voice, onProgress).finally(() => {
-    operationLocks.delete(voice.id);
-  });
-  operationLocks.set(voice.id, operation);
-  return operation;
+export async function downloadVoice(voice: VoiceCatalogItem, onProgress?: (progress: VoiceDownloadProgress) => void): Promise<InstalledVoice> {
+  const canonical = findVoice(voice.id);
+  if (!canonical) throw new Error('Unknown voice.');
+  const active = operationLocks.get(canonical.id); if (active) return active;
+  const operation = installVoice(canonical, onProgress).finally(() => operationLocks.delete(canonical.id)); operationLocks.set(canonical.id, operation); return operation;
 }
 
 export async function removeVoice(voiceId: string): Promise<void> {
-  const voice = VOICE_CATALOG.find((item) => item.id === voiceId);
-  if (!voice) return;
-
-  const active = operationLocks.get(voiceId);
-  if (active) await active.catch(() => undefined);
-
-  const model = modelFile(voice);
-  const config = configFile(voice);
-  safeDelete(model);
-  safeDelete(config);
-  safeDelete(tempModelFile(voice));
-  safeDelete(tempConfigFile(voice));
-
-  const current = await readInstalled();
-  await writeInstalled(current.filter((item) => item.id !== voiceId));
+  const voice = findVoice(voiceId); if (!voice) return;
+  const active = operationLocks.get(voiceId); if (active) await active.catch(() => undefined);
+  safeDelete(modelFile(voice)); safeDelete(configFile(voice)); safeDelete(tempModelFile(voice)); safeDelete(tempConfigFile(voice));
+  await writeInstalled((await getInstalledVoices()).filter((item) => item.id !== voiceId));
 }
