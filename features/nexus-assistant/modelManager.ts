@@ -1,9 +1,10 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { ASSISTANT_MODELS, ASSISTANT_VOICES, type AssistantModel, type AssistantVoice } from './assistantConfig';
 import { downloadAssistantAsset, deleteAssistantAsset } from './stage8AssetManager';
+import { downloadVoice, removeVoice } from '../voice-library/voiceStore';
+import { UNIQUE_VOICE_CATALOG } from '../voice-library/voiceCatalog';
 
 const modelsDir = new Directory(Paths.document, 'nexus-assistant', 'models');
-const voicesDir = new Directory(Paths.document, 'nexus-assistant', 'voices');
 
 function ensureDir(directory: Directory): void {
   directory.create({ idempotent: true, intermediates: true });
@@ -35,15 +36,13 @@ export async function deleteAssistantModel(modelId: string): Promise<void> {
 
 export async function downloadAssistantVoice(voiceId: string): Promise<string> {
   const voice = ASSISTANT_VOICES.find((item) => item.id === voiceId);
-  if (!voice) throw new Error('Unknown Nexus Assistant voice.');
-  return downloadAssistantAsset(voice.id);
+  const canonical = UNIQUE_VOICE_CATALOG.find((item) => item.id === voiceId);
+  if (!voice || !canonical) throw new Error('Unknown Nexus Assistant voice.');
+  const installed = await downloadVoice(canonical);
+  return installed.modelPath;
 }
 
 export async function deleteAssistantVoice(voiceId: string): Promise<void> {
-  ensureDir(voicesDir);
-  for (const extension of ['.onnx', '.tar.bz2', '.json']) {
-    const file = new File(voicesDir, `${voiceId}${extension}`);
-    if (file.exists) file.delete();
-  }
-  try { deleteAssistantAsset(voiceId); } catch { /* no canonical asset to remove */ }
+  if (!UNIQUE_VOICE_CATALOG.some((item) => item.id === voiceId)) return;
+  await removeVoice(voiceId);
 }
