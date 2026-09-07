@@ -1,9 +1,7 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 export type FileManagerLocalModelCapability = 'classify' | 'summarize' | 'extract' | 'rename';
-
 export type FileManagerLocalModelState = 'not-downloaded' | 'downloading' | 'ready' | 'failed';
-
 export type FileManagerLocalModel = {
   id: string;
   version: string;
@@ -19,7 +17,6 @@ const MODEL_FILENAME = 'nexus-file-ai-smollm2-q4.gguf';
 const MODEL_DIR = `${FileSystem.documentDirectory ?? FileSystem.cacheDirectory}models/file-manager/`;
 const MODEL_URI = `${MODEL_DIR}${MODEL_FILENAME}`;
 
-// Verified external reference: SmolLM2-135M Q4_K_M is ~105 MB, so this is intentionally lazy.
 export const FILE_MANAGER_MODEL_MANIFEST = {
   id: 'smollm2-135m-instruct-q4_k_m',
   version: '1.0.0',
@@ -31,15 +28,13 @@ export const FILE_MANAGER_MODEL_MANIFEST = {
 
 export async function isLocalFileModelReady(): Promise<boolean> {
   const info = await FileSystem.getInfoAsync(MODEL_URI);
-  return info.exists && Number(info.size ?? 0) > 0;
+  return info.exists && 'size' in info && Number(info.size) > 0;
 }
 
-export async function ensureLocalFileModel(
-  onProgress?: (progress: number) => void,
-): Promise<string> {
+export async function ensureLocalFileModel(onProgress?: (progress: number) => void): Promise<string> {
   if (await isLocalFileModelReady()) return MODEL_URI;
   await FileSystem.makeDirectoryAsync(MODEL_DIR, { intermediates: true });
-  const download = FileSystem.createDownloadResumable(
+  const task = FileSystem.createDownloadResumable(
     FILE_MANAGER_MODEL_MANIFEST.downloadUrl,
     MODEL_URI,
     {},
@@ -47,7 +42,7 @@ export async function ensureLocalFileModel(
       onProgress?.(totalBytesExpectedToWrite > 0 ? totalBytesWritten / totalBytesExpectedToWrite : 0);
     },
   );
-  const result = await download.downloadAsync();
+  const result = await task.downloadAsync();
   if (!result?.uri) throw new Error('The File Manager AI model could not be downloaded.');
   return result.uri;
 }
