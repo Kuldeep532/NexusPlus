@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import type { FileManagerEntry } from './FileManagerTypes';
 
@@ -41,7 +41,7 @@ export async function getEntryDetails(entry: FileManagerEntry) {
   return {
     ...entry,
     exists: info.exists,
-    size: Number(info.size ?? entry.size),
-    modificationTime: Number(info.modificationTime ?? 0) * 1000,
+    size: 'size' in info ? Number(info.size ?? entry.size) : entry.size,
+    modificationTime: 'modificationTime' in info ? Number(info.modificationTime ?? 0) * 1000 : entry.modifiedAt,
   };
 }
