@@ -1,5 +1,8 @@
 import { askCloudWithFallback, type ProviderResult } from './stage9Providers';
 import { looksLikeWebSearchRequest, webSearchThroughGateway, type WebSearchResult } from './stage9WebSearch';
+import { buildContextPrompt } from './contextRouter';
+import type { BookAssistantContext } from './bookContext';
+import type { ActiveFileContext } from './fileAssistantStore';
 
 type HistoryItem = { role: 'user' | 'assistant'; text: string };
 
@@ -11,10 +14,11 @@ type AssistantRouterResult = {
 export async function routeAssistantRequest(input: {
   message: string;
   history?: HistoryItem[];
-  bookContext?: { title: string; text: string; truncated?: boolean } | null;
+  bookContext?: BookAssistantContext | null;
+  fileContext?: ActiveFileContext | null;
 }): Promise<AssistantRouterResult> {
   let web: WebSearchResult[] = [];
-  if (looksLikeWebSearchRequest(input.message) && !input.bookContext) {
+  if (looksLikeWebSearchRequest(input.message) && !input.bookContext && !input.fileContext) {
     try {
       web = await webSearchThroughGateway(input.message);
     } catch {
@@ -22,17 +26,10 @@ export async function routeAssistantRequest(input: {
     }
   }
 
-  const bookContextMessage = input.bookContext
-    ? {
-        role: 'assistant' as const,
-        text: [
-          `Active book: ${input.bookContext.title}`,
-          'Use this book text as the primary source for book questions and summaries. Do not invent details that are not supported by it.',
-          input.bookContext.truncated ? 'Only part of the book is available locally; clearly state when an answer may depend on omitted sections.' : '',
-          `Book text:\n${input.bookContext.text}`,
-        ].filter(Boolean).join('\n\n'),
-      }
-    : null;
+  const localContext = buildContextPrompt({
+    book: input.bookContext ?? null,
+    file: input.fileContext ?? null,
+  });
 
   const webContextMessage = web.length > 0
     ? {
@@ -43,7 +40,7 @@ export async function routeAssistantRequest(input: {
 
   const enrichedHistory = [
     ...(input.history ?? []),
-    ...(bookContextMessage ? [bookContextMessage] : []),
+    ...(localContext ? [{ role: 'assistant' as const, text: localContext }] : []),
     ...(webContextMessage ? [webContextMessage] : []),
   ];
 
