@@ -25,13 +25,7 @@ const MediaContext = createContext<PersistentMediaContextValue | null>(null);
 
 export function PersistentMediaProvider({ children }: { children: React.ReactNode }) {
   const playerRef = useRef<AudioPlayer | null>(null);
-  const [state, setState] = useState<PersistentMediaState>({
-    current: null,
-    isPlaying: false,
-    positionMs: 0,
-    durationMs: 0,
-    queue: [],
-  });
+  const [state, setState] = useState<PersistentMediaState>({ current: null, isPlaying: false, positionMs: 0, durationMs: 0, queue: [] });
 
   const clearPlayer = () => {
     playerRef.current?.remove();
@@ -40,21 +34,12 @@ export function PersistentMediaProvider({ children }: { children: React.ReactNod
 
   const load = async (item: MediaItemModel, queue = state.queue) => {
     clearPlayer();
-    await setAudioModeAsync({
-      playsInSilentMode: true,
-      shouldPlayInBackground: true,
-      interruptionMode: 'mixWithOthers',
-    });
-    const player = createAudioPlayer({ uri: item.uri }, 250);
+    await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'mixWithOthers' });
+    const player = createAudioPlayer({ uri: item.uri }, { downloadFirst: false });
     playerRef.current = player;
     player.volume = 1;
     player.addListener('playbackStatusUpdate', () => {
-      setState((current) => ({
-        ...current,
-        isPlaying: player.playing,
-        positionMs: player.currentTime * 1000,
-        durationMs: Number.isFinite(player.duration) ? player.duration * 1000 : current.durationMs,
-      }));
+      setState((current) => ({ ...current, isPlaying: player.playing, positionMs: player.currentTime * 1000, durationMs: Number.isFinite(player.duration) ? player.duration * 1000 : current.durationMs }));
     });
     setState({ current: item, isPlaying: true, positionMs: 0, durationMs: item.durationMs ?? 0, queue });
     player.play();
