@@ -18,18 +18,10 @@ export type VoiceCatalogItem = {
   canonicalGroupId?: string;
 };
 
-/**
- * Optional edge mirror. Keep empty for direct Hugging Face downloads.
- * Set EXPO_PUBLIC_VOICE_CDN_BASE_URL to the Cloudflare Worker/R2 hostname
- * when a mirror is deployed. The path after the base URL is the voice ID
- * directory, keeping one predictable object layout for model + config.
- */
 export const VOICE_CDN_BASE_URL = (process.env.EXPO_PUBLIC_VOICE_CDN_BASE_URL || '').replace(/\/$/, '');
 
 function withVoiceCdn(voiceId: string, filename: string, fallbackUrl: string): string {
-  return VOICE_CDN_BASE_URL
-    ? `${VOICE_CDN_BASE_URL}/${encodeURIComponent(voiceId)}/${filename}`
-    : fallbackUrl;
+  return VOICE_CDN_BASE_URL ? `${VOICE_CDN_BASE_URL}/voices/${encodeURIComponent(voiceId)}/${filename}` : fallbackUrl;
 }
 
 const hf = (path: string) => `https://huggingface.co/rhasspy/piper-voices/resolve/main/${path}?download=true`;
@@ -58,10 +50,6 @@ const voice = (
   canonicalGroupId: id,
 });
 
-/**
- * Canonical voice registry. Duplicate IDs are removed below before any
- * downloader or screen consumes this list.
- */
 export const VOICE_CATALOG: VoiceCatalogItem[] = [
   voice('en-us-lessac-medium', 'Lessac Medium', 'en-US', 'English (US)', 'female', 'en/en_US/lessac/medium/en_US-lessac-medium.onnx', 'en/en_US/lessac/medium/en_US-lessac-medium.onnx.json', ['assistant', 'payment', 'reminder'], 63201294),
   voice('en-us-ryan-medium', 'Ryan Medium', 'en-US', 'English (US)', 'male', 'en/en_US/ryan/medium/en_US-ryan-medium.onnx', 'en/en_US/ryan/medium/en_US-ryan-medium.onnx.json', ['assistant']),
