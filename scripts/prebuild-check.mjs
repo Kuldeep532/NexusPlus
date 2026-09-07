@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readdirSync, statSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const root = process.cwd();
@@ -22,30 +22,33 @@ function run(label, command, args) {
   try {
     execFileSync(command, args, { stdio: 'inherit' });
     console.log(`[PASS] ${label}`);
-  } catch (error) {
+    return true;
+  } catch {
     console.error(`[FAIL] ${label}`);
-    process.exitCode = 1;
+    return false;
   }
 }
 
 console.log('NexusPlus prebuild source scan');
-console.log('Checking all tracked JavaScript-family source files for syntax errors.');
+console.log('Checking JavaScript-family syntax before any paid build starts.');
 walk(root);
 sourceFiles.sort();
 console.log(`JavaScript-family files discovered: ${sourceFiles.length}`);
 
+let failed = false;
 for (const file of sourceFiles) {
-  run(`Syntax: ${relative(root, file)}`, process.execPath, ['--check', file]);
+  if (!run(`Syntax: ${relative(root, file)}`, process.execPath, ['--check', file])) failed = true;
 }
 
-run(
-  'TypeScript/TSX: full repository source typecheck',
+if (!run(
+  'TypeScript/TSX: application source typecheck',
   'pnpm',
-  ['exec', 'tsc', '-p', 'tsconfig.prebuild.json', '--noEmit', '--pretty', 'false', '--noErrorTruncation']
-);
+  ['exec', 'tsc', '-p', 'tsconfig.prebuild.json', '--noEmit', '--pretty', 'false', '--noErrorTruncation'],
+)) failed = true;
 
-if (process.exitCode) {
+if (failed) {
   console.error('\nPrebuild source scan failed. EAS/Gradle build must not start.');
+  process.exitCode = 1;
 } else {
   console.log('\nPrebuild source scan passed. It is safe to continue to the build stage.');
 }
