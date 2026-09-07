@@ -4,7 +4,6 @@ const registry: HomeFeatureDefinition[] = [
   { id: 'book-reader', title: 'Book Reader', description: 'Read books and documents.', route: '/reader', icon: 'book-open', category: 'productivity', featured: true, order: 10 },
   { id: 'media-player', title: 'Media Player', description: 'Play audio and media.', route: '/media-player', icon: 'play-circle', category: 'media', featured: true, order: 20 },
   { id: 'biometric-vault', title: 'Biometric Vault', description: 'Protect sensitive information.', route: '/biometric-vault', icon: 'shield', category: 'security', featured: true, order: 30 },
-  { id: 'computer-control', title: 'Computer Control', description: 'Control your computer remotely.', route: '/remote-computer', icon: 'monitor', category: 'productivity', featured: true, order: 40 },
   { id: 'payment-announcer', title: 'Payment Announcer', description: 'Secure payment announcements.', route: '/payment-announcer', icon: 'volume-2', category: 'security', featured: true, order: 50 },
   { id: 'expense-tracker', title: 'Finance Tracker', description: 'Track and review expenses securely.', route: '/expense-tracker', icon: 'credit-card', category: 'security', featured: true, order: 60 },
   { id: 'video-editor', title: 'Video Editor', description: 'Edit and export videos.', route: '/video-editor', icon: 'video', category: 'media', featured: true, order: 70 },
