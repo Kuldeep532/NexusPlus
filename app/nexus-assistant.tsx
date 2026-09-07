@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { ASSISTANT_LIMITS, ASSISTANT_MODELS, ASSISTANT_VOICES } from '@/features/nexus-assistant/assistantConfig';
+import { ASSISTANT_LIMITS, ASSISTANT_MODELS, ASSISTANT_VOICES, NEXUS_CORE_MODEL_ID } from '@/features/nexus-assistant/assistantConfig';
 import { addMessage, ensureSession, initAssistantStore, listMessages, type ChatMessage } from '@/features/nexus-assistant/assistantStore';
 import { downloadAssistantModel, downloadAssistantVoice } from '@/features/nexus-assistant/modelManager';
 import { getLocalInferenceEngine } from '@/features/nexus-assistant/localInference';
@@ -14,8 +14,9 @@ import { getWeatherLocalFirst } from '@/features/nexus-assistant/stage6Weather';
 import { createStage7VoiceBridge, speakAssistant, type VoiceRuntimeStatus } from '@/features/nexus-assistant/stage7VoiceBridge';
 import type { Stage6VoiceBridge, VoiceInputState } from '@/features/nexus-assistant/stage6Voice';
 import { routeAssistantRequest } from '@/features/nexus-assistant/stage9AssistantRouter';
-import { getActiveBookContext } from '@/features/nexus-assistant/bookAssistantStore';
+import { getResolvedAssistantContext } from '@/features/nexus-assistant/assistantContextService';
 import { isBookQuestion } from '@/features/nexus-assistant/bookContext';
+import { getAssetStatus } from '@/features/nexus-assistant/stage8AssetManager';
 
 const SESSION_ID = 'default';
 
@@ -35,7 +36,7 @@ export default function NexusAssistantScreen() {
   const [voiceState, setVoiceState] = useState<VoiceInputState>('idle');
   const [voiceBridge, setVoiceBridge] = useState<Stage6VoiceBridge | null>(null);
   const [webResults, setWebResults] = useState<Array<{ title: string; url: string; snippet?: string }>>([]);
-  const [activeBookTitle, setActiveBookTitle] = useState<string | null>(null);
+  const [activeContextLabel, setActiveContextLabel] = useState<string | null>(null);
   const hasText = input.trim().length > 0;
 
   useEffect(() => {
@@ -63,8 +64,8 @@ export default function NexusAssistantScreen() {
       await initAssistantStore();
       await ensureSession(SESSION_ID, 'Nexus Assistant');
       setMessages(await listMessages(SESSION_ID));
-      const book = await getActiveBookContext();
-      setActiveBookTitle(book?.title ?? null);
+      const context = await getResolvedAssistantContext();
+      setActiveContextLabel(context.book?.title ?? context.file?.name ?? null);
       const engine = await getLocalInferenceEngine();
       const available = await engine.isAvailable();
       setEngineReady(available);
@@ -113,10 +114,11 @@ export default function NexusAssistantScreen() {
         return;
       }
 
-      const bookContext = await getActiveBookContext();
-      if (isBookQuestion(text) && bookContext) setStatus(`Using ${bookContext.title} as the primary source…`);
+      const context = await getResolvedAssistantContext();
+      if (isBookQuestion(text) && context.book) setStatus(`Using ${context.book.title} as the primary source…`);
+      else if (context.file) setStatus(`Using ${context.file.name} as the primary source…`);
 
-      if (/\b(weather|forecast|temperature|rain|raining|humidity|wind)\b|मौसम|तापमान|बारिश|हवा/i.test(text) && !bookContext) {
+      if (/\b(weather|forecast|temperature|rain|raining|humidity|wind)\b|मौसम|तापमान|बारिश|हवा/i.test(text) && !context.book && !context.file) {
         setStatus('Checking local weather cache first…');
         const weather = await getWeatherLocalFirst({ location: text });
         if (weather) {
@@ -129,8 +131,13 @@ export default function NexusAssistantScreen() {
       }
 
       try {
-        setStatus(bookContext ? `Answering from ${bookContext.title} through the available model…` : 'Checking web search and optional cloud providers through Nexus Gateway…');
-        const routed = await routeAssistantRequest({ message: text, history, bookContext });
+        setStatus(context.prompt ? 'Answering with your selected local context…' : 'Checking web search and optional cloud providers through Nexus Gateway…');
+        const routed = await routeAssistantRequest({
+          message: text,
+          history,
+          bookContext: context.book,
+          fileContext: context.file,
+        });
         setWebResults(routed.web);
         if (routed.provider) {
           await addMessage(SESSION_ID, 'assistant', routed.provider.text);
@@ -144,8 +151,8 @@ export default function NexusAssistantScreen() {
       }
 
       if (!engineReady) {
-        const fallback = bookContext
-          ? `I have ${bookContext.title} loaded, but no inference provider is currently available to answer from it. The book stays on this device.`
+        const fallback = context.prompt
+          ? 'Nexus Assistant could not reach an inference provider. Your selected context stays on this device.'
           : 'Nexus Assistant could not reach the available cloud provider and local inference is not available in this build. Your message is stored locally on this device.';
         await addMessage(SESSION_ID, 'assistant', fallback);
         await refreshMessages();
@@ -154,8 +161,12 @@ export default function NexusAssistantScreen() {
         return;
       }
 
-      const model = ASSISTANT_MODELS.find((item) => item.kind === 'chat') ?? ASSISTANT_MODELS[0];
-      const modelContext = bookContext ? `${text}\n\nBook context: ${bookContext.text}` : text;
+      const model = ASSISTANT_MODELS.find((item) => item.id === NEXUS_CORE_MODEL_ID) ?? ASSISTANT_MODELS.find((item) => item.kind === 'chat');
+      if (!model) throw new Error('NEXUS_CORE_MODEL_UNAVAILABLE');
+      if (getAssetStatus(model.id) !== 'ready') {
+        setStatus('Nexus Core AI is still downloading in the background.');
+      }
+      const modelContext = context.prompt ? `${context.prompt}\n\nUSER QUESTION:\n${text}` : text;
       const localReply = await streamAssistantReply({
         sessionId: SESSION_ID,
         modelId: model.id,
@@ -285,15 +296,15 @@ export default function NexusAssistantScreen() {
   };
 
   const downloadModel = async () => {
-    const model = ASSISTANT_MODELS.find((item) => item.kind === 'chat');
+    const model = ASSISTANT_MODELS.find((item) => item.id === NEXUS_CORE_MODEL_ID);
     if (!model) return;
     setAssetBusy(model.id);
     setStatus('Preparing the local chat model download…');
     try {
       await downloadAssistantModel(model.id);
-      setStatus('Local chat model downloaded. It remains outside the APK.');
+      setStatus('Local Nexus Core AI downloaded. It remains outside the APK.');
     } catch {
-      setStatus('Model download failed. Check your connection and try again.');
+      setStatus('Model download failed. Background retry will continue automatically.');
     } finally {
       setAssetBusy(null);
     }
@@ -326,7 +337,7 @@ export default function NexusAssistantScreen() {
       <View accessibilityLiveRegion="polite" style={[styles.status, { borderColor: colors.border, backgroundColor: colors.card }]}>
         <Text style={[styles.statusTitle, { color: colors.foreground }]}>Runtime</Text>
         <Text style={[styles.note, { color: colors.mutedForeground }]}>{status}</Text>
-        {activeBookTitle ? <Text style={[styles.note, { color: colors.primary }]}>Active book: {activeBookTitle}</Text> : null}
+        {activeContextLabel ? <Text style={[styles.note, { color: colors.primary }]}>Active context: {activeContextLabel}</Text> : null}
         <Text style={[styles.note, { color: colors.mutedForeground }]}>Cloud providers and web search are optional. OpenAI failure never blocks Gemini or local fallback.</Text>
       </View>
 
@@ -344,42 +355,48 @@ export default function NexusAssistantScreen() {
       </View>
 
       {webResults.length > 0 ? <View accessibilityLiveRegion="polite" style={[styles.webCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
-        <Text style={[styles.section, { color: colors.foreground }]}>Web sources</Text>
-        {webResults.map((result) => <View key={result.url} style={styles.webResult}><Text selectable style={[styles.webTitle, { color: colors.foreground }]}>{result.title}</Text><Text selectable style={[styles.note, { color: colors.mutedForeground }]}>{result.url}</Text>{result.snippet ? <Text selectable style={[styles.note, { color: colors.mutedForeground }]}>{result.snippet}</Text> : null}</View>)}
+        <Text style={[styles.section, { color: colors.foreground }]}>Web results</Text>
+        {webResults.map((item) => <View key={item.url} style={styles.webResult}><Text style={[styles.webTitle, { color: colors.foreground }]}>{item.title}</Text><Text selectable style={[styles.note, { color: colors.mutedForeground }]}>{item.url}</Text>{item.snippet ? <Text selectable style={[styles.note, { color: colors.mutedForeground }]}>{item.snippet}</Text> : null}</View>)}
       </View> : null}
 
       {pendingProposal ? <View accessibilityLiveRegion="polite" style={[styles.proposal, { borderColor: colors.primary, backgroundColor: colors.card }]}>
-        <Text style={[styles.proposalTitle, { color: colors.foreground }]}>Action confirmation</Text>
-        <Text style={[styles.body, { color: colors.foreground }]}>{formatCapabilityConfirmation(pendingProposal)}</Text>
-        <View style={styles.proposalActions}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Confirm Nexus Assistant action" disabled={busy} onPress={() => void confirmPendingAction()} style={[styles.confirmButton, { backgroundColor: colors.primary }]}><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Confirm action</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Cancel Nexus Assistant action" disabled={busy} onPress={() => void cancelPendingAction()} style={[styles.cancelButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>Cancel</Text></Pressable>
+        <Text style={[styles.proposalTitle, { color: colors.foreground }]}>{pendingProposal.capability.title}</Text>
+        <Text style={[styles.body, { color: colors.mutedForeground }]}>{formatCapabilityConfirmation(pendingProposal)}</Text>
+        <View style={styles.liveActions}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Confirm action" onPress={() => void confirmPendingAction()} style={[styles.talkButton, { backgroundColor: colors.primary }]}><Text style={[styles.controlText, { color: colors.primaryForeground }]}>Confirm</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Cancel action" onPress={() => void cancelPendingAction()} style={[styles.controlButton, { borderColor: colors.border, backgroundColor: colors.card }]}><Text style={[styles.controlText, { color: colors.foreground }]}>Cancel</Text></Pressable>
         </View>
       </View> : null}
 
-      {liveMode ? <View accessibilityLiveRegion="polite" style={[styles.liveCard, { borderColor: colors.primary, backgroundColor: colors.card }]}>
-        <Text accessibilityRole="header" style={[styles.proposalTitle, { color: colors.foreground }]}>Nexus Live Mode</Text>
-        <Text style={[styles.body, { color: colors.mutedForeground }]}>Voice state: {voiceState}. Hold Talk to speak. Release Talk to hand the captured audio to the local voice pipeline. End Live Call exits this mode.</Text>
+      <View style={[styles.composer, { borderColor: colors.border, backgroundColor: colors.card }]}>
+        <TextInput accessibilityLabel="Assistant message" value={input} onChangeText={setInput} multiline placeholder="Ask Nexus Assistant…" placeholderTextColor={colors.mutedForeground} style={[styles.input, { color: colors.foreground }]} />
+        <View style={styles.liveActions}>
+          <Pressable accessibilityRole="button" accessibilityLabel={voiceState === 'listening' ? 'Stop voice input' : 'Start voice input'} onPress={() => void toggleVoiceInput()} style={[styles.controlButton, { borderColor: colors.border, backgroundColor: colors.background }]}><Feather name="mic" size={18} color={colors.foreground} /><Text style={[styles.controlText, { color: colors.foreground }]}>{voiceState === 'listening' ? 'Stop' : 'Voice'}</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Send assistant message" disabled={!hasText || busy} onPress={() => void send()} style={[styles.talkButton, { backgroundColor: colors.primary, opacity: !hasText || busy ? 0.45 : 1 }]}><Feather name="send" size={17} color={colors.primaryForeground} /><Text style={[styles.controlText, { color: colors.primaryForeground }]}>{busy ? 'Working…' : 'Send'}</Text></Pressable>
+        </View>
+      </View>
+
+      <View style={[styles.proposal, { borderColor: colors.border, backgroundColor: colors.card }]}>
+        <Text style={[styles.proposalTitle, { color: colors.foreground }]}>Assistant assets</Text>
+        <Text style={[styles.note, { color: colors.mutedForeground }]}>Nexus Core AI is downloaded outside the APK and bootstrapped quietly after login. Voice assets remain separate because speech synthesis is a different runtime.</Text>
+        <View style={styles.liveActions}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Download Nexus Core AI" onPress={() => void downloadModel()} disabled={assetBusy !== null} style={[styles.controlButton, { borderColor: colors.border, backgroundColor: colors.card }]}><Text style={[styles.controlText, { color: colors.foreground }]}>{assetBusy === NEXUS_CORE_MODEL_ID ? 'Downloading…' : 'Download AI'}</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Download assistant voice" onPress={() => void downloadVoice()} disabled={assetBusy !== null} style={[styles.controlButton, { borderColor: colors.border, backgroundColor: colors.card }]}><Text style={[styles.controlText, { color: colors.foreground }]}>{assetBusy && assetBusy !== NEXUS_CORE_MODEL_ID ? 'Downloading…' : 'Download Voice'}</Text></Pressable>
+        </View>
+      </View>
+
+      {liveMode ? <View style={[styles.proposal, { borderColor: colors.primary, backgroundColor: colors.card }]}>
+        <Text style={[styles.proposalTitle, { color: colors.foreground }]}>Nexus Live Mode</Text>
+        <Text style={[styles.body, { color: colors.mutedForeground }]}>Voice state: {voiceState}. Hold Talk to speak. Release Talk to process the captured audio. End Live Call exits this mode.</Text>
         <View style={styles.liveActions}>
           <Pressable accessibilityRole="button" accessibilityLabel="Hold to talk" onPressIn={() => void holdToTalk()} onPressOut={() => { void releaseTalk(); }} style={[styles.talkButton, { backgroundColor: colors.primary }]}><Feather name="mic" size={23} color={colors.primaryForeground} /><Text style={[styles.controlText, { color: colors.primaryForeground }]}>Hold to Talk</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Stop voice output" onPress={() => void voiceBridge?.stopOutput().catch(() => undefined)} style={[styles.controlButton, { borderColor: colors.border, backgroundColor: colors.card }]}><Feather name="volume-x" size={19} color={colors.foreground} /><Text style={[styles.controlText, { color: colors.foreground }]}>Stop Output</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="End Live Call" onPress={() => void endLiveMode()} style={[styles.endButton, { backgroundColor: colors.destructive ?? colors.primary }]}><Feather name="phone-off" size={19} color={colors.primaryForeground} /><Text style={[styles.controlText, { color: colors.primaryForeground }]}>End Live Call</Text></Pressable>
         </View>
-      </View> : null}
+      </View> : <Pressable accessibilityRole="button" accessibilityLabel="Open Live Mode" onPress={() => void toggleLiveMode()} style={[styles.liveButton, { borderColor: colors.border, backgroundColor: colors.card }]}><Feather name="phone" size={18} color={colors.foreground} /><Text style={[styles.controlText, { color: colors.foreground }]}>Open Live Mode</Text></Pressable>}
 
-      <TextInput accessibilityLabel="Message Nexus Assistant" multiline value={input} onChangeText={setInput} placeholder="Ask Nexus Assistant…" placeholderTextColor={colors.mutedForeground} style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]} />
-      <View style={styles.controls}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Voice Input" onPress={() => void toggleVoiceInput()} style={[styles.controlButton, { borderColor: voiceInput ? colors.primary : colors.border, backgroundColor: voiceInput ? colors.secondary : colors.card }]}><Feather name="mic" size={19} color={colors.foreground} /><Text style={[styles.controlText, { color: colors.foreground }]}>Voice Input</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel={liveMode ? 'Close Live Mode' : 'Open Live Mode'} onPress={() => void toggleLiveMode()} style={[styles.controlButton, { borderColor: liveMode ? colors.primary : colors.border, backgroundColor: liveMode ? colors.secondary : colors.card }]}><Feather name="radio" size={19} color={colors.foreground} /><Text style={[styles.controlText, { color: colors.foreground }]}>{liveMode ? 'Close Live Mode' : 'Open Live Mode'}</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel={hasText ? 'Send message' : 'Voice Input'} disabled={busy || !voiceBridge} onPress={() => void (hasText ? send() : toggleVoiceInput())} style={[styles.sendControl, { backgroundColor: colors.primary, opacity: busy ? 0.6 : 1 }]}>{busy ? <ActivityIndicator color={colors.primaryForeground} /> : <Feather name={hasText ? 'send' : 'mic'} size={19} color={colors.primaryForeground} />}<Text style={[styles.controlText, { color: colors.primaryForeground }]}>{hasText ? 'Send' : 'Voice Input'}</Text></Pressable>
-      </View>
-
-      <View style={[styles.assetCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
-        <Text style={[styles.section, { color: colors.foreground }]}>Local AI assets</Text>
-        <Text style={[styles.note, { color: colors.mutedForeground }]}>APK target: under {ASSISTANT_LIMITS.maxApkSizeMb} MB. Heavy model and voice files remain outside the APK.</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Download Nexus Small Chat model" disabled={!!assetBusy} onPress={() => void downloadModel()} style={[styles.secondaryButton, { borderColor: colors.border, opacity: assetBusy ? 0.6 : 1 }]}><Feather name="download" size={17} color={colors.foreground} /><Text style={[styles.buttonText, { color: colors.foreground }]}>{assetBusy === (ASSISTANT_MODELS.find((item) => item.kind === 'chat')?.id ?? '') ? 'Downloading model…' : 'Download local chat model'}</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Download high quality Piper voice" disabled={!!assetBusy} onPress={() => void downloadVoice()} style={[styles.secondaryButton, { borderColor: colors.border, opacity: assetBusy ? 0.6 : 1 }]}><Feather name="volume-2" size={17} color={colors.foreground} /><Text style={[styles.buttonText, { color: colors.foreground }]}>{assetBusy === ASSISTANT_VOICES[0].id ? 'Downloading voice…' : 'Download Piper voice'}</Text></Pressable>
-      </View>
+      {voiceInput ? <Text accessibilityLiveRegion="polite" style={[styles.note, { color: colors.mutedForeground }]}>Voice input state: {voiceState}. Transcription is submitted through the same Assistant route as typed text.</Text> : null}
+      <Text style={[styles.note, { color: colors.mutedForeground }]}>APK limit {ASSISTANT_LIMITS.maxApkSizeMb}MB · bundled chat model {ASSISTANT_LIMITS.maxBundledModelMb}MB · bundled voice {ASSISTANT_LIMITS.maxBundledVoiceMb}MB</Text>
     </ScrollView>
   );
 }
@@ -389,33 +406,26 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   icon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   copy: { flex: 1, marginLeft: 12 },
-  title: { fontSize: 20, fontFamily: 'Inter_700Bold' },
-  body: { fontSize: 12, lineHeight: 18 },
-  note: { fontSize: 10.5, lineHeight: 16, marginTop: 4 },
-  status: { borderWidth: 1, borderRadius: 16, padding: 13, marginBottom: 14 },
-  statusTitle: { fontSize: 12, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  chat: { gap: 9, marginBottom: 14 },
-  message: { borderWidth: 1, borderRadius: 16, padding: 12 },
-  role: { fontSize: 10, fontFamily: 'Inter_700Bold', marginBottom: 4 },
+  title: { fontSize: 22, fontWeight: '800' },
+  body: { fontSize: 14, lineHeight: 21 },
+  note: { fontSize: 12, lineHeight: 18 },
+  status: { borderWidth: 1, borderRadius: 16, padding: 14, marginBottom: 14, gap: 4 },
+  statusTitle: { fontSize: 13, fontWeight: '800' },
+  chat: { gap: 10, marginBottom: 14 },
+  message: { borderWidth: 1, borderRadius: 16, padding: 12, gap: 5 },
+  role: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
   webCard: { borderWidth: 1, borderRadius: 16, padding: 12, marginBottom: 14 },
-  webResult: { paddingVertical: 7 },
-  webTitle: { fontSize: 11.5, fontFamily: 'Inter_700Bold' },
-  proposal: { borderWidth: 1, borderRadius: 16, padding: 13, marginBottom: 14 },
-  proposalTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', marginBottom: 5 },
-  proposalActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  confirmButton: { minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, flex: 1 },
-  cancelButton: { minHeight: 44, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
-  liveCard: { borderWidth: 1, borderRadius: 18, padding: 14, marginBottom: 14 },
-  liveActions: { gap: 9, marginTop: 12 },
-  talkButton: { minHeight: 58, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
-  endButton: { minHeight: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
-  input: { minHeight: 94, borderWidth: 1, borderRadius: 16, padding: 13, textAlignVertical: 'top', marginBottom: 10 },
-  controls: { gap: 9, marginBottom: 14 },
-  controlButton: { minHeight: 48, borderWidth: 1, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 12 },
-  sendControl: { minHeight: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 12 },
-  controlText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
-  assetCard: { borderWidth: 1, borderRadius: 16, padding: 13 },
-  section: { fontSize: 13, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  secondaryButton: { minHeight: 46, borderWidth: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginTop: 9 },
-  buttonText: { fontSize: 10.5, fontFamily: 'Inter_700Bold' },
+  section: { fontSize: 13, fontWeight: '800', marginBottom: 6 },
+  webResult: { paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: 'transparent' },
+  webTitle: { fontSize: 12, fontWeight: '700' },
+  proposal: { borderWidth: 1, borderRadius: 16, padding: 13, marginBottom: 14, gap: 7 },
+  proposalTitle: { fontSize: 13, fontWeight: '800' },
+  liveActions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
+  talkButton: { minHeight: 48, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center' },
+  controlButton: { minHeight: 48, borderRadius: 14, paddingHorizontal: 14, borderWidth: 1, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center' },
+  endButton: { minHeight: 48, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center' },
+  controlText: { fontSize: 13, fontWeight: '800' },
+  composer: { borderWidth: 1, borderRadius: 18, padding: 10, marginBottom: 14, gap: 10 },
+  input: { minHeight: 86, fontSize: 16, lineHeight: 22, paddingHorizontal: 8, paddingTop: 8, textAlignVertical: 'top' },
+  liveButton: { minHeight: 52, borderWidth: 1, borderRadius: 16, paddingHorizontal: 14, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
 });
