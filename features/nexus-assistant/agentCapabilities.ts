@@ -8,12 +8,7 @@ export type AssistantCapabilityId =
   | 'create-reminder'
   | 'read-local-file'
   | 'share-local-file'
-  | 'play-media'
-  | 'computer-discover'
-  | 'computer-status'
-  | 'computer-open-url'
-  | 'computer-open-file'
-  | 'computer-launch-app';
+  | 'play-media';
 
 export type AssistantCapability = {
   id: AssistantCapabilityId;
@@ -25,8 +20,8 @@ export type AssistantCapability = {
 };
 
 /**
- * Mobile capability registry. Computer actions are delegated to an explicitly paired
- * Nexus Computer Agent on the local network; the phone never executes arbitrary OS commands.
+ * Mobile capability registry. Computer control is intentionally excluded until
+ * a complete, verified cross-platform transport is implemented.
  */
 export const ASSISTANT_CAPABILITIES: readonly AssistantCapability[] = [
   { id: 'device-info', title: 'Device information', description: 'Read basic device state without changing anything.', risk: 'safe', requiresConfirmation: false, offline: true },
@@ -37,11 +32,6 @@ export const ASSISTANT_CAPABILITIES: readonly AssistantCapability[] = [
   { id: 'read-local-file', title: 'Read a local file', description: 'Read a file that the user explicitly selected for the assistant.', risk: 'confirm', requiresConfirmation: true, offline: true },
   { id: 'share-local-file', title: 'Share a local file', description: 'Open the system share sheet for a user-selected local file.', risk: 'confirm', requiresConfirmation: true, offline: true },
   { id: 'play-media', title: 'Play media', description: 'Start playback through an existing Nexus media action.', risk: 'confirm', requiresConfirmation: true, offline: true },
-  { id: 'computer-discover', title: 'Find my computer', description: 'Find a Nexus Computer Agent reachable on the local network.', risk: 'safe', requiresConfirmation: false, offline: false },
-  { id: 'computer-status', title: 'Computer status', description: 'Read status and basic platform information from a paired computer.', risk: 'safe', requiresConfirmation: false, offline: false },
-  { id: 'computer-open-url', title: 'Open a URL on computer', description: 'Open a URL using the computer operating system default browser.', risk: 'confirm', requiresConfirmation: true, offline: false },
-  { id: 'computer-open-file', title: 'Open a file on computer', description: 'Open a user-selected file using the computer operating system default application.', risk: 'confirm', requiresConfirmation: true, offline: false },
-  { id: 'computer-launch-app', title: 'Launch a computer app', description: 'Launch an allow-listed desktop application using the computer operating system.', risk: 'confirm', requiresConfirmation: true, offline: false },
 ];
 
 const capabilityMap = new Map(ASSISTANT_CAPABILITIES.map((capability) => [capability.id, capability]));
