@@ -1,17 +1,74 @@
 # NexusPlus Production Readiness
 
-This directory tracks the staged production-hardening work for NexusPlus.
+This directory tracks staged production-hardening work for NexusPlus.
 
-## Stage 1: Biometric Vault
+## Voice and downloaded-asset hardening — completed in the current pass
 
-The repository already declares `expo-local-authentication` and `expo-secure-store` in the Expo configuration. Stage 1 will harden the existing Biometric Vault implementation without changing unrelated feature behavior.
+The voice download and playback paths are now designed to fail safely:
 
-Principles:
+- Voice-library model/config files are downloaded to temporary `.download` paths and published only after both files pass validation.
+- Partial downloads are cleaned up instead of being treated as installed voices.
+- Duplicate downloads for the same voice/asset are serialized in-process.
+- Existing valid voice installs are preserved when a refresh/download attempt fails.
+- Voice-library metadata is versioned and migrated from the previous storage key.
+- A valid voice file pair can repair missing local metadata without forcing a large re-download.
+- Assistant model/voice APIs now use canonical asset IDs from the catalog instead of hard-coded IDs.
+- Assistant asset downloads use temporary files, non-empty-file validation, cleanup, and duplicate-download protection.
+- Piper TTS checks that the selected model/config and synthesized WAV are actually usable before creating an audio player.
+- Piper failure is fail-safe and returns to the caller so system TTS can be used instead.
+- Reminder audio playback catches player creation/output failures and falls back to system TTS.
+- Voice Library UI now catches download/remove errors and exposes status through an accessibility live region instead of allowing rejected promises to escape the press handler.
+
+## Nexus Assistant voice roles
+
+- Live Voice Call has a dedicated high-quality conversational voice.
+- Book Reader/long-form narration uses a different dedicated high-quality voice.
+- General short Assistant speech has its own default voice role.
+- All roles resolve to canonical Voice Library IDs, so one downloaded model is never duplicated merely because multiple features use it.
+- The Voice Library exposes **Remove** only when both the model and config files are valid; otherwise it exposes **Download**.
+
+## Supabase download-gate integration
+
+The app contains only the client-side orchestration for the Supabase RPC contract; SQL deployment belongs in the Supabase project, not in the Android bundle.
+
+The expected RPC flow is:
+
+1. Before a real voice download begins, the app calls `try_start_download` with the authenticated Supabase user ID, app-token digest, minimal device metadata, and IP when the trusted backend can provide it.
+2. Supabase authoritatively decides whether the global rate window, per-user active-download counter, ban state, and token policy allow the operation.
+3. The app performs the model/config download only after an allowed response.
+4. The app calls `finish_download` from a `finally` path so `profiles.active_downloads` is released even after download failures.
+
+The app also keeps a local burst guard as a fail-safe. It is not a replacement for the shared Supabase limit.
+
+## Reusable UI direction
+
+React Native Paper is now the preferred reusable component library for new dialogs, buttons, surfaces and form controls. Existing manually built controls are intentionally retained where they are already accessible and stable. Future UI additions should prefer reusable Paper primitives with appropriate React Native accessibility roles and states rather than bespoke button/dialog implementations.
+
+## Important release-gate limitation
+
+The repository still must not be described as fully production-verified until a real Android release build and device-level smoke test have passed. In particular, the current Nexus Assistant native voice module captures PCM but its `speak()` method still reports that the local Piper backend is unavailable, and the local inference engine is currently a safe unavailable stub. The code now fails closed rather than crashing or pretending those backends work.
+
+Before release, verify at minimum:
+
+1. Fresh-install Android launch and navigation.
+2. Voice download on good, interrupted, resumed, and low-storage conditions.
+3. Corrupt/partial model recovery and reinstall.
+4. English and Hindi voice playback plus system-TTS fallback.
+5. App background/foreground during download and playback.
+6. Nexus Assistant Live Voice Call and Reader voice-role separation.
+7. Reminder voice playback when the native Piper backend is unavailable.
+8. Supabase RPC allow/deny, counter release, and global rate-window behavior.
+9. Release APK/AAB build with the repository's production workflow.
+10. Device smoke tests on multiple Android API levels and at least one low-memory device.
+
+## Existing Stage 1 scope
+
+The repository also contains the earlier Biometric Vault hardening work. The original security principles remain:
 
 - Never treat biometric availability as guaranteed.
 - Use device capability checks before presenting biometric actions.
 - Keep secrets in secure storage rather than ordinary persistent storage.
 - Preserve a safe fallback when the device cannot authenticate biometrically.
-- Keep all authentication errors user-safe and accessibility-friendly.
+- Keep authentication errors user-safe and accessibility-friendly.
 
-All later production-readiness stages are intended to land in the same long-lived PR.
+All later production-readiness work is intended to be incremental and behavior-preserving unless a production-safety correction requires otherwise.

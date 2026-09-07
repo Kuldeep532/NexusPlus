@@ -1,17 +1,18 @@
 import { NativeEventEmitter, NativeModules, PermissionsAndroid, Platform } from 'react-native';
+import * as Speech from 'expo-speech';
 import type { Stage6VoiceBridge } from './stage6Voice';
+import { getInstalledVoices } from '@/features/voice-library/voiceStore';
+import { getAssistantVoiceProfile } from './voicePolicy';
 
-export type VoiceRuntimeStatus = {
-  state: 'idle' | 'listening' | 'processing' | 'error';
-  error?: string | null;
-};
+type VoiceRole = 'live-call' | 'assistant';
+export type VoiceRuntimeStatus = { state: 'idle' | 'listening' | 'processing' | 'error'; error?: string | null };
 
 type NativeVoiceModule = {
   isAvailable(): Promise<boolean>;
   startListening(): Promise<void>;
   stopListening(): Promise<void>;
   stopOutput(): Promise<void>;
-  speak(text: string): Promise<void>;
+  speak(text: string, options?: { modelPath?: string; configPath?: string }): Promise<void>;
 };
 
 const nativeVoice = NativeModules.NexusAssistantVoice as NativeVoiceModule | undefined;
@@ -29,6 +30,12 @@ async function ensureMicrophonePermission(): Promise<boolean> {
   return result === PermissionsAndroid.RESULTS.GRANTED;
 }
 
+async function resolveSpokenVoice(role: VoiceRole, locale: string) {
+  const profile = getAssistantVoiceProfile(role, locale);
+  const installed = await getInstalledVoices().catch(() => []);
+  return { profile, voice: installed.find((item) => item.id === profile.id) };
+}
+
 export function createStage7VoiceBridge(
   onStatus?: (status: VoiceRuntimeStatus) => void,
   onTranscript?: (text: string) => void,
@@ -39,8 +46,8 @@ export function createStage7VoiceBridge(
         async isAvailable() { return false; },
         async startListening() { throw new Error('VOICE_NATIVE_MODULE_UNAVAILABLE'); },
         async stopListening() {},
-        async stopOutput() {},
-        async speak() { throw new Error('VOICE_NATIVE_MODULE_UNAVAILABLE'); },
+        async stopOutput() { await Speech.stop(); },
+        async speak(text: string) { await Speech.speak(text, { language: 'en-US' }); },
       },
       dispose() {},
     };
@@ -54,19 +61,15 @@ export function createStage7VoiceBridge(
 
   return {
     bridge: {
-      async isAvailable() {
-        return (await ensureMicrophonePermission()) && nativeVoice.isAvailable();
-      },
+      async isAvailable() { return (await ensureMicrophonePermission()) && nativeVoice.isAvailable(); },
       async startListening() {
         if (!(await ensureMicrophonePermission())) throw new Error('MIC_PERMISSION_REQUIRED');
         await nativeVoice.startListening();
       },
-      async stopListening() {
-        await nativeVoice.stopListening();
-        onStatus?.({ state: 'idle' });
-      },
+      async stopListening() { await nativeVoice.stopListening(); onStatus?.({ state: 'idle' }); },
       async stopOutput() {
-        await nativeVoice.stopOutput();
+        await nativeVoice.stopOutput().catch(() => undefined);
+        await Speech.stop().catch(() => undefined);
       },
       async speak(text: string) {
         await nativeVoice.speak(text);
@@ -74,6 +77,34 @@ export function createStage7VoiceBridge(
     },
     dispose() {
       subscription.remove();
+      void Speech.stop().catch(() => undefined);
     },
   };
+}
+
+export async function speakAssistant(
+  text: string,
+  locale = 'en-US',
+  role: VoiceRole = 'assistant',
+): Promise<'piper' | 'system'> {
+  const normalized = text.trim();
+  if (!normalized) return 'system';
+
+  const { voice } = await resolveSpokenVoice(role, locale);
+  if (nativeVoice && voice) {
+    try {
+      await nativeVoice.speak(normalized, { modelPath: voice.modelPath, configPath: voice.configPath });
+      return 'piper';
+    } catch {
+      // Safe system-TTS fallback below.
+    }
+  }
+
+  try {
+    await Speech.stop().catch(() => undefined);
+    await Speech.speak(normalized, { language: locale });
+  } catch {
+    // Speech is best-effort; callers keep their successful text response.
+  }
+  return 'system';
 }

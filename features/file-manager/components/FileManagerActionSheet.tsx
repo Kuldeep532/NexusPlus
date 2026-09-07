@@ -5,6 +5,7 @@ import type { FileManagerEntry, FileManagerSelectionAction } from '../FileManage
 
 const ACTIONS: ReadonlyArray<{ id: FileManagerSelectionAction; title: string; icon: keyof typeof Feather.glyphMap }> = [
   { id: 'open', title: 'Open', icon: 'external-link' },
+  { id: 'ask-about-file', title: 'Ask about this file', icon: 'message-circle' },
   { id: 'share', title: 'Share', icon: 'share-2' },
   { id: 'rename', title: 'Rename', icon: 'edit-2' },
   { id: 'copy', title: 'Copy', icon: 'copy' },
@@ -63,5 +64,5 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 10, marginTop: 3, marginBottom: 14 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
   action: { width: '31.8%', minHeight: 70, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 7 },
-  actionText: { fontSize: 10, fontWeight: '600' },
+  actionText: { fontSize: 10, fontWeight: '600', textAlign: 'center' },
 });

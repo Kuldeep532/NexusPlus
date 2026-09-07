@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "algorithm": "SHA-256",
+  "generatedAt": "BUILD_TIME",
+  "manifestHash": "BUILD_MANIFEST_SHA256",
+  "files": {
+    "app/voices.tsx": "BUILD_HASH",
+    "features/voice-library/voiceCatalog.ts": "BUILD_HASH",
+    "features/voice-library/voiceDownloadGuard.ts": "BUILD_HASH",
+    "features/voice-library/voiceStore.ts": "BUILD_HASH",
+    "features/nexus-assistant/assistantConfig.ts": "BUILD_HASH",
+    "features/nexus-assistant/modelManager.ts": "BUILD_HASH",
+    "features/nexus-assistant/stage6Voice.ts": "BUILD_HASH",
+    "features/nexus-assistant/stage7VoiceBridge.ts": "BUILD_HASH",
+    "features/nexus-assistant/stage8AssetManager.ts": "BUILD_HASH"
+  },
+  "policy": {
+    "verifyOnStartup": true,
+    "verifyBeforeVoiceDownload": true,
+    "verifyBeforeSensitiveAction": true,
+    "failClosedOnMismatch": true,
+    "telemetry": "minimal-security-events-only"
+  }
+}

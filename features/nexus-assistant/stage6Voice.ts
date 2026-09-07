@@ -1,24 +1,14 @@
 export type VoiceInputState = 'idle' | 'listening' | 'processing';
 
-export type LiveBoardState = {
-  isOpen: boolean;
-  voiceInput: VoiceInputState;
-  transcript: string;
-  assistantText: string;
-};
-
+export type LiveBoardState = { isOpen: boolean; voiceInput: VoiceInputState; transcript: string; assistantText: string };
 export type VoiceTranscriptHandler = (text: string) => void;
 
-/**
- * Native voice boundary used by Nexus Assistant. Implementations may deliver
- * transcripts through the startListening callback and/or through runtime events.
- */
 export type Stage6VoiceBridge = {
   isAvailable(): Promise<boolean>;
   startListening(onTranscript?: VoiceTranscriptHandler): Promise<void>;
   stopListening(): Promise<void>;
   stopOutput(): Promise<void>;
-  speak(text: string): Promise<void>;
+  speak(text: string, options?: { modelPath?: string; configPath?: string }): Promise<void>;
 };
 
 export function createUnavailableVoiceBridge(): Stage6VoiceBridge {

@@ -10,6 +10,7 @@ import { PersistentMediaProvider } from '@/media-player/PersistentMediaControlle
 import { GlobalMiniPlayer } from '@/features/media/GlobalMiniPlayer';
 import { RemoteConfigOverlay } from '@/features/supabase/RemoteConfigOverlay';
 import { attachFirebaseTokenRefreshListener, registerForFirebaseNotifications } from '@/features/notifications/pushNotifications';
+import { startAssistantBootstrap } from '@/features/nexus-assistant/assistantBootstrap';
 import DebugErrorBoundary from '../DebugErrorBoundary';
 
 void SplashScreen.preventAutoHideAsync();
@@ -32,6 +33,11 @@ function RootLayoutContent() {
       void registerForFirebaseNotifications();
       return attachFirebaseTokenRefreshListener();
     }
+    return undefined;
+  }, [auth.loading, auth.session]);
+
+  useEffect(() => {
+    if (!auth.loading && auth.session) return startAssistantBootstrap();
     return undefined;
   }, [auth.loading, auth.session]);
 

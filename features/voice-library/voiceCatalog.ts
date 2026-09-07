@@ -14,45 +14,72 @@ export type VoiceCatalogItem = {
   configSizeBytes?: number;
   sha256?: string;
   downloadable: boolean;
+  roles?: Array<'live-call' | 'reader' | 'assistant' | 'payment' | 'reminder'>;
+  canonicalGroupId?: string;
 };
 
-/**
- * Model URLs are intentionally configuration-driven. Large TTS assets are
- * downloaded after installation and never bundled in the APK.
- *
- * The catalog is extensible: add more voices without changing Reader logic.
- * Users may install any number of these voices concurrently.
- */
+export const VOICE_CDN_BASE_URL = (process.env.EXPO_PUBLIC_VOICE_CDN_BASE_URL || '').replace(/\/$/, '');
+
+function withVoiceCdn(voiceId: string, filename: string, fallbackUrl: string): string {
+  return VOICE_CDN_BASE_URL ? `${VOICE_CDN_BASE_URL}/voices/${encodeURIComponent(voiceId)}/${filename}` : fallbackUrl;
+}
+
+const hf = (path: string) => `https://huggingface.co/rhasspy/piper-voices/resolve/main/${path}?download=true`;
+const voice = (
+  id: string,
+  name: string,
+  language: string,
+  languageName: string,
+  gender: VoiceGender,
+  modelPath: string,
+  configPath: string,
+  roles: VoiceCatalogItem['roles'] = ['reader'],
+  modelSizeBytes?: number,
+): VoiceCatalogItem => ({
+  id,
+  name,
+  language,
+  languageName,
+  gender,
+  quality: 'high',
+  modelUrl: withVoiceCdn(id, `${id}.onnx`, hf(modelPath)),
+  configUrl: withVoiceCdn(id, `${id}.onnx.json`, hf(configPath)),
+  ...(modelSizeBytes ? { modelSizeBytes } : {}),
+  downloadable: true,
+  roles,
+  canonicalGroupId: id,
+});
+
 export const VOICE_CATALOG: VoiceCatalogItem[] = [
-  { id: 'en-us-lessac-medium', name: 'Lessac Medium', language: 'en-US', languageName: 'English (US)', gender: 'female', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json?download=true', modelSizeBytes: 63201294, downloadable: true },
-  { id: 'en-us-ryan-medium', name: 'Ryan Medium', language: 'en-US', languageName: 'English (US)', gender: 'male', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/medium/en_US-ryan-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/medium/en_US-ryan-medium.onnx.json?download=true', downloadable: true },
-  { id: 'en-us-amy-medium', name: 'Amy Medium', language: 'en-US', languageName: 'English (US)', gender: 'female', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx.json?download=true', downloadable: true },
-  { id: 'en-gb-alan-medium', name: 'Alan Medium', language: 'en-GB', languageName: 'English (UK)', gender: 'male', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/alan/medium/en_GB-alan-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/alan/medium/en_GB-alan-medium.onnx.json?download=true', downloadable: true },
-  { id: 'en-gb-southern-medium', name: 'Southern English', language: 'en-GB', languageName: 'English (UK)', gender: 'female', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/southern_english_female/medium/en_GB-southern_english_female-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/southern_english_female/medium/en_GB-southern_english_female-medium.onnx.json?download=true', downloadable: true },
-  { id: 'en-in-rohan-medium', name: 'Rohan Medium', language: 'en-IN', languageName: 'English (India)', gender: 'male', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_IN/rohan/medium/en_IN-rohan-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_IN/rohan/medium/en_IN-rohan-medium.onnx.json?download=true', downloadable: true },
-  { id: 'en-in-priyanka-medium', name: 'Priyanka Medium', language: 'en-IN', languageName: 'English (India)', gender: 'female', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_IN/priyanka/medium/en_IN-priyanka-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_IN/priyanka/medium/en_IN-priyanka-medium.onnx.json?download=true', downloadable: true },
-  { id: 'hi-in-priyamvada-medium', name: 'Priyamvada Medium', language: 'hi-IN', languageName: 'Hindi', gender: 'female', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/hi/hi_IN/priyamvada/medium/hi_IN-priyamvada-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/hi/hi_IN/priyamvada/medium/hi_IN-priyamvada-medium.onnx.json?download=true', modelSizeBytes: 63516050, downloadable: true },
-  { id: 'hi-in-vikas-medium', name: 'Vikas Medium', language: 'hi-IN', languageName: 'Hindi', gender: 'male', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/hi/hi_IN/vikas/medium/hi_IN-vikas-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/hi/hi_IN/vikas/medium/hi_IN-vikas-medium.onnx.json?download=true', downloadable: true },
-  { id: 'es-es-sharvard-medium', name: 'Sharvard Medium', language: 'es-ES', languageName: 'Spanish', gender: 'male', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_ES/sharvard/medium/es_ES-sharvard-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_ES/sharvard/medium/es_ES-sharvard-medium.onnx.json?download=true', downloadable: true },
-  { id: 'es-mx-ald-medium', name: 'Ald Medium', language: 'es-MX', languageName: 'Spanish (Mexico)', gender: 'male', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_MX/ald/medium/es_MX-ald-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_MX/ald/medium/es_MX-ald-medium.onnx.json?download=true', downloadable: true },
-  { id: 'fr-fr-siwis-medium', name: 'Siwis Medium', language: 'fr-FR', languageName: 'French', gender: 'female', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx.json?download=true', downloadable: true },
-  { id: 'de-de-thorsten-medium', name: 'Thorsten Medium', language: 'de-DE', languageName: 'German', gender: 'male', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/de/de_DE/thorsten/medium/de_DE-thorsten-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/de/de_DE/thorsten/medium/de_DE-thorsten-medium.onnx.json?download=true', downloadable: true },
-  { id: 'it-it-paola-medium', name: 'Paola Medium', language: 'it-IT', languageName: 'Italian', gender: 'female', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/it/it_IT/paola/medium/it_IT-paola-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/it/it_IT/paola/medium/it_IT-paola-medium.onnx.json?download=true', downloadable: true },
-  { id: 'pt-br-faber-medium', name: 'Faber Medium', language: 'pt-BR', languageName: 'Portuguese (Brazil)', gender: 'male', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx.json?download=true', downloadable: true },
-  { id: 'nl-nl-rdh-medium', name: 'RDH Medium', language: 'nl-NL', languageName: 'Dutch', gender: 'male', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/nl/nl_NL/rdh/medium/nl_NL-rdh-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/nl/nl_NL/rdh/medium/nl_NL-rdh-medium.onnx.json?download=true', downloadable: true },
-  { id: 'sv-se-nst-medium', name: 'NST Medium', language: 'sv-SE', languageName: 'Swedish', gender: 'female', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/sv/sv_SE/nst/medium/sv_SE-nst-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/sv/sv_SE/nst/medium/sv_SE-nst-medium.onnx.json?download=true', downloadable: true },
-  { id: 'da-dk-tales-medium', name: 'Tales Medium', language: 'da-DK', languageName: 'Danish', gender: 'male', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/da/da_DK/tales/medium/da_DK-tales-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/da/da_DK/tales/medium/da_DK-tales-medium.onnx.json?download=true', downloadable: true },
-  { id: 'no-no-tales-medium', name: 'Tales Medium', language: 'no-NO', languageName: 'Norwegian', gender: 'male', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/no/no_NO/tales/medium/no_NO-tales-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/no/no_NO/tales/medium/no_NO-tales-medium.onnx.json?download=true', downloadable: true },
-  { id: 'fi-fi-harri-medium', name: 'Harri Medium', language: 'fi-FI', languageName: 'Finnish', gender: 'male', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/fi/fi_FI/harri/medium/fi_FI-harri-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/fi/fi_FI/harri/medium/fi_FI-harri-medium.onnx.json?download=true', downloadable: true },
-  { id: 'pl-pl-darkman-medium', name: 'Darkman Medium', language: 'pl-PL', languageName: 'Polish', gender: 'male', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx.json?download=true', downloadable: true },
-  { id: 'cs-cz-jirka-medium', name: 'Jirka Medium', language: 'cs-CZ', languageName: 'Czech', gender: 'male', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/cs/cs_CZ/jirka/medium/cs_CZ-jirka-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/cs/cs_CZ/jirka/medium/cs_CZ-jirka-medium.onnx.json?download=true', downloadable: true },
-  { id: 'uk-ua-ukrainian-medium', name: 'Ukrainian Medium', language: 'uk-UA', languageName: 'Ukrainian', gender: 'female', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/uk/uk_UA/ukrainian/medium/uk_UA-ukrainian-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/uk/uk_UA/ukrainian/medium/uk_UA-ukrainian-medium.onnx.json?download=true', downloadable: true },
-  { id: 'ru-ru-irina-medium', name: 'Irina Medium', language: 'ru-RU', languageName: 'Russian', gender: 'female', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx.json?download=true', downloadable: true },
-  { id: 'tr-tr-dfki-medium', name: 'DFKI Medium', language: 'tr-TR', languageName: 'Turkish', gender: 'female', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/tr/tr_TR/dfki/medium/tr_TR-dfki-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/tr/tr_TR/dfki/medium/tr_TR-dfki-medium.onnx.json?download=true', downloadable: true },
-  { id: 'vi-vn-vivos-medium', name: 'VIVOS Medium', language: 'vi-VN', languageName: 'Vietnamese', gender: 'female', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/vi/vi_VN/vivos/medium/vi_VN-vivos-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/vi/vi_VN/vivos/medium/vi_VN-vivos-medium.onnx.json?download=true', downloadable: true },
-  { id: 'ko-kr-kss-medium', name: 'KSS Medium', language: 'ko-KR', languageName: 'Korean', gender: 'female', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/ko/ko_KR/kss/medium/ko_KR-kss-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/ko/ko_KR/kss/medium/ko_KR-kss-medium.onnx.json?download=true', downloadable: true },
-  { id: 'ja-jp-tsukuyomi-medium', name: 'Tsukuyomi Medium', language: 'ja-JP', languageName: 'Japanese', gender: 'female', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/ja/ja_JP/tsukuyomi/medium/ja_JP-tsukuyomi-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/ja/ja_JP/tsukuyomi/medium/ja_JP-tsukuyomi-medium.onnx.json?download=true', downloadable: true },
-  { id: 'zh-cn-huayan-medium', name: 'Huayan Medium', language: 'zh-CN', languageName: 'Chinese (Mandarin)', gender: 'female', quality: 'high', modelUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/zh/zh_CN/huayan/medium/zh_CN-huayan-medium.onnx?download=true', configUrl: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/zh/zh_CN/huayan/medium/zh_CN-huayan-medium.onnx.json?download=true', downloadable: true },
+  voice('en-us-lessac-medium', 'Lessac Medium', 'en-US', 'English (US)', 'female', 'en/en_US/lessac/medium/en_US-lessac-medium.onnx', 'en/en_US/lessac/medium/en_US-lessac-medium.onnx.json', ['assistant', 'payment', 'reminder'], 63201294),
+  voice('en-us-ryan-medium', 'Ryan Medium', 'en-US', 'English (US)', 'male', 'en/en_US/ryan/medium/en_US-ryan-medium.onnx', 'en/en_US/ryan/medium/en_US-ryan-medium.onnx.json', ['assistant']),
+  voice('en-us-amy-medium', 'Amy Medium', 'en-US', 'English (US)', 'female', 'en/en_US/amy/medium/en_US-amy-medium.onnx', 'en/en_US/amy/medium/en_US-amy-medium.onnx.json', ['live-call']),
+  voice('en-in-priyanka-medium', 'Priyanka Medium', 'en-IN', 'English (India)', 'female', 'en/en_IN/priyanka/medium/en_IN-priyanka-medium.onnx', 'en/en_IN/priyanka/medium/en_IN-priyanka-medium.onnx.json', ['reader']),
+  voice('en-in-rohan-medium', 'Rohan Medium', 'en-IN', 'English (India)', 'male', 'en/en_IN/rohan/medium/en_IN-rohan-medium.onnx', 'en/en_IN/rohan/medium/en_IN-rohan-medium.onnx.json', ['reader']),
+  voice('hi-in-priyamvada-medium', 'Priyamvada Medium', 'hi-IN', 'Hindi', 'female', 'hi/hi_IN/priyamvada/medium/hi_IN-priyamvada-medium.onnx', 'hi/hi_IN/priyamvada/medium/hi_IN-priyamvada-medium.onnx.json', ['reader'], 63516050),
+  voice('hi-in-vikas-medium', 'Vikas Medium', 'hi-IN', 'Hindi', 'male', 'hi/hi_IN/vikas/medium/hi_IN-vikas-medium.onnx', 'hi/hi_IN/vikas/medium/hi_IN-vikas-medium.onnx.json', ['live-call']),
+  voice('en-gb-alan-medium', 'Alan Medium', 'en-GB', 'English (UK)', 'male', 'en/en_GB/alan/medium/en_GB-alan-medium.onnx', 'en/en_GB/alan/medium/en_GB-alan-medium.onnx.json'),
+  voice('en-gb-southern-medium', 'Southern English', 'en-GB', 'English (UK)', 'female', 'en/en_GB/southern_english_female/medium/en_GB-southern_english_female-medium.onnx', 'en/en_GB/southern_english_female/medium/en_GB-southern_english_female-medium.onnx.json'),
+  voice('es-es-sharvard-medium', 'Sharvard Medium', 'es-ES', 'Spanish', 'male', 'es/es_ES/sharvard/medium/es_ES-sharvard-medium.onnx', 'es/es_ES/sharvard/medium/es_ES-sharvard-medium.onnx.json'),
+  voice('es-mx-ald-medium', 'Ald Medium', 'es-MX', 'Spanish (Mexico)', 'male', 'es/es_MX/ald/medium/es_MX-ald-medium.onnx', 'es/es_MX/ald/medium/es_MX-ald-medium.onnx.json'),
+  voice('fr-fr-siwis-medium', 'Siwis Medium', 'fr-FR', 'French', 'female', 'fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx', 'fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx.json'),
+  voice('de-de-thorsten-medium', 'Thorsten Medium', 'de-DE', 'German', 'male', 'de/de_DE/thorsten/medium/de_DE-thorsten-medium.onnx', 'de/de_DE/thorsten/medium/de_DE-thorsten-medium.onnx.json'),
+  voice('it-it-paola-medium', 'Paola Medium', 'it-IT', 'Italian', 'female', 'it/it_IT/paola/medium/it_IT-paola-medium.onnx', 'it/it_IT/paola/medium/it_IT-paola-medium.onnx.json'),
+  voice('pt-br-faber-medium', 'Faber Medium', 'pt-BR', 'Portuguese (Brazil)', 'male', 'pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx', 'pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx.json'),
+  voice('nl-nl-rdh-medium', 'RDH Medium', 'nl-NL', 'Dutch', 'male', 'nl/nl_NL/rdh/medium/nl_NL-rdh-medium.onnx', 'nl/nl_NL/rdh/medium/nl_NL-rdh-medium.onnx.json'),
+  voice('sv-se-nst-medium', 'NST Medium', 'sv-SE', 'Swedish', 'female', 'sv/sv_SE/nst/medium/sv_SE-nst-medium.onnx', 'sv/sv_SE/nst/medium/sv_SE-nst-medium.onnx.json'),
+  voice('da-dk-tales-medium', 'Tales Medium', 'da-DK', 'Danish', 'male', 'da/da_DK/tales/medium/da_DK-tales-medium.onnx', 'da/da_DK/tales/medium/da_DK-tales-medium.onnx.json'),
+  voice('no-no-tales-medium', 'Tales Medium', 'no-NO', 'Norwegian', 'male', 'no/no_NO/tales/medium/no_NO-tales-medium.onnx', 'no/no_NO/tales/medium/no_NO-tales-medium.onnx.json'),
+  voice('fi-fi-harri-medium', 'Harri Medium', 'fi-FI', 'Finnish', 'male', 'fi/fi_FI/harri/medium/fi_FI-harri-medium.onnx', 'fi/fi_FI/harri/medium/fi_FI-harri-medium.onnx.json'),
+  voice('pl-pl-darkman-medium', 'Darkman Medium', 'pl-PL', 'Polish', 'male', 'pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx', 'pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx.json'),
+  voice('cs-cz-jirka-medium', 'Jirka Medium', 'cs-CZ', 'Czech', 'male', 'cs/cs_CZ/jirka/medium/cs_CZ-jirka-medium.onnx', 'cs/cs_CZ/jirka/medium/cs_CZ-jirka-medium.onnx.json'),
+  voice('uk-ua-ukrainian-medium', 'Ukrainian Medium', 'uk-UA', 'Ukrainian', 'female', 'uk/uk_UA/ukrainian/medium/uk_UA-ukrainian-medium.onnx', 'uk/uk_UA/ukrainian/medium/uk_UA-ukrainian-medium.onnx.json'),
+  voice('ru-ru-irina-medium', 'Irina Medium', 'ru-RU', 'Russian', 'female', 'ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx', 'ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx.json'),
+  voice('tr-tr-dfki-medium', 'DFKI Medium', 'tr-TR', 'Turkish', 'female', 'tr/tr_TR/dfki/medium/tr_TR-dfki-medium.onnx', 'tr/tr_TR/dfki/medium/tr_TR-dfki-medium.onnx.json'),
+  voice('vi-vn-vivos-medium', 'VIVOS Medium', 'vi-VN', 'Vietnamese', 'female', 'vi/vi_VN/vivos/medium/vi_VN-vivos-medium.onnx', 'vi/vi_VN/vivos/medium/vi_VN-vivos-medium.onnx.json'),
+  voice('ko-kr-kss-medium', 'KSS Medium', 'ko-KR', 'Korean', 'female', 'ko/ko_KR/kss/medium/ko_KR-kss-medium.onnx', 'ko/ko_KR/kss/medium/ko_KR-kss-medium.onnx.json'),
+  voice('ja-jp-tsukuyomi-medium', 'Tsukuyomi Medium', 'ja-JP', 'Japanese', 'female', 'ja/ja_JP/tsukuyomi/medium/ja_JP-tsukuyomi-medium.onnx', 'ja/ja_JP/tsukuyomi/medium/ja_JP-tsukuyomi-medium.onnx.json'),
 ];
 
-export const VOICE_CATALOG_COUNT = VOICE_CATALOG.length;
+export const UNIQUE_VOICE_CATALOG = Array.from(new Map(VOICE_CATALOG.map((item) => [item.id, item])).values());
+export const VOICE_CATALOG_COUNT = UNIQUE_VOICE_CATALOG.length;

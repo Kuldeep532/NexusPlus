@@ -85,6 +85,10 @@ export default function FileManagerScreen() {
           refresh={refresh}
           onEncrypt={(entry) => { setActionSheetEntry(null); setTab('secure'); setPreviewEntry(entry); }}
           onOpen={(entry) => { setActionSheetEntry(null); setPreviewEntry(entry); }}
+          onAskAboutFile={(entry) => {
+            setActionSheetEntry(null);
+            router.push({ pathname: '/nexus-assistant', params: { askFile: entry.name } });
+          }}
         />
       )}
 

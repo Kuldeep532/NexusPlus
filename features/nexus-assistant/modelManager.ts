@@ -1,9 +1,10 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { ASSISTANT_MODELS, ASSISTANT_VOICES, type AssistantModel, type AssistantVoice } from './assistantConfig';
-import { downloadAssistantAsset } from './stage8AssetManager';
+import { downloadAssistantAsset, deleteAssistantAsset } from './stage8AssetManager';
+import { downloadVoice, removeVoice } from '../voice-library/voiceStore';
+import { UNIQUE_VOICE_CATALOG } from '../voice-library/voiceCatalog';
 
 const modelsDir = new Directory(Paths.document, 'nexus-assistant', 'models');
-const voicesDir = new Directory(Paths.document, 'nexus-assistant', 'voices');
 
 function ensureDir(directory: Directory): void {
   directory.create({ idempotent: true, intermediates: true });
@@ -17,34 +18,31 @@ export function getAssistantVoices(): AssistantVoice[] {
   return [...ASSISTANT_VOICES];
 }
 
-/** Legacy chat-model entry point retained for callers already using the Stage 1 API. */
 export async function downloadAssistantModel(modelId: string): Promise<string> {
   const model = ASSISTANT_MODELS.find((item) => item.id === modelId);
   if (!model) throw new Error('Unknown Nexus Assistant model.');
   if (model.kind !== 'chat') throw new Error('Requested asset is not a chat model.');
-  return downloadAssistantAsset('chat-smollm2-360m-q4km');
+  return downloadAssistantAsset(model.id);
 }
 
 export async function deleteAssistantModel(modelId: string): Promise<void> {
   ensureDir(modelsDir);
-  const candidates = [`${modelId}.gguf`, `${modelId}.tar.bz2`, `${modelId}.onnx`];
-  for (const name of candidates) {
+  for (const name of [`${modelId}.gguf`, `${modelId}.tar.bz2`, `${modelId}.onnx`]) {
     const file = new File(modelsDir, name);
     if (file.exists) file.delete();
   }
+  try { deleteAssistantAsset(modelId); } catch { /* no canonical asset to remove */ }
 }
 
-/** Legacy voice entry point retained for callers already using the Stage 1 API. */
 export async function downloadAssistantVoice(voiceId: string): Promise<string> {
   const voice = ASSISTANT_VOICES.find((item) => item.id === voiceId);
-  if (!voice) throw new Error('Unknown Nexus Assistant voice.');
-  return downloadAssistantAsset('tts-piper-en-us-lessac-medium');
+  const canonical = UNIQUE_VOICE_CATALOG.find((item) => item.id === voiceId);
+  if (!voice || !canonical) throw new Error('Unknown Nexus Assistant voice.');
+  const installed = await downloadVoice(canonical);
+  return installed.modelPath;
 }
 
 export async function deleteAssistantVoice(voiceId: string): Promise<void> {
-  ensureDir(voicesDir);
-  for (const extension of ['.onnx', '.tar.bz2', '.json']) {
-    const file = new File(voicesDir, `${voiceId}${extension}`);
-    if (file.exists) file.delete();
-  }
+  if (!UNIQUE_VOICE_CATALOG.some((item) => item.id === voiceId)) return;
+  await removeVoice(voiceId);
 }

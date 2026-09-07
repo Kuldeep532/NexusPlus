@@ -7,15 +7,19 @@ import { FileManagerRenameSheet } from './FileManagerRenameSheet';
 import { FileManagerDeleteSheet } from './FileManagerDeleteSheet';
 import { copyEntryTo, moveEntryTo, renameEntryTo, shareEntry, deleteEntryWithConfirmation } from '../FileManagerActions';
 import type { FileManagerEntry as Entry } from '../FileManagerTypes';
+import { buildAssistantFileContext, formatFileContextForAssistant } from '@/features/nexus-assistant/fileContext';
+import { setActiveFileContext } from '@/features/nexus-assistant/fileAssistantStore';
 
 export function FileManagerActionHost({
   refresh,
   onEncrypt,
   onOpen,
+  onAskAboutFile,
 }: {
   refresh: () => Promise<void>;
   onEncrypt: (entry: Entry) => void;
   onOpen?: (entry: Entry) => void;
+  onAskAboutFile?: (entry: Entry) => void;
 }) {
   const [entry, setEntry] = useState<Entry | null>(null);
   const [sheet, setSheet] = useState<'actions' | 'properties' | 'rename' | 'delete' | null>(null);
@@ -37,6 +41,25 @@ export function FileManagerActionHost({
     if (action === 'open') {
       close();
       return onOpen?.(target);
+    }
+    if (action === 'ask-about-file') {
+      close();
+      try {
+        const context = await buildAssistantFileContext({
+          uri: target.uri,
+          name: target.name,
+          format: target.extension.replace(/^\./, '').toLowerCase() as 'pdf' | 'epub' | 'txt' | 'md' | 'html' | 'rtf' | 'docx' | 'doc' | 'odt' | 'unsupported',
+          sizeBytes: target.size,
+        });
+        await setActiveFileContext({
+          ...context,
+          promptContext: formatFileContextForAssistant(context),
+        });
+        onAskAboutFile?.(target);
+      } catch (error) {
+        Alert.alert('Unable to read file', error instanceof Error ? error.message : String(error));
+      }
+      return;
     }
     if (action === 'share') {
       try {
