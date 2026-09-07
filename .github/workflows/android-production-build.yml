@@ -62,6 +62,9 @@ jobs:
         run: pnpm install --no-frozen-lockfile
       - name: Validate Expo configuration
         run: pnpm exec expo config --type public
+      - name: Validate Nexus Computer Agent
+        working-directory: computer-agent
+        run: npm run check
       - name: Validate EAS token
         run: test -n "$EAS_TOKEN"
       - name: Build Android Development Build with Expo EAS
@@ -118,6 +121,9 @@ jobs:
           run_install: false
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
+      - name: Validate Nexus Computer Agent
+        working-directory: computer-agent
+        run: npm run check
       - name: Materialize Firebase configuration
         shell: bash
         env:
@@ -223,6 +229,10 @@ jobs:
           [ $rc -eq 0 ] || failed=1
           echo '=== 3. JavaScript/TypeScript bundle dry-run ==='
           pnpm exec expo export --platform android --output-dir /tmp/nexusplus-bundle-check --clear
+          rc=$?
+          [ $rc -eq 0 ] || failed=1
+          echo '=== 4. Nexus Computer Agent syntax ==='
+          (cd computer-agent && npm run check)
           rc=$?
           [ $rc -eq 0 ] || failed=1
           echo '=== Consolidated diagnostics summary ==='
