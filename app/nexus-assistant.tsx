@@ -11,10 +11,11 @@ import { streamAssistantReply } from '@/features/nexus-assistant/stage2Agent';
 import { planCapability, formatCapabilityConfirmation, type CapabilityProposal } from '@/features/nexus-assistant/agentPlanner';
 import { runStage3Agent } from '@/features/nexus-assistant/stage3Agent';
 import { getWeatherLocalFirst } from '@/features/nexus-assistant/stage6Weather';
-import { createStage7VoiceBridge, type VoiceRuntimeStatus } from '@/features/nexus-assistant/stage7VoiceBridge';
+import { createStage7VoiceBridge, speakAssistant, type VoiceRuntimeStatus } from '@/features/nexus-assistant/stage7VoiceBridge';
 import type { Stage6VoiceBridge, VoiceInputState } from '@/features/nexus-assistant/stage6Voice';
 import { routeAssistantRequest } from '@/features/nexus-assistant/stage9AssistantRouter';
-import { speakAssistant } from '@/features/nexus-assistant/stage7VoiceBridge';
+import { getActiveBookContext } from '@/features/nexus-assistant/bookAssistantStore';
+import { isBookQuestion } from '@/features/nexus-assistant/bookContext';
 
 const SESSION_ID = 'default';
 
@@ -34,6 +35,7 @@ export default function NexusAssistantScreen() {
   const [voiceState, setVoiceState] = useState<VoiceInputState>('idle');
   const [voiceBridge, setVoiceBridge] = useState<Stage6VoiceBridge | null>(null);
   const [webResults, setWebResults] = useState<Array<{ title: string; url: string; snippet?: string }>>([]);
+  const [activeBookTitle, setActiveBookTitle] = useState<string | null>(null);
   const hasText = input.trim().length > 0;
 
   useEffect(() => {
@@ -48,8 +50,8 @@ export default function NexusAssistantScreen() {
         setInput(text);
         setVoiceState('idle');
         setVoiceInput(true);
-        setStatus(liveMode ? 'Voice transcription ready. Sending to Nexus Assistant…' : 'Voice transcription ready. Press Send to submit.');
-        if (liveMode && text.trim()) void send(text);
+        setStatus('Voice transcription ready. Press Send to submit.');
+        if (liveMode) void send(text, true);
       },
     );
     setVoiceBridge(created.bridge);
@@ -61,10 +63,12 @@ export default function NexusAssistantScreen() {
       await initAssistantStore();
       await ensureSession(SESSION_ID, 'Nexus Assistant');
       setMessages(await listMessages(SESSION_ID));
+      const book = await getActiveBookContext();
+      setActiveBookTitle(book?.title ?? null);
       const engine = await getLocalInferenceEngine();
       const available = await engine.isAvailable();
       setEngineReady(available);
-      setStatus(available ? 'Local assistant ready. Cloud providers and web search are optional through the Gateway.' : 'Assistant ready. Cloud providers and web search are available through the Gateway; local inference is unavailable in this build.');
+      setStatus(available ? 'Local assistant ready. Cloud providers and web search are optional through the Gateway.' : 'Assistant ready. Local inference engine is not available in this build.');
     })().catch(() => setStatus('Local chat storage could not be opened.'));
   }, []);
 
@@ -75,14 +79,19 @@ export default function NexusAssistantScreen() {
 
   const refreshMessages = async () => setMessages(await listMessages(SESSION_ID));
 
-  const speakResponse = async (text: string, locale = 'en-US') => {
-    if (!liveMode || !text.trim()) return;
-    setStatus('Preparing the Live Voice response…');
-    const backend = await speakAssistant(text, locale, 'live-call');
-    setStatus(backend === 'piper' ? 'Live Voice response playing with the configured high-quality voice.' : 'Live Voice response is using the device speech fallback.');
+  const speakResponseForMode = async (text: string, live: boolean) => {
+    if (!live || !text.trim()) return;
+    const result = await speakAssistant(text, 'en-US', 'live-call');
+    if (result === 'piper') setStatus('Speaking with the Live Voice Call voice.');
+    else {
+      const Speech = await import('expo-speech');
+      Speech.stop();
+      Speech.speak(text, { language: 'en-US' });
+      setStatus('Speaking with the device voice fallback.');
+    }
   };
 
-  const send = async (providedText?: string) => {
+  const send = async (providedText?: string, fromLiveMode = liveMode) => {
     const text = (providedText ?? input).trim();
     if (!text || busy) return;
     setBusy(true);
@@ -104,27 +113,30 @@ export default function NexusAssistantScreen() {
         return;
       }
 
-      if (/\b(weather|forecast|temperature|rain|raining|humidity|wind)\b|मौसम|तापमान|बारिश|हवा/i.test(text)) {
+      const bookContext = await getActiveBookContext();
+      if (isBookQuestion(text) && bookContext) setStatus(`Using ${bookContext.title} as the primary source…`);
+
+      if (/\b(weather|forecast|temperature|rain|raining|humidity|wind)\b|मौसम|तापमान|बारिश|हवा/i.test(text) && !bookContext) {
         setStatus('Checking local weather cache first…');
         const weather = await getWeatherLocalFirst({ location: text });
         if (weather) {
           await addMessage(SESSION_ID, 'assistant', weather.text);
           await refreshMessages();
-          await speakResponse(weather.text);
           setStatus(weather.source === 'cache' ? 'Weather served from the on-device cache.' : 'Weather refreshed through the Gateway and cached locally.');
+          await speakResponseForMode(weather.text, fromLiveMode);
           return;
         }
       }
 
       try {
-        setStatus('Checking web search and optional cloud providers through Nexus Gateway…');
-        const routed = await routeAssistantRequest({ message: text, history });
+        setStatus(bookContext ? `Answering from ${bookContext.title} through the available model…` : 'Checking web search and optional cloud providers through Nexus Gateway…');
+        const routed = await routeAssistantRequest({ message: text, history, bookContext });
         setWebResults(routed.web);
         if (routed.provider) {
           await addMessage(SESSION_ID, 'assistant', routed.provider.text);
           await refreshMessages();
-          await speakResponse(routed.provider.text);
           setStatus(`${routed.provider.provider === 'openai' ? 'OpenAI' : 'Gemini'} response received through Nexus Gateway.`);
+          await speakResponseForMode(routed.provider.text, fromLiveMode);
           return;
         }
       } catch {
@@ -132,28 +144,30 @@ export default function NexusAssistantScreen() {
       }
 
       if (!engineReady) {
-        const fallback = 'Nexus Assistant could not reach the available cloud provider and local inference is not available in this build. Your message is stored locally on this device.';
+        const fallback = bookContext
+          ? `I have ${bookContext.title} loaded, but no inference provider is currently available to answer from it. The book stays on this device.`
+          : 'Nexus Assistant could not reach the available cloud provider and local inference is not available in this build. Your message is stored locally on this device.';
         await addMessage(SESSION_ID, 'assistant', fallback);
         await refreshMessages();
-        await speakResponse(fallback);
         setStatus('No inference provider available; message remains local.');
+        await speakResponseForMode(fallback, fromLiveMode);
         return;
       }
 
       const model = ASSISTANT_MODELS.find((item) => item.kind === 'chat') ?? ASSISTANT_MODELS[0];
-      await streamAssistantReply({
+      const modelContext = bookContext ? `${text}\n\nBook context: ${bookContext.text}` : text;
+      const localReply = await streamAssistantReply({
         sessionId: SESSION_ID,
         modelId: model.id,
         modelPath: model.url,
-        userText: text,
+        userText: modelContext,
         onStatus: setStatus,
         onToken: (chunk) => setStreaming((value) => value + chunk),
       });
       await refreshMessages();
-      const localText = (await listMessages(SESSION_ID)).at(-1)?.content ?? streaming;
-      await speakResponse(localText);
       setStreaming('');
       setStatus('Local response complete.');
+      await speakResponseForMode(localReply.text, fromLiveMode);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Assistant request failed.');
       await refreshMessages();
@@ -200,6 +214,8 @@ export default function NexusAssistantScreen() {
     if (!next) {
       await voiceBridge.stopListening().catch(() => undefined);
       await voiceBridge.stopOutput().catch(() => undefined);
+      const Speech = await import('expo-speech');
+      Speech.stop();
       setVoiceState('idle');
       setStatus('Live Mode closed.');
       return;
@@ -228,13 +244,15 @@ export default function NexusAssistantScreen() {
     if (!liveMode || !voiceBridge || voiceState !== 'listening') return;
     await voiceBridge.stopListening().catch(() => undefined);
     setVoiceState('processing');
-    setStatus('Voice captured. Waiting for the voice transcript…');
+    setStatus('Voice captured. Waiting for local ASR transcript…');
   };
 
   const endLiveMode = async () => {
     setLiveMode(false);
     await voiceBridge?.stopListening().catch(() => undefined);
     await voiceBridge?.stopOutput().catch(() => undefined);
+    const Speech = await import('expo-speech');
+    Speech.stop();
     setVoiceState('idle');
     setStatus('Live Mode ended.');
   };
@@ -284,10 +302,10 @@ export default function NexusAssistantScreen() {
   const downloadVoice = async () => {
     const voice = ASSISTANT_VOICES[0];
     setAssetBusy(voice.id);
-    setStatus('Preparing the high-quality Live Voice download…');
+    setStatus('Preparing the local Piper voice download…');
     try {
       await downloadAssistantVoice(voice.id);
-      setStatus('High-quality Live Voice downloaded.');
+      setStatus('Piper voice downloaded.');
     } catch {
       setStatus('Voice download failed. Check your connection and try again.');
     } finally {
@@ -301,13 +319,14 @@ export default function NexusAssistantScreen() {
         <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="cpu" size={23} color={colors.primary} /></View>
         <View style={styles.copy}>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Nexus Assistant</Text>
-          <Text style={[styles.body, { color: colors.mutedForeground }]}>Cloud-first assistant with optional local inference, web search, Voice Input, and Live Voice Call.</Text>
+          <Text style={[styles.body, { color: colors.mutedForeground }]}>Local agent + Gemini + optional OpenAI + Gateway web search.</Text>
         </View>
       </View>
 
       <View accessibilityLiveRegion="polite" style={[styles.status, { borderColor: colors.border, backgroundColor: colors.card }]}>
         <Text style={[styles.statusTitle, { color: colors.foreground }]}>Runtime</Text>
         <Text style={[styles.note, { color: colors.mutedForeground }]}>{status}</Text>
+        {activeBookTitle ? <Text style={[styles.note, { color: colors.primary }]}>Active book: {activeBookTitle}</Text> : null}
         <Text style={[styles.note, { color: colors.mutedForeground }]}>Cloud providers and web search are optional. OpenAI failure never blocks Gemini or local fallback.</Text>
       </View>
 
@@ -340,9 +359,9 @@ export default function NexusAssistantScreen() {
 
       {liveMode ? <View accessibilityLiveRegion="polite" style={[styles.liveCard, { borderColor: colors.primary, backgroundColor: colors.card }]}>
         <Text accessibilityRole="header" style={[styles.proposalTitle, { color: colors.foreground }]}>Nexus Live Mode</Text>
-        <Text style={[styles.body, { color: colors.mutedForeground }]}>Voice state: {voiceState}. Hold Talk to speak; release to send the transcript automatically. Assistant replies are spoken with the Live Voice role when the high-quality voice is installed.</Text>
+        <Text style={[styles.body, { color: colors.mutedForeground }]}>Voice state: {voiceState}. Hold Talk to speak. Release Talk to hand the captured audio to the local voice pipeline. End Live Call exits this mode.</Text>
         <View style={styles.liveActions}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Hold to talk" onPressIn={() => void holdToTalk()} onPressOut={() => void releaseTalk()} style={[styles.talkButton, { backgroundColor: colors.primary }]}><Feather name="mic" size={23} color={colors.primaryForeground} /><Text style={[styles.controlText, { color: colors.primaryForeground }]}>Hold to Talk</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Hold to talk" onPressIn={() => void holdToTalk()} onPressOut={() => { void releaseTalk(); }} style={[styles.talkButton, { backgroundColor: colors.primary }]}><Feather name="mic" size={23} color={colors.primaryForeground} /><Text style={[styles.controlText, { color: colors.primaryForeground }]}>Hold to Talk</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Stop voice output" onPress={() => void voiceBridge?.stopOutput().catch(() => undefined)} style={[styles.controlButton, { borderColor: colors.border, backgroundColor: colors.card }]}><Feather name="volume-x" size={19} color={colors.foreground} /><Text style={[styles.controlText, { color: colors.foreground }]}>Stop Output</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="End Live Call" onPress={() => void endLiveMode()} style={[styles.endButton, { backgroundColor: colors.destructive ?? colors.primary }]}><Feather name="phone-off" size={19} color={colors.primaryForeground} /><Text style={[styles.controlText, { color: colors.primaryForeground }]}>End Live Call</Text></Pressable>
         </View>
@@ -359,7 +378,7 @@ export default function NexusAssistantScreen() {
         <Text style={[styles.section, { color: colors.foreground }]}>Local AI assets</Text>
         <Text style={[styles.note, { color: colors.mutedForeground }]}>APK target: under {ASSISTANT_LIMITS.maxApkSizeMb} MB. Heavy model and voice files remain outside the APK.</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Download Nexus Small Chat model" disabled={!!assetBusy} onPress={() => void downloadModel()} style={[styles.secondaryButton, { borderColor: colors.border, opacity: assetBusy ? 0.6 : 1 }]}><Feather name="download" size={17} color={colors.foreground} /><Text style={[styles.buttonText, { color: colors.foreground }]}>{assetBusy === (ASSISTANT_MODELS.find((item) => item.kind === 'chat')?.id ?? '') ? 'Downloading model…' : 'Download local chat model'}</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Download high quality Live Voice" disabled={!!assetBusy} onPress={() => void downloadVoice()} style={[styles.secondaryButton, { borderColor: colors.border, opacity: assetBusy ? 0.6 : 1 }]}><Feather name="volume-2" size={17} color={colors.foreground} /><Text style={[styles.buttonText, { color: colors.foreground }]}>{assetBusy === ASSISTANT_VOICES[0].id ? 'Downloading voice…' : 'Download high-quality Live Voice'}</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Download high quality Piper voice" disabled={!!assetBusy} onPress={() => void downloadVoice()} style={[styles.secondaryButton, { borderColor: colors.border, opacity: assetBusy ? 0.6 : 1 }]}><Feather name="volume-2" size={17} color={colors.foreground} /><Text style={[styles.buttonText, { color: colors.foreground }]}>{assetBusy === ASSISTANT_VOICES[0].id ? 'Downloading voice…' : 'Download Piper voice'}</Text></Pressable>
       </View>
     </ScrollView>
   );
