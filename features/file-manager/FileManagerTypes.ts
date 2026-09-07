@@ -30,4 +30,5 @@ export type FileManagerSelectionAction =
   | 'copy'
   | 'compress'
   | 'encrypt'
-  | 'properties';
+  | 'properties'
+  | 'ask-about-file';
