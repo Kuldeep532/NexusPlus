@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { VOICE_CATALOG } from '@/features/voice-library/voiceCatalog';
 import { getInstalledVoices, type InstalledVoice } from '@/features/voice-library/voiceStore';
 import { configureReminderNotifications, scheduleReminder, rescheduleReminder } from './reminderScheduler';
 import { deleteReminder, loadReminders, setReminderEnabled, snoozeReminder } from './reminderBackend';
