@@ -19,6 +19,18 @@ The voice download and playback paths are now designed to fail safely:
 - Reminder audio playback catches player creation/output failures and falls back to system TTS.
 - Voice Library UI now catches download/remove errors and exposes status through an accessibility live region instead of allowing rejected promises to escape the press handler.
 
+## Nexus Assistant voice roles
+
+- Live Voice Call has a dedicated high-quality conversational voice.
+- Book Reader/long-form narration uses a different dedicated high-quality voice.
+- General short Assistant speech has its own default voice role.
+- All roles resolve to the same canonical Voice Library IDs, so one downloaded model is never duplicated merely because multiple features use it.
+- The Voice Library exposes **Remove** only when both the model and config files are valid; otherwise it exposes **Download**.
+
+## Reusable UI direction
+
+React Native Paper is now the preferred reusable component library for new dialogs, buttons, surfaces and form controls. Existing manually built controls are intentionally retained where they are already accessible and stable. Future UI additions should prefer reusable Paper primitives with appropriate React Native accessibility roles and states rather than bespoke button/dialog implementations.
+
 ## Important release-gate limitation
 
 The repository still must not be described as fully production-verified until a real Android release build and device-level smoke test have passed. In particular, the current Nexus Assistant native voice module captures PCM but its `speak()` method still reports that the local Piper backend is unavailable, and the local inference engine is currently a safe unavailable stub. The code now fails closed rather than crashing or pretending those backends work.
@@ -30,9 +42,10 @@ Before release, verify at minimum:
 3. Corrupt/partial model recovery and reinstall.
 4. English and Hindi voice playback plus system-TTS fallback.
 5. App background/foreground during download and playback.
-6. Reminder voice playback when the native Piper backend is unavailable.
-7. Release APK/AAB build with the repository's production workflow.
-8. Device smoke tests on multiple Android API levels and at least one low-memory device.
+6. Nexus Assistant Live Voice Call and Reader voice-role separation.
+7. Reminder voice playback when the native Piper backend is unavailable.
+8. Release APK/AAB build with the repository's production workflow.
+9. Device smoke tests on multiple Android API levels and at least one low-memory device.
 
 ## Existing Stage 1 scope
 
