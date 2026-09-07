@@ -2,7 +2,7 @@ import * as MediaLibrary from 'expo-media-library';
 import type { MediaCollections, MediaItemModel, MediaPlaylist } from './types';
 
 function assetToMediaItem(asset: MediaLibrary.Asset): MediaItemModel {
-  const isVideo = asset.mediaType === MediaLibrary.MediaType.video;
+  const isVideo = asset.mediaType === 'video';
   return {
     id: asset.id,
     uri: asset.uri,
@@ -23,12 +23,12 @@ export async function requestMediaPermission(): Promise<boolean> {
   return next.granted || next.accessPrivileges === 'all';
 }
 
-async function getAllAssets(mediaType: MediaLibrary.MediaType): Promise<MediaLibrary.Asset[]> {
+async function getAllAssets(mediaType: string): Promise<MediaLibrary.Asset[]> {
   const output: MediaLibrary.Asset[] = [];
   let after: string | undefined;
   do {
     const page = await MediaLibrary.getAssetsAsync({
-      mediaType,
+      mediaType: mediaType as never,
       first: 200,
       after,
       sortBy: [[MediaLibrary.SortBy.default, false]],
@@ -55,8 +55,8 @@ export async function scanLocalMedia() {
   const granted = await requestMediaPermission();
   if (!granted) return { permissionGranted: false, audio: [], video: [] };
   const [audioAssets, videoAssets] = await Promise.all([
-    getAllAssets(MediaLibrary.MediaType.audio),
-    getAllAssets(MediaLibrary.MediaType.video),
+    getAllAssets('audio'),
+    getAllAssets('video'),
   ]);
   return {
     permissionGranted: true,
