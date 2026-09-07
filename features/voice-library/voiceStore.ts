@@ -24,6 +24,11 @@ export function configureSupabaseVoiceDownloadGate(
 export type InstalledVoice = VoiceCatalogItem & { installedAt: number; modelPath: string; configPath: string };
 export type VoiceDownloadProgress = { voiceId: string; stage: 'model' | 'config'; downloadedBytes: number; totalBytes: number };
 
+type DownloadProgressEvent = {
+  totalBytesWritten: number;
+  totalBytesExpectedToWrite: number;
+};
+
 const findVoice = (voiceId: string) => UNIQUE_VOICE_CATALOG.find((item) => item.id === voiceId);
 const modelFile = (voice: VoiceCatalogItem) => new File(ROOT, `${voice.id}.onnx`);
 const configFile = (voice: VoiceCatalogItem) => new File(ROOT, `${voice.id}.onnx.json`);
@@ -101,9 +106,29 @@ async function installVoice(voice: VoiceCatalogItem, onProgress?: (progress: Voi
     }
 
     safeDelete(modelTemp); safeDelete(configTemp);
-    const modelDownload = await File.createDownloadTask(voice.modelUrl, modelTemp, {}, ({ totalBytesWritten, totalBytesExpectedToWrite }) => onProgress?.({ voiceId: voice.id, stage: 'model', downloadedBytes: totalBytesWritten, totalBytes: totalBytesExpectedToWrite || voice.modelSizeBytes || 0 })).downloadAsync();
+    const modelDownload = await File.downloadFileAsync(
+      voice.modelUrl,
+      modelTemp,
+      {},
+      (progress: DownloadProgressEvent) => onProgress?.({
+        voiceId: voice.id,
+        stage: 'model',
+        downloadedBytes: progress.totalBytesWritten,
+        totalBytes: progress.totalBytesExpectedToWrite || voice.modelSizeBytes || 0,
+      }),
+    );
     if (!modelDownload?.exists || !validFile(modelDownload, voice.modelSizeBytes)) throw new Error(`Voice model ${voice.name} failed integrity verification.`);
-    const configDownload = await File.createDownloadTask(voice.configUrl, configTemp, {}, ({ totalBytesWritten, totalBytesExpectedToWrite }) => onProgress?.({ voiceId: voice.id, stage: 'config', downloadedBytes: totalBytesWritten, totalBytes: totalBytesExpectedToWrite || voice.configSizeBytes || 0 })).downloadAsync();
+    const configDownload = await File.downloadFileAsync(
+      voice.configUrl,
+      configTemp,
+      {},
+      (progress: DownloadProgressEvent) => onProgress?.({
+        voiceId: voice.id,
+        stage: 'config',
+        downloadedBytes: progress.totalBytesWritten,
+        totalBytes: progress.totalBytesExpectedToWrite || voice.configSizeBytes || 0,
+      }),
+    );
     if (!configDownload?.exists || !validFile(configDownload, voice.configSizeBytes)) throw new Error(`Voice configuration for ${voice.name} failed integrity verification.`);
     safeDelete(model); safeDelete(config); modelTemp.move(model); configTemp.move(config);
     if (!validFile(model, voice.modelSizeBytes) || !validFile(config, voice.configSizeBytes)) throw new Error(`Voice ${voice.name} could not be finalized safely.`);
