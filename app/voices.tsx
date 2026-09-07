@@ -4,12 +4,16 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { UNIQUE_VOICE_CATALOG, VOICE_CATALOG_COUNT, type VoiceCatalogItem } from '@/features/voice-library/voiceCatalog';
+import { VoiceDownloadRateLimitError } from '@/features/voice-library/voiceDownloadGuard';
 import { downloadVoice, getInstalledVoices, removeVoice, type InstalledVoice } from '@/features/voice-library/voiceStore';
 
 const languageFilters = ['All', ...Array.from(new Set(UNIQUE_VOICE_CATALOG.map((voice) => voice.languageName)))];
 type Filter = 'all' | 'female' | 'male' | 'downloaded';
 
 function userSafeError(error: unknown, action: 'download' | 'remove'): string {
+  if (error instanceof VoiceDownloadRateLimitError) {
+    return 'Voice downloads are temporarily busy. Please wait a moment and try again.';
+  }
   const suffix = error instanceof Error && error.message ? ` ${error.message}` : '';
   return action === 'download'
     ? `Voice download could not be completed.${suffix}`
