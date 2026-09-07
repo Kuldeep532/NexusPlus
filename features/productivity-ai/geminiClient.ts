@@ -1,7 +1,7 @@
 import { callGateway, discoverGatewayEndpoints, type GatewayEndpoint } from '@/features/api-gateway/apiGatewayClient';
 import { composeMessage, type ComposedMessage, type MessageContext } from './aiMessageComposer';
 
-export type GeminiGenerationResult = ComposedMessage & { source: 'gemini' | 'local-patterns' };
+export type GeminiGenerationResult = ComposedMessage | (ComposedMessage & { source: 'gemini' });
 
 function findGeminiEndpoint(endpoints: GatewayEndpoint[]): GatewayEndpoint | null {
   const ranked = endpoints
