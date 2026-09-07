@@ -9,6 +9,15 @@ export const FILE_MANAGER_TABS: ReadonlyArray<{ id: FileManagerTab; title: strin
 
 export const DEFAULT_FILE_MANAGER_VIEW: FileManagerViewMode = 'list';
 export const DEFAULT_FILE_SORT: FileSortMode = 'name-asc';
+export const FILE_SORT_OPTIONS: ReadonlyArray<{ id: FileSortMode; title: string }> = [
+  { id: 'name-asc', title: 'Name A–Z' },
+  { id: 'name-desc', title: 'Name Z–A' },
+  { id: 'size-asc', title: 'Size small to large' },
+  { id: 'size-desc', title: 'Size large to small' },
+  { id: 'date-new', title: 'Newest first' },
+  { id: 'date-old', title: 'Oldest first' },
+  { id: 'type', title: 'File type' },
+];
 
 export const SUPPORTED_FILE_GROUPS = {
   images: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic'],
