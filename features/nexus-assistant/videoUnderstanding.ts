@@ -1,73 +1,81 @@
-import { callGateway, discoverGatewayEndpoints } from '@/features/api-gateway/apiGatewayClient';
+import { callGateway } from '@/features/api-gateway/apiGatewayClient';
 
-type VideoUnderstandingRequest = {
+export type VideoUnderstandingRequest = {
   uri: string;
-  mimeType: string;
+  mimeType?: string;
   prompt: string;
+  displayName?: string;
 };
 
 export type VideoUnderstandingResult = {
   text: string;
+  mediaName?: string;
+  provider: 'gemini';
 };
 
-function readText(payload: any): string | null {
-  const text = payload?.output_text
+type GatewayVideoResponse = {
+  text?: unknown;
+  output_text?: unknown;
+  response?: { text?: unknown };
+  result?: { text?: unknown };
+  mediaName?: unknown;
+};
+
+function readText(payload: GatewayVideoResponse): string | null {
+  const value = payload?.output_text
     ?? payload?.text
-    ?? payload?.output?.text
-    ?? payload?.result?.text
     ?? payload?.response?.text
-    ?? payload?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text).filter(Boolean).join('');
-  return typeof text === 'string' && text.trim() ? text.trim() : null;
+    ?? payload?.result?.text;
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function findVideoEndpoint(endpoints: Awaited<ReturnType<typeof discoverGatewayEndpoints>>) {
-  return endpoints
-    .map((endpoint) => {
-      const haystack = `${endpoint.id} ${endpoint.path} ${endpoint.feature ?? ''} ${endpoint.description ?? ''}`.toLowerCase();
-      let score = 0;
-      if (haystack.includes('video')) score += 8;
-      if (haystack.includes('multimodal')) score += 5;
-      if (haystack.includes('gemini')) score += 4;
-      if (haystack.includes('file')) score += 2;
-      if (haystack.includes('interaction')) score += 2;
-      return { endpoint, score };
-    })
-    .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score)[0]?.endpoint ?? null;
+function normalizeMimeType(uri: string, mimeType?: string): string {
+  if (mimeType?.trim()) return mimeType.trim();
+  const extension = uri.split('?')[0].split('#')[0].split('.').pop()?.toLowerCase();
+  const byExtension: Record<string, string> = {
+    mp4: 'video/mp4',
+    mov: 'video/quicktime',
+    m4v: 'video/x-m4v',
+    webm: 'video/webm',
+    avi: 'video/x-msvideo',
+    mkv: 'video/x-matroska',
+    mpeg: 'video/mpeg',
+    mpg: 'video/mpeg',
+    '3gp': 'video/3gpp',
+  };
+  return byExtension[extension ?? ''] ?? 'video/mp4';
 }
 
 /**
- * Sends the local video through the authenticated Gateway using a multimodal
- * video input contract. The Gateway owns provider credentials and decides the
- * concrete Gemini/OpenAI implementation; the app never receives provider keys.
- *
- * The app does not flatten video into a text transcript first because modern
- * multimodal models can reason over audio + sampled visual frames together.
+ * Mobile-side adapter for the Nexus Gateway's Gemini multimodal video route.
+ * Provider credentials stay server-side. The gateway performs media upload/
+ * processing before asking Gemini to reason over video + audio + visuals.
  */
 export async function understandVideo(input: VideoUnderstandingRequest): Promise<VideoUnderstandingResult> {
   if (!input.uri.trim()) throw new Error('VIDEO_URI_REQUIRED');
-  if (!input.mimeType.startsWith('video/')) throw new Error('VIDEO_MIME_TYPE_REQUIRED');
+  const mimeType = normalizeMimeType(input.uri, input.mimeType);
+  if (!mimeType.startsWith('video/')) throw new Error('VIDEO_MIME_TYPE_REQUIRED');
 
-  const endpoints = await discoverGatewayEndpoints();
-  const endpoint = findVideoEndpoint(endpoints);
-  if (!endpoint) throw new Error('VIDEO_UNDERSTANDING_UNAVAILABLE');
-
-  const payload = await callGateway<any>(endpoint.path, {
-    method: endpoint.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  const payload = await callGateway<GatewayVideoResponse>('/ai/video/understand', {
+    method: 'POST',
     body: {
-      model: endpoint.id || undefined,
-      video: {
+      media: {
         uri: input.uri,
-        mime_type: input.mimeType,
-        processing: 'agentic',
+        mimeType,
+        displayName: input.displayName ?? 'NexusPlus video',
       },
-      input: [{ type: 'video', uri: input.uri, mime_type: input.mimeType, processing: 'agentic' }, { type: 'text', text: input.prompt }],
       prompt: input.prompt,
-      mime_type: input.mimeType,
+      multimodal: true,
+      processing: 'agentic',
+      responseFormat: 'text',
     },
   });
 
   const text = readText(payload);
   if (!text) throw new Error('VIDEO_UNDERSTANDING_EMPTY');
-  return { text };
+  return {
+    text,
+    mediaName: typeof payload.mediaName === 'string' ? payload.mediaName : undefined,
+    provider: 'gemini',
+  };
 }
