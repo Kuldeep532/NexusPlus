@@ -35,7 +35,7 @@ export function PersistentMediaProvider({ children }: { children: React.ReactNod
   const load = async (item: MediaItemModel, queue = state.queue) => {
     clearPlayer();
     await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'mixWithOthers' });
-    const player = createAudioPlayer({ uri: item.uri }, { downloadFirst: false });
+    const player = createAudioPlayer({ uri: item.uri });
     playerRef.current = player;
     player.volume = 1;
     player.addListener('playbackStatusUpdate', () => {
