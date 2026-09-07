@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import type { FileManagerEntry, FileSortMode } from './FileManagerTypes';
 
 const asNumber = (value: string | number | undefined): number => typeof value === 'number' ? value : Number(value ?? 0);
@@ -6,19 +6,11 @@ const asNumber = (value: string | number | undefined): number => typeof value ==
 export function entryFromInfo(uri: string, info: FileSystem.FileInfo): FileManagerEntry {
   const name = uri.replace(/\/$/, '').split('/').pop() || uri;
   const extension = name.includes('.') ? name.split('.').pop()!.toLowerCase() : '';
-  return {
-    id: uri,
-    uri,
-    name,
-    isDirectory: info.isDirectory,
-    size: asNumber(info.size),
-    modifiedAt: asNumber(info.modificationTime) * 1000,
-    extension,
-  };
+  return { id: uri, uri, name, isDirectory: info.exists ? info.isDirectory : false, size: asNumber('size' in info ? info.size : 0), modifiedAt: asNumber('modificationTime' in info ? info.modificationTime : 0) * 1000, extension };
 }
 
 export async function listDirectory(uri: string): Promise<FileManagerEntry[]> {
-  const names = await FileSystem.StorageAccessFramework.readDirectoryAsync(uri).catch(async () => []);
+  const names = await FileSystem.StorageAccessFramework.readDirectoryAsync(uri).catch(async () => [] as string[]);
   return Promise.all(names.map(async (name) => {
     const childUri = name.startsWith('content://') ? name : `${uri.replace(/\/$/, '')}/${name}`;
     const info = await FileSystem.getInfoAsync(childUri);
