@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { File, Directory, Paths } from 'expo-file-system';
 import { UNIQUE_VOICE_CATALOG, type VoiceCatalogItem } from './voiceCatalog';
-import { acquireVoiceDownloadSlot } from './voiceDownloadGuard';
+import { acquireVoiceDownloadSlot, releaseVoiceDownloadSlot } from './voiceDownloadGuard';
 
 const STORAGE_KEY = 'nexus-plus.voice-library.v4';
 const LEGACY_STORAGE_KEYS = ['nexus-plus.voice-library.v3', 'nexus-plus.voice-library.v2'];
@@ -72,9 +72,9 @@ async function installVoice(voice: VoiceCatalogItem, onProgress?: (progress: Voi
     const existing = (await getInstalledVoices()).find((item) => item.id === voice.id);
     if (existing) return existing;
   }
-  acquireVoiceDownloadSlot();
-  safeDelete(modelTemp); safeDelete(configTemp);
+  acquireVoiceDownloadSlot(voice.id);
   try {
+    safeDelete(modelTemp); safeDelete(configTemp);
     const modelDownload = await File.createDownloadTask(voice.modelUrl, modelTemp, {}, ({ totalBytesWritten, totalBytesExpectedToWrite }) => onProgress?.({ voiceId: voice.id, stage: 'model', downloadedBytes: totalBytesWritten, totalBytes: totalBytesExpectedToWrite || voice.modelSizeBytes || 0 })).downloadAsync();
     if (!modelDownload?.exists || !validFile(modelDownload, voice.modelSizeBytes)) throw new Error(`Voice model ${voice.name} failed integrity verification.`);
     const configDownload = await File.createDownloadTask(voice.configUrl, configTemp, {}, ({ totalBytesWritten, totalBytesExpectedToWrite }) => onProgress?.({ voiceId: voice.id, stage: 'config', downloadedBytes: totalBytesWritten, totalBytes: totalBytesExpectedToWrite || voice.configSizeBytes || 0 })).downloadAsync();
@@ -86,6 +86,7 @@ async function installVoice(voice: VoiceCatalogItem, onProgress?: (progress: Voi
     await writeInstalled([...current.filter((item) => item.id !== voice.id), installed]);
     return installed;
   } catch (error) { safeDelete(modelTemp); safeDelete(configTemp); throw error instanceof Error ? error : new Error(`Voice ${voice.name} download failed.`); }
+  finally { releaseVoiceDownloadSlot(voice.id); }
 }
 
 export async function downloadVoice(voice: VoiceCatalogItem, onProgress?: (progress: VoiceDownloadProgress) => void): Promise<InstalledVoice> {
