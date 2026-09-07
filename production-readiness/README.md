@@ -12,7 +12,7 @@ The voice download and playback paths are now designed to fail safely:
 - Existing valid voice installs are preserved when a refresh/download attempt fails.
 - Voice-library metadata is versioned and migrated from the previous storage key.
 - A valid voice file pair can repair missing local metadata without forcing a large re-download.
-- Assistant model/voice APIs now use the canonical asset IDs from the catalog instead of hard-coded IDs.
+- Assistant model/voice APIs now use canonical asset IDs from the catalog instead of hard-coded IDs.
 - Assistant asset downloads use temporary files, non-empty-file validation, cleanup, and duplicate-download protection.
 - Piper TTS checks that the selected model/config and synthesized WAV are actually usable before creating an audio player.
 - Piper failure is fail-safe and returns to the caller so system TTS can be used instead.
@@ -24,8 +24,21 @@ The voice download and playback paths are now designed to fail safely:
 - Live Voice Call has a dedicated high-quality conversational voice.
 - Book Reader/long-form narration uses a different dedicated high-quality voice.
 - General short Assistant speech has its own default voice role.
-- All roles resolve to the same canonical Voice Library IDs, so one downloaded model is never duplicated merely because multiple features use it.
+- All roles resolve to canonical Voice Library IDs, so one downloaded model is never duplicated merely because multiple features use it.
 - The Voice Library exposes **Remove** only when both the model and config files are valid; otherwise it exposes **Download**.
+
+## Supabase download-gate integration
+
+The app contains only the client-side orchestration for the Supabase RPC contract; SQL deployment belongs in the Supabase project, not in the Android bundle.
+
+The expected RPC flow is:
+
+1. Before a real voice download begins, the app calls `try_start_download` with the authenticated Supabase user ID, app-token digest, minimal device metadata, and IP when the trusted backend can provide it.
+2. Supabase authoritatively decides whether the global rate window, per-user active-download counter, ban state, and token policy allow the operation.
+3. The app performs the model/config download only after an allowed response.
+4. The app calls `finish_download` from a `finally` path so `profiles.active_downloads` is released even after download failures.
+
+The app also keeps a local burst guard as a fail-safe. It is not a replacement for the shared Supabase limit.
 
 ## Reusable UI direction
 
@@ -44,8 +57,9 @@ Before release, verify at minimum:
 5. App background/foreground during download and playback.
 6. Nexus Assistant Live Voice Call and Reader voice-role separation.
 7. Reminder voice playback when the native Piper backend is unavailable.
-8. Release APK/AAB build with the repository's production workflow.
-9. Device smoke tests on multiple Android API levels and at least one low-memory device.
+8. Supabase RPC allow/deny, counter release, and global rate-window behavior.
+9. Release APK/AAB build with the repository's production workflow.
+10. Device smoke tests on multiple Android API levels and at least one low-memory device.
 
 ## Existing Stage 1 scope
 
