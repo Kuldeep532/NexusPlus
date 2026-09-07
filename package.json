@@ -25,6 +25,7 @@
     "expo-battery": "~10.0.8",
     "expo-speech": "~14.0.8",
     "expo-web-browser": "~15.0.11",
+    "react-native-paper": "^5.14.5",
     "react-native-qrcode-svg": "^6.3.15"
   },
   "devDependencies": {
@@ -88,9 +89,5 @@
     "zod": "catalog:",
     "zod-validation-error": "^3.4.0"
   },
-  "pnpm": {
-    "overrides": {
-      "@react-native/codegen": "0.81.5"
-    }
-  }
+  "pnpm": { "overrides": { "@react-native/codegen": "0.81.5" } }
 }
