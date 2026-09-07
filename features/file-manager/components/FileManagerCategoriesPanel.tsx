@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 const CATEGORY_ICONS = { images: 'image', videos: 'video', audio: 'music', documents: 'file-text', archives: 'archive' } as const;
 
-export function FileManagerCategoriesPanel({ entries, onOpen }: { entries: FileManagerEntry[]; onOpen: (entry: FileManagerEntry) => void }) {
+export function FileManagerCategoriesPanel({ entries = [], onOpen = () => undefined }: { entries?: FileManagerEntry[]; onOpen?: (entry: FileManagerEntry) => void }) {
   const colors = useColors();
   return (
     <View style={styles.root}>
