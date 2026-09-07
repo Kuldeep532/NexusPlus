@@ -1,4 +1,5 @@
 import * as Speech from 'expo-speech';
+import { File } from 'expo-file-system';
 import { createAudioPlayer } from 'expo-audio';
 import { getInstalledVoices, type InstalledVoice } from '@/features/voice-library/voiceStore';
 
@@ -26,7 +27,7 @@ function safeStopPlayer(): void {
 function safeAudioPath(path: unknown): path is string {
   if (typeof path !== 'string' || !path.trim()) return false;
   try {
-    const file = new (require('expo-file-system').File)(path);
+    const file = new File(path);
     return file.exists && file.size > 0;
   } catch {
     return false;
