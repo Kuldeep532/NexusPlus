@@ -3,11 +3,29 @@
   "compilerOptions": {
     "noEmit": true,
     "incremental": false,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "lib": ["dom", "es2022"]
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx"
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "constants/**/*.ts",
+    "features/**/*.ts",
+    "features/**/*.tsx",
+    "hooks/**/*.ts",
+    "hooks/**/*.tsx",
+    "media-player/**/*.ts",
+    "media-player/**/*.tsx",
+    "lib/api-client-react/src/**/*.ts",
+    "lib/api-client-react/src/**/*.tsx",
+    "lib/api-zod/src/**/*.ts",
+    "lib/api-zod/src/**/*.tsx",
+    "scripts/**/*.ts",
+    "scripts/**/*.tsx",
+    "*.ts",
+    "*.tsx"
   ],
   "exclude": [
     "node_modules",
