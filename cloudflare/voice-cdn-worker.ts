@@ -20,9 +20,12 @@ function clientKey(request: Request): string {
 }
 
 function validPath(pathname: string): { voiceId: string; filename: string } | null {
-  const match = pathname.match(/^\/voices\/([^/]+)\/(\1\.onnx|\1\.onnx\.json)$/);
+  const match = pathname.match(/^\/voices\/([^/]+)\/([^/]+)$/);
   if (!match) return null;
-  return { voiceId: decodeURIComponent(match[1]), filename: match[2] };
+  const voiceId = decodeURIComponent(match[1]);
+  const filename = decodeURIComponent(match[2]);
+  if ((filename !== `${voiceId}.onnx` && filename !== `${voiceId}.onnx.json`) || !/^[a-z0-9-]+$/.test(voiceId)) return null;
+  return { voiceId, filename };
 }
 
 export default {
