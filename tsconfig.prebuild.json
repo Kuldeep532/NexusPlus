@@ -22,8 +22,6 @@
     "lib/api-client-react/src/**/*.tsx",
     "lib/api-zod/src/**/*.ts",
     "lib/api-zod/src/**/*.tsx",
-    "scripts/**/*.ts",
-    "scripts/**/*.tsx",
     "*.ts",
     "*.tsx"
   ],
@@ -35,6 +33,8 @@
     "android/app/build",
     "coverage",
     "dist",
-    "build"
+    "build",
+    "lib/api-spec/**/*.ts",
+    "lib/api-spec/**/*.tsx"
   ]
 }
