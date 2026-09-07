@@ -1,3 +1,5 @@
+import { UNIQUE_VOICE_CATALOG } from '../voice-library/voiceCatalog';
+
 export type AssistantModel = {
   id: string;
   title: string;
@@ -21,17 +23,17 @@ export type AssistantVoice = {
   title: string;
   locale: string;
   quality: 'high' | 'medium';
-  url: string;
-  sizeMb: number;
 };
 
-/** Assistant uses the same canonical voice IDs as Voice Library; no duplicate assets are introduced here. */
-export const ASSISTANT_VOICES: AssistantVoice[] = [
-  { id: 'en-us-amy-medium', title: 'Amy Medium · Live Voice Call', locale: 'en-US', quality: 'high', url: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx?download=true', sizeMb: 61 },
-  { id: 'en-in-priyanka-medium', title: 'Priyanka Medium · Reader', locale: 'en-IN', quality: 'high', url: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_IN/priyanka/medium/en_IN-priyanka-medium.onnx?download=true', sizeMb: 61 },
-  { id: 'en-us-lessac-medium', title: 'Lessac Medium · Assistant', locale: 'en-US', quality: 'high', url: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx?download=true', sizeMb: 61 },
-  { id: 'hi-in-priyamvada-medium', title: 'Priyamvada Medium · Hindi Reader', locale: 'hi-IN', quality: 'high', url: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/hi/hi_IN/priyamvada/medium/hi_IN-priyamvada-medium.onnx?download=true', sizeMb: 61 },
-];
+/** Assistant voice metadata is derived from the canonical Voice Library registry. */
+export const ASSISTANT_VOICES: AssistantVoice[] = UNIQUE_VOICE_CATALOG
+  .filter((voice) => voice.roles?.includes('live-call') || voice.roles?.includes('assistant') || voice.roles?.includes('reader'))
+  .map((voice) => ({
+    id: voice.id,
+    title: `${voice.name} · ${voice.roles?.includes('live-call') ? 'Live Voice Call' : voice.roles?.includes('reader') ? 'Reader' : 'Assistant'}`,
+    locale: voice.language,
+    quality: voice.quality,
+  }));
 
 export const ASSISTANT_LIMITS = { maxApkSizeMb: 150, maxBundledModelMb: 0, maxBundledVoiceMb: 0 };
 export const ONNX_MODEL_POLICY = { runtime: 'onnx-runtime', storage: 'app-document-storage', offlineInference: true, deleteable: true } as const;
