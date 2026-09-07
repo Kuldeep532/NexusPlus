@@ -3,6 +3,7 @@ import { File, Directory, Paths } from 'expo-file-system';
 import { VOICE_CATALOG, type VoiceCatalogItem } from './voiceCatalog';
 
 const STORAGE_KEY = 'nexus-plus.voice-library.v3';
+const LEGACY_STORAGE_KEY = 'nexus-plus.voice-library.v2';
 const ROOT = new Directory(Paths.document, 'voice-library');
 const operationLocks = new Map<string, Promise<InstalledVoice>>();
 
@@ -39,7 +40,7 @@ function safeDelete(file: File): void {
   try {
     if (file.exists) file.delete();
   } catch {
-    // Best-effort cleanup only. The original error remains authoritative.
+    // Best-effort cleanup only. Preserve the primary operation error.
   }
 }
 
@@ -49,17 +50,32 @@ function isExpectedSize(file: File, expected?: number): boolean {
   return file.size === expected;
 }
 
+function validInstalledRecord(item: unknown): item is InstalledVoice {
+  if (!item || typeof item !== 'object') return false;
+  const value = item as Partial<InstalledVoice>;
+  return typeof value.id === 'string'
+    && typeof value.modelPath === 'string'
+    && typeof value.configPath === 'string'
+    && typeof value.installedAt === 'number';
+}
+
 async function readInstalled(): Promise<InstalledVoice[]> {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is InstalledVoice =>
-      !!item && typeof item === 'object' && typeof (item as InstalledVoice).id === 'string'
-      && typeof (item as InstalledVoice).modelPath === 'string'
-      && typeof (item as InstalledVoice).configPath === 'string',
-    );
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.filter(validInstalledRecord);
+    }
+
+    // Migrate the previous metadata key so app updates do not make valid
+    // downloaded voices disappear from the library.
+    const legacyRaw = await AsyncStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!legacyRaw) return [];
+    const legacyParsed: unknown = JSON.parse(legacyRaw);
+    if (!Array.isArray(legacyParsed)) return [];
+    const legacy = legacyParsed.filter(validInstalledRecord);
+    if (legacy.length) await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(legacy));
+    return legacy;
   } catch {
     return [];
   }
@@ -88,10 +104,21 @@ async function installVoice(voice: VoiceCatalogItem, onProgress?: (progress: Voi
   const modelTemp = tempModelFile(voice);
   const configTemp = tempConfigFile(voice);
 
-  // Never trust a stale/partial final file. A complete pair is required.
   if (await isVoiceInstalled(voice.id)) {
-    const existing = (await readInstalled()).find((item) => item.id === voice.id);
+    const current = await readInstalled();
+    const existing = current.find((item) => item.id === voice.id);
     if (existing) return existing;
+
+    // Repair metadata from an older/broken app-state write without forcing a
+    // multi-hundred-megabyte re-download when both files are valid.
+    const repaired: InstalledVoice = {
+      ...voice,
+      installedAt: Date.now(),
+      modelPath: model.uri,
+      configPath: config.uri,
+    };
+    await writeInstalled([...current.filter((item) => item.id !== voice.id), repaired]);
+    return repaired;
   }
 
   safeDelete(modelTemp);
@@ -124,7 +151,8 @@ async function installVoice(voice: VoiceCatalogItem, onProgress?: (progress: Voi
       throw new Error(`Voice configuration for ${voice.name} failed integrity verification.`);
     }
 
-    // Publish only after both downloads are verified, so runtime never sees a half-installed pair.
+    // Publish only after both parts are verified, so runtime never sees a
+    // partially installed voice pair.
     safeDelete(model);
     safeDelete(config);
     modelTemp.move(model);
@@ -154,7 +182,6 @@ async function installVoice(voice: VoiceCatalogItem, onProgress?: (progress: Voi
   } catch (error) {
     safeDelete(modelTemp);
     safeDelete(configTemp);
-    // Never leave stale metadata pointing at broken files.
     const current = await readInstalled();
     const retained = current.filter((item) => item.id !== voice.id);
     if (retained.length !== current.length) {
@@ -181,10 +208,17 @@ export async function downloadVoice(
 export async function removeVoice(voiceId: string): Promise<void> {
   const voice = VOICE_CATALOG.find((item) => item.id === voiceId);
   if (!voice) return;
-  safeDelete(modelFile(voice));
-  safeDelete(configFile(voice));
+
+  const active = operationLocks.get(voiceId);
+  if (active) await active.catch(() => undefined);
+
+  const model = modelFile(voice);
+  const config = configFile(voice);
+  safeDelete(model);
+  safeDelete(config);
   safeDelete(tempModelFile(voice));
   safeDelete(tempConfigFile(voice));
+
   const current = await readInstalled();
   await writeInstalled(current.filter((item) => item.id !== voiceId));
 }
