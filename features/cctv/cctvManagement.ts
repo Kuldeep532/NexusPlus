@@ -1,11 +1,9 @@
 import type { CctvCamera, CctvCapabilities, CctvDeviceKind, CctvAuthenticationProfile } from './cctvTypes';
 import { listCctvCameraRecords, upsertCctvCamera } from './cctvRepository';
-import { deriveStableCameraId, cctvCredentialStore, sanitizeNetworkField } from './cctvBackend';
+import { deriveStableCameraId, cctvCredentialStore } from './cctvBackend';
 import { detectAuthenticationProfile } from './cctvAuthProfile';
-import { rebuildManagedDevices, type CctvManagedDevice } from './cctvDeviceRegistry';
 
 export interface CctvManagementState {
-  devices: CctvManagedDevice[];
   cameras: CctvCamera[];
 }
 
@@ -29,8 +27,7 @@ export async function getCctvManagementState(): Promise<CctvManagementState> {
       protocol: camera.protocol,
     }),
   }));
-  const devices = await rebuildManagedDevices(cameras);
-  return { cameras, devices };
+  return { cameras };
 }
 
 export async function saveManagedCamera(input: {
@@ -74,6 +71,5 @@ export async function saveManagedCamera(input: {
   };
   await upsertCctvCamera(camera);
   await cctvCredentialStore.save(camera.id, camera.username, input.password);
-  await rebuildManagedDevices([...(await listCctvCameraRecords()), camera]);
   return camera;
 }
