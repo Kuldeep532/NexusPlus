@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import type { CctvCamera } from './cctvTypes';
 import { addCctvCamera, getCctvCameras, removeCctvCameraSecurely } from './cctvController';
 import type { CctvDetectionInput } from './cctvService';
+import type { CctvCameraRecord } from './cctvBackend';
 
 export function useCctvCameras() {
-  const [cameras, setCameras] = useState<CctvCamera[]>([]);
+  const [cameras, setCameras] = useState<CctvCameraRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {

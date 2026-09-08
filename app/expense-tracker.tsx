@@ -38,7 +38,7 @@ export default function ExpenseTrackerScreen() {
           <View style={[styles.lockCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Unlock to view your expenses</Text>
             <Text style={[styles.body, { color: colors.mutedForeground }]}>Expense amounts, merchant details, notes, and synced financial data stay behind the biometric gate.</Text>
-            <Pressable accessibilityRole="button" accessibilityLabel="Unlock Expense Tracker with biometric" onPress={() => void expense.unlock().then((ok) => { if (!ok && expense.error) Alert.alert('Expense Tracker', expense.error); })} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Feather name="fingerprint" size={17} color={colors.primaryForeground} /><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Unlock with biometric</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Unlock Expense Tracker with biometric" onPress={() => void expense.unlock().then((ok) => { if (!ok && expense.error) Alert.alert('Expense Tracker', expense.error); })} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><MaterialCommunityIcons name="fingerprint" size={17} color={colors.primaryForeground} /><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Unlock with biometric</Text></Pressable>
           </View>
         ) : (
           <>

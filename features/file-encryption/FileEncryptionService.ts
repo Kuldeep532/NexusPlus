@@ -20,7 +20,9 @@ export function getNativeFileEncryptionBridge(): NativeFileEncryptionBridge {
 export async function createEncryptedOutputUri(originalName: string): Promise<string> {
   const safeName = originalName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 128);
   const id = Crypto.randomUUID();
-  return `${FileSystem.cacheDirectory}nexus-${id}-${safeName}.nexusenc`;
+  const base = FileSystem.cacheDirectory;
+  if (!base) throw new Error('App cache storage is unavailable.');
+  return `${base}nexus-${id}-${safeName}.nexusenc`;
 }
 
 export const FILE_ENCRYPTION_FORMAT = { magic: MAGIC, version: VERSION, algorithm: 'AES-256-GCM' as const, kdf: 'PBKDF2-SHA256' as const, iterations: PBKDF2_ITERATIONS };

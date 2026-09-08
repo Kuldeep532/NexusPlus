@@ -40,11 +40,15 @@ for (const file of sourceFiles) {
   if (!run(`Syntax: ${relative(root, file)}`, process.execPath, ['--check', file])) failed = true;
 }
 
-if (!run(
-  'TypeScript/TSX: application source typecheck',
+// Always run the complete TypeScript application-source scan exactly once.
+// --noErrorTruncation keeps every compiler diagnostic visible so a first
+// failure cannot hide later independent errors behind a one-at-a-time loop.
+const typecheckPassed = run(
+  'TypeScript/TSX: complete application source typecheck',
   'pnpm',
   ['exec', 'tsc', '-p', 'tsconfig.prebuild.json', '--noEmit', '--pretty', 'false', '--noErrorTruncation'],
-)) failed = true;
+);
+if (!typecheckPassed) failed = true;
 
 if (failed) {
   console.error('\nPrebuild source scan failed. EAS/Gradle build must not start.');

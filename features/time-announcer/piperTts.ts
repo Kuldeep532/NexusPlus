@@ -18,7 +18,8 @@ export async function ensurePiperVoice(language: string): Promise<File | null> {
   if (!model) return null;
   if (isOfflineVoiceInstalled(model)) return new File(MODEL_DIRECTORY, model.modelFileName);
   try {
-    return await downloadOfflineVoiceModel(model);
+    const downloadedPath = await downloadOfflineVoiceModel(model);
+    return new File(downloadedPath);
   } catch {
     return null;
   }

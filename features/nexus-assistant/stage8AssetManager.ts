@@ -62,8 +62,8 @@ async function performDownload(id: string): Promise<string> {
   safeDelete(temp);
 
   try {
-    const downloaded = await File.downloadFileAsync(asset.downloadUrl, temp, { idempotent: true });
-    if (!downloaded || !isUsableFile(asset, downloaded)) {
+    await File.downloadFileAsync(asset.downloadUrl, temp, { idempotent: true });
+    if (!isUsableFile(asset, temp)) {
       throw new Error(`ASSET_DOWNLOAD_INVALID:${id}`);
     }
 

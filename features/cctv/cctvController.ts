@@ -2,6 +2,7 @@ import { detectCctvCamera, type CctvDetectionInput } from './cctvService';
 import { cctvCredentialStore } from './cctvBackend';
 import { removeCctvCamera, listCctvCameraRecords, upsertCctvCamera } from './cctvRepository';
 import type { CctvCamera } from './cctvTypes';
+import type { CctvCameraRecord } from './cctvBackend';
 
 export async function addCctvCamera(input: CctvDetectionInput): Promise<CctvCamera> {
   const camera = await detectCctvCamera(input);
@@ -15,6 +16,6 @@ export async function removeCctvCameraSecurely(cameraId: string): Promise<void> 
   await removeCctvCamera(cameraId);
 }
 
-export async function getCctvCameras(): Promise<CctvCamera[]> {
+export async function getCctvCameras(): Promise<CctvCameraRecord[]> {
   return listCctvCameraRecords();
 }

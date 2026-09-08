@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { clearPaymentAnnouncerUiSession, isPaymentAnnouncerUiAuthenticated, requirePaymentAnnouncerUiAuthentication } from '../paymentAnnouncerAccess';
 
@@ -41,7 +41,7 @@ export function PaymentAnnouncerProtected({ children }: { children: React.ReactN
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Payment Announcer locked</Text>
           <Text style={[styles.body, { color: colors.mutedForeground }]}>Biometric authentication is required to view payments, analytics, business information, rules, voice configuration, security, or settings.</Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Unlock Payment Announcer protected area" onPress={() => void authenticate()} style={[styles.button, { backgroundColor: colors.primary }]}> 
-            <Feather name="fingerprint" size={17} color={colors.primaryForeground} />
+            <MaterialCommunityIcons name="fingerprint" size={17} color={colors.primaryForeground} />
             <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Unlock with biometric</Text>
           </Pressable>
         </View>

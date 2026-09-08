@@ -16,7 +16,7 @@ const tools: Tool[] = [
   { key: 'clock', title: 'World Clock', subtitle: 'Track time across cities and time zones', icon: 'earth', route: '/time-assisted/world-clock' },
   { key: 'announce', title: 'Time Announcement', subtitle: 'Announce the current time with your selected voice', icon: 'bullhorn-outline', route: '/time-assisted/time-announcement' },
   { key: 'interval', title: 'Interval Time Announcement', subtitle: 'Announce time automatically at your chosen interval', icon: 'timer-outline', route: '/time-assisted/interval-announcement' },
-  { key: 'stopwatch', title: 'Stopwatch', subtitle: 'Precise stopwatch with laps and spoken state feedback', icon: 'stopwatch-outline', route: '/time-assisted/stopwatch' },
+  { key: 'stopwatch', title: 'Stopwatch', subtitle: 'Precise stopwatch with laps and spoken state feedback', icon: 'timer-outline', route: '/time-assisted/stopwatch' },
   { key: 'alarm', title: 'Alarms', subtitle: 'Quick time-based reminders with accessible controls', icon: 'alarm', route: '/time-assisted/alarms' },
   { key: 'difference', title: 'Time Difference', subtitle: 'Compare two times and get the exact duration', icon: 'swap-horizontal-bold', route: '/time-assisted/time-difference' },
 ];
