@@ -16,48 +16,37 @@ export interface AutoDiscoveredCctv {
   };
 }
 
-const DEFAULT_CAPABILITIES: CctvCapabilities = {
-  liveView: true,
-  audio: false,
-  recordings: false,
-  playback: false,
-  eraseData: false,
-  passwordChange: false,
-  discovery: true,
-  multiCamera: false,
-  switchCamera: false,
-  flip: false,
-  panTiltZoom: false,
-  nightVision: false,
-  talk: false,
-};
-
 /**
- * Normalizes information learned from a standards-compliant discovery adapter.
- * This layer deliberately contains no manufacturer/model database.
+ * Background discovery is correlation-only. A LAN result is never enough to
+ * create a managed camera. The result must already be securely correlated by
+ * the authorized QR/intent flow.
  */
 export function normalizeDiscoveredCctv(input: Partial<AutoDiscoveredCctv>): AutoDiscoveredCctv | null {
   if (input.protocol !== 'onvif' && input.protocol !== 'rtsp' && input.protocol !== 'http') return null;
   const host = input.host?.trim() || undefined;
   const port = input.port && Number.isInteger(input.port) && input.port > 0 && input.port < 65536 ? input.port : undefined;
-  const capabilities = { ...DEFAULT_CAPABILITIES, ...(input.capabilities ?? {}) };
+  const capabilities = input.capabilities;
   const security = input.security ?? { verified: false, transport: 'unknown', authentication: 'unknown' };
   if (!security.verified) return null;
   if (security.transport !== 'tls' && security.transport !== 'local') return null;
   if (security.authentication !== 'digest' && security.authentication !== 'token' && security.authentication !== 'password') return null;
-  return {
-    manufacturer: input.manufacturer?.trim() || undefined,
-    model: input.model?.trim() || undefined,
-    serialNumber: input.serialNumber?.trim() || undefined,
-    protocol: input.protocol,
-    deviceKind: input.deviceKind,
-    host,
-    port,
-    capabilities,
-    security,
-  };
+  if (!capabilities?.liveView) return null;
+  return { manufacturer: input.manufacturer?.trim() || undefined, model: input.model?.trim() || undefined, serialNumber: input.serialNumber?.trim() || undefined, protocol: input.protocol, deviceKind: input.deviceKind, host, port, capabilities, security };
 }
 
 export function isSecureAutoDiscoveryResult(device: AutoDiscoveredCctv): boolean {
-  return device.security.verified && (device.security.transport === 'tls' || device.security.transport === 'local') && device.security.authentication !== 'unknown';
+  return device.security.verified
+    && (device.security.transport === 'tls' || device.security.transport === 'local')
+    && device.security.authentication !== 'unknown'
+    && device.capabilities.liveView;
+}
+
+export function isAuthorizedDiscoveryMatch(device: AutoDiscoveredCctv, authorization: { manufacturer?: string; model?: string; serialNumber?: string }): boolean {
+  if (!isSecureAutoDiscoveryResult(device)) return false;
+  if (authorization.serialNumber && device.serialNumber) return authorization.serialNumber.trim().toLowerCase() === device.serialNumber.trim().toLowerCase();
+  if (authorization.manufacturer && device.manufacturer && authorization.model && device.model) {
+    return authorization.manufacturer.trim().toLowerCase() === device.manufacturer.trim().toLowerCase()
+      && authorization.model.trim().toLowerCase() === device.model.trim().toLowerCase();
+  }
+  return false;
 }
