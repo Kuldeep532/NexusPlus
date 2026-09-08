@@ -1,9 +1,13 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useState } from 'react';
+import { Audio } from 'expo-av';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+
+// The uploaded scanner beep is intended only for QR scanning success, never generation.
+const SCAN_BEEP_SOURCE = require('../../assets/audio/qr/qr-scan-beep.mp3');
 
 type ScanState = 'idle' | 'scanning' | 'result';
 
@@ -22,14 +26,52 @@ export default function QRScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [state, setState] = useState<ScanState>('idle');
   const [payload, setPayload] = useState('');
+  const [guidance, setGuidance] = useState('Hold to scan. Move left or right to center the QR code.');
+  const beepRef = useRef<Audio.Sound | null>(null);
+  const announcedRef = useRef(false);
+  const lastPayloadRef = useRef('');
+
+  useEffect(() => {
+    let mounted = true;
+    Audio.Sound.createAsync(SCAN_BEEP_SOURCE, { shouldPlay: false }).then(({ sound }) => {
+      if (mounted) beepRef.current = sound;
+      else void sound.unloadAsync();
+    }).catch(() => undefined);
+    return () => {
+      mounted = false;
+      void beepRef.current?.unloadAsync();
+      beepRef.current = null;
+    };
+  }, []);
+
+  const announce = (message: string) => {
+    setGuidance(message);
+    // Native accessibility services receive this from the live accessibility label/state.
+  };
 
   const startScanning = async () => {
     if (!permission?.granted) {
       const next = await requestPermission();
-      if (!next.granted) return;
+      if (!next.granted) {
+        announce('Camera permission is required.');
+        return;
+      }
     }
     setPayload('');
+    announcedRef.current = false;
+    lastPayloadRef.current = '';
+    announce('Hold to scan. Move left or right to center the QR code.');
     setState('scanning');
+  };
+
+  const handleScanned = async (data: string) => {
+    if (!data || announcedRef.current || lastPayloadRef.current === data) return;
+    announcedRef.current = true;
+    lastPayloadRef.current = data;
+    setPayload(data);
+    await beepRef.current?.replayAsync().catch(() => undefined);
+    announce('QR code scan successful.');
+    setState('result');
   };
 
   return (
@@ -44,28 +86,25 @@ export default function QRScannerScreen() {
 
       {state === 'scanning' ? (
         <View style={[styles.scannerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.scannerWrap}>
+          <Text accessibilityRole="text" accessibilityLiveRegion="polite" style={[styles.guidance, { color: colors.foreground }]}>{guidance}</Text>
+          <View style={styles.scannerWrap} accessibilityLabel="QR scanner. Hold steady. Move right, move left, or move closer until the QR code is centered.">
             <CameraView
-              accessibilityLabel="QR code scanner camera"
               style={styles.scanner}
               facing="back"
               barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-              onBarcodeScanned={({ data }) => {
-                setPayload(data);
-                setState('result');
-              }}
+              onBarcodeScanned={({ data }) => { void handleScanned(data); }}
             />
             <View pointerEvents="none" style={styles.scanFrame} />
           </View>
-          <Pressable accessibilityRole="button" onPress={() => setState('idle')} style={[styles.secondaryButton, { borderColor: colors.border }]}>
+          <Text accessibilityRole="text" style={[styles.helper, { color: colors.mutedForeground }]}>Hold steady. Move right or left to center the code inside the frame.</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Stop scanning" onPress={() => { setState('idle'); announce('Scanning stopped.'); }} style={[styles.secondaryButton, { borderColor: colors.border }]}>
             <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>Stop scanning</Text>
           </Pressable>
         </View>
       ) : state === 'result' ? (
         <View style={[styles.resultCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.resultIcon}>
-            <MaterialCommunityIcons name="check-circle" size={32} color={colors.primary} />
-          </View>
+          <View style={styles.resultIcon}><MaterialCommunityIcons name="check-circle" size={32} color={colors.primary} /></View>
+          <Text accessibilityRole="text" accessibilityLiveRegion="polite" style={[styles.success, { color: colors.foreground }]}>QR code scan successful.</Text>
           <Text style={[styles.resultType, { color: colors.foreground }]}>{classifyPayload(payload)}</Text>
           <Text selectable style={[styles.payload, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border }]}>{payload}</Text>
           <Pressable accessibilityRole="button" onPress={startScanning} style={[styles.primaryButton, { backgroundColor: colors.primary }]}>
@@ -78,7 +117,7 @@ export default function QRScannerScreen() {
           <MaterialCommunityIcons name="camera-outline" size={58} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Ready to scan</Text>
           <Text style={[styles.cardText, { color: colors.mutedForeground }]}>Point the rear camera at a QR code. The scanner supports standard QR payloads, including Text, URLs, WhatsApp, Wi‑Fi and UPI.</Text>
-          <Pressable accessibilityRole="button" onPress={startScanning} style={[styles.primaryButton, { backgroundColor: colors.primary }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Start QR scanner" onPress={startScanning} style={[styles.primaryButton, { backgroundColor: colors.primary }]}>
             <MaterialCommunityIcons name="camera" size={18} color={colors.primaryForeground} />
             <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_700Bold' }}>Start scanner</Text>
           </Pressable>
@@ -89,22 +128,5 @@ export default function QRScannerScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  header: { paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 },
-  copy: { flex: 1 },
-  title: { fontSize: 27, fontFamily: 'Inter_700Bold' },
-  subtitle: { marginTop: 3, fontSize: 12, lineHeight: 18 },
-  startCard: { marginHorizontal: 20, minHeight: 330, borderWidth: 1, borderRadius: 20, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
-  cardTitle: { fontSize: 18, fontFamily: 'Inter_700Bold' },
-  cardText: { textAlign: 'center', fontSize: 12, lineHeight: 19, maxWidth: 320 },
-  primaryButton: { minHeight: 48, paddingHorizontal: 18, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginTop: 8 },
-  secondaryButton: { minHeight: 46, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, marginTop: 14 },
-  scannerCard: { marginHorizontal: 20, borderWidth: 1, borderRadius: 20, padding: 14 },
-  scannerWrap: { width: '100%', aspectRatio: 1, overflow: 'hidden', borderRadius: 16, position: 'relative' },
-  scanner: { flex: 1 },
-  scanFrame: { position: 'absolute', width: '66%', height: '66%', left: '17%', top: '17%', borderWidth: 3, borderColor: '#FFFFFF', borderRadius: 20 },
-  resultCard: { marginHorizontal: 20, borderWidth: 1, borderRadius: 20, padding: 22, alignItems: 'center', gap: 10 },
-  resultIcon: { marginBottom: 2 },
-  resultType: { fontSize: 18, fontFamily: 'Inter_700Bold' },
-  payload: { width: '100%', minHeight: 100, borderWidth: 1, borderRadius: 14, padding: 12, fontSize: 12, lineHeight: 18, textAlign: 'left', textAlignVertical: 'top' },
+  screen: { flex: 1 }, header: { paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 }, copy: { flex: 1 }, title: { fontSize: 27, fontFamily: 'Inter_700Bold' }, subtitle: { marginTop: 3, fontSize: 12, lineHeight: 18 }, guidance: { fontSize: 14, fontFamily: 'Inter_700Bold', textAlign: 'center', marginBottom: 10 }, helper: { fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 10 }, startCard: { marginHorizontal: 20, minHeight: 330, borderWidth: 1, borderRadius: 20, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }, cardTitle: { fontSize: 18, fontFamily: 'Inter_700Bold' }, cardText: { textAlign: 'center', fontSize: 12, lineHeight: 19, maxWidth: 320 }, primaryButton: { minHeight: 48, paddingHorizontal: 18, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginTop: 8 }, secondaryButton: { minHeight: 46, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, marginTop: 14 }, scannerCard: { marginHorizontal: 20, borderWidth: 1, borderRadius: 20, padding: 14 }, scannerWrap: { width: '100%', aspectRatio: 1, overflow: 'hidden', borderRadius: 16, position: 'relative' }, scanner: { flex: 1 }, scanFrame: { position: 'absolute', width: '66%', height: '66%', left: '17%', top: '17%', borderWidth: 3, borderColor: '#FFFFFF', borderRadius: 20 }, resultCard: { marginHorizontal: 20, borderWidth: 1, borderRadius: 20, padding: 22, alignItems: 'center', gap: 10 }, resultIcon: { marginBottom: 2 }, success: { fontSize: 14, fontFamily: 'Inter_700Bold', textAlign: 'center' }, resultType: { fontSize: 18, fontFamily: 'Inter_700Bold' }, payload: { width: '100%', minHeight: 100, borderWidth: 1, borderRadius: 14, padding: 12, fontSize: 12, lineHeight: 18, textAlign: 'left', textAlignVertical: 'top' },
 });
