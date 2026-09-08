@@ -41,10 +41,10 @@ for (const file of sourceFiles) {
 }
 
 // Run the complete TypeScript application-source scan exactly once.
-// The compiler is configured to emit the full diagnostic set instead of
-// stopping at the first reported problem. Keep the output untruncated.
+// Always disable incremental state so a stale .tsbuildinfo cannot affect diagnostics.
+// Keep all diagnostics untruncated; the command must report the full error set.
 const typecheckPassed = run(
-  'TypeScript/TSX: complete application source typecheck',
+  'TypeScript/TSX: complete application source typecheck (clean)',
   'pnpm',
   [
     'exec',
@@ -57,6 +57,7 @@ const typecheckPassed = run(
     '--noErrorTruncation',
     '--incremental',
     'false',
+    '--skipLibCheck',
   ],
 );
 if (!typecheckPassed) failed = true;
