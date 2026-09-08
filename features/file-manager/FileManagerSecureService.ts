@@ -8,7 +8,9 @@ export function isSecureFile(entryName: string): boolean {
 
 export async function createSecureOutputUri(name: string): Promise<string> {
   const safe = name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 128);
-  return `${FileSystem.cacheDirectory}nexus-${Crypto.randomUUID()}-${safe}.nexusenc`;
+  const base = FileSystem.cacheDirectory;
+  if (!base) throw new Error('App cache storage is unavailable.');
+  return `${base}nexus-${Crypto.randomUUID()}-${safe}.nexusenc`;
 }
 
 export async function encryptFile(inputUri: string, originalName: string, password: string): Promise<string> {
@@ -21,7 +23,9 @@ export async function encryptFile(inputUri: string, originalName: string, passwo
 export async function decryptFile(inputUri: string, originalName: string, password: string): Promise<string> {
   if (password.length < 8) throw new Error('Use a password of at least 8 characters.');
   if (!FileEncryptionNative.isAvailable()) throw new Error('Native encryption is unavailable in this build.');
+  const base = FileSystem.cacheDirectory;
+  if (!base) throw new Error('App cache storage is unavailable.');
   const safe = originalName.replace(/\.nexusenc$/i, '').replace(/[^a-zA-Z0-9._-]/g, '_');
-  const outputUri = `${FileSystem.cacheDirectory}unlocked-${safe}`;
+  const outputUri = `${base}unlocked-${safe}`;
   return FileEncryptionNative.unlockFile(inputUri, outputUri, password);
 }
