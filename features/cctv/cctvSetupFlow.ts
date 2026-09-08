@@ -23,10 +23,12 @@ export function selectCctvSetupMethod(draft: CctvSetupDraft, method: CctvSetupMe
 
 export function completeCctvIdentification(draft: CctvSetupDraft, input: { qrPayload?: string; serialNumber?: string }): CctvSetupDraft {
   const method = draft.method;
-  if (method === 'qr' && !input.qrPayload?.trim()) throw new Error('QR identification data is required.');
-  if (method === 'serial' && !input.serialNumber?.trim()) throw new Error('Serial number is required.');
-  if ((method === 'manual') && !input.serialNumber?.trim()) throw new Error('Manual setup requires a serial number or device identity.');
-  return { ...draft, qrPayload: input.qrPayload?.trim() || undefined, serialNumber: input.serialNumber?.trim() || undefined, step: 'credentials' };
+  const qrPayload = input.qrPayload?.trim();
+  const serialNumber = input.serialNumber?.trim();
+  if (method === 'qr' && !qrPayload && !serialNumber) throw new Error('Scan or upload the CCTV QR code, or enter the serial number.');
+  if (method === 'serial' && !serialNumber) throw new Error('Serial number is required.');
+  if (method === 'manual' && !serialNumber) throw new Error('Manual setup requires a serial number.');
+  return { ...draft, qrPayload: qrPayload || undefined, serialNumber: serialNumber || undefined, step: 'credentials' };
 }
 
 export function completeCctvCredentials(draft: CctvSetupDraft, input: { name: string; username: string }): CctvSetupDraft {
