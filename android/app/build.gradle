@@ -9,13 +9,10 @@ def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 def reactNativeDirPath = ["node", "--print", "require('path').dirname(require.resolve('react-native/package.json'))"].execute(null, rootDir).text.trim()
 def expoCliPath = ["node", "--print", "require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })"].execute(null, rootDir).text.trim()
 
-def expoRouterEntry = ["node", "--print", "require.resolve('expo-router/entry')"].execute(null, rootDir).text.trim()
-
 react {
     root = file(projectRoot)
     reactNativeDir = file(reactNativeDirPath)
     cliFile = file(expoCliPath)
-    entryFile = file(expoRouterEntry)
     autolinkLibrariesWithApp()
 }
 
