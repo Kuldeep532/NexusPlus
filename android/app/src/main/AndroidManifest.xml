@@ -11,6 +11,7 @@
         android:usesCleartextTraffic="false"
         android:label="Nexus Plus"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="false"
         android:theme="@style/Theme.NexusPlus">
         <activity
             android:name=".AlarmRingActivity"
@@ -35,13 +36,6 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
         <service
-            android:name=".NexusContentFilterVpnService"
-            android:enabled="true"
-            android:exported="false"
-            android:permission="android.permission.BIND_VPN_SERVICE">
-            <intent-filter><action android:name="android.net.VpnService" /></intent-filter>
-        </service>
-        <service
             android:name=".NexusSafetyAccessibilityService"
             android:enabled="true"
             android:exported="false"
@@ -49,20 +43,6 @@
             <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
             <meta-data android:name="android.accessibilityservice" android:resource="@xml/nexus_safety_accessibility" />
         </service>
-        <activity android:name=".NexusSafeDeviceGateActivity" android:exported="false" android:label="Nexus Safe Device Setup" />
-        <activity
-            android:name=".NexusLauncherActivity"
-            android:exported="true"
-            android:label="Nexus Launcher"
-            android:launchMode="singleTask">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.HOME" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </activity>
-        <activity android:name=".NexusLauncherSettingsActivity" android:exported="false" android:label="Nexus Launcher Settings" />
-        <activity android:name=".NexusLauncherMentorActivity" android:exported="false" android:label="Nexus Habit &amp; Focus Mentor" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
