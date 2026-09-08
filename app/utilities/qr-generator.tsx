@@ -1,6 +1,8 @@
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { Alert, BackHandler, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import QRCode from 'react-native-qrcode-svg';
@@ -9,186 +11,85 @@ import { useColors } from '@/hooks/useColors';
 
 type Tab = 'text' | 'url' | 'wifi' | 'upi' | 'whatsapp';
 type WifiSecurity = 'WPA' | 'WPA2' | 'WPA3' | 'WPA3-Enterprise';
+type UpiMode = 'personal' | 'business';
 type QRTheme = { foreground: string; background: string };
 
+const BUSINESS_CATEGORIES = ['Groceries', 'Restaurant & Food', 'Cafe & Bakery', 'Retail', 'Clothing & Fashion', 'Electronics', 'Pharmacy', 'Medical', 'Education', 'Travel', 'Hotel & Stay', 'Salon & Beauty', 'Fitness & Gym', 'Home Services', 'Automotive', 'Fuel', 'Utilities', 'Professional Services', 'Freelance Services', 'Online Store', 'Donations', 'Other'];
 const COLOR_PALETTE: Array<{ name: string; value: string }> = [
-  ['Black', '#000000'], ['White', '#FFFFFF'], ['Navy Blue', '#0B1F3A'], ['Dark Blue', '#123C73'], ['Blue', '#2563EB'],
-  ['Sky Blue', '#0EA5E9'], ['Teal', '#0F766E'], ['Green', '#16A34A'], ['Dark Green', '#14532D'], ['Lime', '#65A30D'],
-  ['Yellow', '#EAB308'], ['Orange', '#F97316'], ['Red', '#DC2626'], ['Maroon', '#7F1D1D'], ['Pink', '#DB2777'],
-  ['Rose', '#E11D48'], ['Purple', '#7C3AED'], ['Deep Purple', '#4C1D95'], ['Violet', '#8B5CF6'], ['Indigo', '#4338CA'],
-  ['Brown', '#92400E'], ['Slate', '#334155'], ['Gray', '#6B7280'], ['Silver', '#9CA3AF'], ['Cream', '#FFF7ED'],
+  ['Black', '#000000'], ['White', '#FFFFFF'], ['Navy Blue', '#0B1F3A'], ['Dark Blue', '#123C73'], ['Blue', '#2563EB'], ['Sky Blue', '#0EA5E9'], ['Teal', '#0F766E'], ['Green', '#16A34A'], ['Dark Green', '#14532D'], ['Lime', '#65A30D'], ['Yellow', '#EAB308'], ['Orange', '#F97316'], ['Red', '#DC2626'], ['Maroon', '#7F1D1D'], ['Pink', '#DB2777'], ['Rose', '#E11D48'], ['Purple', '#7C3AED'], ['Deep Purple', '#4C1D95'], ['Violet', '#8B5CF6'], ['Indigo', '#4338CA'], ['Brown', '#92400E'], ['Slate', '#334155'], ['Gray', '#6B7280'], ['Silver', '#9CA3AF'], ['Cream', '#FFF7ED'],
 ].map(([name, value]) => ({ name, value }));
-
 const tabs: Array<{ key: Tab; label: string; icon: string }> = [
-  { key: 'text', label: 'Text', icon: 'text' }, { key: 'url', label: 'URL', icon: 'link-variant' },
-  { key: 'whatsapp', label: 'WhatsApp', icon: 'whatsapp' }, { key: 'wifi', label: 'Wi‑Fi', icon: 'wifi' },
-  { key: 'upi', label: 'UPI', icon: 'currency-inr' },
+  { key: 'text', label: 'Text', icon: 'text' }, { key: 'url', label: 'URL', icon: 'link-variant' }, { key: 'whatsapp', label: 'WhatsApp', icon: 'whatsapp' }, { key: 'wifi', label: 'Wi‑Fi', icon: 'wifi' }, { key: 'upi', label: 'UPI', icon: 'currency-inr' },
 ];
-
 const escapeWifi = (value: string) => value.replace(/([\\;,\":])/g, '\\$1');
+const BUSINESS_MODE_KEY = '@nexus-plus/qr-upi-business-mode';
 
 export default function QRGeneratorScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const qrRef = useRef<QRCode>(null);
   const [tab, setTab] = useState<Tab>('text');
-  const [text, setText] = useState('');
-  const [ssid, setSsid] = useState('');
-  const [password, setPassword] = useState('');
-  const [security, setSecurity] = useState<WifiSecurity>('WPA2');
-  const [hidden, setHidden] = useState(false);
-  const [enterpriseIdentity, setEnterpriseIdentity] = useState('');
-  const [upiId, setUpiId] = useState('');
-  const [upiName, setUpiName] = useState('');
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
-  const [whatsappNumber, setWhatsappNumber] = useState('');
-  const [whatsappMessage, setWhatsappMessage] = useState('');
-  const [qrTheme, setQrTheme] = useState<QRTheme>({ foreground: '#000000', background: '#FFFFFF' });
-  const [size, setSize] = useState(240);
-  const [quietZone, setQuietZone] = useState(12);
-  const [generated, setGenerated] = useState(false);
-  const [generatedValue, setGeneratedValue] = useState('');
-  const [generatedTheme, setGeneratedTheme] = useState<QRTheme>({ foreground: '#000000', background: '#FFFFFF' });
-  const [generatedSize, setGeneratedSize] = useState(240);
-  const [generatedQuietZone, setGeneratedQuietZone] = useState(12);
+  const [text, setText] = useState(''); const [ssid, setSsid] = useState(''); const [password, setPassword] = useState(''); const [security, setSecurity] = useState<WifiSecurity>('WPA2'); const [hidden, setHidden] = useState(false); const [enterpriseIdentity, setEnterpriseIdentity] = useState('');
+  const [upiId, setUpiId] = useState(''); const [upiName, setUpiName] = useState(''); const [amount, setAmount] = useState(''); const [description, setDescription] = useState(''); const [businessMode, setBusinessMode] = useState(false); const [businessCategory, setBusinessCategory] = useState('Groceries');
+  const [whatsappNumber, setWhatsappNumber] = useState(''); const [whatsappMessage, setWhatsappMessage] = useState('');
+  const [qrTheme, setQrTheme] = useState<QRTheme>({ foreground: '#000000', background: '#FFFFFF' }); const [size, setSize] = useState(240); const [quietZone, setQuietZone] = useState(12);
+  const [generated, setGenerated] = useState(false); const [generatedValue, setGeneratedValue] = useState(''); const [generatedTheme, setGeneratedTheme] = useState<QRTheme>({ foreground: '#000000', background: '#FFFFFF' }); const [generatedSize, setGeneratedSize] = useState(240); const [generatedQuietZone, setGeneratedQuietZone] = useState(12);
+
+  useFocusEffect(useCallback(() => { AsyncStorage.getItem(BUSINESS_MODE_KEY).then((stored) => { if (stored === 'true') setBusinessMode(true); }).catch(() => undefined); return undefined; }, []));
 
   const value = useMemo(() => {
     if (tab === 'text' || tab === 'url') return text.trim();
     if (tab === 'wifi') {
-      if (!ssid.trim()) return '';
+      if (!ssid.trim() || !security) return '';
       const auth = security === 'WPA3-Enterprise' ? 'WPA2-EAP' : security;
       const identity = security === 'WPA3-Enterprise' && enterpriseIdentity.trim() ? `;E:${escapeWifi(enterpriseIdentity.trim())}` : '';
       return `WIFI:T:${auth};S:${escapeWifi(ssid.trim())};P:${escapeWifi(password)};H:${hidden ? 'true' : 'false'}${identity};;`;
     }
     if (tab === 'upi') {
-      if (!upiId.trim()) return '';
-      const params = new URLSearchParams({ pa: upiId.trim(), cu: 'INR' });
-      if (upiName.trim()) params.set('pn', upiName.trim());
+      if (!upiId.trim() || !upiName.trim()) return '';
+      const params = new URLSearchParams({ pa: upiId.trim(), pn: upiName.trim(), cu: 'INR' });
       if (amount.trim()) params.set('am', amount.trim());
-      if (note.trim()) params.set('tn', note.trim());
+      if (description.trim()) params.set('tn', description.trim());
+      if (businessMode && businessCategory) params.set('mc', businessCategory);
       return `upi://pay?${params.toString()}`;
     }
-    const digits = whatsappNumber.replace(/\D/g, '');
-    if (!digits) return '';
+    const digits = whatsappNumber.replace(/\D/g, ''); if (!digits) return '';
     return `https://wa.me/${digits}${whatsappMessage.trim() ? `?text=${encodeURIComponent(whatsappMessage.trim())}` : ''}`;
-  }, [tab, text, ssid, password, security, hidden, enterpriseIdentity, upiId, upiName, amount, note, whatsappNumber, whatsappMessage]);
+  }, [tab, text, ssid, password, security, hidden, enterpriseIdentity, upiId, upiName, amount, description, businessMode, businessCategory, whatsappNumber, whatsappMessage]);
 
-  const clearAll = () => {
-    setText(''); setSsid(''); setPassword(''); setEnterpriseIdentity(''); setUpiId(''); setUpiName(''); setAmount(''); setNote(''); setWhatsappNumber(''); setWhatsappMessage('');
-    setSecurity('WPA2'); setHidden(false); setQrTheme({ foreground: '#000000', background: '#FFFFFF' }); setSize(240); setQuietZone(12);
-    setGenerated(false); setGeneratedValue(''); setGeneratedTheme({ foreground: '#000000', background: '#FFFFFF' }); setGeneratedSize(240); setGeneratedQuietZone(12);
+  const clearAll = () => { setText(''); setSsid(''); setPassword(''); setEnterpriseIdentity(''); setUpiId(''); setUpiName(''); setAmount(''); setDescription(''); setWhatsappNumber(''); setWhatsappMessage(''); setSecurity('WPA2'); setHidden(false); setBusinessCategory('Groceries'); setQrTheme({ foreground: '#000000', background: '#FFFFFF' }); setSize(240); setQuietZone(12); setGenerated(false); setGeneratedValue(''); setGeneratedTheme({ foreground: '#000000', background: '#FFFFFF' }); setGeneratedSize(240); setGeneratedQuietZone(12); };
+  const openEditorForRegenerate = () => { setGenerated(false); setGeneratedValue(''); setQrTheme(generatedTheme); setSize(generatedSize); setQuietZone(generatedQuietZone); };
+
+  const validateAndGenerate = () => {
+    if (tab === 'text' && !text.trim()) return Alert.alert('Text required', 'Enter some text before generating the QR code.');
+    if (tab === 'url' && !/^https?:\/\/.+/i.test(text.trim())) return Alert.alert('Valid URL required', 'Enter a URL beginning with http:// or https://.');
+    if (tab === 'wifi' && (!ssid.trim() || !security)) return Alert.alert('Wi‑Fi details required', 'SSID, password and security selection are required.');
+    if (tab === 'upi') { if (!upiId.trim() || !upiName.trim()) return Alert.alert('UPI details required', 'UPI ID and name are required.'); if (amount.trim() && (!/^\d+(\.\d{1,2})?$/.test(amount.trim()) || Number(amount) <= 0)) return Alert.alert('Invalid amount', 'Enter a valid positive INR amount.'); if (businessMode && !businessCategory) return Alert.alert('Business category required', 'Choose a business category.'); }
+    if (tab === 'whatsapp' && !/^\d{8,15}$/.test(whatsappNumber.replace(/\D/g, ''))) return Alert.alert('Valid WhatsApp number required', 'Use an international number with country code.');
+    if (!value) return Alert.alert('Missing information', 'Enter the required information first.');
+    if (qrTheme.foreground === qrTheme.background) return Alert.alert('Choose contrasting colors', 'QR color and background color must be different.');
+    setGeneratedValue(value); setGeneratedTheme(qrTheme); setGeneratedSize(size); setGeneratedQuietZone(quietZone); setGenerated(true);
   };
 
-  const openEditorForRegenerate = () => {
-    setGenerated(false);
-    setGeneratedValue('');
-    setQrTheme(generatedTheme);
-    setSize(generatedSize);
-    setQuietZone(generatedQuietZone);
-  };
+  const toggleBusinessMode = async () => { const next = !businessMode; setBusinessMode(next); try { await AsyncStorage.setItem(BUSINESS_MODE_KEY, String(next)); } catch { /* preference remains in memory */ } };
 
-  const handleGenerate = () => {
-    if (!value) {
-      Alert.alert('Missing information', 'Enter the required information first.');
-      return;
-    }
-    if (qrTheme.foreground === qrTheme.background) {
-      Alert.alert('Choose contrasting colors', 'QR color and background color must be different.');
-      return;
-    }
-    setGeneratedValue(value);
-    setGeneratedTheme(qrTheme);
-    setGeneratedSize(size);
-    setGeneratedQuietZone(quietZone);
-    setGenerated(true);
-  };
+  const getQrPng = async () => { if (!generatedValue || !qrRef.current) throw new Error('QR code is not ready.'); return new Promise<string>((resolve, reject) => { let settled = false; const finish = (fn: (value: string) => void, value: string) => { if (!settled) { settled = true; clearTimeout(timer); fn(value); } }; const timer = setTimeout(() => finish(reject, 'Timed out while rendering the QR code.'), 5000); qrRef.current?.toDataURL((data) => finish(resolve, data)); }); };
+  const downloadQr = async () => { try { const base64 = await getQrPng(); const directory = FileSystem.documentDirectory; if (!directory) throw new Error('Device storage is unavailable.'); const fileUri = `${directory}nexus-plus-qr-${Date.now()}.png`; await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 }); Alert.alert('QR code downloaded', 'The QR code PNG has been saved in Nexus Plus app storage.'); } catch (error) { Alert.alert('Download failed', error instanceof Error ? error.message : 'Could not save the QR code.'); } };
+  const shareQr = async () => { try { const base64 = await getQrPng(); const directory = FileSystem.documentDirectory; if (!directory) throw new Error('Device storage is unavailable.'); const fileUri = `${directory}nexus-plus-qr-share-${Date.now()}.png`; await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 }); if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(fileUri, { mimeType: 'image/png', dialogTitle: 'Share QR code' }); else await Share.share({ title: 'Nexus Plus QR code', message: generatedValue }); } catch (error) { Alert.alert('Share failed', error instanceof Error ? error.message : 'Could not share the QR code.'); } };
 
-  const getQrPng = async () => {
-    if (!generatedValue || !qrRef.current) throw new Error('QR code is not ready.');
-    return new Promise<string>((resolve, reject) => {
-      let settled = false;
-      const finish = (fn: (value: string) => void, value: string) => { if (!settled) { settled = true; clearTimeout(timer); fn(value); } };
-      const timer = setTimeout(() => finish(reject, 'Timed out while rendering the QR code.'), 5000);
-      qrRef.current?.toDataURL((data) => finish(resolve, data));
-    });
-  };
+  useFocusEffect(useCallback(() => { const subscription = BackHandler.addEventListener('hardwareBackPress', () => { if (generated) { clearAll(); return true; } return false; }); return () => subscription.remove(); }, [generated]));
 
-  const downloadQr = async () => {
-    try {
-      const base64 = await getQrPng();
-      const directory = FileSystem.documentDirectory;
-      if (!directory) throw new Error('Device storage is unavailable.');
-      const fileUri = `${directory}nexus-plus-qr-${Date.now()}.png`;
-      await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
-      Alert.alert('QR code downloaded', 'The QR code PNG has been saved in Nexus Plus app storage.');
-    } catch (error) {
-      Alert.alert('Download failed', error instanceof Error ? error.message : 'Could not save the QR code.');
-    }
-  };
+  if (generated) return <View style={[styles.resultScreen, { backgroundColor: colors.background, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 20 }]}><View style={styles.resultHeader}><Pressable accessibilityRole="button" accessibilityLabel="Back to QR code generator" onPress={clearAll} style={[styles.iconButton, { borderColor: colors.border, backgroundColor: colors.card }]}><Feather name="arrow-left" size={21} color={colors.foreground} /></Pressable><Text accessibilityRole="header" style={[styles.resultTitle, { color: colors.foreground }]}>Generated QR Code</Text><View style={{ width: 46 }} /></View><View style={[styles.resultCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.resultHint, { color: colors.mutedForeground }]}>Your QR code is ready.</Text><View style={{ padding: generatedQuietZone, backgroundColor: generatedTheme.background, borderRadius: 14 }} accessible accessibilityLabel="Generated QR code"><QRCode ref={qrRef} value={generatedValue} size={generatedSize} backgroundColor={generatedTheme.background} color={generatedTheme.foreground} quietZone={0} ecl="H" /></View><View style={styles.resultActions}><ActionButton icon="download" label="Download" onPress={downloadQr} colors={colors} /><ActionButton icon="share-2" label="Share" onPress={shareQr} colors={colors} /><ActionButton icon="refresh-cw" label="Regenerate" onPress={openEditorForRegenerate} colors={colors} /></View></View></View>;
 
-  const shareQr = async () => {
-    try {
-      const base64 = await getQrPng();
-      const directory = FileSystem.documentDirectory;
-      if (!directory) throw new Error('Device storage is unavailable.');
-      const fileUri = `${directory}nexus-plus-qr-share-${Date.now()}.png`;
-      await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, { mimeType: 'image/png', dialogTitle: 'Share QR code' });
-      } else {
-        await Share.share({ title: 'Nexus Plus QR code', message: generatedValue });
-      }
-    } catch (error) {
-      Alert.alert('Share failed', error instanceof Error ? error.message : 'Could not share the QR code.');
-    }
-  };
-
-  if (generated) {
-    return (
-      <View style={[styles.resultScreen, { backgroundColor: colors.background, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 20 }]}>
-        <View style={styles.resultHeader}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Back to QR code generator" onPress={clearAll} style={[styles.iconButton, { borderColor: colors.border, backgroundColor: colors.card }]}>
-            <Feather name="arrow-left" size={21} color={colors.foreground} />
-          </Pressable>
-          <Text accessibilityRole="header" style={[styles.resultTitle, { color: colors.foreground }]}>Generated QR Code</Text>
-          <View style={{ width: 46 }} />
-        </View>
-        <View style={[styles.resultCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.resultHint, { color: colors.mutedForeground }]}>Your QR code is ready.</Text>
-          <View style={{ padding: generatedQuietZone, backgroundColor: generatedTheme.background, borderRadius: 14 }} accessible accessibilityLabel="Generated QR code">
-            <QRCode ref={qrRef} value={generatedValue} size={generatedSize} backgroundColor={generatedTheme.background} color={generatedTheme.foreground} quietZone={0} ecl="H" />
-          </View>
-          <View style={styles.resultActions}>
-            <ActionButton icon="download" label="Download" onPress={downloadQr} colors={colors} />
-            <ActionButton icon="share-2" label="Share" onPress={shareQr} colors={colors} />
-            <ActionButton icon="refresh-cw" label="Regenerate" onPress={openEditorForRegenerate} colors={colors} />
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <ScrollView style={[styles.screen, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 60 }} keyboardShouldPersistTaps="handled">
-      <View style={styles.header}><MaterialCommunityIcons name="qrcode-edit" size={30} color={colors.primary} /><View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>QR Code Generator</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Enter data, customize the QR code, then generate it.</Text></View></View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>{tabs.map((item) => <Pressable key={item.key} accessibilityRole="tab" accessibilityState={{ selected: tab === item.key }} accessibilityLabel={`Generate ${item.label} QR code`} onPress={() => setTab(item.key)} style={[styles.tab, { borderColor: colors.border, backgroundColor: tab === item.key ? colors.primary : colors.card }]}><MaterialCommunityIcons name={item.icon as never} size={15} color={tab === item.key ? colors.primaryForeground : colors.foreground} /><Text style={{ color: tab === item.key ? colors.primaryForeground : colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 12 }}>{item.label}</Text></Pressable>)}</ScrollView>
-      <View style={[styles.form, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {(tab === 'text' || tab === 'url') && <Field label={tab === 'text' ? 'Text' : 'URL'} value={text} onChangeText={setText} placeholder={tab === 'text' ? 'Type any text' : 'https://example.com'} colors={colors} multiline autoCapitalize={tab === 'url' ? 'none' : 'sentences'} keyboardType={tab === 'url' ? 'url' : 'default'} />}
-        {tab === 'wifi' && <><Field label="Network name (SSID)" value={ssid} onChangeText={setSsid} placeholder="My Wi‑Fi" colors={colors} /><Field label="Password" value={password} onChangeText={setPassword} placeholder="Wi‑Fi password" colors={colors} secure /><Text style={[styles.label, { color: colors.foreground }]}>Security</Text><View style={styles.securityRow}>{(['WPA', 'WPA2', 'WPA3', 'WPA3-Enterprise'] as WifiSecurity[]).map((item) => <Pressable key={item} accessibilityRole="radio" accessibilityState={{ selected: security === item }} onPress={() => setSecurity(item)} style={[styles.security, { borderColor: security === item ? colors.primary : colors.border, backgroundColor: security === item ? colors.secondary : colors.background }]}><Text style={{ color: colors.foreground, fontSize: 11 }}>{item}</Text></Pressable>)}</View>{security === 'WPA3-Enterprise' && <Field label="Enterprise identity" value={enterpriseIdentity} onChangeText={setEnterpriseIdentity} placeholder="Identity" colors={colors} />}<Pressable accessibilityRole="switch" accessibilityState={{ checked: hidden }} onPress={() => setHidden((current) => !current)} style={[styles.switchRow, { borderColor: colors.border }]}><Text style={[styles.switchText, { color: colors.foreground }]}>Hidden network</Text><Text style={{ color: colors.primary, fontFamily: 'Inter_700Bold' }}>{hidden ? 'On' : 'Off'}</Text></Pressable></>}
-        {tab === 'upi' && <><Field label="UPI ID" value={upiId} onChangeText={setUpiId} placeholder="name@upi" colors={colors} autoCapitalize="none" /><Field label="Name" value={upiName} onChangeText={setUpiName} placeholder="Receiver name" colors={colors} /><Field label="Amount (INR)" value={amount} onChangeText={setAmount} placeholder="0.00" colors={colors} keyboardType="decimal-pad" /><Field label="Note" value={note} onChangeText={setNote} placeholder="Payment note" colors={colors} multiline /></>}
-        {tab === 'whatsapp' && <><Field label="WhatsApp number" value={whatsappNumber} onChangeText={setWhatsappNumber} placeholder="919876543210" colors={colors} keyboardType="phone-pad" /><Field label="Pre-filled message" value={whatsappMessage} onChangeText={setWhatsappMessage} placeholder="Hello!" colors={colors} multiline /><Text style={[styles.help, { color: colors.mutedForeground }]}>Use the international phone number without the + sign.</Text></>}
-      </View>
-      <View style={[styles.customizer, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.sectionTitle, { color: colors.foreground }]}>Customize QR</Text><Text style={[styles.sectionHint, { color: colors.mutedForeground }]}>Choose separate QR and background colors. High contrast is recommended for reliable scanning.</Text><Text style={[styles.label, { color: colors.foreground }]}>QR color</Text><ColorGrid selected={qrTheme.foreground} onSelect={(color) => setQrTheme((current) => ({ ...current, foreground: color }))} colors={colors} /><Text style={[styles.label, { color: colors.foreground, marginTop: 12 }]}>Background color</Text><ColorGrid selected={qrTheme.background} onSelect={(color) => setQrTheme((current) => ({ ...current, background: color }))} colors={colors} /><View style={styles.sliderRow}><Text style={[styles.label, { color: colors.foreground }]}>QR size</Text><Text style={[styles.valueBadge, { color: colors.primary }]}>{size}px</Text></View><View style={styles.stepperRow}>{[180, 220, 240, 280, 320].map((item) => <Pressable key={item} onPress={() => setSize(item)} accessibilityRole="radio" accessibilityState={{ selected: size === item }} style={[styles.stepper, { borderColor: size === item ? colors.primary : colors.border, backgroundColor: size === item ? colors.secondary : colors.background }]}><Text style={{ color: colors.foreground, fontSize: 11 }}>{item}</Text></Pressable>)}</View><View style={styles.sliderRow}><Text style={[styles.label, { color: colors.foreground }]}>Quiet zone</Text><Text style={[styles.valueBadge, { color: colors.primary }]}>{quietZone}</Text></View><View style={styles.stepperRow}>{[4, 8, 12, 16, 20].map((item) => <Pressable key={item} onPress={() => setQuietZone(item)} accessibilityRole="radio" accessibilityState={{ selected: quietZone === item }} style={[styles.stepper, { borderColor: quietZone === item ? colors.primary : colors.border, backgroundColor: quietZone === item ? colors.secondary : colors.background }]}><Text style={{ color: colors.foreground, fontSize: 11 }}>{item}</Text></Pressable>)}</View></View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Generate QR code" onPress={handleGenerate} style={[styles.generateButton, { backgroundColor: colors.primary }]}><MaterialCommunityIcons name="qrcode" size={20} color={colors.primaryForeground} /><Text style={[styles.generateText, { color: colors.primaryForeground }]}>Generate QR Code</Text></Pressable>
-    </ScrollView>
-  );
+  return <ScrollView style={[styles.screen, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 60 }} keyboardShouldPersistTaps="handled"><View style={styles.header}><MaterialCommunityIcons name="qrcode-edit" size={30} color={colors.primary} /><View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>QR Code Generator</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Enter data, choose options, then generate your QR code.</Text></View></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>{tabs.map((item) => <Pressable key={item.key} accessibilityRole="tab" accessibilityState={{ selected: tab === item.key }} accessibilityLabel={`Generate ${item.label} QR code`} onPress={() => { setTab(item.key); if (item.key !== 'upi') return; }} style={[styles.tab, { borderColor: colors.border, backgroundColor: tab === item.key ? colors.primary : colors.card }]}><MaterialCommunityIcons name={item.icon as never} size={15} color={tab === item.key ? colors.primaryForeground : colors.foreground} /><Text style={{ color: tab === item.key ? colors.primaryForeground : colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 12 }}>{item.label}</Text></Pressable>)}</ScrollView><View style={[styles.form, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    {(tab === 'text' || tab === 'url') && <Field label={tab === 'text' ? 'Text' : 'URL'} value={text} onChangeText={setText} placeholder={tab === 'text' ? 'Type any text' : 'https://example.com'} colors={colors} multiline autoCapitalize={tab === 'url' ? 'none' : 'sentences'} keyboardType={tab === 'url' ? 'url' : 'default'} />}
+    {tab === 'wifi' && <><Field label="Network name (SSID)" value={ssid} onChangeText={setSsid} placeholder="My Wi‑Fi" colors={colors} /><Field label="Password" value={password} onChangeText={setPassword} placeholder="Wi‑Fi password" colors={colors} secure /><Text style={[styles.label, { color: colors.foreground }]}>Security</Text><View style={styles.securityRow}>{(['WPA', 'WPA2', 'WPA3', 'WPA3-Enterprise'] as WifiSecurity[]).map((item) => <Pressable key={item} accessibilityRole="radio" accessibilityState={{ selected: security === item }} onPress={() => setSecurity(item)} style={[styles.security, { borderColor: security === item ? colors.primary : colors.border, backgroundColor: security === item ? colors.secondary : colors.background }]}><Text style={{ color: colors.foreground, fontSize: 11 }}>{item}</Text></Pressable>)}</View>{security === 'WPA3-Enterprise' && <Field label="Enterprise identity" value={enterpriseIdentity} onChangeText={setEnterpriseIdentity} placeholder="Identity" colors={colors} />}<Pressable accessibilityRole="switch" accessibilityState={{ checked: hidden }} onPress={() => setHidden((current) => !current)} style={[styles.switchRow, { borderColor: colors.border }]}><Text style={[styles.switchText, { color: colors.foreground }]}>Hidden network</Text><Text style={{ color: colors.primary, fontFamily: 'Inter_700Bold' }}>{hidden ? 'On' : 'Off'}</Text></Pressable></>}
+    {tab === 'upi' && <><Field label="UPI ID" value={upiId} onChangeText={setUpiId} placeholder="name@upi" colors={colors} autoCapitalize="none" /><Field label="UPI Name" value={upiName} onChangeText={setUpiName} placeholder="Receiver name" colors={colors} /><Field label="Amount (INR, optional)" value={amount} onChangeText={setAmount} placeholder="0.00" colors={colors} keyboardType="decimal-pad" /><Field label="Description / Note (optional)" value={description} onChangeText={setDescription} placeholder="What is this payment for?" colors={colors} multiline /><Pressable accessibilityRole="switch" accessibilityState={{ checked: businessMode }} onPress={toggleBusinessMode} style={[styles.businessToggle, { borderColor: colors.border, backgroundColor: businessMode ? colors.secondary : colors.background }]}><View style={styles.businessToggleCopy}><Text style={[styles.businessTitle, { color: colors.foreground }]}>Business / Merchant QR</Text><Text style={[styles.businessSubtitle, { color: colors.mutedForeground }]}>Off = personal UPI. On = advanced business QR with category.</Text></View><Text style={{ color: colors.primary, fontFamily: 'Inter_700Bold' }}>{businessMode ? 'On' : 'Off'}</Text></Pressable>{businessMode && <View style={[styles.businessPanel, { borderColor: colors.border, backgroundColor: colors.background }]}><Text style={[styles.label, { color: colors.foreground }]}>Business category</Text><View style={styles.categoryGrid}>{BUSINESS_CATEGORIES.map((category) => <Pressable key={category} accessibilityRole="radio" accessibilityState={{ selected: businessCategory === category }} onPress={() => setBusinessCategory(category)} style={[styles.categoryChip, { borderColor: businessCategory === category ? colors.primary : colors.border, backgroundColor: businessCategory === category ? colors.secondary : colors.card }]}><Text style={{ color: colors.foreground, fontSize: 11 }}>{category}</Text></Pressable>)}</View></View>}</>}
+    {tab === 'whatsapp' && <><Field label="WhatsApp number" value={whatsappNumber} onChangeText={setWhatsappNumber} placeholder="919876543210" colors={colors} keyboardType="phone-pad" /><Field label="Pre-filled message (optional)" value={whatsappMessage} onChangeText={setWhatsappMessage} placeholder="Hello!" colors={colors} multiline /><Text style={[styles.help, { color: colors.mutedForeground }]}>Use an international phone number with country code.</Text></>}
+    </View><View style={[styles.customizer, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.sectionTitle, { color: colors.foreground }]}>Customize QR</Text><Text style={[styles.sectionHint, { color: colors.mutedForeground }]}>Choose QR and background colors separately. High contrast is recommended.</Text><Text style={[styles.label, { color: colors.foreground }]}>QR color</Text><ColorGrid selected={qrTheme.foreground} onSelect={(color) => setQrTheme((current) => ({ ...current, foreground: color }))} colors={colors} /><Text style={[styles.label, { color: colors.foreground, marginTop: 12 }]}>Background color</Text><ColorGrid selected={qrTheme.background} onSelect={(color) => setQrTheme((current) => ({ ...current, background: color }))} colors={colors} /><View style={styles.sliderRow}><Text style={[styles.label, { color: colors.foreground }]}>QR size</Text><Text style={[styles.valueBadge, { color: colors.primary }]}>{size}px</Text></View><View style={styles.stepperRow}>{[180, 220, 240, 280, 320].map((item) => <Pressable key={item} onPress={() => setSize(item)} accessibilityRole="radio" accessibilityState={{ selected: size === item }} style={[styles.stepper, { borderColor: size === item ? colors.primary : colors.border, backgroundColor: size === item ? colors.secondary : colors.background }]}><Text style={{ color: colors.foreground, fontSize: 11 }}>{item}</Text></Pressable>)}</View><View style={styles.sliderRow}><Text style={[styles.label, { color: colors.foreground }]}>Quiet zone</Text><Text style={[styles.valueBadge, { color: colors.primary }]}>{quietZone}</Text></View><View style={styles.stepperRow}>{[4, 8, 12, 16, 20].map((item) => <Pressable key={item} onPress={() => setQuietZone(item)} accessibilityRole="radio" accessibilityState={{ selected: quietZone === item }} style={[styles.stepper, { borderColor: quietZone === item ? colors.primary : colors.border, backgroundColor: quietZone === item ? colors.secondary : colors.background }]}><Text style={{ color: colors.foreground, fontSize: 11 }}>{item}</Text></Pressable>)}</View></View><Pressable accessibilityRole="button" accessibilityLabel="Generate QR code" onPress={validateAndGenerate} style={[styles.generateButton, { backgroundColor: colors.primary }]}><MaterialCommunityIcons name="qrcode" size={20} color={colors.primaryForeground} /><Text style={[styles.generateText, { color: colors.primaryForeground }]}>Generate QR Code</Text></Pressable></ScrollView>;
 }
 
 function ActionButton({ icon, label, onPress, colors }: { icon: string; label: string; onPress: () => void; colors: ReturnType<typeof useColors> }) { return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={[styles.actionButton, { backgroundColor: colors.background, borderColor: colors.border }]}><Feather name={icon as never} size={20} color={colors.primary} /><Text style={[styles.actionText, { color: colors.foreground }]}>{label}</Text></Pressable>; }
 function ColorGrid({ selected, onSelect, colors }: { selected: string; onSelect: (value: string) => void; colors: ReturnType<typeof useColors> }) { return <View style={styles.colorGrid}>{COLOR_PALETTE.map((color) => <Pressable key={color.value} accessibilityRole="radio" accessibilityLabel={`${color.name}, ${color.value}`} accessibilityState={{ selected: selected === color.value }} onPress={() => onSelect(color.value)} style={[styles.colorSwatch, { backgroundColor: color.value, borderColor: selected === color.value ? colors.primary : colors.border }]}>{selected === color.value ? <MaterialCommunityIcons name="check" size={18} color={color.value === '#FFFFFF' || color.value === '#FFF7ED' || color.value === '#EAB308' ? '#000000' : '#FFFFFF'} /> : null}</Pressable>)}</View>; }
 function Field({ label, value, onChangeText, placeholder, colors, secure, multiline, keyboardType, autoCapitalize = 'sentences' }: { label: string; value: string; onChangeText: (value: string) => void; placeholder: string; colors: ReturnType<typeof useColors>; secure?: boolean; multiline?: boolean; keyboardType?: 'default' | 'decimal-pad' | 'phone-pad' | 'url'; autoCapitalize?: 'none' | 'sentences' }) { return <View style={styles.field}><Text style={[styles.label, { color: colors.foreground }]}>{label}</Text><TextInput accessibilityLabel={label} value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.mutedForeground} secureTextEntry={secure} multiline={multiline} keyboardType={keyboardType} autoCapitalize={autoCapitalize} style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background, minHeight: multiline ? 90 : 46 }]} /></View>; }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1 }, header: { paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 }, copy: { flex: 1 }, title: { fontSize: 27, fontFamily: 'Inter_700Bold' }, subtitle: { marginTop: 3, fontSize: 12, lineHeight: 18 }, tabs: { paddingHorizontal: 20, gap: 8, paddingBottom: 12 }, tab: { minHeight: 40, borderRadius: 20, borderWidth: 1, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 5 }, form: { marginHorizontal: 20, borderWidth: 1, borderRadius: 18, padding: 15, gap: 12 }, field: { gap: 6 }, label: { fontSize: 12, fontFamily: 'Inter_600SemiBold' }, input: { borderWidth: 1, borderRadius: 13, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13 }, securityRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 }, security: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 9 }, switchRow: { minHeight: 48, borderTopWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10 }, switchText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' }, help: { fontSize: 11, lineHeight: 16 }, customizer: { margin: 20, borderWidth: 1, borderRadius: 18, padding: 15, gap: 10 }, sectionTitle: { fontSize: 15, fontFamily: 'Inter_700Bold' }, sectionHint: { fontSize: 11, lineHeight: 17, marginBottom: 4 }, colorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 }, colorSwatch: { width: 35, height: 35, borderRadius: 18, borderWidth: 2, alignItems: 'center', justifyContent: 'center' }, sliderRow: { marginTop: 7, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, valueBadge: { fontSize: 12, fontFamily: 'Inter_700Bold' }, stepperRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 }, stepper: { minWidth: 51, borderWidth: 1, borderRadius: 11, paddingHorizontal: 9, paddingVertical: 9, alignItems: 'center' }, generateButton: { marginHorizontal: 20, minHeight: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }, generateText: { fontSize: 14, fontFamily: 'Inter_700Bold' }, resultScreen: { flex: 1, paddingHorizontal: 20 }, resultHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }, iconButton: { width: 46, height: 46, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, resultTitle: { fontSize: 20, fontFamily: 'Inter_700Bold' }, resultCard: { flex: 1, borderRadius: 20, borderWidth: 1, alignItems: 'center', padding: 20, justifyContent: 'center', gap: 18 }, resultHint: { fontSize: 12 }, resultActions: { width: '100%', gap: 10 }, actionButton: { minHeight: 52, borderWidth: 1, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }, actionText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
-});
+const styles = StyleSheet.create({ screen: { flex: 1 }, header: { paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 }, copy: { flex: 1 }, title: { fontSize: 27, fontFamily: 'Inter_700Bold' }, subtitle: { marginTop: 3, fontSize: 12, lineHeight: 18 }, tabs: { paddingHorizontal: 20, gap: 8, paddingBottom: 12 }, tab: { minHeight: 40, borderRadius: 20, borderWidth: 1, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 5 }, form: { marginHorizontal: 20, borderWidth: 1, borderRadius: 18, padding: 15, gap: 12 }, field: { gap: 6 }, label: { fontSize: 12, fontFamily: 'Inter_600SemiBold' }, input: { borderWidth: 1, borderRadius: 13, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13 }, securityRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 }, security: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 9 }, switchRow: { minHeight: 48, borderTopWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10 }, switchText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' }, help: { fontSize: 11, lineHeight: 16 }, customizer: { margin: 20, borderWidth: 1, borderRadius: 18, padding: 15, gap: 10 }, sectionTitle: { fontSize: 15, fontFamily: 'Inter_700Bold' }, sectionHint: { fontSize: 11, lineHeight: 17, marginBottom: 4 }, colorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 }, colorSwatch: { width: 35, height: 35, borderRadius: 18, borderWidth: 2, alignItems: 'center', justifyContent: 'center' }, sliderRow: { marginTop: 7, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, valueBadge: { fontSize: 12, fontFamily: 'Inter_700Bold' }, stepperRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 }, stepper: { minWidth: 51, borderWidth: 1, borderRadius: 11, paddingHorizontal: 9, paddingVertical: 9, alignItems: 'center' }, generateButton: { marginHorizontal: 20, minHeight: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }, generateText: { fontSize: 14, fontFamily: 'Inter_700Bold' }, resultScreen: { flex: 1, paddingHorizontal: 20 }, resultHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }, iconButton: { width: 46, height: 46, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, resultTitle: { fontSize: 20, fontFamily: 'Inter_700Bold' }, resultCard: { flex: 1, borderRadius: 20, borderWidth: 1, alignItems: 'center', padding: 20, justifyContent: 'center', gap: 18 }, resultHint: { fontSize: 12 }, resultActions: { width: '100%', gap: 10 }, actionButton: { minHeight: 52, borderWidth: 1, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }, actionText: { fontSize: 13, fontFamily: 'Inter_700Bold' }, businessToggle: { minHeight: 58, borderWidth: 1, borderRadius: 14, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }, businessToggleCopy: { flex: 1 }, businessTitle: { fontSize: 13, fontFamily: 'Inter_700Bold' }, businessSubtitle: { marginTop: 3, fontSize: 11, lineHeight: 16 }, businessPanel: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 9 }, categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 }, categoryChip: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8 }, });
