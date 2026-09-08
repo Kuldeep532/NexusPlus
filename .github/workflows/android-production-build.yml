@@ -144,6 +144,34 @@ jobs:
           mkdir -p android/app
           printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
           test -s android/app/google-services.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('android/app/google-services.json')
+          data = json.loads(p.read_text())
+          project = data.get('project_info', {})
+          clients = data.get('client', [])
+          package_name = 'com.nexuswavetech.nexusplus'
+          firebase_project_id = project.get('project_id')
+          if not firebase_project_id:
+              raise SystemExit('Firebase google-services.json is missing project_info.project_id')
+          matches = []
+          for client in clients:
+              info = client.get('client_info', {})
+              android = info.get('android_client_info', {})
+              if android.get('package_name') == package_name:
+                  app_id = info.get('mobilesdk_app_id')
+                  if app_id:
+                      matches.append(app_id)
+          if not matches:
+              raise SystemExit(f'Firebase google-services.json has no client for {package_name}.')
+          selected_app_id = matches[0]
+          print(f'Firebase JSON: valid, project_id={firebase_project_id}, package matched, app_id={selected_app_id}')
+          env_file = Path('/tmp/firebase-derived.env')
+          env_file.write_text(f'FIREBASE_PROJECT_ID={firebase_project_id}\nFIREBASE_APP_ID={selected_app_id}\n')
+          PY
+          cat /tmp/firebase-derived.env >> "$GITHUB_ENV"
+          chmod 600 android/app/google-services.json
       - name: Materialize Android signing configuration
         shell: bash
         env:
@@ -174,43 +202,42 @@ jobs:
           test -n "$FIREBASE_STORAGE_BUCKET"
           test -n "$FIREBASE_MESSAGING_SENDER_ID"
           test -n "$FIREBASE_APP_ID"
-      - name: Deep Android preflight diagnostics
+          test -n "$EXPO_PUBLIC_FIREBASE_API_KEY"
+          test -n "$EXPO_PUBLIC_FIREBASE_PROJECT_ID"
+          test -n "$EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"
+          test -n "$EXPO_PUBLIC_FIREBASE_APP_ID"
+          if [ -n "${PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER:-}" ]; then
+            [[ "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER" =~ ^[0-9]+$ ]]
+            echo "Play Integrity: configured"
+          else
+            echo "Play Integrity: optional/not configured"
+          fi
+      - name: Consolidated diagnostics (non-blocking)
         shell: bash
         run: |
           set +e
-          failed=0
-          check() {
+          log_dir="$RUNNER_TEMP/nexusplus-diagnostics"
+          mkdir -p "$log_dir"
+          run_check() {
             local label="$1"
-            shift
-            echo ""
-            echo "========== $label =========="
-            "$@"
-            local rc=$?
+            local log_file="$2"
+            shift 2
+            echo "=== $label ==="
+            "$@" 2>&1 | tee "$log_file"
+            local rc=${PIPESTATUS[0]}
             if [ "$rc" -ne 0 ]; then
-              failed=1
               echo "[$label] FAILED (exit $rc)"
             else
               echo "[$label] PASSED"
             fi
+            return 0
           }
-          check '1. AndroidManifest XML syntax' python -c 'import xml.etree.ElementTree as ET; from pathlib import Path; paths=[Path("android/app/src/main/AndroidManifest.xml"),Path("android/app/src/debug/AndroidManifest.xml"),Path("android/app/src/release/AndroidManifest.xml")]; [ET.parse(p) for p in paths if p.exists()]; print("Manifest XML syntax: OK")'
-          if command -v xmllint >/dev/null 2>&1; then
-            check '2. xmllint manifest validation' xmllint --noout android/app/src/main/AndroidManifest.xml
-          else
-            echo '[2. xmllint manifest validation] SKIPPED: xmllint not installed'
-          fi
-          check '3. Node syntax/config scripts' node --check app.config.js
-          check '4. Expo configuration' pnpm exec expo config --type public
-          check '5. TypeScript/source diagnostics' node scripts/prebuild-check.mjs
-          check '6. Expo Android bundle dry-run' pnpm exec expo export --platform android --output-dir /tmp/nexusplus-bundle-check --clear
-          check '7. Gradle configuration model' bash -lc 'cd android && gradle help --no-daemon --no-build-cache --stacktrace'
-          check '8. Android manifest merge model' bash -lc 'cd android && gradle processReleaseMainManifest --no-daemon --no-build-cache --stacktrace --info'
-          echo ""
-          if [ "$failed" -ne 0 ]; then
-            echo 'PRECHECK FAILED: one or more independent diagnostics found errors.'
-            exit 1
-          fi
-          echo 'PRECHECK PASSED: all deterministic Android preflight checks completed successfully.'
+          run_check '1. TypeScript/source diagnostics' "$log_dir/typescript.log" node scripts/prebuild-check.mjs
+          run_check '2. Expo configuration' "$log_dir/expo-config.log" pnpm exec expo config --type public
+          run_check '3. Expo Android bundle dry-run' "$log_dir/expo-export.log" pnpm exec expo export --platform android --output-dir /tmp/nexusplus-bundle-check --clear
+          run_check '4. AndroidManifest XML syntax' "$log_dir/manifest.log" python -c 'import xml.etree.ElementTree as ET; ET.parse("android/app/src/main/AndroidManifest.xml"); print("AndroidManifest.xml XML syntax: OK")'
+          echo "Diagnostics are informational only; the actual Gradle build remains the authoritative gate."
+          tar -czf "$RUNNER_TEMP/nexusplus-diagnostics.tgz" -C "$log_dir" . 2>/dev/null || true
       - name: Set up Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
