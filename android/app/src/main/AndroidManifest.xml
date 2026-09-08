@@ -11,7 +11,6 @@
         android:usesCleartextTraffic="false"
         android:label="Nexus Plus"
         android:supportsRtl="true"
-        android:usesCleartextTraffic="false"
         android:theme="@style/Theme.NexusPlus">
         <activity
             android:name=".AlarmRingActivity"
