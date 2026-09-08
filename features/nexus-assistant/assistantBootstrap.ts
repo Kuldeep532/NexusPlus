@@ -21,7 +21,7 @@ function scheduleRetry(): void {
   if (retryTimer) clearTimeout(retryTimer);
   retryTimer = setTimeout(() => {
     retryTimer = null;
-    void ensureNexusCoreModel(true);
+    void ensureNexusCoreModel();
   }, RETRY_AFTER_MS);
 }
 
