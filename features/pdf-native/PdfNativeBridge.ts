@@ -4,6 +4,7 @@ type PdfNativeApi = {
   isAvailable(): Promise<boolean>;
   merge(inputPaths: string[], outputPath: string): Promise<string>;
   imageToPdf(inputPaths: string[], outputPath: string, quality: number): Promise<string>;
+  protect(inputPath: string, outputPath: string, password: string): Promise<string>;
   unlock(inputPath: string, outputPath: string, password: string): Promise<string>;
   compress(inputPath: string, outputPath: string, quality: number): Promise<string>;
 };
@@ -40,6 +41,10 @@ export const PdfNativeBridge = {
   imageToPdf: async (inputPaths: string[], outputPath: string, quality = 90) => {
     validatePaths(inputPaths); validatePath(outputPath); if (!Number.isFinite(quality)) throw new Error('Invalid image quality.');
     return (await requireNative()).imageToPdf(inputPaths, outputPath, Math.max(1, Math.min(100, Math.round(quality))));
+  },
+  protect: async (inputPath: string, outputPath: string, password: string) => {
+    validatePath(inputPath); validatePath(outputPath); if (password.length < 8) throw new Error('PDF password must be at least 8 characters.');
+    return (await requireNative()).protect(inputPath, outputPath, password);
   },
   unlock: async (inputPath: string, outputPath: string, password: string) => {
     validatePath(inputPath); validatePath(outputPath); if (!password) throw new Error('PDF password is required.');
