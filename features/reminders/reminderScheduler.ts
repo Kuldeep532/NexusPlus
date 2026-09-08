@@ -54,7 +54,7 @@ export async function scheduleReminder(draft: ReminderDraft): Promise<ReminderIt
       minute: target.getMinutes(),
     };
   } else if (k === 'weekly') {
-    const weekdays = draft.weekdays?.length ? draft.weekdays : [target.getDay() === 0 ? 1 : target.getDay() + 1];
+    const weekdays = draft.weekdays?.length ? draft.weekdays : [target.getDay() + 1];
     trigger = {
       type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
       weekday: weekdays[0],
