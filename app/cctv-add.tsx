@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { saveManagedCamera } from '@/features/cctv/cctvManagement';
 import { detectAuthenticationProfile, getAuthenticationFields } from '@/features/cctv/cctvAuthProfile';
+import { isSupportedCctvQrPayload } from '@/features/cctv/cctvService';
 import type { CctvCapabilities, CctvDeviceKind, CctvProtocol } from '@/features/cctv/cctvTypes';
 import { initialCctvSetupDraft, selectCctvSetupMethod, type CctvSetupDraft, type CctvSetupMethod } from '@/features/cctv/cctvSetupFlow';
 
@@ -17,12 +18,11 @@ const DEVICE_KINDS: Array<{ id: CctvDeviceKind; label: string; icon: string }> =
   { id: 'dvr', label: 'DVR', icon: 'server' },
   { id: 'nvr', label: 'NVR', icon: 'hard-drive' },
 ];
-
 const DEFAULT_CAPABILITIES: CctvCapabilities = { liveView: true, audio: false, recordings: false, playback: false, eraseData: false, passwordChange: false, discovery: false, multiCamera: false, switchCamera: false, flip: false, panTiltZoom: false, nightVision: false, talk: false };
 const METHODS: Array<{ id: CctvSetupMethod; title: string; description: string; icon: string }> = [
-  { id: 'qr', title: 'Scan QR Code', description: 'Use the same QR scanner technology as QR Tools.', icon: 'maximize' },
+  { id: 'qr', title: 'Scan QR Code', description: 'Only Nexus Plus CCTV QR codes are accepted.', icon: 'maximize' },
   { id: 'serial', title: 'Enter Serial Number', description: 'Identify the camera by serial number.', icon: 'hash' },
-  { id: 'manual', title: 'Manual Setup', description: 'Enter the serial number or device identity manually.', icon: 'edit-3' },
+  { id: 'manual', title: 'Manual Setup', description: 'Enter the camera serial number manually.', icon: 'edit-3' },
 ];
 
 export default function CctvAddScreen() {
@@ -39,7 +39,8 @@ export default function CctvAddScreen() {
 
   const acceptIdentification = (payload?: string, serial?: string) => {
     const nextPayload = payload?.trim() || ''; const nextSerial = serial?.trim() || '';
-    if (draft.method === 'qr' && !nextPayload && !nextSerial) return Alert.alert('Identification required', 'Scan or upload the camera QR code, or enter the serial number.');
+    if (draft.method === 'qr' && nextPayload && !isSupportedCctvQrPayload(nextPayload)) return Alert.alert('Unsupported QR code', 'This scanner only accepts a Nexus Plus CCTV QR code. Use the QR code displayed by the CCTV camera/DVR/NVR.');
+    if (draft.method === 'qr' && !nextPayload && !nextSerial) return Alert.alert('Identification required', 'Scan the CCTV QR code or enter the serial number.');
     if ((draft.method === 'serial' || draft.method === 'manual') && !nextSerial) return Alert.alert('Serial number required', 'Enter the camera serial number.');
     setQrPayload(nextPayload); setSerialNumber(nextSerial);
     setDraft((current) => ({ ...current, step: 'credentials', qrPayload: nextPayload || undefined, serialNumber: nextSerial || undefined }));
@@ -48,12 +49,13 @@ export default function CctvAddScreen() {
   const uploadQr = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 1 });
     if (result.canceled || !result.assets[0]?.uri) return;
-    Alert.alert('QR image selected', 'The shared QR scanner image path is selected. For camera onboarding, enter or confirm the serial number from the QR payload before continuing.', [{ text: 'OK', onPress: () => undefined }]);
+    Alert.alert('Upload QR Code', 'Image selection is available, but this Expo build does not include a native image QR decoder. Use the CCTV camera scanner, then confirm the serial number.');
   };
 
   const save = async () => {
     const requiredMissing = authFields.filter((field) => field.required && !fieldValue(field.id).trim());
     if (requiredMissing.length > 0) return Alert.alert('Required information', `Enter ${requiredMissing.map((field) => field.label).join(', ')} before saving.`);
+    if (draft.method === 'qr' && !draft.qrPayload && !draft.serialNumber) return Alert.alert('Identification required', 'A valid CCTV QR code or serial number is required.');
     setSaving(true);
     try {
       const camera = await saveManagedCamera({ name: name.trim() || serialNumber.trim() || 'CCTV Camera', username: username.trim() || 'camera', password: password || token || pin || passcode, serialNumber: draft.serialNumber, protocol: 'unknown' as CctvProtocol, deviceKind, authenticationProfile: detectedProfile, capabilities: DEFAULT_CAPABILITIES });
@@ -64,16 +66,16 @@ export default function CctvAddScreen() {
   return <View style={[styles.root, { backgroundColor: colors.background }]}>
     <Stack.Screen options={{ title: `Add CCTV Camera — Step ${stepNumber} of 4` }} />
     <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 28 }]} keyboardShouldPersistTaps="handled">
-      <Text style={[styles.title, { color: colors.foreground }]}>Add CCTV Camera</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>QR identification uses the same scanner family as QR Tools; the camera model then determines authentication.</Text>
+      <Text style={[styles.title, { color: colors.foreground }]}>Add CCTV Camera</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>CCTV QR onboarding only accepts Nexus Plus camera QR payloads. After identification, the existing model/authentication flow remains in place.</Text>
       <View style={styles.progressRow}>{[1, 2, 3, 4].map((item) => <View key={item} style={[styles.progressBar, { backgroundColor: item <= stepNumber ? colors.primary : colors.border }]} />)}</View>
       {draft.step === 'method' && <View style={styles.stack}>{METHODS.map((item) => <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={item.title} onPress={() => setDraft((current) => selectCctvSetupMethod(current, item.id))} style={[styles.optionCard, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.optionIcon, { backgroundColor: colors.secondary }]}><Feather name={item.icon as never} size={20} color={colors.primary} /></View><View style={styles.copy}><Text style={[styles.optionTitle, { color: colors.foreground }]}>{item.title}</Text><Text style={[styles.note, { color: colors.mutedForeground }]}>{item.description}</Text></View><Feather name="chevron-right" size={18} color={colors.mutedForeground} /></Pressable>)}</View>}
       {draft.step === 'identify' && draft.method && <>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Identify Camera</Text>
         {draft.method === 'qr' && <>
-          {!permission?.granted && <Pressable accessibilityRole="button" onPress={() => void requestPermission()} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Feather name="camera" size={18} color={colors.primaryForeground} /><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Allow Camera</Text></Pressable>}
-          {permission?.granted && !scanning && <Pressable accessibilityRole="button" onPress={() => setScanning(true)} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Feather name="camera" size={18} color={colors.primaryForeground} /><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Start QR Scanner</Text></Pressable>}
-          {permission?.granted && scanning && <View style={styles.scannerWrap}><Text accessibilityRole="text" accessibilityLiveRegion="polite" style={[styles.guidance, { color: colors.foreground }]}>Hold to scan. Move left or right to center the QR code.</Text><CameraView accessibilityLabel="CCTV QR scanner. Hold steady. Move right or move left to center the QR code." style={styles.scanner} facing="back" barcodeScannerSettings={{ barcodeTypes: ['qr'] }} onBarcodeScanned={({ data }) => { setQrPayload(data); setScanning(false); }} /><View pointerEvents="none" style={styles.scanFrame} /></View>}
-          {!scanning && Boolean(qrPayload) && <Text style={[styles.success, { color: colors.foreground }]}>QR code captured. Verify or enter the camera serial number below before continuing.</Text>}
+          {!permission?.granted && <Pressable accessibilityRole="button" accessibilityLabel="Allow camera access for CCTV QR scanning" onPress={() => void requestPermission()} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Feather name="camera" size={18} color={colors.primaryForeground} /><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Allow Camera</Text></Pressable>}
+          {permission?.granted && !scanning && <Pressable accessibilityRole="button" accessibilityLabel="Start CCTV QR scanner" onPress={() => setScanning(true)} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Feather name="camera" size={18} color={colors.primaryForeground} /><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Start QR Scanner</Text></Pressable>}
+          {permission?.granted && scanning && <View style={styles.scannerWrap}><Text accessibilityRole="text" accessibilityLiveRegion="polite" style={[styles.guidance, { color: colors.foreground }]}>Hold to scan. Center the CCTV QR code inside the frame.</Text><CameraView accessibilityLabel="CCTV QR scanner. Only Nexus Plus CCTV QR codes are accepted." style={styles.scanner} facing="back" barcodeScannerSettings={{ barcodeTypes: ['qr'] }} onBarcodeScanned={({ data }) => { if (!isSupportedCctvQrPayload(data)) return Alert.alert('Unsupported QR code', 'Only the CCTV camera QR code is accepted here.'); setQrPayload(data); setScanning(false); }} /><View pointerEvents="none" style={styles.scanFrame} /></View>}
+          {!scanning && Boolean(qrPayload) && <Text accessibilityRole="text" style={[styles.success, { color: colors.foreground }]}>Valid CCTV QR captured. Confirm the serial number below before continuing.</Text>}
           <Pressable accessibilityRole="button" accessibilityLabel="Upload CCTV QR code" onPress={() => void uploadQr()} style={[styles.secondaryButton, { borderColor: colors.border }]}><Feather name="upload" size={17} color={colors.foreground} /><Text style={[styles.secondaryText, { color: colors.foreground }]}>Upload QR Code</Text></Pressable>
           <Field label="Serial Number (optional for QR, required as fallback)" value={serialNumber} onChangeText={setSerialNumber} placeholder="Enter SN" colors={colors} autoCapitalize="none" />
         </>}
