@@ -18,8 +18,6 @@
 -keep class com.nexuswavetech.nexusplus.NexusDocumentReaderPackage { *; }
 -keep class com.nexuswavetech.nexusplus.NexusNativeSecurityModule { *; }
 -keep class com.nexuswavetech.nexusplus.NexusNativeSecurityPackage { *; }
--keep class com.nexuswavetech.nexusplus.NexusSafetyGateModule { *; }
--keep class com.nexuswavetech.nexusplus.NexusSafetyGatePackage { *; }
 
 # Android manifest components and the custom Application entry point.
 -keep class com.nexuswavetech.nexusplus.MainActivity { *; }
@@ -29,7 +27,6 @@
 -keep class com.nexuswavetech.nexusplus.BootReceiver { *; }
 -keep class com.nexuswavetech.nexusplus.NexusMediaPlaybackService { *; }
 -keep class com.nexuswavetech.nexusplus.NexusSafetyAccessibilityService { *; }
--keep class com.nexuswavetech.nexusplus.NexusSafeDeviceGateActivity { *; }
 
 # Native encryption bridge.
 -keep class com.nexuswavetech.nexusplus.encryption.FileEncryptionNative { *; }
