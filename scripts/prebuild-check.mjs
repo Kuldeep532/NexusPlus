@@ -40,13 +40,24 @@ for (const file of sourceFiles) {
   if (!run(`Syntax: ${relative(root, file)}`, process.execPath, ['--check', file])) failed = true;
 }
 
-// Always run the complete TypeScript application-source scan exactly once.
-// --noErrorTruncation keeps every compiler diagnostic visible so a first
-// failure cannot hide later independent errors behind a one-at-a-time loop.
+// Run the complete TypeScript application-source scan exactly once.
+// The compiler is configured to emit the full diagnostic set instead of
+// stopping at the first reported problem. Keep the output untruncated.
 const typecheckPassed = run(
   'TypeScript/TSX: complete application source typecheck',
   'pnpm',
-  ['exec', 'tsc', '-p', 'tsconfig.prebuild.json', '--noEmit', '--pretty', 'false', '--noErrorTruncation'],
+  [
+    'exec',
+    'tsc',
+    '-p',
+    'tsconfig.prebuild.json',
+    '--noEmit',
+    '--pretty',
+    'false',
+    '--noErrorTruncation',
+    '--incremental',
+    'false',
+  ],
 );
 if (!typecheckPassed) failed = true;
 
