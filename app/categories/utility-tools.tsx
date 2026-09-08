@@ -12,7 +12,7 @@ export default function UtilityToolsScreen() {
   const tools = getUtilityTools();
   return <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 18, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24 }}>
     <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Utility Tools</Text>
-    <Text style={[styles.body, { color: colors.mutedForeground }]}>AI calculator, links, clock, time and everyday accessibility utilities.</Text>
+    <Text style={[styles.body, { color: colors.mutedForeground }]}>AI calculator, links, QR tools, clock, time and everyday accessibility utilities.</Text>
     <View style={styles.list}>{tools.map((tool) => <Pressable key={tool.id} accessibilityRole="button" accessibilityLabel={`${tool.title}. ${tool.description}`} onPress={() => router.push(tool.route as never)} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name={tool.icon as never} size={20} color={colors.primary} /></View><View style={styles.copy}><Text style={[styles.cardTitle, { color: colors.foreground }]}>{tool.title}</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>{tool.description}</Text></View><Feather name="chevron-right" size={19} color={colors.mutedForeground} accessibilityElementsHidden /></Pressable>)}</View>
   </ScrollView>;
 }
