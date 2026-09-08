@@ -13,6 +13,7 @@ react {
     root = file(projectRoot)
     reactNativeDir = file(reactNativeDirPath)
     cliFile = file(expoCliPath)
+    entryFile = file("${projectRoot}/index.js")
     autolinkLibrariesWithApp()
 }
 
