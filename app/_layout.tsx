@@ -4,7 +4,6 @@ import { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useAuth } from '@/features/auth/useAuth';
 import { useColors } from '@/hooks/useColors';
-import { getLaunchRoute } from '@/features/app-shell/launchPreferences';
 import { hasCompletedWelcome } from '@/features/app-shell/onboardingPreferences';
 import { PersistentMediaProvider } from '@/media-player/PersistentMediaController';
 import { GlobalMiniPlayer } from '@/features/media/GlobalMiniPlayer';
@@ -57,20 +56,21 @@ function RootLayoutContent() {
     }
 
     if (!auth.session) {
-      if (inWelcome || inAuth || inLegal) return;
+      if (inWelcome || inLegal) return;
 
       void hasCompletedWelcome().then((completed) => {
         if (!completed) {
           router.replace('/welcome');
           return;
         }
+        if (inAuth) return;
         router.replace('/login-plus-register');
       });
       return;
     }
 
     if (inAuth || inWelcome || (!firstSegment && !inTabs && !inHome && !inLegal)) {
-      void getLaunchRoute().then((route) => router.replace(route));
+      router.replace('/home');
     }
   }, [auth.loading, auth.session, router, segments]);
 
