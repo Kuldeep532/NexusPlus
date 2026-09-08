@@ -64,7 +64,7 @@ android {
     signingConfigs {
         release {
             if (keystorePropertiesFile.exists()) {
-                storeFile file(keystoreProperties['storeFile'])
+                storeFile rootProject.file(keystoreProperties['storeFile'])
                 storePassword keystoreProperties['storePassword']
                 keyAlias keystoreProperties['keyAlias']
                 keyPassword keystoreProperties['keyPassword']
@@ -72,16 +72,36 @@ android {
         }
     }
 
+    packaging {
+        jniLibs { useLegacyPackaging = false }
+        resources {
+            excludes += [
+                'META-INF/DEPENDENCIES', 'META-INF/LICENSE*', 'META-INF/NOTICE*', 'META-INF/*.version'
+            ]
+        }
+    }
+
     buildTypes {
+        debug {
+            minifyEnabled false
+        }
         release {
-            signingConfig signingConfigs.release
             minifyEnabled enableMinifyInReleaseBuilds
             shrinkResources enableShrinkResourcesInReleaseBuilds
             crunchPngs enablePngCrunchInReleaseBuilds
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
 }
 
-// Keep React Native / Expo bundling aligned with the native app's single JS entry point.
-reactNativeArchitectures = "arm64-v8a,x86_64"
+dependencies {
+    implementation 'androidx.core:core-ktx:1.15.0'
+    implementation 'androidx.activity:activity-ktx:1.10.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.biometric:biometric:1.1.0'
+    implementation 'com.google.android.play:integrity:1.6.0'
+    implementation 'com.tom-roush:pdfbox-android:2.0.27.0'
+    implementation 'com.facebook.react:react-android'
+    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.22.0'
+}
