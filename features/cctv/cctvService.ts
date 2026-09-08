@@ -1,5 +1,5 @@
 import * as Crypto from 'expo-crypto';
-import type { CctvCamera, CctvCapabilities, CctvDiscoveryMode, CctvDeviceKind } from './cctvTypes';
+import type { CctvCamera, CctvCapabilities, CctvDiscoveryMode, CctvDeviceKind, CctvSecurityProfile } from './cctvTypes';
 import { detectAuthenticationProfile } from './cctvAuthProfile';
 
 export interface CctvDetectionInput {
@@ -14,7 +14,7 @@ export interface CctvDetectionInput {
 
 export const CCTV_QR_PREFIX = 'nexusplus://cctv/';
 const DEFAULT_CAPABILITIES: CctvCapabilities = {
-  liveView: true,
+  liveView: false,
   audio: false,
   recordings: false,
   playback: false,
@@ -39,6 +39,7 @@ export interface CctvQrPayload {
   deviceKind: CctvDeviceKind;
   authentication?: { profile?: string; fields?: string[] };
   capabilities?: Partial<CctvCapabilities>;
+  security?: Partial<Pick<CctvSecurityProfile, 'secureTransport' | 'authenticated' | 'protocolFamily' | 'securityLevel'>>;
 }
 
 export interface CctvQrIdentity {
@@ -49,6 +50,7 @@ export interface CctvQrIdentity {
   protocol?: CctvCamera['protocol'];
   deviceKind?: CctvDeviceKind;
   capabilities?: CctvCapabilities;
+  securityProfile?: CctvSecurityProfile;
 }
 
 export function parseCctvQrPayload(payload: string): CctvQrIdentity {
@@ -61,6 +63,15 @@ export function parseCctvQrPayload(payload: string): CctvQrIdentity {
     if (typeof parsed.serialNumber !== 'string' || !parsed.serialNumber.trim()) return { valid: false };
     if (parsed.deviceKind !== 'ip_camera' && parsed.deviceKind !== 'network_camera' && parsed.deviceKind !== 'dvr' && parsed.deviceKind !== 'nvr') return { valid: false };
     if (parsed.protocol !== 'onvif' && parsed.protocol !== 'rtsp' && parsed.protocol !== 'http') return { valid: false };
+    const security = parsed.security;
+    const securityProfile: CctvSecurityProfile = {
+      secureTransport: security?.secureTransport === true,
+      authenticated: security?.authenticated === true,
+      protocolFamily: security?.protocolFamily === 'onvif' ? 'onvif' : 'unknown',
+      securityLevel: security?.securityLevel === 'verified' ? 'verified' : 'rejected',
+      reason: security?.securityLevel === 'verified' ? undefined : 'CCTV QR authorization did not include a verified security profile.',
+    };
+    if (securityProfile.securityLevel !== 'verified' || !securityProfile.secureTransport || !securityProfile.authenticated) return { valid: false };
     return {
       valid: true,
       manufacturer: parsed.manufacturer.trim(),
@@ -69,6 +80,7 @@ export function parseCctvQrPayload(payload: string): CctvQrIdentity {
       protocol: parsed.protocol,
       deviceKind: parsed.deviceKind,
       capabilities: { ...DEFAULT_CAPABILITIES, ...(parsed.capabilities ?? {}) },
+      securityProfile,
     };
   } catch {
     return { valid: false };
@@ -80,8 +92,8 @@ export function isSupportedCctvQrPayload(payload: string): boolean {
 }
 
 export async function detectCctvCamera(input: CctvDetectionInput): Promise<CctvCamera> {
-  const qrInfo = input.mode === 'qr' && input.qrPayload ? parseCctvQrPayload(input.qrPayload) : { valid: false };
-  if (input.mode === 'qr' && !qrInfo.valid) throw new Error('Unsupported QR code. Scan the QR code shown by this CCTV camera or DVR/NVR.');
+  const qrInfo = input.mode === 'qr' && input.qrPayload ? parseCctvQrPayload(input.qrPayload) : { valid: false as const };
+  if (input.mode === 'qr' && !qrInfo.valid) throw new Error('Unsupported CCTV authorization QR. A verified secure QR is required.');
   const manufacturer = input.manufacturer?.trim() || qrInfo.manufacturer;
   const model = input.model?.trim() || qrInfo.model;
   const serialNumber = input.serialNumber?.trim() || qrInfo.serialNumber;
@@ -90,7 +102,7 @@ export async function detectCctvCamera(input: CctvDetectionInput): Promise<CctvC
   const identity = [manufacturer ?? '', serialNumber ?? model ?? 'camera', input.username.trim().toLowerCase()].join(':');
   const id = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, identity);
   const authenticationProfile = detectAuthenticationProfile({ manufacturer, model, protocol, qrPayload: input.qrPayload, source: input.mode });
-  return { id, name: model ?? serialNumber ?? 'CCTV Camera', serialNumber, model, manufacturer, protocol, deviceKind: qrInfo.deviceKind, username: input.username.trim(), passwordRef: id, createdAt: now, updatedAt: now, capabilities: qrInfo.capabilities ?? DEFAULT_CAPABILITIES, authenticationProfile };
+  return { id, name: model ?? serialNumber ?? 'CCTV Camera', serialNumber, model, manufacturer, protocol, deviceKind: qrInfo.deviceKind, username: input.username.trim(), passwordRef: id, createdAt: now, updatedAt: now, capabilities: qrInfo.capabilities ?? DEFAULT_CAPABILITIES, authenticationProfile, securityProfile: qrInfo.securityProfile };
 }
 
 export function getMaskedCameraLabel(camera: CctvCamera): string { const serial = camera.serialNumber; return serial ? `Serial ending ${serial.slice(-4)}` : camera.name; }
