@@ -6,7 +6,6 @@ const registry: HomeFeatureDefinition[] = [
   { id: 'biometric-vault', title: 'Biometric Vault', description: 'Protect sensitive information.', route: '/biometric-vault', icon: 'shield', category: 'security', featured: true, order: 30 },
   { id: 'payment-announcer', title: 'Payment Announcer', description: 'Secure payment announcements.', route: '/payment-announcer', icon: 'volume-2', category: 'security', featured: true, order: 50 },
   { id: 'expense-tracker', title: 'Finance Tracker', description: 'Track and review expenses securely.', route: '/expense-tracker', icon: 'credit-card', category: 'security', featured: true, order: 60 },
-  { id: 'video-editor', title: 'Video Editor', description: 'Edit and export videos.', route: '/video-editor', icon: 'video', category: 'media', featured: true, order: 70 },
   { id: 'file-manager', title: 'File Manager', description: 'Browse, organize, preview and secure local files.', route: '/file-manager', icon: 'folder', category: 'utility', featured: true, order: 75 },
   { id: 'cctv-manager', title: 'CCTV Manager', description: 'Manage local CCTV cameras, DVRs and NVRs.', route: '/cctv-cameras', icon: 'video', category: 'security', featured: true, order: 77 },
   { id: 'reminders', title: 'My Reminders', description: 'Plan, schedule and manage accessible voice reminders.', route: '/reminders', icon: 'bell', category: 'productivity', order: 78 },
@@ -26,7 +25,7 @@ export function getFeaturesByCategory(category: FeatureCategory): HomeFeatureDef
 export const FEATURE_CATEGORY_META: Record<FeatureCategory, { title: string; description: string; icon: string; route: string }> = {
   utility: { title: 'Utility Tools', description: 'Clock, time, alarm and accessibility utilities.', icon: 'clock', route: '/categories/utility-tools' },
   pdf: { title: 'PDF Tools', description: 'Convert, protect, lock, unlock and manage PDFs.', icon: 'file-text', route: '/categories/pdf-tools' },
-  media: { title: 'Media Tools', description: 'Audio, radio and video tools.', icon: 'film', route: '/categories/media-tools' },
+  media: { title: 'Media Tools', description: 'Audio and radio tools.', icon: 'film', route: '/categories/media-tools' },
   security: { title: 'Security Tools', description: 'Additional security and privacy utilities. File encryption lives in File Manager.', icon: 'shield', route: '/categories/security-tools' },
   productivity: { title: 'Productivity Tools', description: 'Planning, reading and focused workflows.', icon: 'grid', route: '/categories/productivity-tools' },
 };
