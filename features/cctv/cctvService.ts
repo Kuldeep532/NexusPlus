@@ -12,6 +12,7 @@ export interface CctvDetectionInput {
   password: string;
 }
 
+export const CCTV_QR_PREFIX = 'nexusplus://cctv/';
 const DEFAULT_CAPABILITIES: CctvCapabilities = {
   liveView: true,
   audio: false,
@@ -28,26 +29,52 @@ const DEFAULT_CAPABILITIES: CctvCapabilities = {
   talk: false,
 };
 
-function parseSupportedQrPayload(payload: string): Partial<CctvCamera> {
+export interface CctvQrPayload {
+  version: 1;
+  kind: 'cctv';
+  manufacturer: string;
+  model: string;
+  serialNumber: string;
+  protocol: CctvCamera['protocol'];
+  deviceKind: CctvDeviceKind;
+  authentication?: { profile?: string; fields?: string[] };
+  capabilities?: Partial<CctvCapabilities>;
+}
+
+function parseSupportedQrPayload(payload: string): Partial<CctvCamera> & { valid: boolean } {
+  if (!payload.startsWith(CCTV_QR_PREFIX)) return { valid: false };
   try {
-    const parsed = JSON.parse(payload) as Record<string, unknown>;
-    const rawCapabilities = parsed.capabilities;
-    const capabilities = rawCapabilities && typeof rawCapabilities === 'object' ? rawCapabilities as Partial<CctvCapabilities> : {};
+    const encoded = payload.slice(CCTV_QR_PREFIX.length);
+    const parsed = JSON.parse(decodeURIComponent(encoded)) as Partial<CctvQrPayload>;
+    if (parsed.version !== 1 || parsed.kind !== 'cctv') return { valid: false };
+    if (typeof parsed.manufacturer !== 'string' || typeof parsed.model !== 'string' || typeof parsed.serialNumber !== 'string') return { valid: false };
     const kind = parsed.deviceKind;
     const deviceKind: CctvDeviceKind | undefined = kind === 'ip_camera' || kind === 'network_camera' || kind === 'dvr' || kind === 'nvr' ? kind : undefined;
+    if (!deviceKind) return { valid: false };
+    if (parsed.protocol !== 'onvif' && parsed.protocol !== 'rtsp' && parsed.protocol !== 'http') return { valid: false };
     return {
-      manufacturer: typeof parsed.manufacturer === 'string' ? parsed.manufacturer.trim() : undefined,
-      model: typeof parsed.model === 'string' ? parsed.model.trim() : undefined,
-      serialNumber: typeof parsed.serialNumber === 'string' ? parsed.serialNumber.trim() : undefined,
-      protocol: parsed.protocol === 'onvif' || parsed.protocol === 'rtsp' || parsed.protocol === 'http' ? parsed.protocol : 'unknown',
+      valid: true,
+      manufacturer: parsed.manufacturer.trim(),
+      model: parsed.model.trim(),
+      serialNumber: parsed.serialNumber.trim(),
+      protocol: parsed.protocol,
       deviceKind,
-      capabilities: { ...DEFAULT_CAPABILITIES, ...capabilities },
+      capabilities: { ...DEFAULT_CAPABILITIES, ...(parsed.capabilities ?? {}) },
     };
-  } catch { return {}; }
+  } catch {
+    return { valid: false };
+  }
+}
+
+export function isSupportedCctvQrPayload(payload: string): boolean {
+  return parseSupportedQrPayload(payload).valid;
 }
 
 export async function detectCctvCamera(input: CctvDetectionInput): Promise<CctvCamera> {
-  const qrInfo = input.mode === 'qr' && input.qrPayload ? parseSupportedQrPayload(input.qrPayload) : {};
+  const qrInfo = input.mode === 'qr' && input.qrPayload ? parseSupportedQrPayload(input.qrPayload) : { valid: false };
+  if (input.mode === 'qr' && !qrInfo.valid) {
+    throw new Error('Unsupported QR code. Scan the QR code shown by this CCTV camera or DVR/NVR.');
+  }
   const manufacturer = input.manufacturer?.trim() ?? qrInfo.manufacturer;
   const model = input.model?.trim() ?? qrInfo.model;
   const serialNumber = input.serialNumber?.trim() ?? qrInfo.serialNumber;
