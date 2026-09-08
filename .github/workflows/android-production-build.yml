@@ -58,6 +58,15 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
           run_install: false
+      - name: Force clean build workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .expo .expo-shared node_modules/.cache node_modules/.vite node_modules/.cache/metro
+          rm -rf "$HOME/.cache/expo" "$HOME/.cache/metro"
+          rm -rf /tmp/metro-* /tmp/haste-map-* /tmp/nexusplus-*
+          rm -rf "$RUNNER_TEMP/nexusplus-*"
+          echo "All local Expo/Metro/temporary build caches removed."
       - name: Install dependencies from workspace manifests
         run: pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false --reporter=append-only
       - name: Full source prebuild scan
@@ -77,13 +86,13 @@ jobs:
         run: test -n "$EAS_TOKEN"
       - name: Build Android Development Build with Expo EAS
         if: ${{ inputs.build_type == 'development' }}
-        run: pnpm dlx eas-cli@latest build --platform android --profile development --non-interactive --wait
+        run: pnpm dlx eas-cli@latest build --platform android --profile development --non-interactive --wait --clear-cache
       - name: Build Android APK with Expo EAS
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        run: pnpm dlx eas-cli@latest build --platform android --profile preview --non-interactive --wait
+        run: pnpm dlx eas-cli@latest build --platform android --profile preview --non-interactive --wait --clear-cache
       - name: Build Android AAB with Expo EAS
         if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        run: pnpm dlx eas-cli@latest build --platform android --profile production --non-interactive --wait
+        run: pnpm dlx eas-cli@latest build --platform android --profile production --non-interactive --wait --clear-cache
 
   github:
     name: GitHub Runner Android Build
@@ -127,6 +136,16 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
           run_install: false
+      - name: Force clean build workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .expo .expo-shared node_modules/.cache node_modules/.vite node_modules/.cache/metro
+          rm -rf "$HOME/.cache/expo" "$HOME/.cache/metro" "$HOME/.gradle/caches" "$HOME/.gradle/wrapper/dists"
+          rm -rf android/.gradle android/build android/app/build android/app/.cxx
+          rm -rf /tmp/metro-* /tmp/haste-map-* /tmp/nexusplus-*
+          rm -rf "$RUNNER_TEMP/nexusplus-*"
+          echo "All Expo/Metro/Gradle/CMake/temporary build caches removed."
       - name: Install dependencies from workspace manifests
         run: pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false --reporter=append-only
       - name: Materialize Firebase configuration
@@ -169,10 +188,7 @@ jobs:
           selected_app_id = matches[0]
           print(f'Firebase JSON: valid, project_id={firebase_project_id}, package matched, app_id={selected_app_id}')
           env_file = Path('/tmp/firebase-derived.env')
-          env_file.write_text(
-              f'FIREBASE_PROJECT_ID={firebase_project_id}\n'
-              f'FIREBASE_APP_ID={selected_app_id}\n'
-          )
+          env_file.write_text(f'FIREBASE_PROJECT_ID={firebase_project_id}\nFIREBASE_APP_ID={selected_app_id}\n')
           PY
           cat /tmp/firebase-derived.env >> "$GITHUB_ENV"
           chmod 600 android/app/google-services.json
@@ -242,14 +258,9 @@ jobs:
           }
 
           echo '=== Full source diagnostics ==='
-          run_check '1. Full JavaScript/TypeScript source scan' "$source_scan_log" \
-            node scripts/prebuild-check.mjs
-
-          run_check '2. Expo configuration' "$expo_config_log" \
-            pnpm exec expo config --type public
-
-          run_check '3. JavaScript/TypeScript bundle dry-run' "$bundle_log" \
-            pnpm exec expo export --platform android --output-dir /tmp/nexusplus-bundle-check --clear
+          run_check '1. Full JavaScript/TypeScript source scan' "$source_scan_log" node scripts/prebuild-check.mjs
+          run_check '2. Expo configuration' "$expo_config_log" pnpm exec expo config --type public
+          run_check '3. JavaScript/TypeScript bundle dry-run (clean Metro cache)' "$bundle_log" pnpm exec expo export --platform android --output-dir /tmp/nexusplus-bundle-check --clear
 
           echo '=== Final diagnostics summary ==='
           if [ "$failed" -ne 0 ]; then
@@ -261,27 +272,28 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: ${{ env.GRADLE_VERSION }}
+          cache-disabled: true
       - name: Build Debug/Development APK
         if: ${{ inputs.build_type == 'development' }}
         working-directory: android
-        run: gradle assembleDebug --no-daemon
+        run: gradle assembleDebug --no-daemon --no-build-cache
       - name: Build release APK
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         working-directory: android
         run: |
           if [ -n "${PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER:-}" ]; then
-            gradle assembleRelease --no-daemon -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
+            gradle assembleRelease --no-daemon --no-build-cache -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
           else
-            gradle assembleRelease --no-daemon
+            gradle assembleRelease --no-daemon --no-build-cache
           fi
       - name: Build release AAB
         if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
         working-directory: android
         run: |
           if [ -n "${PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER:-}" ]; then
-            gradle bundleRelease --no-daemon -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
+            gradle bundleRelease --no-daemon --no-build-cache -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
           else
-            gradle bundleRelease --no-daemon
+            gradle bundleRelease --no-daemon --no-build-cache
           fi
       - name: Upload Development APK
         if: ${{ inputs.build_type == 'development' }}
