@@ -253,6 +253,28 @@ jobs:
           else
             gradle assembleRelease --no-daemon --no-build-cache
           fi
+      - name: Verify release APK output
+        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apks=(app/build/outputs/apk/release/*.apk)
+          if [ "${#apks[@]}" -eq 0 ]; then
+            echo 'ERROR: release APK was not produced.' >&2
+            find app/build/outputs -maxdepth 4 -type f -print >&2 || true
+            exit 1
+          fi
+          if [ "${#apks[@]}" -ne 1 ]; then
+            echo "ERROR: expected exactly one release APK, found ${#apks[@]}." >&2
+            printf '%s\n' "${apks[@]}" >&2
+            exit 1
+          fi
+          apk="${apks[0]}"
+          test -s "$apk"
+          echo "Release APK: $apk"
+          ls -lh "$apk"
       - name: Build release AAB
         if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
         working-directory: android
@@ -262,6 +284,28 @@ jobs:
           else
             gradle bundleRelease --no-daemon --no-build-cache
           fi
+      - name: Verify release AAB output
+        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          aabs=(app/build/outputs/bundle/release/*.aab)
+          if [ "${#aabs[@]}" -eq 0 ]; then
+            echo 'ERROR: release AAB was not produced.' >&2
+            find app/build/outputs -maxdepth 5 -type f -print >&2 || true
+            exit 1
+          fi
+          if [ "${#aabs[@]}" -ne 1 ]; then
+            echo "ERROR: expected exactly one release AAB, found ${#aabs[@]}." >&2
+            printf '%s\n' "${aabs[@]}" >&2
+            exit 1
+          fi
+          aab="${aabs[0]}"
+          test -s "$aab"
+          echo "Release AAB: $aab"
+          ls -lh "$aab"
       - name: Upload Development APK
         if: ${{ inputs.build_type == 'development' }}
         uses: actions/upload-artifact@v4
