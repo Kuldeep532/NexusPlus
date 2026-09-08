@@ -174,54 +174,43 @@ jobs:
           test -n "$FIREBASE_STORAGE_BUCKET"
           test -n "$FIREBASE_MESSAGING_SENDER_ID"
           test -n "$FIREBASE_APP_ID"
-      - name: Validate Android manifest before Gradle
-        if: ${{ inputs.build_type != 'development' || inputs.build_source == 'github' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import xml.etree.ElementTree as ET
-          from pathlib import Path
-          p = Path('android/app/src/main/AndroidManifest.xml')
-          if not p.is_file():
-              raise SystemExit(f'Missing manifest: {p}')
-          try:
-              ET.parse(p)
-          except ET.ParseError as e:
-              print(f'ERROR: malformed AndroidManifest.xml: {e}')
-              raise
-          root = ET.parse(p).getroot()
-          if root.tag != '{http://schemas.android.com/apk/res/android}manifest' and root.tag != 'manifest':
-              raise SystemExit(f'ERROR: unexpected manifest root: {root.tag!r}')
-          print(f'AndroidManifest.xml XML syntax: OK ({p})')
-          PY
-          if command -v xmllint >/dev/null 2>&1; then
-            xmllint --noout android/app/src/main/AndroidManifest.xml
-            echo 'xmllint validation: OK'
-          fi
-      - name: Consolidated prebuild diagnostics
+      - name: Deep Android preflight diagnostics
         shell: bash
         run: |
           set +e
           failed=0
-          source_scan_log="$RUNNER_TEMP/nexusplus-source-scan.log"
-          expo_config_log="$RUNNER_TEMP/nexusplus-expo-config.log"
-          bundle_log="$RUNNER_TEMP/nexusplus-bundle.log"
-          run_check() {
+          check() {
             local label="$1"
-            local log_file="$2"
-            shift 2
-            echo "=== $label ==="
-            "$@" 2>&1 | tee "$log_file"
-            local rc=${PIPESTATUS[0]}
-            if [ "$rc" -ne 0 ]; then failed=1; echo "[$label] FAILED with exit code $rc"; else echo "[$label] PASSED"; fi
-            return 0
+            shift
+            echo ""
+            echo "========== $label =========="
+            "$@"
+            local rc=$?
+            if [ "$rc" -ne 0 ]; then
+              failed=1
+              echo "[$label] FAILED (exit $rc)"
+            else
+              echo "[$label] PASSED"
+            fi
           }
-          echo '=== Diagnostics (non-blocking) ==='
-          run_check '1. TypeScript/source diagnostics' "$source_scan_log" node scripts/prebuild-check.mjs
-          run_check '2. Expo configuration' "$expo_config_log" pnpm exec expo config --type public
-          run_check '3. JavaScript/TypeScript bundle dry-run' "$bundle_log" pnpm exec expo export --platform android --output-dir /tmp/nexusplus-bundle-check --clear
-          echo 'Diagnostics completed; Android compile remains the authoritative build gate.'
+          check '1. AndroidManifest XML syntax' python -c 'import xml.etree.ElementTree as ET; from pathlib import Path; paths=[Path("android/app/src/main/AndroidManifest.xml"),Path("android/app/src/debug/AndroidManifest.xml"),Path("android/app/src/release/AndroidManifest.xml")]; [ET.parse(p) for p in paths if p.exists()]; print("Manifest XML syntax: OK")'
+          if command -v xmllint >/dev/null 2>&1; then
+            check '2. xmllint manifest validation' xmllint --noout android/app/src/main/AndroidManifest.xml
+          else
+            echo '[2. xmllint manifest validation] SKIPPED: xmllint not installed'
+          fi
+          check '3. Node syntax/config scripts' node --check app.config.js
+          check '4. Expo configuration' pnpm exec expo config --type public
+          check '5. TypeScript/source diagnostics' node scripts/prebuild-check.mjs
+          check '6. Expo Android bundle dry-run' pnpm exec expo export --platform android --output-dir /tmp/nexusplus-bundle-check --clear
+          check '7. Gradle configuration model' bash -lc 'cd android && gradle help --no-daemon --no-build-cache --stacktrace'
+          check '8. Android manifest merge model' bash -lc 'cd android && gradle processReleaseMainManifest --no-daemon --no-build-cache --stacktrace --info'
+          echo ""
+          if [ "$failed" -ne 0 ]; then
+            echo 'PRECHECK FAILED: one or more independent diagnostics found errors.'
+            exit 1
+          fi
+          echo 'PRECHECK PASSED: all deterministic Android preflight checks completed successfully.'
       - name: Set up Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
