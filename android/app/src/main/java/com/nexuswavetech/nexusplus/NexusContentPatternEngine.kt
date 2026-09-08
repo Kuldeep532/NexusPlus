@@ -9,7 +9,6 @@ object NexusContentPatternEngine {
         val normalized = normalize(hostname)
         if (normalized.isBlank()) return false
         if (NexusAdultSafetyPolicy.safeContextSignals.any(normalized::contains)) return false
-        return NexusAdultSafetyPolicy.highRiskTextSignals.any(normalized::contains) ||
-            NexusVpnDnsPolicy.shouldBlock(normalized)
+        return NexusAdultSafetyPolicy.highRiskTextSignals.any(normalized::contains)
     }
 }
