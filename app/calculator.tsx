@@ -30,11 +30,9 @@ export default function CalculatorScreen() {
   const [expression, setExpression] = useState('');
   const [fields, setFields] = useState<Record<string, string>>({});
   const [result, setResult] = useState('');
-
   const update = (key: string, value: string) => setFields((current) => ({ ...current, [key]: value }));
   const value = (key: string) => fields[key] ?? '';
   const speakResult = (text: string) => { setResult(text); announce(text); };
-
   const standardButtons = useMemo(() => [['7','8','9','÷'],['4','5','6','×'],['1','2','3','-'],['0','.','%','+']], []);
   const onStandard = (key: string) => {
     if (key === '=') {
@@ -46,36 +44,31 @@ export default function CalculatorScreen() {
     setExpression((current) => `${current}${key}`);
     announce(key === '÷' ? 'divide' : key === '×' ? 'multiply' : key);
   };
-
   const calculate = () => {
     try {
       let spoken = '';
       switch (mode) {
-        case 'age': { const [y,m,d] = value('dob').split('-').map(Number); const a = calculateAge(new Date(y, (m || 1) - 1, d || 1)); spoken = `${a.years} years, ${a.months} months, ${a.days} days`; break; }
+        case 'age': { const [y,m,d] = value('dob').split('-').map(Number); if (![y,m,d].every(Number.isFinite)) throw new Error('Enter date as YYYY-MM-DD.'); const a = calculateAge(new Date(y, m - 1, d)); spoken = `${a.years} years, ${a.months} months, ${a.days} days`; break; }
         case 'tip-bill': { const r = calculateTipBill(Number(value('bill')), Number(value('tip')), Number(value('people'))); spoken = `Tip ${formatNumber(r.tip)}, total ${formatNumber(r.total)}, each person ${formatNumber(r.perPerson)}`; break; }
-        case 'electricity': { const r = calculateElectricity(Number(value('units')), Number(value('fixed')), Number(value('rate')), Number(value('surcharge')); spoken = `Energy ${formatNumber(r.energy)}, surcharge ${formatNumber(r.surcharge)}, total ${formatNumber(r.total)}`; break; }
+        case 'electricity': { const r = calculateElectricity(Number(value('units')), Number(value('fixed')), Number(value('rate')), Number(value('surcharge'))); spoken = `Energy ${formatNumber(r.energy)}, surcharge ${formatNumber(r.surcharge)}, total ${formatNumber(r.total)}`; break; }
         case 'fixed-deposit': { const r = calculateFixedDeposit(Number(value('principal')), Number(value('rate')), Number(value('years')), Number(value('compound') || '4')); spoken = `Interest ${formatNumber(r.interest)}, maturity ${formatNumber(r.maturity)}`; break; }
         case 'emi': { const r = calculateEmi(Number(value('loan')), Number(value('rate')), Number(value('months'))); spoken = `Monthly EMI ${formatNumber(r.emi)}, total interest ${formatNumber(r.interest)}, total payment ${formatNumber(r.totalPayment)}`; break; }
-        case 'discount': { const r = calculateDiscount(Number(value('price')), Number(value('discount')), Number(value('tax')); spoken = `Discount ${formatNumber(r.discount)}, tax ${formatNumber(r.tax)}, final price ${formatNumber(r.finalPrice)}`; break; }
+        case 'discount': { const r = calculateDiscount(Number(value('price')), Number(value('discount')), Number(value('tax'))); spoken = `Discount ${formatNumber(r.discount)}, tax ${formatNumber(r.tax)}, final price ${formatNumber(r.finalPrice)}`; break; }
         case 'percentage': { const r = calculatePercentage(Number(value('number')), Number(value('percent'))); spoken = `${formatNumber(value('percent'))} percent of ${formatNumber(value('number'))} is ${formatNumber(r)}`; break; }
         default: break;
       }
       speakResult(spoken);
     } catch (error) { const message = error instanceof Error ? error.message : 'Check your values.'; Alert.alert('Calculator', message); announce(message); }
   };
-
-  const field = (key: string, label: string, placeholder: string) => <View style={styles.field}><Text style={[styles.label, { color: colors.foreground }]}>{label}</Text><TextInput accessibilityLabel={label} value={value(key)} onChangeText={(v) => update(key, v)} keyboardType="decimal-pad" placeholder={placeholder} placeholderTextColor={colors.mutedForeground} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} /></View>;
-
+  const field = (key: string, label: string, placeholder: string) => <View style={styles.field}><Text style={[styles.label, { color: colors.foreground }]}>{label}</Text><TextInput accessibilityLabel={label} value={value(key)} onChangeText={(v) => update(key, v)} keyboardType={mode === 'age' ? 'numbers-and-punctuation' : 'decimal-pad'} placeholder={placeholder} placeholderTextColor={colors.mutedForeground} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} /></View>;
   return <View style={[styles.root, { backgroundColor: colors.background }]}>
     <Stack.Screen options={{ title: 'Talking Calculator' }} />
     <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 30 }]}>
       <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Talking Calculator</Text>
       <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Accessible calculations with spoken results, screen-reader controls and Nexus Assistant help.</Text>
-
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs} accessibilityLabel="Calculator modes">
         {MODES.map((item) => <Pressable key={item.id} accessibilityRole="tab" accessibilityState={{ selected: mode === item.id }} accessibilityLabel={`${item.label} calculator`} onPress={() => { setMode(item.id); setResult(''); }} style={[styles.tab, { backgroundColor: mode === item.id ? colors.primary : colors.card, borderColor: mode === item.id ? colors.primary : colors.border }]}><Feather name={item.icon as never} size={16} color={mode === item.id ? colors.primaryForeground : colors.foreground} /><Text style={[styles.tabText, { color: mode === item.id ? colors.primaryForeground : colors.foreground }]}>{item.label}</Text></Pressable>)}
       </ScrollView>
-
       {mode === 'standard' ? <View style={styles.standardWrap}>
         <View accessibilityLiveRegion="polite" style={[styles.display, { backgroundColor: colors.card, borderColor: colors.border }]}><Text accessibilityLabel={`Expression ${expression || 'empty'}`} style={[styles.expression, { color: colors.mutedForeground }]}>{expression || '0'}</Text><Text accessibilityLabel={`Result ${result || 'none'}`} style={[styles.result, { color: colors.foreground }]}>{result || 'Ready'}</Text></View>
         <View style={styles.pad}>{standardButtons.flat().map((key) => <Key key={key} label={key} onPress={() => onStandard(key)} colors={colors} />)}<Key label="C" onPress={() => onStandard('C')} colors={colors} wide /><Key label="⌫" onPress={() => onStandard('⌫')} colors={colors} /><Key label="=" onPress={() => onStandard('=')} colors={colors} /></View>
@@ -92,13 +85,10 @@ export default function CalculatorScreen() {
         </View>
         {result ? <View accessibilityLiveRegion="polite" style={[styles.answer, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.answerLabel, { color: colors.primary }]}>RESULT</Text><Text accessibilityRole="summary" style={[styles.answerText, { color: colors.foreground }]}>{result}</Text></View> : null}
       </>}
-
       <Pressable accessibilityRole="button" accessibilityLabel="Ask Nexus Assistant for calculator help" onPress={() => Alert.alert('Ask Nexus Assistant', 'Use Nexus Assistant for explaining a result, comparing scenarios, or suggesting which calculator mode fits your question.')} style={[styles.aiCard, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.aiIcon, { backgroundColor: colors.secondary }]}><Feather name="cpu" size={21} color={colors.primary} /></View><View style={styles.aiCopy}><Text style={[styles.aiTitle, { color: colors.foreground }]}>Ask Nexus Assistant</Text><Text style={[styles.aiText, { color: colors.mutedForeground }]}>Explain a result, compare two scenarios, or choose the right calculator. Core calculations stay deterministic.</Text></View><Feather name="chevron-right" size={18} color={colors.mutedForeground} /></Pressable>
     </ScrollView>
   </View>;
 }
-
 function Key({ label, onPress, colors, wide = false }: { label: string; onPress: () => void; colors: ReturnType<typeof useColors>; wide?: boolean }) { return <Pressable accessibilityRole="button" accessibilityLabel={label === '×' ? 'multiply' : label === '÷' ? 'divide' : label} onPress={onPress} style={[styles.key, wide && styles.keyWide, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.keyText, { color: colors.foreground }]}>{label}</Text></Pressable>; }
 function formatNumber(value: number | string) { const n = typeof value === 'number' ? value : Number(value); if (!Number.isFinite(n)) throw new Error('Invalid number.'); return Number(n.toFixed(2)).toLocaleString('en-IN'); }
-
-const styles = StyleSheet.create({ root: { flex: 1 }, content: { paddingHorizontal: 18, gap: 14 }, title: { fontSize: 25, fontFamily: 'Inter_700Bold' }, subtitle: { fontSize: 11, lineHeight: 17 }, tabs: { gap: 8, paddingVertical: 2 }, tab: { minHeight: 44, paddingHorizontal: 13, borderRadius: 14, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }, tabText: { fontSize: 11, fontFamily: 'Inter_700Bold' }, display: { minHeight: 150, borderRadius: 18, borderWidth: 1, padding: 16, justifyContent: 'flex-end', alignItems: 'flex-end' }, expression: { fontSize: 18 }, result: { fontSize: 30, fontFamily: 'Inter_700Bold', marginTop: 8 }, pad: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 12 }, key: { width: '22%', minHeight: 58, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, keyWide: { width: '47%' }, keyText: { fontSize: 19, fontFamily: 'Inter_700Bold' }, form: { borderWidth: 1, borderRadius: 18, padding: 14, gap: 11 }, field: { gap: 6 }, label: { fontSize: 11, fontFamily: 'Inter_700Bold' }, input: { minHeight: 48, borderWidth: 1, borderRadius: 13, paddingHorizontal: 13, fontSize: 13 }, calculateButton: { minHeight: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 2 }, calculateText: { fontSize: 12, fontFamily: 'Inter_700Bold' }, answer: { borderWidth: 1, borderRadius: 18, padding: 16, gap: 5 }, answerLabel: { fontSize: 9, letterSpacing: 1.5, fontFamily: 'Inter_700Bold' }, answerText: { fontSize: 16, lineHeight: 23, fontFamily: 'Inter_700Bold' }, aiCard: { borderWidth: 1, borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'center' }, aiIcon: { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, aiCopy: { flex: 1, marginHorizontal: 11 }, aiTitle: { fontSize: 13, fontFamily: 'Inter_700Bold' }, aiText: { fontSize: 10.5, lineHeight: 16, marginTop: 3 } });
+const styles = StyleSheet.create({ root: { flex: 1 }, content: { paddingHorizontal: 18, gap: 14 }, title: { fontSize: 25, fontFamily: 'Inter_700Bold' }, subtitle: { fontSize: 11, lineHeight: 17 }, tabs: { gap: 8, paddingVertical: 2 }, tab: { minHeight: 44, paddingHorizontal: 13, borderRadius: 14, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }, tabText: { fontSize: 11, fontFamily: 'Inter_700Bold' }, standardWrap: { gap: 0 }, display: { minHeight: 150, borderRadius: 18, borderWidth: 1, padding: 16, justifyContent: 'flex-end', alignItems: 'flex-end' }, expression: { fontSize: 18 }, result: { fontSize: 30, fontFamily: 'Inter_700Bold', marginTop: 8 }, pad: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 12 }, key: { width: '22%', minHeight: 58, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, keyWide: { width: '47%' }, keyText: { fontSize: 19, fontFamily: 'Inter_700Bold' }, form: { borderWidth: 1, borderRadius: 18, padding: 14, gap: 11 }, field: { gap: 6 }, label: { fontSize: 11, fontFamily: 'Inter_700Bold' }, input: { minHeight: 48, borderWidth: 1, borderRadius: 13, paddingHorizontal: 13, fontSize: 13 }, calculateButton: { minHeight: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 2 }, calculateText: { fontSize: 12, fontFamily: 'Inter_700Bold' }, answer: { borderWidth: 1, borderRadius: 18, padding: 16, gap: 5 }, answerLabel: { fontSize: 9, letterSpacing: 1.5, fontFamily: 'Inter_700Bold' }, answerText: { fontSize: 16, lineHeight: 23, fontFamily: 'Inter_700Bold' }, aiCard: { borderWidth: 1, borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'center' }, aiIcon: { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, aiCopy: { flex: 1, marginHorizontal: 11 }, aiTitle: { fontSize: 13, fontFamily: 'Inter_700Bold' }, aiText: { fontSize: 10.5, lineHeight: 16, marginTop: 3 } });
