@@ -26,7 +26,6 @@
 -keep class com.nexuswavetech.nexusplus.AlarmRingActivity { *; }
 -keep class com.nexuswavetech.nexusplus.BootReceiver { *; }
 -keep class com.nexuswavetech.nexusplus.NexusMediaPlaybackService { *; }
--keep class com.nexuswavetech.nexusplus.NexusSafetyAccessibilityService { *; }
 
 # Native encryption bridge.
 -keep class com.nexuswavetech.nexusplus.encryption.FileEncryptionNative { *; }
