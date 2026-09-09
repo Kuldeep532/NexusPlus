@@ -1,7 +1,8 @@
 import { NativeModules, Platform } from 'react-native';
 
 type PdfPageApi = {
-  split(inputPath: string, outputPath: string, pageRanges: string[]): Promise<string[]>;
+  split(inputPath: string, outputDirectory: string, pageRanges: string[]): Promise<string[]>;
+  reorder(inputPath: string, outputPath: string, pageOrder: number[]): Promise<string>;
 };
 
 const nativeModule = NativeModules.NexusPdfNative as PdfPageApi | undefined;
@@ -17,6 +18,13 @@ function validateRanges(ranges: string[]): void {
   });
 }
 
+function validatePageOrder(pageOrder: number[]): void {
+  if (!Array.isArray(pageOrder) || pageOrder.length === 0 || pageOrder.length > 1000) throw new Error('Invalid page order.');
+  pageOrder.forEach((page, index) => {
+    if (!Number.isInteger(page) || page < 1) throw new Error(`Invalid page number at position ${index + 1}.`);
+  });
+}
+
 export const splitPdfWithNativeEngine = async (
   inputPath: string,
   outputDirectory: string,
@@ -29,4 +37,18 @@ export const splitPdfWithNativeEngine = async (
     throw new Error(`PDF split is not available in the current ${Platform.OS} native build yet.`);
   }
   return nativeModule.split(inputPath, outputDirectory, pageRanges);
+};
+
+export const reorderPdfWithNativeEngine = async (
+  inputPath: string,
+  outputPath: string,
+  pageOrder: number[],
+): Promise<string> => {
+  validatePath(inputPath);
+  validatePath(outputPath);
+  validatePageOrder(pageOrder);
+  if (!nativeModule?.reorder) {
+    throw new Error(`PDF reorder is not available in the current ${Platform.OS} native build yet.`);
+  }
+  return nativeModule.reorder(inputPath, outputPath, pageOrder);
 };
