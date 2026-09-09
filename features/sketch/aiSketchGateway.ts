@@ -6,12 +6,7 @@ const TextSketchResponseSchema = z.object({
   height: z.number().int().positive(),
 });
 
-export type TextSketchRequest = {
-  text: string;
-  width?: number;
-  height?: number;
-};
-
+export type TextSketchRequest = { text: string; width?: number; height?: number };
 export type TextSketchResponse = z.infer<typeof TextSketchResponseSchema>;
 
 function gatewayUrl(): string {
