@@ -45,6 +45,11 @@ function validateImageFormat(format: string): 'png' | 'jpeg' {
   if (normalized !== 'png' && normalized !== 'jpeg' && normalized !== 'jpg') throw new Error('Image format must be PNG or JPG.');
   return normalized === 'png' ? 'png' : 'jpeg';
 }
+function validateImagePages(pageNumbers: number[], pageCount?: number): number[] {
+  if (!Array.isArray(pageNumbers) || pageNumbers.length === 0 || pageNumbers.length > 1000) throw new Error('Select at least one valid PDF page.');
+  if (pageCount === undefined) return [...new Set(pageNumbers)];
+  return pageNumbers.flatMap((page) => pageRangeStrings(String(page), pageCount)).map(Number).filter(Number.isInteger);
+}
 
 export const PdfNativeBridge = {
   isAvailable: async () => {
@@ -58,14 +63,12 @@ export const PdfNativeBridge = {
   },
   pdfToImages: async (inputPath: string, outputDirectory: string, pageNumbers: number[], dpi = 300, format = 'png', pageCount?: number) => {
     validatePath(inputPath); validatePath(outputDirectory);
-    if (!Array.isArray(pageNumbers) || pageNumbers.length === 0 || pageNumbers.length > 1000) throw new Error('Select at least one valid PDF page.');
-    const safePages = pageCount === undefined ? pageNumbers : buildPageOrder(pageCount, Array.from(new Set(pageNumbers)).sort((a, b) => a - b));
+    const safePages = validateImagePages(pageNumbers, pageCount);
     const safeDpi = Math.max(72, Math.min(600, Math.round(Number(dpi) || 300)));
     return (await requireNative()).pdfToImages(inputPath, outputDirectory, safePages, safeDpi, validateImageFormat(format));
   },
   combineImages: async (inputPaths: string[], outputPath: string, format = 'png', quality = 95) => {
-    validatePaths(inputPaths); validatePath(outputPath);
-    if (inputPaths.length < 2) throw new Error('Select at least two images to combine.');
+    validatePaths(inputPaths); validatePath(outputPath); if (inputPaths.length < 2) throw new Error('Select at least two images to combine.');
     return (await requireNative()).combineImages(inputPaths, outputPath, validateImageFormat(format), Math.max(1, Math.min(100, Math.round(quality))));
   },
   protect: async (inputPath: string, outputPath: string, password: string) => { validatePath(inputPath); validatePath(outputPath); if (!password) throw new Error('PDF password is required.'); return (await requireNative()).protect(inputPath, outputPath, password); },
