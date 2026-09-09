@@ -156,6 +156,25 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
     }
 
     @ReactMethod
+    fun rotate(inputPath: String, outputPath: String, degrees: Int, promise: Promise) {
+        runCatching {
+            ensurePdfBoxInitialized()
+            require(degrees == 90 || degrees == 180 || degrees == 270) { "Rotation must be 90, 180, or 270 degrees." }
+            val output = File(outputPath)
+            output.parentFile?.mkdirs()
+            PDDocument.load(File(requireReadablePath(inputPath))).use { document ->
+                for (pageIndex in 0 until document.numberOfPages) {
+                    val page = document.getPage(pageIndex)
+                    val current = ((page.rotation % 360) + 360) % 360
+                    page.rotation = (current + degrees) % 360
+                }
+                FileOutputStream(output).use { document.save(it) }
+            }
+            output.absolutePath
+        }.onSuccess { promise.resolve(it) }.onFailure { promise.reject("PDF_ROTATE", it.message, it) }
+    }
+
+    @ReactMethod
     fun compress(inputPath: String, outputPath: String, quality: Int, promise: Promise) {
         runCatching {
             ensurePdfBoxInitialized()
