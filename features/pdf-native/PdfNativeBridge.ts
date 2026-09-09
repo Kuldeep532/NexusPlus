@@ -10,6 +10,7 @@ type PdfNativeApi = {
   compress(inputPath: string, outputPath: string, quality: number): Promise<string>;
   split(inputPath: string, outputDirectory: string, pageRanges: string[]): Promise<string[]>;
   reorder(inputPath: string, outputPath: string, pageOrder: number[]): Promise<string>;
+  rotate(inputPath: string, outputPath: string, pageRanges: string[], angle: number): Promise<string>;
   preparePdfOutput(category: string, filename: string): Promise<string>;
 };
 
@@ -32,6 +33,11 @@ function validatePath(path: string): void {
 function validatePaths(paths: string[]): void {
   if (!Array.isArray(paths) || paths.length === 0 || paths.length > 100) throw new Error('Invalid PDF input list.');
   paths.forEach(validatePath);
+}
+
+function validateRotation(angle: number): number {
+  if (!Number.isInteger(angle) || ![90, 180, 270].includes(angle)) throw new Error('Rotation must be 90, 180, or 270 degrees.');
+  return angle;
 }
 
 export const PdfNativeBridge = {
@@ -68,6 +74,12 @@ export const PdfNativeBridge = {
     validatePath(inputPath); validatePath(outputPath);
     const safeOrder = pageCount === undefined ? pageOrder : buildPageOrder(pageCount, pageOrder);
     return (await requireNative()).reorder(inputPath, outputPath, safeOrder);
+  },
+  rotate: async (inputPath: string, outputPath: string, pageRanges: string[], angle: number, pageCount?: number) => {
+    validatePath(inputPath); validatePath(outputPath); validateRotation(angle);
+    if (!Array.isArray(pageRanges) || pageRanges.length === 0 || pageRanges.length > 100) throw new Error('Select at least one page range.');
+    const safeRanges = pageCount === undefined ? pageRanges : pageRangeStrings(pageRanges.join(', '), pageCount);
+    return (await requireNative()).rotate(inputPath, outputPath, safeRanges, angle);
   },
   preparePdfOutput: async (category: string, filename: string) => {
     if (!category.trim()) throw new Error('PDF output category is required.');
