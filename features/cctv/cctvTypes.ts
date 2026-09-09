@@ -13,9 +13,8 @@ export interface CctvSecurityProfile {
 }
 
 /**
- * Capabilities are a device contract, not app defaults. `true` means the
- * authorized camera handshake explicitly confirmed that operation. `false`
- * means the feature must remain unavailable in the UI and command layer.
+ * Capabilities are runtime facts established by the authenticated native
+ * protocol handshake. Persisted values are treated as hints until refreshed.
  */
 export interface CctvCapabilities {
   liveView: boolean;
