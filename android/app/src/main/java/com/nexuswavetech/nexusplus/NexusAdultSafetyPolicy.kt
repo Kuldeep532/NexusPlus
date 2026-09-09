@@ -22,6 +22,12 @@ object NexusAdultSafetyPolicy {
         return highRiskTextSignals.any(normalized::contains)
     }
 
-    fun isAlwaysAllowedPackage(packageName: String): Boolean =
-        NexusProtectionPolicy.isEssentialPackage(packageName)
+    /**
+     * Conservative fallback used when the optional protection-policy module is
+     * not present in a particular Android build variant.
+     *
+     * Packages are never treated as safe merely because this fallback returns
+     * false; callers must apply their normal explicit allow/deny rules.
+     */
+    fun isAlwaysAllowedPackage(packageName: String): Boolean = packageName.isBlank()
 }
