@@ -1,34 +1,24 @@
 import type { CctvCamera } from './cctvTypes';
-import { assertCapability, getCctvAdapter, validateRecordingSearch, type CctvCameraRecord, type CctvRecordingItem, type CctvRecordingSearch } from './cctvBackend';
-import type { CctvLiveSession } from './cctvSessionService';
+import { assertCapability, validateRecordingSearch, type CctvCameraRecord, type CctvRecordingItem, type CctvRecordingSearch } from './cctvBackend';
+import { searchCctvRecordings } from './cctvSession';
+import { getCctvAdapter } from './cctvBackend';
+import { openCctvSession } from './cctvSession';
 
-export async function searchCctvRecordings(
-  live: CctvLiveSession,
-  query: CctvRecordingSearch,
-): Promise<CctvRecordingItem[]> {
-  validateRecordingSearch(query);
-  assertCapability(live.camera, 'recordings');
-  assertCapability(live.camera, 'playback');
-  const adapter = getCctvAdapter(live.camera.protocol);
-  const context = await adapter.connect(live.camera);
-  try {
-    return await adapter.searchRecordings(context, query);
-  } finally {
-    await adapter.disconnect(context);
-  }
+export async function searchCctvRecordingsForCamera(camera: CctvCameraRecord, query: CctvRecordingSearch): Promise<CctvRecordingItem[]> {
+  const validated = validateRecordingSearch(query);
+  assertCapability(camera, 'recordings');
+  assertCapability(camera, 'playback');
+  return searchCctvRecordings(camera, validated);
 }
 
-export async function eraseCctvData(
-  live: CctvLiveSession,
-  scope: 'all_recordings' | 'selected_recording',
-): Promise<void> {
-  assertCapability(live.camera, 'eraseData');
-  const adapter = getCctvAdapter(live.camera.protocol);
-  const context = await adapter.connect(live.camera);
+export async function eraseCctvData(camera: CctvCameraRecord, scope: 'all_recordings' | 'selected_recording', recordingToken?: string): Promise<void> {
+  assertCapability(camera, 'eraseData');
+  if (scope === 'selected_recording' && !recordingToken) throw new Error('A selected recording is required.');
+  const active = await openCctvSession(camera);
   try {
-    await adapter.eraseData(context, scope);
+    await getCctvAdapter(camera.protocol).eraseData(active.context, scope, recordingToken);
   } finally {
-    await adapter.disconnect(context);
+    await getCctvAdapter(camera.protocol).disconnect(active.context);
   }
 }
 
@@ -41,7 +31,7 @@ export function canErase(camera: CctvCamera): boolean {
 }
 
 export function canChangePassword(camera: CctvCamera): boolean {
-  return camera.capabilities.passwordChange && Boolean(camera.host && camera.port);
+  return camera.capabilities.passwordChange && Boolean(camera.host && camera.port && camera.securityProfile?.secureTransport && camera.securityProfile.authenticated);
 }
 
 export function sanitizePlaybackQuery(query: CctvRecordingSearch): CctvRecordingSearch {

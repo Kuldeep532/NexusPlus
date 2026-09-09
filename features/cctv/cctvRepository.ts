@@ -3,24 +3,24 @@ import type { CctvCamera } from './cctvTypes';
 import { sanitizeCameraForPersistence } from './cctvBackend';
 import type { CctvCameraRecord } from './cctvBackend';
 
-const CAMERAS_KEY = 'nexus_plus_cctv_cameras_v2';
+const CAMERAS_KEY = 'nexus_plus_cctv_cameras_v3';
 
 interface PersistedCctvState {
-  schemaVersion: 2;
+  schemaVersion: 3;
   cameras: CctvCameraRecord[];
 }
 
 async function readState(): Promise<PersistedCctvState> {
   const raw = await SecureStore.getItemAsync(CAMERAS_KEY);
-  if (!raw) return { schemaVersion: 2, cameras: [] };
+  if (!raw) return { schemaVersion: 3, cameras: [] };
   try {
     const parsed = JSON.parse(raw) as Partial<PersistedCctvState>;
-    if (parsed.schemaVersion !== 2 || !Array.isArray(parsed.cameras)) {
-      return { schemaVersion: 2, cameras: [] };
+    if (parsed.schemaVersion !== 3 || !Array.isArray(parsed.cameras)) {
+      return { schemaVersion: 3, cameras: [] };
     }
-    return { schemaVersion: 2, cameras: parsed.cameras };
+    return { schemaVersion: 3, cameras: parsed.cameras };
   } catch {
-    return { schemaVersion: 2, cameras: [] };
+    return { schemaVersion: 3, cameras: [] };
   }
 }
 
@@ -41,7 +41,7 @@ export async function upsertCctvCamera(camera: CctvCamera): Promise<CctvCameraRe
   const cameras = state.cameras.some((item) => item.id === next.id)
     ? state.cameras.map((item) => (item.id === next.id ? next : item))
     : [...state.cameras, next];
-  await writeState({ schemaVersion: 2, cameras });
+  await writeState({ schemaVersion: 3, cameras });
   return next;
 }
 
@@ -49,7 +49,7 @@ export async function removeCctvCamera(cameraId: string): Promise<void> {
   const state = await readState();
   const cameras = state.cameras.filter((camera) => camera.id !== cameraId);
   if (cameras.length === state.cameras.length) return;
-  await writeState({ schemaVersion: 2, cameras });
+  await writeState({ schemaVersion: 3, cameras });
 }
 
 export async function updateCctvCameraStatus(
@@ -61,7 +61,7 @@ export async function updateCctvCameraStatus(
   if (!camera) return null;
   const updated: CctvCameraRecord = { ...camera, ...patch, updatedAt: Date.now() };
   await writeState({
-    schemaVersion: 2,
+    schemaVersion: 3,
     cameras: state.cameras.map((item) => (item.id === cameraId ? updated : item)),
   });
   return updated;
