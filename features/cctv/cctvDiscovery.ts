@@ -1,6 +1,5 @@
 import { NativeModules, Platform } from 'react-native';
-import * as Crypto from 'expo-crypto';
-import type { CctvCamera, CctvProtocol, CctvSecurityProfile } from './cctvTypes';
+import type { CctvCamera, CctvProtocol } from './cctvTypes';
 import type { CctvCameraRecord, CctvProtocolAdapter } from './cctvBackend';
 import { getCctvAdapter } from './cctvBackend';
 
@@ -32,6 +31,7 @@ function parseEndpoint(value: string | undefined): { host?: string; port?: numbe
     const url = new URL(value);
     const secureTransport = url.protocol === 'https:';
     const port = url.port ? Number(url.port) : secureTransport ? 443 : 80;
+    if (url.username || url.password) return { secureTransport: false };
     return { host: url.hostname, port: Number.isFinite(port) ? port : undefined, secureTransport };
   } catch { return { secureTransport: false }; }
 }
@@ -45,15 +45,7 @@ function inferDeviceKind(types = ''): CctvCamera['deviceKind'] {
 function extractManufacturer(scopes = ''): string | undefined { const match = scopes.match(/(?:^|\s)onvif:\/\/www\.onvif\.org\/name\/([^\s]+)/i); return match?.[1] ? decodeURIComponent(match[1]).replace(/_/g, ' ') : undefined; }
 function extractModel(scopes = ''): string | undefined { const match = scopes.match(/(?:^|\s)onvif:\/\/www\.onvif\.org\/hardware\/([^\s]+)/i); return match?.[1] ? decodeURIComponent(match[1]).replace(/_/g, ' ') : undefined; }
 
-function makeSecurityProfile(device: NativeOnvifDevice, secureTransport: boolean): CctvSecurityProfile {
-  const profileTokens = `${device.types ?? ''} ${device.scopes ?? ''}`.toLowerCase();
-  const profileTDetected = profileTokens.includes('profile_t');
-  const authenticated = profileTDetected || profileTokens.includes('credential');
-  if (secureTransport && authenticated) return { secureTransport: true, authenticated: true, protocolFamily: 'onvif', securityLevel: 'verified' };
-  if (authenticated) return { secureTransport: false, authenticated: true, protocolFamily: 'onvif', securityLevel: 'detected', reason: 'ONVIF authentication detected without an HTTPS endpoint.' };
-  return { secureTransport, authenticated: false, protocolFamily: 'onvif', securityLevel: 'rejected', reason: 'The discovery response did not advertise a verifiable authenticated camera profile.' };
-}
-
+/** LAN discovery is untrusted input. Authentication is proven only by the later ONVIF handshake. */
 export async function discoverCctvCameras(request: CctvDiscoveryRequest): Promise<CctvDiscoveryResult> {
   if (request.source !== 'lan') return { cameras: [], source: request.source };
   if (Platform.OS !== 'android' || !nativeDiscovery) return { cameras: [], source: 'lan' };
@@ -62,14 +54,13 @@ export async function discoverCctvCameras(request: CctvDiscoveryRequest): Promis
   for (const device of devices) {
     const xaddr = device.xaddrs?.split(/\s+/).find(Boolean);
     const endpoint = parseEndpoint(xaddr);
-    const securityProfile = makeSecurityProfile(device, endpoint.secureTransport);
-    if (securityProfile.securityLevel !== 'verified') continue;
+    if (!endpoint.secureTransport || !endpoint.host || !endpoint.port) continue;
     const manufacturer = extractManufacturer(device.scopes);
     const model = extractModel(device.scopes);
     const kind = inferDeviceKind(device.types);
     const protocol: CctvProtocol = 'onvif';
-    const identity = [manufacturer ?? '', model ?? '', device.sourceIp, endpoint.port ?? '', device.endpoint ?? ''].join('|');
-    const id = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, identity);
+    const identity = [manufacturer ?? '', model ?? '', device.sourceIp, endpoint.port, device.endpoint ?? ''].join('|');
+    const id = `${await import('expo-crypto').then(({ digestStringAsync, CryptoDigestAlgorithm }) => digestStringAsync(CryptoDigestAlgorithm.SHA256, identity))}`;
     const now = Date.now();
     cameras.push({
       id,
@@ -78,20 +69,20 @@ export async function discoverCctvCameras(request: CctvDiscoveryRequest): Promis
       model,
       protocol,
       deviceKind: kind,
-      host: endpoint.host ?? device.sourceIp,
+      host: endpoint.host,
       port: endpoint.port,
       username: '',
       passwordRef: id,
       createdAt: now,
       updatedAt: now,
-      capabilities: { liveView: true, audio: false, recordings: false, playback: false, eraseData: false, passwordChange: false, discovery: true, multiCamera: false, switchCamera: false, flip: false, panTiltZoom: false, nightVision: false, talk: false },
-      authenticationProfile: { id: 'username_password', fields: [{ id: 'username', label: 'Username', required: true }, { id: 'password', label: 'Password', required: true, secret: true }], source: 'protocol', confidence: 'verified' },
-      securityProfile,
+      capabilities: { liveView: false, audio: false, recordings: false, playback: false, eraseData: false, passwordChange: false, discovery: false, multiCamera: false, switchCamera: false, flip: false, panTiltZoom: false, nightVision: false, talk: false },
+      authenticationProfile: { id: 'username_password', fields: [{ id: 'username', label: 'Username', required: true }, { id: 'password', label: 'Password', required: true, secret: true }], source: 'protocol', confidence: 'detected' },
+      securityProfile: { secureTransport: true, authenticated: false, protocolFamily: 'onvif', securityLevel: 'detected', reason: 'LAN discovery found an HTTPS ONVIF endpoint; authentication must be verified separately.' },
       connectionState: 'idle',
-      schemaVersion: 2,
+      schemaVersion: 3,
     });
   }
   return { cameras, source: 'lan' };
 }
 export function createDiscoveryAdapter(protocol: CctvCamera['protocol']): CctvProtocolAdapter { return getCctvAdapter(protocol); }
-export function isLanPreferred(camera: CctvCamera): boolean { return Boolean(camera.host && camera.port && camera.protocol !== 'unknown'); }
+export function isLanPreferred(camera: CctvCamera): boolean { return Boolean(camera.host && camera.port && camera.protocol === 'onvif' && camera.securityProfile?.secureTransport); }
