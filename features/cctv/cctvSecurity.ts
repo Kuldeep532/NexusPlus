@@ -3,6 +3,7 @@ import { cctvCredentialStore } from './cctvBackend';
 
 const ERASE_CHALLENGE_PREFIX = 'nexus_plus_cctv_erase_';
 const CHALLENGE_TTL_MS = 2 * 60 * 1000;
+const activeChallenges = new Map<string, CctvEraseChallenge>();
 
 export interface CctvEraseChallenge {
   id: string;
@@ -27,14 +28,12 @@ function equalDigest(left: string, right: string): boolean {
 export async function createEraseChallenge(cameraId: string): Promise<CctvEraseChallenge> {
   const normalizedCameraId = cameraId.trim();
   if (!normalizedCameraId) throw new Error('Camera ID is required.');
-  const nonce = `${normalizedCameraId}:${Date.now()}:${Math.random()}`;
+  const random = await Crypto.getRandomBytesAsync(32);
+  const nonce = `${normalizedCameraId}:${Date.now()}:${Array.from(random).join(',')}`;
   const verificationHash = await hash(nonce);
-  return {
-    id: `${ERASE_CHALLENGE_PREFIX}${verificationHash.slice(0, 24)}`,
-    cameraId: normalizedCameraId,
-    expiresAt: Date.now() + CHALLENGE_TTL_MS,
-    verificationHash,
-  };
+  const challenge = { id: `${ERASE_CHALLENGE_PREFIX}${verificationHash.slice(0, 24)}`, cameraId: normalizedCameraId, expiresAt: Date.now() + CHALLENGE_TTL_MS, verificationHash };
+  activeChallenges.set(challenge.id, challenge);
+  return challenge;
 }
 
 export async function verifyCctvEraseAuthorization(
@@ -43,10 +42,19 @@ export async function verifyCctvEraseAuthorization(
   challenge: CctvEraseChallenge,
 ): Promise<boolean> {
   const normalizedCameraId = cameraId.trim();
-  if (!normalizedCameraId || !password || challenge.cameraId !== normalizedCameraId || challenge.expiresAt <= Date.now()) return false;
-  const credentials = await cctvCredentialStore.read(normalizedCameraId);
-  if (!credentials) return false;
-  const supplied = await hash(`${normalizedCameraId}:${password}`);
-  const expected = await hash(`${normalizedCameraId}:${credentials.password}`);
-  return equalDigest(supplied, expected);
+  const active = activeChallenges.get(challenge.id);
+  if (!normalizedCameraId || !password || !active || active.cameraId !== normalizedCameraId || active.expiresAt <= Date.now() || active.verificationHash !== challenge.verificationHash) return false;
+  try {
+    const credentials = await cctvCredentialStore.read(normalizedCameraId);
+    if (!credentials) return false;
+    const supplied = await hash(`${normalizedCameraId}:${password}`);
+    const expected = await hash(`${normalizedCameraId}:${credentials.password}`);
+    return equalDigest(supplied, expected);
+  } finally {
+    activeChallenges.delete(challenge.id);
+  }
+}
+
+export function invalidateCctvEraseChallenge(challengeId: string): void {
+  activeChallenges.delete(challengeId);
 }
