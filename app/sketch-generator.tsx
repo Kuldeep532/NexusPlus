@@ -1,98 +1,51 @@
 import { Feather } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import Svg, { Polyline } from 'react-native-svg';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import Svg, { Circle, Ellipse, Line, Path, Polyline, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useState, useRef } from 'react';
 import { useColors } from '@/hooks/useColors';
-import { addStroke, clearSketch, createSketchDocument, createStroke, undoLastStroke, type Point, type SketchDocument } from '@/features/sketch/sketchEngine';
 import { generateAiSketch } from '@/features/sketch/aiSketchGateway';
+import { addStroke, BRUSH_SIZES, COLOR_FAMILIES, clearSketch, createSketchDocument, createStroke, setBackground, type Point, type SketchDocument, type SketchSettings, type ToolKind } from '@/features/sketch/sketchEngine';
 
 const CANVAS_SIZE = 320;
+const TOOLS: { label: string; tool: ToolKind; icon: string }[] = [
+  { label: 'Pen', tool: 'pen', icon: 'edit-3' }, { label: 'Pencil', tool: 'pencil', icon: 'edit-2' },
+  { label: 'Marker', tool: 'marker', icon: 'edit-3' }, { label: 'Brush', tool: 'brush', icon: 'feather' },
+  { label: 'Airbrush', tool: 'airbrush', icon: 'cloud' }, { label: 'Crayon', tool: 'crayon', icon: 'edit' },
+  { label: 'Charcoal', tool: 'charcoal', icon: 'edit-2' }, { label: 'Highlight', tool: 'highlighter', icon: 'sun' },
+  { label: 'Eraser', tool: 'eraser', icon: 'square' }, { label: 'Line', tool: 'line', icon: 'minus' },
+  { label: 'Rect', tool: 'rectangle', icon: 'square' }, { label: 'Ellipse', tool: 'ellipse', icon: 'circle' },
+  { label: 'Arrow', tool: 'arrow', icon: 'arrow-up-right' },
+];
+const BACKGROUNDS = ['#FFFFFF', '#F8FAFC', '#FEF3C7', '#DBEAFE', '#DCFCE7', '#FCE7F3', '#EDE9FE', '#111827'];
 
 export default function SketchGeneratorScreen() {
-  const colors = useColors();
-  const insets = useSafeAreaInsets();
+  const colors = useColors(); const insets = useSafeAreaInsets();
   const [document, setDocument] = useState<SketchDocument>(() => createSketchDocument());
   const [mode, setMode] = useState<'traditional' | 'ai'>('traditional');
-  const [prompt, setPrompt] = useState('A simple mountain landscape with a sun');
-  const [style, setStyle] = useState('pencil sketch');
-  const [busy, setBusy] = useState(false);
-  const [aiAsset, setAiAsset] = useState<string | null>(null);
-  const drawing = useRef<Point[]>([]);
-
-  const scale = CANVAS_SIZE / document.width;
-  const previewPoints = useMemo(() => document.strokes.map((stroke) => ({ ...stroke, points: stroke.points.map((point) => ({ x: point.x * scale, y: point.y * scale })) })), [document, scale]);
-
-  const finishStroke = () => {
-    if (drawing.current.length > 1) setDocument((current) => addStroke(current, createStroke(drawing.current)));
-    drawing.current = [];
-  };
-
-  const startStroke = (x: number, y: number) => { drawing.current = [{ x: x / scale, y: y / scale }]; };
+  const [settings, setSettings] = useState<SketchSettings>({ color: '#111827', width: 4, opacity: 1, tool: 'pen' });
+  const [history, setHistory] = useState<SketchDocument[]>([]); const [selectedFamily, setSelectedFamily] = useState('Black & White');
+  const [prompt, setPrompt] = useState('A serene mountain landscape with a sun, hand-drawn sketch'); const [style, setStyle] = useState('pencil sketch');
+  const [busy, setBusy] = useState(false); const [aiAsset, setAiAsset] = useState<string | null>(null);
+  const drawing = useRef<Point[]>([]); const gestureStart = useRef<Point | null>(null); const scale = CANVAS_SIZE / document.width;
+  const commit = (next: SketchDocument) => { setHistory((current) => [...current, document].slice(-50)); setDocument(next); };
+  const startStroke = (x: number, y: number) => { const p = { x: x / scale, y: y / scale }; gestureStart.current = p; drawing.current = [p]; };
   const moveStroke = (x: number, y: number) => { drawing.current = [...drawing.current, { x: x / scale, y: y / scale }]; };
-
-  const generate = async () => {
-    setBusy(true);
-    setAiAsset(null);
-    try {
-      const result = await generateAiSketch({ prompt, style, width: document.width, height: document.height });
-      setAiAsset(result.imageUrl ?? result.svg ?? null);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <Stack.Screen options={{ title: 'Sketch Generator' }} />
-      <ScrollView contentContainerStyle={{ padding: 18, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 28 }}>
-        <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Sketch Generator</Text>
-        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Create a sketch manually or generate one with the AI REST gateway.</Text>
-
-        <View style={[styles.modeRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Pressable accessibilityRole="button" accessibilityState={{ selected: mode === 'traditional' }} onPress={() => setMode('traditional')} style={[styles.modeButton, mode === 'traditional' && { backgroundColor: colors.secondary }]}><Feather name="edit-3" size={17} color={colors.primary} /><Text style={[styles.modeText, { color: colors.foreground }]}>Traditional</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityState={{ selected: mode === 'ai' }} onPress={() => setMode('ai')} style={[styles.modeButton, mode === 'ai' && { backgroundColor: colors.secondary }]}><Feather name="cpu" size={17} color={colors.primary} /><Text style={[styles.modeText, { color: colors.foreground }]}>AI Based</Text></Pressable>
-        </View>
-
-        {mode === 'traditional' ? (
-          <>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Drawing canvas</Text>
-            <View style={[styles.canvasWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View
-                accessibilityRole="image"
-                accessibilityLabel="Sketch drawing canvas"
-                onTouchStart={(event) => startStroke(event.nativeEvent.locationX, event.nativeEvent.locationY)}
-                onTouchMove={(event) => moveStroke(event.nativeEvent.locationX, event.nativeEvent.locationY)}
-                onTouchEnd={finishStroke}
-                style={styles.canvas}
-              >
-                <Svg width={CANVAS_SIZE} height={CANVAS_SIZE}>
-                  <Polyline points={`0,0 ${CANVAS_SIZE},0 ${CANVAS_SIZE},${CANVAS_SIZE} 0,${CANVAS_SIZE} 0,0`} fill="#ffffff" stroke={colors.border} strokeWidth={1} />
-                  {previewPoints.map((stroke) => <Polyline key={stroke.id} points={stroke.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke={stroke.color} strokeWidth={Math.max(1, stroke.width * scale)} strokeLinecap="round" strokeLinejoin="round" />)}
-                </Svg>
-              </View>
-            </View>
-            <View style={styles.actionRow}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Undo last stroke" disabled={document.strokes.length === 0} onPress={() => setDocument((current) => undoLastStroke(current))} style={[styles.actionButton, { backgroundColor: colors.card, borderColor: colors.border, opacity: document.strokes.length === 0 ? 0.5 : 1 }]}><Feather name="corner-up-left" size={17} color={colors.foreground} /><Text style={[styles.actionText, { color: colors.foreground }]}>Undo</Text></Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Clear sketch" onPress={() => setDocument((current) => clearSketch(current))} style={[styles.actionButton, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="trash-2" size={17} color={colors.foreground} /><Text style={[styles.actionText, { color: colors.foreground }]}>Clear</Text></Pressable>
-            </View>
-          </>
-        ) : (
-          <>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>AI sketch prompt</Text>
-            <TextInput accessibilityLabel="AI sketch prompt" value={prompt} onChangeText={setPrompt} multiline style={[styles.input, { color: colors.foreground, backgroundColor: colors.card, borderColor: colors.border }]} placeholder="Describe the sketch you want" placeholderTextColor={colors.mutedForeground} />
-            <TextInput accessibilityLabel="AI sketch style" value={style} onChangeText={setStyle} style={[styles.input, { color: colors.foreground, backgroundColor: colors.card, borderColor: colors.border }]} placeholder="Style, for example pencil sketch" placeholderTextColor={colors.mutedForeground} />
-            <Pressable accessibilityRole="button" accessibilityLabel="Generate AI sketch" disabled={busy || !prompt.trim()} onPress={generate} style={[styles.generateButton, { backgroundColor: colors.primary, opacity: busy || !prompt.trim() ? 0.6 : 1 }]}><Feather name={busy ? 'loader' : 'zap'} size={18} color={colors.primaryForeground} /><Text style={[styles.generateText, { color: colors.primaryForeground }]}>{busy ? 'Generating…' : 'Generate Sketch'}</Text></Pressable>
-            <View accessible accessibilityRole="summary" style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.infoTitle, { color: colors.foreground }]}>Gateway security</Text><Text style={[styles.infoText, { color: colors.mutedForeground }]}>The app sends requests only to the configured REST gateway. Hugging Face credentials stay server-side; no token is embedded in the mobile app.</Text></View>
-            {aiAsset && <View accessible accessibilityRole="image" accessibilityLabel="Generated AI sketch asset" style={[styles.resultCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.infoTitle, { color: colors.foreground }]}>Generated asset ready</Text><Text style={[styles.infoText, { color: colors.mutedForeground }]}>{aiAsset.startsWith('<svg') ? 'SVG sketch returned by the gateway.' : 'Image asset returned by the gateway.'}</Text></View>}
-          </>
-        )}
-      </ScrollView>
-    </View>
-  );
+  const finishStroke = () => { const start = gestureStart.current; const end = drawing.current.at(-1); if (!start || !end) return; if (settings.tool === 'line' || settings.tool === 'arrow') commit(addStroke(document, createStroke([start, end], settings))); else if (settings.tool === 'rectangle' || settings.tool === 'ellipse') { const minX=Math.min(start.x,end.x), minY=Math.min(start.y,end.y), maxX=Math.max(start.x,end.x), maxY=Math.max(start.y,end.y); commit(addStroke(document, createStroke([{x:minX,y:minY},{x:maxX,y:minY},{x:maxX,y:maxY},{x:minX,y:maxY},{x:minX,y:minY}], settings))); } else if (drawing.current.length > 1) commit(addStroke(document, createStroke(drawing.current, settings))); gestureStart.current=null; drawing.current=[]; };
+  const undo = () => { if (!history.length) return; setDocument(history.at(-1)!); setHistory((h)=>h.slice(0,-1)); };
+  const chooseColor = (color:string) => setSettings((s)=>({...s,color,tool:s.tool==='eraser'?'pen':s.tool}));
+  const renderStroke = (stroke: SketchDocument['strokes'][number]) => { const pts=stroke.points.map(p=>`${p.x*scale},${p.y*scale}`).join(' '); const c=stroke.tool==='eraser'?document.background:stroke.color; const opacity=stroke.tool==='highlighter'?Math.min(.35,stroke.opacity):stroke.opacity; const w=Math.max(1,stroke.width*scale); if(stroke.tool==='ellipse'){const xs=stroke.points.map(p=>p.x*scale),ys=stroke.points.map(p=>p.y*scale);return <Ellipse key={stroke.id} cx={(Math.min(...xs)+Math.max(...xs))/2} cy={(Math.min(...ys)+Math.max(...ys))/2} rx={(Math.max(...xs)-Math.min(...xs))/2} ry={(Math.max(...ys)-Math.min(...ys))/2} fill="none" stroke={c} strokeOpacity={opacity} strokeWidth={w}/>;} if(stroke.tool==='rectangle'){const xs=stroke.points.map(p=>p.x*scale),ys=stroke.points.map(p=>p.y*scale);return <Rect key={stroke.id} x={Math.min(...xs)} y={Math.min(...ys)} width={Math.max(...xs)-Math.min(...xs)} height={Math.max(...ys)-Math.min(...ys)} fill="none" stroke={c} strokeOpacity={opacity} strokeWidth={w}/>;} if(stroke.tool==='line'||stroke.tool==='arrow'){const [a,b]=stroke.points;if(!a||!b)return null;const x1=a.x*scale,y1=a.y*scale,x2=b.x*scale,y2=b.y*scale,ang=Math.atan2(y2-y1,x2-x1),head=Math.max(8,w*2.8),hx1=x2-head*Math.cos(ang-Math.PI/6),hy1=y2-head*Math.sin(ang-Math.PI/6),hx2=x2-head*Math.cos(ang+Math.PI/6),hy2=y2-head*Math.sin(ang+Math.PI/6);return <><Line key={`${stroke.id}-l`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={c} strokeOpacity={opacity} strokeWidth={w} strokeLinecap="round"/>{stroke.tool==='arrow'&&<Path key={`${stroke.id}-h`} d={`M ${hx1} ${hy1} L ${x2} ${y2} L ${hx2} ${hy2}`} fill="none" stroke={c} strokeOpacity={opacity} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round"/>}</>;} return stroke.points.length>1?<Polyline key={stroke.id} points={pts} fill="none" stroke={c} strokeOpacity={opacity} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round"/>:null; };
+  const generate=async()=>{setBusy(true);setAiAsset(null);try{const r=await generateAiSketch({prompt,style,width:document.width,height:document.height});setAiAsset(r.dataUrl??r.imageUrl??null);}finally{setBusy(false);}};
+  return <View style={[styles.root,{backgroundColor:colors.background}]}><Stack.Screen options={{title:'Sketch Generator'}}/><ScrollView contentContainerStyle={{padding:18,paddingTop:insets.top+12,paddingBottom:insets.bottom+28}} keyboardShouldPersistTaps="handled">
+    <Text accessibilityRole="header" style={[styles.title,{color:colors.foreground}]}>Sketch Generator</Text><Text style={[styles.subtitle,{color:colors.mutedForeground}]}>Traditional painter workspace and secured AI sketch generation.</Text>
+    <View style={[styles.modeRow,{backgroundColor:colors.card,borderColor:colors.border}]}><Pressable accessibilityRole="button" accessibilityState={{selected:mode==='traditional'}} onPress={()=>setMode('traditional')} style={[styles.modeButton,mode==='traditional'&&{backgroundColor:colors.secondary}]}><Feather name="edit-3" size={17} color={colors.primary}/><Text style={[styles.modeText,{color:colors.foreground}]}>Traditional</Text></Pressable><Pressable accessibilityRole="button" accessibilityState={{selected:mode==='ai'}} onPress={()=>setMode('ai')} style={[styles.modeButton,mode==='ai'&&{backgroundColor:colors.secondary}]}><Feather name="cpu" size={17} color={colors.primary}/><Text style={[styles.modeText,{color:colors.foreground}]}>AI Based</Text></Pressable></View>
+    {mode==='traditional'?<><Text style={[styles.sectionTitle,{color:colors.foreground}]}>Painter tools</Text><View style={styles.toolGrid}>{TOOLS.map(t=><Pressable key={t.tool} accessibilityRole="button" accessibilityState={{selected:settings.tool===t.tool}} accessibilityLabel={`${t.label} tool`} onPress={()=>setSettings(s=>({...s,tool:t.tool}))} style={[styles.toolButton,{backgroundColor:colors.card,borderColor:settings.tool===t.tool?colors.primary:colors.border}]}><Feather name={t.icon as never} size={15} color={colors.foreground}/><Text style={[styles.toolText,{color:colors.foreground}]}>{t.label}</Text></Pressable>)}</View>
+    <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Color library</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.familyRow}>{COLOR_FAMILIES.map(f=><Pressable key={f.name} accessibilityRole="button" accessibilityState={{selected:selectedFamily===f.name}} onPress={()=>setSelectedFamily(f.name)} style={[styles.familyButton,{backgroundColor:colors.card,borderColor:selectedFamily===f.name?colors.primary:colors.border}]}><Text style={[styles.familyText,{color:colors.foreground}]}>{f.name}</Text></Pressable>)}</ScrollView><View style={styles.colorGrid}>{(COLOR_FAMILIES.find(f=>f.name===selectedFamily)?.shades??[]).map(c=><Pressable key={c} accessibilityRole="button" accessibilityLabel={`${selectedFamily} shade`} onPress={()=>chooseColor(c)} style={[styles.colorSwatch,{backgroundColor:c,borderColor:settings.color===c?colors.primary:colors.border}]}/>)}</View>
+    <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Brush size</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sizeRow}>{BRUSH_SIZES.map(s=><Pressable key={s} accessibilityRole="button" accessibilityState={{selected:settings.width===s}} onPress={()=>setSettings(v=>({...v,width:s}))} style={[styles.sizeButton,{backgroundColor:colors.card,borderColor:settings.width===s?colors.primary:colors.border}]}><View style={{width:Math.min(24,Math.max(3,s/2)),height:Math.min(24,Math.max(3,s/2)),borderRadius:99,backgroundColor:settings.color}}/><Text style={[styles.sizeText,{color:colors.foreground}]}>{s}px</Text></Pressable>)}</ScrollView>
+    <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Opacity</Text><View style={styles.opacityRow}>{[1,.75,.5,.25,.1].map(o=><Pressable key={o} accessibilityRole="button" accessibilityState={{selected:settings.opacity===o}} onPress={()=>setSettings(v=>({...v,opacity:o}))} style={[styles.opacityButton,{backgroundColor:colors.card,borderColor:settings.opacity===o?colors.primary:colors.border}]}><Text style={[styles.opacityText,{color:colors.foreground}]}>{Math.round(o*100)}%</Text></Pressable>)}</View>
+    <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Canvas</Text><View style={[styles.canvasWrap,{backgroundColor:colors.card,borderColor:colors.border}]}><View accessibilityRole="image" accessibilityLabel="Traditional sketch canvas. Draw with touch." onTouchStart={e=>startStroke(e.nativeEvent.locationX,e.nativeEvent.locationY)} onTouchMove={e=>moveStroke(e.nativeEvent.locationX,e.nativeEvent.locationY)} onTouchEnd={finishStroke} style={[styles.canvas,{backgroundColor:document.background}]}><Svg width={CANVAS_SIZE} height={CANVAS_SIZE}>{document.strokes.map(renderStroke)}</Svg></View></View><View style={styles.actionRow}><Pressable accessibilityRole="button" accessibilityLabel="Undo last action" disabled={!history.length} onPress={undo} style={[styles.actionButton,{backgroundColor:colors.card,borderColor:colors.border,opacity:history.length?1:.5}]}><Feather name="corner-up-left" size={17} color={colors.foreground}/><Text style={[styles.actionText,{color:colors.foreground}]}>Undo</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Clear canvas" onPress={()=>{setHistory(h=>[...h,document].slice(-50));setDocument(clearSketch(document));}} style={[styles.actionButton,{backgroundColor:colors.card,borderColor:colors.border}]}><Feather name="trash-2" size={17} color={colors.foreground}/><Text style={[styles.actionText,{color:colors.foreground}]}>Clear</Text></Pressable></View>
+    <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Paper</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.backgroundRow}>{BACKGROUNDS.map(c=><Pressable key={c} accessibilityRole="button" onPress={()=>setDocument(d=>setBackground(d,c))} style={[styles.backgroundSwatch,{backgroundColor:c,borderColor:document.background===c?colors.primary:colors.border}]}/>)}</ScrollView></>:<><Text style={[styles.sectionTitle,{color:colors.foreground}]}>AI sketch generation</Text><TextInput accessibilityLabel="AI sketch prompt" value={prompt} onChangeText={setPrompt} multiline style={[styles.input,{color:colors.foreground,backgroundColor:colors.card,borderColor:colors.border}]} placeholder="Describe your sketch" placeholderTextColor={colors.mutedForeground}/><TextInput accessibilityLabel="AI sketch style" value={style} onChangeText={setStyle} style={[styles.input,{color:colors.foreground,backgroundColor:colors.card,borderColor:colors.border}]} placeholder="Style" placeholderTextColor={colors.mutedForeground}/><Pressable accessibilityRole="button" disabled={busy||!prompt.trim()} onPress={generate} style={[styles.generateButton,{backgroundColor:colors.primary,opacity:busy||!prompt.trim()?.6:1}]}><Feather name="zap" size={18} color={colors.primaryForeground}/><Text style={[styles.generateText,{color:colors.primaryForeground}]}>{busy?'Generating…':'Generate Sketch'}</Text></Pressable>{aiAsset&&<View style={[styles.resultCard,{backgroundColor:colors.card,borderColor:colors.border}]}><Image accessibilityLabel="AI generated sketch" source={{uri:aiAsset}} style={styles.resultImage}/><Text style={[styles.infoText,{color:colors.mutedForeground}]}>Generated through the Hugging Face gateway.</Text></View>}</>}
+  </ScrollView></View>;
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1 }, title: { fontSize: 27, fontFamily: 'Inter_700Bold' }, subtitle: { fontSize: 11, lineHeight: 17, marginTop: 6 }, modeRow: { flexDirection: 'row', borderWidth: 1, borderRadius: 16, padding: 4, marginTop: 18 }, modeButton: { flex: 1, minHeight: 44, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, modeText: { fontSize: 12, fontFamily: 'Inter_700Bold' }, sectionTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', marginTop: 20, marginBottom: 9 }, canvasWrap: { alignSelf: 'center', borderWidth: 1, borderRadius: 18, padding: 7 }, canvas: { width: CANVAS_SIZE, height: CANVAS_SIZE, overflow: 'hidden', backgroundColor: '#ffffff', borderRadius: 12 }, actionRow: { flexDirection: 'row', gap: 10, marginTop: 12 }, actionButton: { flex: 1, minHeight: 46, borderWidth: 1, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, actionText: { fontSize: 12, fontFamily: 'Inter_700Bold' }, input: { minHeight: 52, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, fontSize: 12, marginBottom: 10 }, generateButton: { minHeight: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 3 }, generateText: { fontSize: 12, fontFamily: 'Inter_700Bold' }, infoCard: { borderWidth: 1, borderRadius: 16, padding: 14, marginTop: 14 }, resultCard: { borderWidth: 1, borderRadius: 16, padding: 14, marginTop: 10 }, infoTitle: { fontSize: 12, fontFamily: 'Inter_700Bold', marginBottom: 5 }, infoText: { fontSize: 11, lineHeight: 17 }
-});
+const styles=StyleSheet.create({root:{flex:1},title:{fontSize:27,fontFamily:'Inter_700Bold'},subtitle:{fontSize:11,lineHeight:17,marginTop:6},modeRow:{flexDirection:'row',borderWidth:1,borderRadius:16,padding:4,marginTop:18},modeButton:{flex:1,minHeight:44,borderRadius:12,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8},modeText:{fontSize:12,fontFamily:'Inter_700Bold'},sectionTitle:{fontSize:15,fontFamily:'Inter_700Bold',marginTop:20,marginBottom:9},toolGrid:{flexDirection:'row',flexWrap:'wrap',gap:8},toolButton:{width:'31%',minHeight:48,borderWidth:1,borderRadius:13,alignItems:'center',justifyContent:'center',gap:4},toolText:{fontSize:10,fontFamily:'Inter_700Bold'},familyRow:{gap:8},familyButton:{borderWidth:1,borderRadius:12,paddingHorizontal:11,minHeight:38,justifyContent:'center'},familyText:{fontSize:10,fontFamily:'Inter_700Bold'},colorGrid:{flexDirection:'row',flexWrap:'wrap',gap:8,marginTop:10},colorSwatch:{width:34,height:34,borderRadius:17,borderWidth:2},sizeRow:{gap:8},sizeButton:{minWidth:70,minHeight:48,borderWidth:1,borderRadius:12,alignItems:'center',justifyContent:'center',gap:4,paddingHorizontal:8},sizeText:{fontSize:9,fontFamily:'Inter_700Bold'},opacityRow:{flexDirection:'row',gap:8},opacityButton:{flex:1,minHeight:42,borderWidth:1,borderRadius:12,alignItems:'center',justifyContent:'center'},opacityText:{fontSize:10,fontFamily:'Inter_700Bold'},canvasWrap:{alignSelf:'center',borderWidth:1,borderRadius:18,padding:7},canvas:{width:CANVAS_SIZE,height:CANVAS_SIZE,overflow:'hidden',borderRadius:12},actionRow:{flexDirection:'row',gap:10,marginTop:12},actionButton:{flex:1,minHeight:46,borderWidth:1,borderRadius:14,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8},actionText:{fontSize:12,fontFamily:'Inter_700Bold'},backgroundRow:{gap:8},backgroundSwatch:{width:42,height:42,borderRadius:13,borderWidth:2},input:{minHeight:52,borderWidth:1,borderRadius:14,paddingHorizontal:14,paddingVertical:10,fontSize:12,marginBottom:10},generateButton:{minHeight:50,borderRadius:14,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8},generateText:{fontSize:12,fontFamily:'Inter_700Bold'},resultCard:{borderWidth:1,borderRadius:16,padding:12,marginTop:14},resultImage:{width:'100%',aspectRatio:1,borderRadius:12,marginBottom:8},infoText:{fontSize:11,lineHeight:17}});
