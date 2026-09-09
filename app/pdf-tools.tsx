@@ -8,11 +8,11 @@ type Tool = { key: string; title: string; description: string; icon: React.Compo
 
 const tools: Tool[] = [
   { key: 'merge-pdf', title: 'Merge PDF', description: 'Combine multiple PDF files into one PDF.', icon: 'file-document-multiple-outline', route: '/merge-pdf' },
+  { key: 'split-pdf', title: 'Split PDF', description: 'Cut a PDF into separate files using page ranges.', icon: 'content-cut', route: '/split-pdf' },
   { key: 'pdf-to-images', title: 'PDF to Images', description: 'Convert PDF pages into PNG or JPG files.', icon: 'file-image-outline', route: '/pdf-to-images' },
   { key: 'image-to-pdf', title: 'Images to PDF', description: 'Create a PDF from one or more images.', icon: 'file-image-plus-outline', route: '/image-to-pdf' },
   { key: 'compress-pdf', title: 'Compress PDF', description: 'Reduce PDF file size for easier sharing.', icon: 'file-minus-outline', route: '/compress-pdf' },
-  { key: 'unlock-pdf', title: 'Unlock PDF', description: 'Remove password protection after authentication.', icon: 'lock-open-outline', route: '/unlock-pdf' },
-  { key: 'split-pdf', title: 'Split PDF', description: 'Extract selected pages or ranges into separate PDFs.', icon: 'content-cut', route: '/split-pdf' },
+  { key: 'lock-unlock-pdf', title: 'Lock & Unlock PDF', description: 'Password-protect a PDF or remove its existing protection.', icon: 'shield-lock-outline', route: '/lock-unlock-pdf' },
   { key: 'reorder-pdf', title: 'Reorder PDF', description: 'Change the order of pages and save a new PDF.', icon: 'swap-vertical', route: '/reorder-pdf' },
   { key: 'delete-pages', title: 'Delete PDF Pages', description: 'Remove unwanted pages from a PDF.', icon: 'file-remove-outline', route: '/delete-pdf-pages' },
   { key: 'extract-pages', title: 'Extract PDF Pages', description: 'Save selected pages as a new PDF.', icon: 'file-export-outline', route: '/extract-pdf-pages' },
