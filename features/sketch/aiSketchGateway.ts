@@ -14,6 +14,7 @@ export type AiSketchRequest = {
   width?: number;
   height?: number;
   seed?: number;
+  model?: string;
 };
 
 export type AiSketchResponse = z.infer<typeof AiSketchResponseSchema>;
