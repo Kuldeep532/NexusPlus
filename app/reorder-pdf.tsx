@@ -3,21 +3,16 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Stack } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { PdfNativeBridge } from '@/features/pdf-native/PdfNativeBridge';
-import { reorderPdfWithNativeEngine } from '@/features/pdf-native/pdfPageOperations';
+import { buildPageOrder, assertValidPageCount } from '@/features/pdf-native/pdfPageInput';
+import { getPdfInfo } from '@uzimandias/react-native-pdf-to-image';
 
 function safeBaseName(name: string): string {
   return name.replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 128) || 'document';
-}
-
-async function getPageCount(path: string): Promise<number> {
-  const infoModule = await import('@uzimandias/react-native-pdf-to-image');
-  const info = await infoModule.getPdfInfo(path);
-  return info.pageCount;
 }
 
 type PdfInput = { uri: string; name: string; pageCount: number };
@@ -38,11 +33,11 @@ export default function ReorderPdfScreen() {
     if (picked.canceled || !picked.assets?.[0]) return;
     try {
       const asset = picked.assets[0];
-      const pageCount = await getPageCount(asset.uri);
-      if (!Number.isInteger(pageCount) || pageCount < 1 || pageCount > 1000) throw new Error('This PDF has an unsupported number of pages.');
+      const info = await getPdfInfo(asset.uri);
+      const pageCount = assertValidPageCount(info.pageCount);
       setPdf({ uri: asset.uri, name: asset.name || 'document.pdf', pageCount });
       setPageOrder(Array.from({ length: pageCount }, (_, index) => index + 1));
-      setStatus(`${pageCount} pages loaded. Use Move Up and Move Down to change the order.`);
+      setStatus(`${pageCount} pages loaded. Valid page numbers are 1 to ${pageCount}.`);
     } catch (error) {
       setPdf(null);
       setPageOrder([]);
@@ -70,18 +65,16 @@ export default function ReorderPdfScreen() {
   }
 
   async function saveReorderedPdf() {
-    if (!pdf || pageOrder.length !== pdf.pageCount) {
-      setStatus('Select a PDF before reordering pages.');
-      return;
-    }
-    setBusy(true);
-    setResult(null);
-    setStatus('Reordering PDF pages…');
+    if (!pdf) { setStatus('Select a PDF before reordering pages.'); return; }
     try {
+      const safeOrder = buildPageOrder(pdf.pageCount, pageOrder);
+      setBusy(true);
+      setResult(null);
+      setStatus('Reordering PDF pages…');
       const base = FileSystem.cacheDirectory;
       if (!base) throw new Error('App cache storage is unavailable.');
       const output = `${base}nexus-pdf-${Date.now()}-${safeBaseName(pdf.name)}-reordered.pdf`;
-      const uri = await PdfNativeBridge.reorder(pdf.uri, output, pageOrder);
+      const uri = await PdfNativeBridge.reorder(pdf.uri, output, safeOrder);
       setResult(uri);
       setStatus('PDF reordered successfully.');
     } catch (error) {
@@ -101,12 +94,6 @@ export default function ReorderPdfScreen() {
     }
   }
 
-  useEffect(() => () => {
-    if (result && result.startsWith(FileSystem.cacheDirectory ?? '___never___')) {
-      void FileSystem.deleteAsync(result, { idempotent: true }).catch(() => undefined);
-    }
-  }, [result]);
-
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}> 
       <Stack.Screen options={{ title: 'Reorder PDF' }} />
@@ -120,12 +107,12 @@ export default function ReorderPdfScreen() {
         <ScrollView contentContainerStyle={{ paddingTop: insets.top + 18, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
             <View style={[styles.icon, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="swap-vertical" size={29} color={colors.primary} /></View>
-            <View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Reorder PDF</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Change page order without combining workflows into another screen.</Text></View>
+            <View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Reorder PDF</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Change page order without leaving this dedicated tool.</Text></View>
           </View>
 
           <Pressable accessibilityRole="button" accessibilityLabel={pdf ? `Selected PDF ${pdf.name}` : 'Choose PDF'} onPress={() => void pickPdf()} style={({ pressed }) => [styles.pick, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]}>
             <Feather name="file-plus" size={20} color={colors.primary} />
-            <View style={styles.pickCopy}><Text style={[styles.pickTitle, { color: colors.foreground }]}>{pdf ? pdf.name : 'Choose PDF'}</Text><Text style={[styles.pickDetail, { color: colors.mutedForeground }]}>{pdf ? `${pdf.pageCount} pages` : 'Select a local PDF file'}</Text></View>
+            <View style={styles.pickCopy}><Text style={[styles.pickTitle, { color: colors.foreground }]}>{pdf ? pdf.name : 'Choose PDF'}</Text><Text style={[styles.pickDetail, { color: colors.mutedForeground }]}>{pdf ? `${pdf.pageCount} pages • valid range 1-${pdf.pageCount}` : 'Select a local PDF file'}</Text></View>
             <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
           </Pressable>
 
@@ -135,7 +122,7 @@ export default function ReorderPdfScreen() {
                 <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Page order</Text>
                 <Pressable accessibilityRole="button" accessibilityLabel="Restore original page order" onPress={resetOrder}><Text style={[styles.resetText, { color: colors.primary }]}>Reset</Text></Pressable>
               </View>
-              <Text style={[styles.hint, { color: colors.mutedForeground }]}>Page 1 means the original first page. Each page has accessible Move Up and Move Down controls.</Text>
+              <Text style={[styles.hint, { color: colors.mutedForeground }]}>This PDF has {pdf.pageCount} pages. Every valid page number is 1-{pdf.pageCount}, and each page must appear exactly once.</Text>
 
               <View style={styles.pages}>
                 {pageOrder.map((originalPage, index) => (
