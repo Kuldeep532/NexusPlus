@@ -1,4 +1,4 @@
-import type { CctvCamera, CctvCapabilities, CctvDeviceKind, CctvAuthenticationProfile } from './cctvTypes';
+import type { CctvCamera, CctvCapabilities, CctvDeviceKind, CctvAuthenticationProfile, CctvSecurityProfile } from './cctvTypes';
 import { listCctvCameraRecords, upsertCctvCamera } from './cctvRepository';
 import { deriveStableCameraId, cctvCredentialStore } from './cctvBackend';
 import { detectAuthenticationProfile } from './cctvAuthProfile';
@@ -40,6 +40,9 @@ export async function saveManagedCamera(input: {
   protocol: CctvCamera['protocol'];
   deviceKind?: CctvDeviceKind;
   authenticationProfile?: CctvAuthenticationProfile;
+  securityProfile?: CctvSecurityProfile;
+  host?: string;
+  port?: number;
   capabilities: CctvCapabilities;
 }): Promise<CctvCamera> {
   const authProfile = input.authenticationProfile ?? detectAuthenticationProfile({
@@ -62,13 +65,19 @@ export async function saveManagedCamera(input: {
     manufacturer: input.manufacturer?.trim() || undefined,
     protocol: input.protocol,
     deviceKind: input.deviceKind ?? 'ip_camera',
+    host: input.host?.trim() || undefined,
+    port: input.port,
     username: input.username.trim(),
     passwordRef: id,
     createdAt: now,
     updatedAt: now,
     capabilities: input.capabilities,
     authenticationProfile: authProfile,
+    securityProfile: input.securityProfile,
   };
+  if (camera.securityProfile?.securityLevel === 'verified' && (!camera.host || !camera.port)) {
+    throw new Error('A verified CCTV camera must have an authorized network endpoint.');
+  }
   await upsertCctvCamera(camera);
   await cctvCredentialStore.save(camera.id, camera.username, input.password);
   return camera;
