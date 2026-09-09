@@ -6,6 +6,7 @@ type PdfNativeApi = {
   imageToPdf(inputPaths: string[], outputPath: string, quality: number): Promise<string>;
   unlock(inputPath: string, outputPath: string, password: string): Promise<string>;
   compress(inputPath: string, outputPath: string, quality: number): Promise<string>;
+  split(inputPath: string, outputDirectory: string, pageRanges: string[]): Promise<string[]>;
 };
 
 const nativeModule = NativeModules.NexusPdfNative as PdfNativeApi | undefined;
@@ -48,5 +49,11 @@ export const PdfNativeBridge = {
   compress: async (inputPath: string, outputPath: string, quality = 75) => {
     validatePath(inputPath); validatePath(outputPath); if (!Number.isFinite(quality)) throw new Error('Invalid compression quality.');
     return (await requireNative()).compress(inputPath, outputPath, Math.max(1, Math.min(100, Math.round(quality))));
+  },
+  split: async (inputPath: string, outputDirectory: string, pageRanges: string[]) => {
+    validatePath(inputPath); validatePath(outputDirectory);
+    if (!Array.isArray(pageRanges) || pageRanges.length === 0 || pageRanges.length > 100) throw new Error('Select at least one page range.');
+    pageRanges.forEach((range) => { if (!range.trim() || !/^\d+(?:-\d+)?$/.test(range.trim())) throw new Error(`Invalid page range: ${range}`); });
+    return (await requireNative()).split(inputPath, outputDirectory, pageRanges);
   },
 };
