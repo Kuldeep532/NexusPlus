@@ -14,7 +14,7 @@ export default function ProductivityToolsScreen() {
   return (
     <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 18, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24 }}>
       <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Productivity Tools</Text>
-      <Text style={[styles.body, { color: colors.mutedForeground }]}>Reading, computer control and focused workflows.</Text>
+      <Text style={[styles.body, { color: colors.mutedForeground }]}>Reading, publishing and focused workflows.</Text>
       <View style={styles.list}>
         {tools.map((tool) => (
           <Pressable key={tool.id} accessibilityRole="button" accessibilityLabel={`${tool.title}. ${tool.description}`} onPress={() => router.push(tool.route as never)} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
