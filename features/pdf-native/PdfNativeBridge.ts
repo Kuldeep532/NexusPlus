@@ -1,4 +1,5 @@
 import { NativeModules, Platform } from 'react-native';
+import { buildPageOrder, pageRangeStrings } from './pdfPageInput';
 
 type PdfNativeApi = {
   isAvailable(): Promise<boolean>;
@@ -32,13 +33,6 @@ function validatePaths(paths: string[]): void {
   paths.forEach(validatePath);
 }
 
-function validatePageOrder(pageOrder: number[]): void {
-  if (!Array.isArray(pageOrder) || pageOrder.length === 0 || pageOrder.length > 1000) throw new Error('Invalid page order.');
-  pageOrder.forEach((page, index) => {
-    if (!Number.isInteger(page) || page < 1) throw new Error(`Invalid page number at position ${index + 1}.`);
-  });
-}
-
 export const PdfNativeBridge = {
   isAvailable: async () => {
     if (!nativeModule) return false;
@@ -63,13 +57,15 @@ export const PdfNativeBridge = {
     validatePath(inputPath); validatePath(outputPath); if (!Number.isFinite(quality)) throw new Error('Invalid compression quality.');
     return (await requireNative()).compress(inputPath, outputPath, Math.max(1, Math.min(100, Math.round(quality))));
   },
-  split: async (inputPath: string, outputDirectory: string, pageRanges: string[]) => {
+  split: async (inputPath: string, outputDirectory: string, pageRanges: string[], pageCount?: number) => {
     validatePath(inputPath); validatePath(outputDirectory);
     if (!Array.isArray(pageRanges) || pageRanges.length === 0 || pageRanges.length > 100) throw new Error('Invalid PDF page ranges.');
-    return (await requireNative()).split(inputPath, outputDirectory, pageRanges);
+    const safeRanges = pageCount === undefined ? pageRanges : pageRangeStrings(pageRanges.join(', '), pageCount);
+    return (await requireNative()).split(inputPath, outputDirectory, safeRanges);
   },
-  reorder: async (inputPath: string, outputPath: string, pageOrder: number[]) => {
-    validatePath(inputPath); validatePath(outputPath); validatePageOrder(pageOrder);
-    return (await requireNative()).reorder(inputPath, outputPath, pageOrder);
+  reorder: async (inputPath: string, outputPath: string, pageOrder: number[], pageCount?: number) => {
+    validatePath(inputPath); validatePath(outputPath);
+    const safeOrder = pageCount === undefined ? pageOrder : buildPageOrder(pageCount, pageOrder);
+    return (await requireNative()).reorder(inputPath, outputPath, safeOrder);
   },
 };
