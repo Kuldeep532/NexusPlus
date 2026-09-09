@@ -8,14 +8,16 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, Text
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { splitPdfWithNativeEngine } from '@/features/pdf-native/pdfPageOperations';
+import { assertValidPageCount, clampPageNumber, sanitizePageRangeInput } from '@/features/pdf-native/pdfPageInput';
+import { getPdfInfo } from '@uzimandias/react-native-pdf-to-image';
 
-type PdfInput = { uri: string; name: string };
+type PdfInput = { uri: string; name: string; pageCount: number };
 
 export default function SplitPdfScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [pdf, setPdf] = useState<PdfInput | null>(null);
-  const [ranges, setRanges] = useState('1-3');
+  const [ranges, setRanges] = useState('');
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const [outputs, setOutputs] = useState<string[]>([]);
@@ -25,21 +27,36 @@ export default function SplitPdfScreen() {
     setOutputs([]);
     const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', multiple: false, copyToCacheDirectory: true });
     if (result.canceled || !result.assets?.[0]) return;
-    setPdf({ uri: result.assets[0].uri, name: result.assets[0].name || 'document.pdf' });
-    setStatus('PDF selected. Enter one or more page ranges, such as 1-3, 5, 8-10.');
+    try {
+      const asset = result.assets[0];
+      const info = await getPdfInfo(asset.uri);
+      const pageCount = assertValidPageCount(info.pageCount);
+      setPdf({ uri: asset.uri, name: asset.name || 'document.pdf', pageCount });
+      setRanges('');
+      setStatus(`${pageCount} pages loaded. Valid page numbers are 1 to ${pageCount}.`);
+    } catch (error) {
+      setPdf(null);
+      setRanges('');
+      setStatus(error instanceof Error ? error.message : 'Could not read the PDF page count.');
+    }
+  }
+
+  function updateRanges(value: string) {
+    if (!pdf) { setRanges(value); return; }
+    setRanges(sanitizePageRangeInput(value, pdf.pageCount));
   }
 
   async function split() {
     if (!pdf) { setStatus('Select a PDF first.'); return; }
-    const pageRanges = ranges.split(',').map((item) => item.trim()).filter(Boolean);
-    if (!pageRanges.length) { setStatus('Enter at least one page range.'); return; }
+    if (!ranges.trim()) { setStatus(`Enter page numbers or ranges from 1 to ${pdf.pageCount}.`); return; }
     setBusy(true);
     setOutputs([]);
     setStatus('Preparing PDF split…');
     try {
+      const pageRanges = ranges.split(',').map((item) => item.trim()).filter(Boolean);
       const directory = `${FileSystem.cacheDirectory || ''}nexus-pdf-split-${Date.now()}/`;
       await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
-      const result = await splitPdfWithNativeEngine(pdf.uri, directory, pageRanges);
+      const result = await splitPdfWithNativeEngine(pdf.uri, directory, pageRanges, pdf.pageCount);
       setOutputs(result);
       setStatus(`Created ${result.length} split PDF${result.length === 1 ? '' : 's'}.`);
     } catch (error) {
@@ -59,7 +76,7 @@ export default function SplitPdfScreen() {
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View style={[styles.root, { backgroundColor: colors.background }]}> 
       <Stack.Screen options={{ title: 'Split PDF' }} />
       {busy ? (
         <View style={styles.loading}>
@@ -75,13 +92,13 @@ export default function SplitPdfScreen() {
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel={pdf ? `Selected PDF ${pdf.name}` : 'Choose PDF'} onPress={() => void pickPdf()} style={({ pressed }) => [styles.pick, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]}>
             <Feather name="file-plus" size={20} color={colors.primary} />
-            <View style={styles.pickCopy}><Text style={[styles.pickTitle, { color: colors.foreground }]}>{pdf ? pdf.name : 'Choose PDF'}</Text><Text style={[styles.pickDetail, { color: colors.mutedForeground }]}>{pdf ? 'Ready to split' : 'Select a local PDF file'}</Text></View>
+            <View style={styles.pickCopy}><Text style={[styles.pickTitle, { color: colors.foreground }]}>{pdf ? pdf.name : 'Choose PDF'}</Text><Text style={[styles.pickDetail, { color: colors.mutedForeground }]}>{pdf ? `${pdf.pageCount} pages • valid range 1-${pdf.pageCount}` : 'Select a local PDF file'}</Text></View>
             <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
           </Pressable>
           <Text style={[styles.label, { color: colors.foreground }]}>Page ranges</Text>
-          <TextInput accessibilityLabel="Page ranges" accessibilityHint="Enter ranges separated by commas, for example 1-3, 5, 8-10" value={ranges} onChangeText={setRanges} autoCapitalize="none" autoCorrect={false} placeholder="1-3, 5, 8-10" placeholderTextColor={colors.mutedForeground} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
-          <Text style={[styles.hint, { color: colors.mutedForeground }]}>Each range becomes a separate PDF. Example: 1-3, 6-8 creates two output PDFs.</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Split PDF" onPress={() => void split()} disabled={!pdf} style={({ pressed }) => [styles.primary, { backgroundColor: colors.primary }, (pressed || !pdf) && styles.disabled]}>
+          <TextInput accessibilityLabel="Page ranges" accessibilityHint={pdf ? `Enter page numbers from 1 to ${pdf.pageCount}. Use commas for separate outputs, for example 1-3, 5, 8-${pdf.pageCount}` : 'Select a PDF first to know the valid page range.'} value={ranges} onChangeText={updateRanges} keyboardType="numbers-and-punctuation" autoCapitalize="none" autoCorrect={false} placeholder={pdf ? `1-${Math.min(3, pdf.pageCount)}` : 'Select PDF first'} placeholderTextColor={colors.mutedForeground} editable={Boolean(pdf)} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }, !pdf && styles.disabled]} />
+          <Text style={[styles.hint, { color: colors.mutedForeground }]}>{pdf ? `Only pages 1-${pdf.pageCount} are accepted. Numbers above ${pdf.pageCount} are automatically clamped to ${pdf.pageCount}.` : 'After selecting a PDF, this field automatically enforces its actual page count.'}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Split PDF" onPress={() => void split()} disabled={!pdf || !ranges.trim()} style={({ pressed }) => [styles.primary, { backgroundColor: colors.primary }, (pressed || !pdf || !ranges.trim()) && styles.disabled]}>
             <MaterialCommunityIcons name="content-cut" size={19} color={colors.primaryForeground} /><Text style={[styles.primaryText, { color: colors.primaryForeground }]}>Split PDF</Text>
           </Pressable>
           {!!status && <Text accessibilityLiveRegion="polite" style={[styles.status, { color: status.includes('Created') ? colors.primary : colors.mutedForeground }]}>{status}</Text>}
@@ -93,4 +110,5 @@ export default function SplitPdfScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 }, header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginBottom: 22 }, icon: { width: 54, height: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, copy: { flex: 1, marginLeft: 13 }, title: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 5 }, subtitle: { fontSize: 12, lineHeight: 18 }, pick: { marginHorizontal: 20, minHeight: 72, borderWidth: 1, borderRadius: 16, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center' }, pickCopy: { flex: 1, marginHorizontal: 12 }, pickTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', marginBottom: 4 }, pickDetail: { fontSize: 11 }, label: { marginHorizontal: 20, marginTop: 20, marginBottom: 8, fontSize: 12, fontFamily: 'Inter_700Bold' }, input: { marginHorizontal: 20, minHeight: 48, borderWidth: 1, borderRadius: 13, paddingHorizontal: 13, fontSize: 14 }, hint: { marginHorizontal: 20, marginTop: 8, fontSize: 11, lineHeight: 17 }, primary: { marginHorizontal: 20, marginTop: 16, minHeight: 52, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }, primaryText: { fontSize: 14, fontFamily: 'Inter_700Bold' }, status: { marginHorizontal: 20, marginTop: 15, fontSize: 11, lineHeight: 17 }, outputs: { marginHorizontal: 20, marginTop: 15, gap: 8 }, output: { minHeight: 54, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, outputTitle: { fontSize: 13, fontFamily: 'Inter_700Bold' }, loading: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 }, loadingTitle: { fontSize: 22, fontFamily: 'Inter_700Bold', marginTop: 22, marginBottom: 8 }, loadingText: { textAlign: 'center', fontSize: 13, lineHeight: 19 }, pressed: { opacity: 0.74 }, disabled: { opacity: 0.5 } });
+  root: { flex: 1 }, header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginBottom: 22 }, icon: { width: 54, height: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, copy: { flex: 1, marginLeft: 13 }, title: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 5 }, subtitle: { fontSize: 12, lineHeight: 18 }, pick: { marginHorizontal: 20, minHeight: 72, borderWidth: 1, borderRadius: 16, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center' }, pickCopy: { flex: 1, marginHorizontal: 12 }, pickTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', marginBottom: 4 }, pickDetail: { fontSize: 11 }, label: { marginHorizontal: 20, marginTop: 20, marginBottom: 8, fontSize: 12, fontFamily: 'Inter_700Bold' }, input: { marginHorizontal: 20, minHeight: 48, borderWidth: 1, borderRadius: 13, paddingHorizontal: 13, fontSize: 14 }, hint: { marginHorizontal: 20, marginTop: 8, fontSize: 11, lineHeight: 17 }, primary: { marginHorizontal: 20, marginTop: 16, minHeight: 52, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }, primaryText: { fontSize: 14, fontFamily: 'Inter_700Bold' }, status: { marginHorizontal: 20, marginTop: 15, fontSize: 11, lineHeight: 17 }, outputs: { marginHorizontal: 20, marginTop: 15, gap: 8 }, output: { minHeight: 54, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, outputTitle: { fontSize: 13, fontFamily: 'Inter_700Bold' }, loading: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 }, loadingTitle: { fontSize: 22, fontFamily: 'Inter_700Bold', marginTop: 22, marginBottom: 8 }, loadingText: { textAlign: 'center', fontSize: 13, lineHeight: 19 }, pressed: { opacity: 0.74 }, disabled: { opacity: 0.5 }
+});
