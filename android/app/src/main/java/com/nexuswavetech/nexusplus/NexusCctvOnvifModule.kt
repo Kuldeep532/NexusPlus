@@ -11,9 +11,8 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Capability-aware ONVIF bridge.
  *
- * JS supplies capabilities discovered during the authorized camera handshake.
- * Unsupported operations are rejected instead of being reported as successful.
- * Endpoint and credential values remain native-only and are never returned to JS.
+ * Device-side controls intentionally fail closed until a verified ONVIF
+ * SOAP/media transport implementation is present. No fake success is returned.
  */
 class NexusCctvOnvifModule(
     private val reactContext: ReactApplicationContext,
@@ -47,6 +46,7 @@ class NexusCctvOnvifModule(
         try {
             require(cameraId.isNotBlank()) { "Camera authorization is required." }
             require(host.isNotBlank()) { "Camera endpoint is required." }
+            require(port in 1..65535) { "Camera port is invalid." }
             require(username.isNotBlank()) { "Camera authentication is required." }
             require(password.isNotBlank()) { "Camera authentication is required." }
             require(secure) { "Secure ONVIF transport is required." }
@@ -105,13 +105,11 @@ class NexusCctvOnvifModule(
             promise.reject("CCTV_UNSUPPORTED_CONTROL", "Unknown CCTV control.")
             return
         }
-        if (control != "start" && control != "stop" && !session.capabilities.contains(capability)) {
+        if (!session.capabilities.contains(capability)) {
             promise.reject("CCTV_OPERATION_UNSUPPORTED", "Camera did not authorize this control.")
             return
         }
 
-        // Do not simulate device-side success. The repository still needs a verified
-        // ONVIF SOAP/media implementation to execute these authorized operations.
         promise.reject(
             "CCTV_TRANSPORT_UNAVAILABLE",
             "The camera authorized this control, but the verified ONVIF transport engine is not installed in this build."
