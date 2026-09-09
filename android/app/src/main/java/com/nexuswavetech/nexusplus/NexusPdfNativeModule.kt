@@ -156,15 +156,18 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
     }
 
     @ReactMethod
-    fun rotate(inputPath: String, outputPath: String, degrees: Int, promise: Promise) {
+    fun rotate(inputPath: String, outputPath: String, pageRanges: ReadableArray, degrees: Int, promise: Promise) {
         runCatching {
             ensurePdfBoxInitialized()
             require(degrees == 90 || degrees == 180 || degrees == 270) { "Rotation must be 90, 180, or 270 degrees." }
             val output = File(outputPath)
             output.parentFile?.mkdirs()
             PDDocument.load(File(requireReadablePath(inputPath))).use { document ->
-                for (pageIndex in 0 until document.numberOfPages) {
-                    val page = document.getPage(pageIndex)
+                val pageCount = document.numberOfPages
+                require(pageRanges.size() > 0 && pageRanges.size() <= 100) { "Select at least one page range." }
+                val pages = pageRangesToPages(pageRanges, pageCount)
+                for (pageNumber in pages) {
+                    val page = document.getPage(pageNumber - 1)
                     val current = ((page.rotation % 360) + 360) % 360
                     page.rotation = (current + degrees) % 360
                 }
@@ -195,6 +198,20 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
             require(directory.isDirectory && directory.canWrite()) { "Nexus Plus PDF storage is unavailable." }
             File(directory, uniqueFilename(directory, safeFilename)).absolutePath
         }.onSuccess { promise.resolve(it) }.onFailure { promise.reject("PDF_STORAGE", it.message, it) }
+    }
+
+    private fun pageRangesToPages(values: ReadableArray, pageCount: Int): Set<Int> {
+        val pages = linkedSetOf<Int>()
+        for (index in 0 until values.size()) {
+            val range = requireArrayString(values, index)
+            val match = Regex("^(\\d+)(?:-(\\d+))?$").matchEntire(range.trim())
+                ?: throw IllegalArgumentException("Invalid page range: $range")
+            val start = match.groupValues[1].toInt()
+            val end = if (match.groupValues[2].isEmpty()) start else match.groupValues[2].toInt()
+            require(start in 1..pageCount && end in 1..pageCount) { "Page range is outside the document: $range" }
+            for (page in minOf(start, end)..maxOf(start, end)) pages.add(page)
+        }
+        return pages
     }
 
     private fun uniqueFilename(directory: File, desired: String): String {
