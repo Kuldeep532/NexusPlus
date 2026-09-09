@@ -166,6 +166,40 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
         }.onSuccess { promise.resolve(it) }.onFailure { promise.reject("PDF_COMPRESS", it.message, it) }
     }
 
+    @ReactMethod
+    fun preparePdfOutput(category: String, filename: String, promise: Promise) {
+        runCatching {
+            val safeCategory = sanitizePathSegment(category, "General PDFs")
+            val safeFilename = sanitizePdfFilename(filename)
+            val root = File(reactContext.getExternalFilesDir(null), "Nexus Plus/PDF Tools")
+            val directory = File(root, safeCategory).apply { mkdirs() }
+            require(directory.isDirectory && directory.canWrite()) { "Nexus Plus PDF storage is unavailable." }
+            File(directory, uniqueFilename(directory, safeFilename)).absolutePath
+        }.onSuccess { promise.resolve(it) }.onFailure { promise.reject("PDF_STORAGE", it.message, it) }
+    }
+
+    private fun uniqueFilename(directory: File, desired: String): String {
+        val base = desired.removeSuffix(".pdf")
+        var candidate = "$base.pdf"
+        var counter = 2
+        while (File(directory, candidate).exists()) {
+            candidate = "$base-$counter.pdf"
+            counter += 1
+        }
+        return candidate
+    }
+
+    private fun sanitizePathSegment(value: String, fallback: String): String {
+        val sanitized = value.replace(Regex("[^a-zA-Z0-9 _-]"), "_").trim().take(80)
+        return sanitized.ifEmpty { fallback }
+    }
+
+    private fun sanitizePdfFilename(value: String): String {
+        val sanitized = value.removeSuffix(".pdf").replace(Regex("[^a-zA-Z0-9._ -]"), "_").trim().take(140)
+        require(sanitized.isNotEmpty()) { "A PDF filename is required." }
+        return "$sanitized.pdf"
+    }
+
     private fun ensurePdfBoxInitialized() { PDFBoxResourceLoader.init(reactContext) }
 
     private fun requireArrayString(values: ReadableArray, index: Int): String {
