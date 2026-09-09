@@ -10,6 +10,7 @@ type PdfNativeApi = {
   compress(inputPath: string, outputPath: string, quality: number): Promise<string>;
   split(inputPath: string, outputDirectory: string, pageRanges: string[]): Promise<string[]>;
   reorder(inputPath: string, outputPath: string, pageOrder: number[]): Promise<string>;
+  preparePdfOutput(category: string, filename: string): Promise<string>;
 };
 
 const nativeModule = NativeModules.NexusPdfNative as PdfNativeApi | undefined;
@@ -67,5 +68,10 @@ export const PdfNativeBridge = {
     validatePath(inputPath); validatePath(outputPath);
     const safeOrder = pageCount === undefined ? pageOrder : buildPageOrder(pageCount, pageOrder);
     return (await requireNative()).reorder(inputPath, outputPath, safeOrder);
+  },
+  preparePdfOutput: async (category: string, filename: string) => {
+    if (!category.trim()) throw new Error('PDF output category is required.');
+    if (!filename.trim()) throw new Error('PDF output filename is required.');
+    return (await requireNative()).preparePdfOutput(category, filename);
   },
 };
