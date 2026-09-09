@@ -8,14 +8,13 @@ import { useColors } from '@/hooks/useColors';
 import { PdfNativeBridge } from '@/features/pdf-native/PdfNativeBridge';
 import { preparePdfOutputPath } from '@/features/pdf-native/pdfPageOperations';
 import { PdfToolResultPanel } from '@/features/pdf-native/PdfToolResultPanel';
-import { assertValidPageCount, pageRangeStrings } from '@/features/pdf-native/pdfPageInput';
+import { assertValidPageCount } from '@/features/pdf-native/pdfPageInput';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getPdfInfo } from '@uzimandias/react-native-pdf-to-image';
 
 type Mode = 'pdf-to-image' | 'image-to-pdf';
 type Format = 'png' | 'jpeg';
 type ImageItem = { uri: string; name: string };
-
 type Result = { uri: string; mime: string; filename: string; imageCount?: number } | null;
 
 function parsePageSelection(value: string, pageCount: number): number[] {
@@ -27,13 +26,16 @@ function parsePageSelection(value: string, pageCount: number): number[] {
     if (!match) continue;
     const start = Number(match[1]);
     const end = Number(match[2] ?? match[1]);
-    if (!Number.isInteger(start) || !Number.isInteger(end)) continue;
     const left = Math.min(start, end);
     const right = Math.max(start, end);
-    if (left < 1 || right > pageCount) continue;
+    if (!Number.isInteger(left) || !Number.isInteger(right) || left < 1 || right > pageCount) continue;
     for (let page = left; page <= right; page += 1) pages.add(page);
   }
   return [...pages].sort((a, b) => a - b);
+}
+
+function baseName(name: string): string {
+  return name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9._ -]/g, '_').trim() || 'converted';
 }
 
 export default function PdfImageScreen() {
@@ -51,18 +53,12 @@ export default function PdfImageScreen() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
 
-  const selectedPages = useMemo(
-    () => (pdf ? parsePageSelection(selection || `1-${pdf.pageCount}`, pdf.pageCount) : []),
-    [pdf, selection],
-  );
+  const selectedPages = useMemo(() => (pdf ? parsePageSelection(selection || `1-${pdf.pageCount}`, pdf.pageCount) : []), [pdf, selection]);
 
   function reset() {
     setPdf(null); setSelection(''); setImages([]); setResult(null); setBusy(false); setStatus(''); setOutputName('');
   }
-
-  function switchMode(next: Mode) {
-    reset(); setMode(next);
-  }
+  function switchMode(next: Mode) { reset(); setMode(next); }
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -97,10 +93,6 @@ export default function PdfImageScreen() {
     setStatus(`${picked.assets.length} image${picked.assets.length === 1 ? '' : 's'} selected.`);
   }
 
-  function baseName(name: string) {
-    return name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9._ -]/g, '_').trim() || 'converted';
-  }
-
   async function convertPdfToImages() {
     if (!pdf || selectedPages.length === 0) { setStatus('Select at least one valid page within the PDF.'); return; }
     const parsedDpi = Math.min(600, Math.max(72, Number(dpi) || 300));
@@ -110,33 +102,31 @@ export default function PdfImageScreen() {
       await FileSystem.makeDirectoryAsync(outputDir, { intermediates: true });
       const rendered = await PdfNativeBridge.pdfToImages(pdf.uri, outputDir, selectedPages, parsedDpi, format, pdf.pageCount);
       if (!rendered.length) throw new Error('The PDF did not produce any supported image pages.');
-
       const source = baseName(pdf.name);
+      const rootName = outputName.trim() || source;
       if (rendered.length === 1 || !combine) {
-        const target = await PdfNativeBridge.preparePdfToolOutput('PDF to Images', `${outputName.trim() || source}-page-${String(selectedPages[0]).padStart(4, '0')}.${format === 'png' ? 'png' : 'jpg'}`);
+        const pageNumber = selectedPages[0];
+        const target = await PdfNativeBridge.preparePdfToolOutput('PDF to Images', `${rootName}-page-${String(pageNumber).padStart(4, '0')}.${format === 'png' ? 'png' : 'jpg'}`);
         await FileSystem.copyAsync({ from: rendered[0], to: target });
         setResult({ uri: target, mime: format === 'png' ? 'image/png' : 'image/jpeg', filename: target.split('/').pop() || 'converted-image', imageCount: 1 });
         setStatus('Image created and saved.');
         return;
       }
-
-      const combinedPath = await PdfNativeBridge.preparePdfToolOutput('PDF to Images', `${outputName.trim() || source}-combined.${format === 'png' ? 'png' : 'jpg'}`);
+      const combinedPath = await PdfNativeBridge.preparePdfToolOutput('PDF to Images', `${rootName}-combined.${format === 'png' ? 'png' : 'jpg'}`);
       try {
         const combined = await PdfNativeBridge.combineImages(rendered, combinedPath, format, 95);
         setResult({ uri: combined, mime: format === 'png' ? 'image/png' : 'image/jpeg', filename: combined.split('/').pop() || 'combined-image', imageCount: 1 });
         setStatus(`${rendered.length} pages combined into one image and saved.`);
-      } catch (combineError) {
+      } catch {
         const fallbackPaths: string[] = [];
         for (let index = 0; index < rendered.length; index += 1) {
           const pageNumber = selectedPages[index];
-          const target = await PdfNativeBridge.preparePdfToolOutput('PDF to Images', `${outputName.trim() || source}-page-${String(pageNumber).padStart(4, '0')}.${format === 'png' ? 'png' : 'jpg'}`);
+          const target = await PdfNativeBridge.preparePdfToolOutput('PDF to Images', `${rootName}-page-${String(pageNumber).padStart(4, '0')}.${format === 'png' ? 'png' : 'jpg'}`);
           await FileSystem.copyAsync({ from: rendered[index], to: target });
           fallbackPaths.push(target);
         }
-        const first = fallbackPaths[0];
-        setResult({ uri: first, mime: format === 'png' ? 'image/png' : 'image/jpeg', filename: `${fallbackPaths.length} images`, imageCount: fallbackPaths.length });
+        setResult({ uri: fallbackPaths[0], mime: format === 'png' ? 'image/png' : 'image/jpeg', filename: `${fallbackPaths.length} images`, imageCount: fallbackPaths.length });
         setStatus(`One-image output was not safe on this device, so Nexus Plus automatically created ${fallbackPaths.length} separate images instead.`);
-        void combineError;
       }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Could not convert this PDF to images. Try a lower DPI.');
@@ -148,10 +138,9 @@ export default function PdfImageScreen() {
     setBusy(true); setResult(null); setStatus(`Creating a ${images.length}-page PDF with the native PDF engine…`);
     try {
       const source = baseName(images[0]?.name || 'images');
-      const filename = images.length === 1 ? `${source}.pdf` : `${source}-images-to-pdf.pdf`;
-      const output = await preparePdfOutputPath('Images to PDF', filename);
+      const output = await preparePdfOutputPath('Images to PDF', images.length === 1 ? `${source}.pdf` : `${source}-images-to-pdf.pdf`);
       const uri = await PdfNativeBridge.imageToPdf(images.map((item) => item.uri), output, 90);
-      setResult({ uri, mime: 'application/pdf', filename: uri.split('/').pop() || filename });
+      setResult({ uri, mime: 'application/pdf', filename: uri.split('/').pop() || 'images-to-pdf.pdf' });
       setStatus(images.length === 1 ? 'Single-page PDF created and saved.' : `${images.length}-page PDF created and saved.`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Could not create the PDF.');
@@ -170,21 +159,20 @@ export default function PdfImageScreen() {
             <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === 'pdf-to-image' }} onPress={() => switchMode('pdf-to-image')} style={[styles.tab, { backgroundColor: mode === 'pdf-to-image' ? colors.primary : colors.card, borderColor: colors.border }]}><Text style={[styles.tabText, { color: mode === 'pdf-to-image' ? colors.primaryForeground : colors.foreground }]}>PDF to Images</Text></Pressable>
             <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === 'image-to-pdf' }} onPress={() => switchMode('image-to-pdf')} style={[styles.tab, { backgroundColor: mode === 'image-to-pdf' ? colors.primary : colors.card, borderColor: colors.border }]}><Text style={[styles.tabText, { color: mode === 'image-to-pdf' ? colors.primaryForeground : colors.foreground }]}>Images to PDF</Text></Pressable>
           </View>
-
           {mode === 'pdf-to-image' ? (
             <>
               <Pressable accessibilityRole="button" accessibilityLabel="Choose PDF" onPress={() => void pickPdf()} style={({ pressed }) => [styles.pick, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]}><Feather name="file-plus" size={20} color={colors.primary} /><View style={styles.pickCopy}><Text style={[styles.pickTitle, { color: colors.foreground }]}>{pdf ? pdf.name : 'Choose PDF'}</Text><Text style={[styles.pickDetail, { color: colors.mutedForeground }]}>{pdf ? `${pdf.pageCount} pages` : 'Select a local PDF file'}</Text></View><Feather name="chevron-right" size={18} color={colors.mutedForeground} /></Pressable>
               {pdf && <>
                 <Text style={[styles.label, { color: colors.foreground }]}>Pages</Text>
                 <TextInput accessibilityLabel="Pages to convert" accessibilityHint={`Enter page numbers from 1 to ${pdf.pageCount}, or ranges such as 1-3`} value={selection} onChangeText={setSelection} placeholder={`1-${pdf.pageCount}`} placeholderTextColor={colors.mutedForeground} keyboardType="numbers-and-punctuation" style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
-                <Text style={[styles.hint, { color: colors.mutedForeground }]}>Only pages inside this document are accepted. Invalid/out-of-range page entries are ignored rather than rendered.</Text>
+                <Text style={[styles.hint, { color: colors.mutedForeground }]}>Only valid page numbers inside this PDF are converted.</Text>
                 <Text style={[styles.label, { color: colors.foreground }]}>Image format</Text>
                 <View style={styles.options}>{(['png', 'jpeg'] as Format[]).map((item) => <Pressable key={item} accessibilityRole="radio" accessibilityState={{ selected: format === item }} onPress={() => setFormat(item)} style={[styles.option, { backgroundColor: format === item ? colors.primary : colors.card, borderColor: colors.border }]}><Text style={[styles.optionText, { color: format === item ? colors.primaryForeground : colors.foreground }]}>{item === 'png' ? 'PNG' : 'JPG'}</Text></Pressable>)}</View>
                 <Text style={[styles.label, { color: colors.foreground }]}>Resolution (DPI)</Text>
                 <TextInput accessibilityLabel="Output resolution in DPI" value={dpi} onChangeText={setDpi} keyboardType="number-pad" style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
                 <Text style={[styles.label, { color: colors.foreground }]}>Output name (optional)</Text>
                 <TextInput accessibilityLabel="Output image name" value={outputName} onChangeText={setOutputName} placeholder="Use PDF filename automatically" placeholderTextColor={colors.mutedForeground} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
-                <Pressable accessibilityRole="switch" accessibilityState={{ checked: combine }} onPress={() => setCombine((value) => !value)} style={[styles.toggle, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.toggleDot, { backgroundColor: combine ? colors.primary : colors.mutedForeground }]} /><View style={styles.toggleCopy}><Text style={[styles.toggleTitle, { color: colors.foreground }]}>Try one combined image</Text><Text style={[styles.toggleHint, { color: colors.mutedForeground }]}>When the pages cannot safely fit into one image, Nexus Plus automatically falls back to separate images.</Text></View></Pressable>
+                {selectedPages.length > 1 && <Pressable accessibilityRole="switch" accessibilityState={{ checked: combine }} onPress={() => setCombine((value) => !value)} style={[styles.toggle, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.toggleDot, { backgroundColor: combine ? colors.primary : colors.mutedForeground }]} /><View style={styles.toggleCopy}><Text style={[styles.toggleTitle, { color: colors.foreground }]}>Try one combined image</Text><Text style={[styles.toggleHint, { color: colors.mutedForeground }]}>If a single bitmap is unsafe, the app automatically saves separate page images.</Text></View></Pressable>}
                 <Pressable accessibilityRole="button" accessibilityLabel={`Convert ${selectedPages.length} PDF pages to images`} disabled={selectedPages.length === 0} onPress={() => void convertPdfToImages()} style={({ pressed }) => [styles.primary, { backgroundColor: colors.primary }, (!selectedPages.length || pressed) && styles.disabled]}><Feather name="image" size={19} color={colors.primaryForeground} /><Text style={[styles.primaryText, { color: colors.primaryForeground }]}>Convert to Images</Text></Pressable>
               </>}
             </>
@@ -196,7 +184,7 @@ export default function PdfImageScreen() {
             </>
           )}
           {!!status && <Text accessibilityLiveRegion="polite" style={[styles.status, { color: colors.mutedForeground }]}>{status}</Text>}
-          {result && <PdfToolResultPanel resultUri={result.uri} filename={result.filename} onClose={reset} title={mode === 'image-to-pdf' ? 'PDF saved successfully' : result.imageCount && result.imageCount > 1 ? 'Images saved successfully' : 'Image saved successfully'} />}
+          {result && <PdfToolResultPanel resultUri={result.uri} filename={result.filename} mimeType={result.mime} onClose={reset} onReset={reset} title={mode === 'image-to-pdf' ? 'PDF saved successfully' : result.imageCount && result.imageCount > 1 ? 'Images saved successfully' : 'Image saved successfully'} />}
         </ScrollView>
       )}
     </View>
