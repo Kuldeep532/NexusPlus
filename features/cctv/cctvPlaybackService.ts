@@ -1,31 +1,24 @@
 import type { CctvCamera } from './cctvTypes';
 import { assertCapability, validateRecordingSearch, type CctvCameraRecord, type CctvRecordingItem, type CctvRecordingSearch } from './cctvBackend';
 import { searchCctvRecordings } from './cctvSession';
+import { getCctvAdapter } from './cctvBackend';
+import { openCctvSession } from './cctvSession';
 
-export async function searchCctvRecordingsForCamera(
-  camera: CctvCameraRecord,
-  query: CctvRecordingSearch,
-): Promise<CctvRecordingItem[]> {
+export async function searchCctvRecordingsForCamera(camera: CctvCameraRecord, query: CctvRecordingSearch): Promise<CctvRecordingItem[]> {
   const validated = validateRecordingSearch(query);
   assertCapability(camera, 'recordings');
   assertCapability(camera, 'playback');
   return searchCctvRecordings(camera, validated);
 }
 
-export async function eraseCctvData(
-  camera: CctvCameraRecord,
-  scope: 'all_recordings' | 'selected_recording',
-  recordingToken?: string,
-): Promise<void> {
+export async function eraseCctvData(camera: CctvCameraRecord, scope: 'all_recordings' | 'selected_recording', recordingToken?: string): Promise<void> {
   assertCapability(camera, 'eraseData');
-  const { getCctvAdapter } = await import('./cctvBackend');
-  const { openCctvSession } = await import('./cctvSession');
+  if (scope === 'selected_recording' && !recordingToken) throw new Error('A selected recording is required.');
   const active = await openCctvSession(camera);
   try {
-    await getCctvAdapter(camera.protocol).eraseData(active.context, scope);
-    void recordingToken;
-  } catch (error) {
-    throw error;
+    await getCctvAdapter(camera.protocol).eraseData(active.context, scope, recordingToken);
+  } finally {
+    await getCctvAdapter(camera.protocol).disconnect(active.context);
   }
 }
 
