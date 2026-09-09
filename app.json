@@ -33,7 +33,7 @@
       "expo-font",
       "expo-document-picker",
       "expo-web-browser",
-      ["expo-camera", { "cameraPermission": "Allow Nexus Plus to use your camera for selfies." }],
+      ["expo-camera", { "cameraPermission": "Allow Nexus Plus to use your camera for selfies, QR scanning, and other user-started camera features." }],
       ["expo-notifications", { "defaultChannel": "nexus-alarm" }],
       "expo-local-authentication",
       "expo-secure-store"
