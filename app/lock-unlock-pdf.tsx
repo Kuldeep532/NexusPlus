@@ -37,11 +37,11 @@ export default function LockUnlockPdfScreen() {
   useEffect(() => () => { void cleanup(result?.uri); }, [result?.uri]);
 
   async function pickPdf() {
-    setStatus('');
     await cleanup(result?.uri);
     setResult(null);
     setPassword('');
     setConfirmPassword('');
+    setStatus('');
     const picked = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', multiple: false, copyToCacheDirectory: true });
     if (picked.canceled || !picked.assets?.[0]) return;
     const asset = picked.assets[0];
@@ -67,21 +67,22 @@ export default function LockUnlockPdfScreen() {
     } else if (!password) {
       setStatus('Enter the current PDF password.'); return;
     }
-
     setBusy(true);
     setResult(null);
     setStatus(tab === 'lock' ? 'Locking PDF…' : 'Unlocking PDF…');
     try {
+      let output: ProtectPdfResult;
       if (tab === 'lock') {
         const base = FileSystem.cacheDirectory;
         if (!base) throw new Error('App cache storage is unavailable.');
         const outputPath = `${base}nexus-pdf-${Date.now()}-${safeBaseName(pdf.name)}-locked.pdf`;
         await PdfNativeBridge.protect(pdf.uri, outputPath, password);
-        setResult({ uri: outputPath, name: `${safeBaseName(pdf.name)}-locked.pdf` });
+        output = { uri: outputPath, name: `${safeBaseName(pdf.name)}-locked.pdf` };
         try { await savePdfPasswordToVault(pdf.name, password); } catch { /* best effort */ }
       } else {
-        setResult(await unlockPdfWithEngine(pdf, password));
+        output = await unlockPdfWithEngine(pdf, password);
       }
+      setResult(output);
       setPassword('');
       setConfirmPassword('');
       setStatus(tab === 'lock' ? 'PDF locked successfully.' : 'PDF unlocked successfully.');
@@ -122,24 +123,19 @@ export default function LockUnlockPdfScreen() {
               <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Password-protect a PDF or remove its existing protection.</Text>
             </View>
           </View>
-
           <View accessibilityRole="tablist" style={[styles.tabs, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Pressable accessibilityRole="tab" accessibilityState={{ selected: tab === 'lock' }} accessibilityLabel="Lock PDF tab" onPress={() => switchTab('lock')} style={[styles.tab, { backgroundColor: tab === 'lock' ? colors.primary : 'transparent' }]}>
-              <Feather name="lock" size={17} color={tab === 'lock' ? colors.primaryForeground : colors.foreground} />
-              <Text style={[styles.tabText, { color: tab === 'lock' ? colors.primaryForeground : colors.foreground }]}>Lock PDF</Text>
+              <Feather name="lock" size={17} color={tab === 'lock' ? colors.primaryForeground : colors.foreground} /><Text style={[styles.tabText, { color: tab === 'lock' ? colors.primaryForeground : colors.foreground }]}>Lock PDF</Text>
             </Pressable>
             <Pressable accessibilityRole="tab" accessibilityState={{ selected: tab === 'unlock' }} accessibilityLabel="Unlock PDF tab" onPress={() => switchTab('unlock')} style={[styles.tab, { backgroundColor: tab === 'unlock' ? colors.primary : 'transparent' }]}>
-              <Feather name="unlock" size={17} color={tab === 'unlock' ? colors.primaryForeground : colors.foreground} />
-              <Text style={[styles.tabText, { color: tab === 'unlock' ? colors.primaryForeground : colors.foreground }]}>Unlock PDF</Text>
+              <Feather name="unlock" size={17} color={tab === 'unlock' ? colors.primaryForeground : colors.foreground} /><Text style={[styles.tabText, { color: tab === 'unlock' ? colors.primaryForeground : colors.foreground }]}>Unlock PDF</Text>
             </Pressable>
           </View>
-
           <Pressable accessibilityRole="button" accessibilityLabel={pdf ? `Selected PDF ${pdf.name}` : 'Choose PDF'} onPress={() => void pickPdf()} style={({ pressed }) => [styles.pick, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]}>
             <Feather name="file-plus" size={20} color={colors.primary} />
             <View style={styles.pickCopy}><Text style={[styles.pickTitle, { color: colors.foreground }]}>{pdf ? pdf.name : 'Choose PDF'}</Text><Text style={[styles.pickDetail, { color: colors.mutedForeground }]}>{pdf ? 'Ready for this operation' : 'Select a local PDF file'}</Text></View>
             <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
           </Pressable>
-
           {pdf && !result && tab === 'lock' && <>
             <Text style={[styles.label, { color: colors.foreground }]}>New password</Text>
             <TextInput accessibilityLabel="New PDF password" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
@@ -147,19 +143,15 @@ export default function LockUnlockPdfScreen() {
             <TextInput accessibilityLabel="Confirm new PDF password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
             <Text style={[styles.hint, { color: colors.mutedForeground }]}>Uses the existing native PDF protection mechanism. Passwords are not logged.</Text>
           </>}
-
           {pdf && !result && tab === 'unlock' && <>
             <Text style={[styles.label, { color: colors.foreground }]}>Current password</Text>
             <TextInput accessibilityLabel="Current PDF password" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
-            <Text style={[styles.hint, { color: colors.mutedForeground }]}>Enter the current password to remove PDF protection. The password is held only in memory for the operation.</Text>
+            <Text style={[styles.hint, { color: colors.mutedForeground }]}>Enter the current password to remove PDF protection. The password is held only in memory for this operation.</Text>
           </>}
-
           {pdf && !result && <Pressable accessibilityRole="button" accessibilityLabel={tab === 'lock' ? 'Lock PDF' : 'Unlock PDF'} onPress={() => void processPdf()} style={({ pressed }) => [styles.primary, { backgroundColor: colors.primary }, pressed && styles.pressed]}>
             <Feather name={tab === 'lock' ? 'lock' : 'unlock'} size={19} color={colors.primaryForeground} /><Text style={[styles.primaryText, { color: colors.primaryForeground }]}>{tab === 'lock' ? 'Lock PDF' : 'Unlock PDF'}</Text>
           </Pressable>}
-
           {!!status && <Text accessibilityLiveRegion="polite" style={[styles.status, { color: status.includes('successfully') ? colors.primary : colors.mutedForeground }]}>{status}</Text>}
-
           {result && <View style={styles.actions}>
             <Pressable accessibilityRole="button" accessibilityLabel="Share PDF" onPress={() => void share()} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="share-2" size={18} color={colors.primary} /><Text style={[styles.actionText, { color: colors.foreground }]}>Share</Text></Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel="Start another PDF operation" onPress={() => { void cleanup(result.uri); setPdf(null); setResult(null); setPassword(''); setConfirmPassword(''); setStatus(''); }} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="refresh-cw" size={18} color={colors.primary} /><Text style={[styles.actionText, { color: colors.foreground }]}>Another PDF</Text></Pressable>
