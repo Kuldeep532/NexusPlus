@@ -2,7 +2,7 @@
 
 Last Updated: September 9, 2026
 
-This document is the source-of-truth checklist for the Google Play submission of Nexus Plus regarding camera/CCTV functionality.
+This document is a compliance checklist for the Google Play submission of Nexus Plus regarding camera/CCTV functionality. It is not a guarantee of approval and does not replace the Play Console declarations or review process.
 
 ## Product positioning
 
@@ -12,7 +12,13 @@ The app must not provide a feature, link, hidden flow, or alternate download tha
 
 ## In-app disclosure
 
-Before CCTV-related sensitive access or camera functionality is requested, the app presents a clear in-app responsible-use disclosure and obtains affirmative user action. The disclosure explains:
+The first-launch responsible-use notice is a supplemental disclosure. It does not replace feature-specific disclosure immediately before a relevant sensitive permission request or capability request.
+
+When a CCTV feature requests camera permission for QR scanning, the in-app flow should explain before the Android permission request that camera access is used to scan a QR code for the user-initiated CCTV setup. The request must follow the disclosure and require the normal Android user choice.
+
+When a CCTV feature requests or obtains other personal or sensitive data, the in-app flow should clearly describe what is accessed or collected, how it is used, and any sharing that occurs, immediately before the applicable consent or permission step where the Play User Data policy requires it.
+
+The responsible-use disclosure should explain:
 
 - only cameras the user owns or is expressly authorized to use may be connected or controlled;
 - third-party or unauthorized camera access is prohibited;
@@ -20,13 +26,13 @@ Before CCTV-related sensitive access or camera functionality is requested, the a
 - unsupported or unverified camera capabilities are disabled; and
 - suspected misuse may lead to security review and account/feature restrictions.
 
-The first-launch notice is an additional safety disclosure; it does not replace the Privacy Policy, Terms & Conditions, Google Play Data safety declarations, or any permission-specific disclosure that may be required.
-
 ## Technical anti-abuse boundary
 
 Supported CCTV integrations use authenticated transport and device-identity verification before privileged operations are enabled. LAN discovery data is treated as untrusted input and is not itself authorization. The app does not treat a QR code, serial number, network address, or advertised capability as sufficient proof of authority.
 
 Privileged functions are gated by the authenticated native protocol session and verified device capabilities. Unsupported controls fail closed.
+
+The app must never claim that it can secretly detect a hacker, infer that someone is using a third-party camera, or guarantee that unauthorized camera activity will be detected unless the shipped product actually implements that capability and the claim is accurate.
 
 ## Privacy Policy and Terms
 
@@ -42,7 +48,7 @@ The Play Console Data safety form must be completed to match the production APK/
 
 The store listing should describe CCTV functionality accurately, for example as authorized CCTV/device management for equipment the user owns or is authorized to operate. Do not use marketing language suggesting secret surveillance, spying, covert monitoring, hidden tracking, or access to cameras belonging to other people.
 
-Store screenshots and video must show the same disclosure and the same user-facing CCTV flow implemented in the APK.
+Store screenshots and video must show the same user-facing functionality implemented in the APK. Do not present policy text, screenshots, or videos as evidence of a capability the build does not actually provide.
 
 ## Review positioning
 
@@ -50,9 +56,14 @@ Google Play review should be able to verify the following directly in the build:
 
 1. CCTV is a declared user-facing feature rather than a hidden behavior.
 2. The user is informed before sensitive access is requested where applicable.
-3. Camera access and controls require user action and authorization.
-4. Unauthorized third-party camera use is prohibited.
-5. Unsupported or unverified controls are blocked rather than simulated.
-6. Privacy Policy and Terms are available inside the app and are consistent with the store declarations.
+3. Camera permission for QR scanning, when requested, is clearly explained immediately before the Android permission prompt.
+4. Camera controls require user action and supported authorization checks.
+5. Unauthorized third-party camera use is prohibited.
+6. Unsupported or unverified controls are blocked rather than simulated.
+7. Privacy Policy and Terms are available inside the app and are consistent with the store declarations.
 
-This checklist cannot guarantee approval. Google Play makes its own policy determination during review, and the final Data safety and permission declarations must match the actual shipped build.
+## Approval boundary
+
+No wording, privacy policy, first-launch notice, technical safeguard, or documentation in this repository can guarantee Google Play approval. Approval depends on the complete shipped APK/AAB, all SDKs and permissions, Play Console declarations, store metadata, account status, and Google's review of the actual behavior.
+
+This checklist should be re-checked whenever camera/CCTV behavior, permissions, SDKs, backend data flows, or store metadata change.
