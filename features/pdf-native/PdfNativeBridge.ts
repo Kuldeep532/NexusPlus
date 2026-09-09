@@ -18,16 +18,20 @@ type PdfNativeApi = {
 };
 
 const nativeModule = NativeModules.NexusPdfNative as PdfNativeApi | undefined;
+
 async function requireNative(): Promise<PdfNativeApi> {
   if (!nativeModule) throw new Error(`Nexus PDF native module is unavailable on ${Platform.OS}.`);
-  try { if (!(await nativeModule.isAvailable())) throw new Error('Nexus PDF native module is unavailable in this build.'); }
-  catch { throw new Error('Nexus PDF native module is unavailable in this build.'); }
+  try {
+    if (!(await nativeModule.isAvailable())) throw new Error('Nexus PDF native module is unavailable in this build.');
+  } catch {
+    throw new Error('Nexus PDF native module is unavailable in this build.');
+  }
   return nativeModule;
 }
 function validatePath(path: string): void { if (!path || path.length > 4096 || /[\u0000\r\n]/.test(path)) throw new Error('Invalid PDF path.'); }
 function validatePaths(paths: string[]): void { if (!Array.isArray(paths) || paths.length === 0 || paths.length > 100) throw new Error('Invalid PDF input list.'); paths.forEach(validatePath); }
 function validateRotation(angle: number): number { if (!Number.isInteger(angle) || ![90, 180, 270].includes(angle)) throw new Error('Rotation must be 90, 180, or 270 degrees.'); return angle; }
-function validateImageFormat(format: string): 'png' | 'jpeg' { const normalized = format.toLowerCase(); if (!['png','jpeg','jpg'].includes(normalized)) throw new Error('Image format must be PNG or JPG.'); return normalized === 'png' ? 'png' : 'jpeg'; }
+function validateImageFormat(format: string): 'png' | 'jpeg' { const normalized = format.toLowerCase(); if (!['png', 'jpeg', 'jpg'].includes(normalized)) throw new Error('Image format must be PNG or JPG.'); return normalized === 'png' ? 'png' : 'jpeg'; }
 
 export const PdfNativeBridge = {
   isAvailable: async () => { if (!nativeModule) return false; try { return await nativeModule.isAvailable(); } catch { return false; } },
