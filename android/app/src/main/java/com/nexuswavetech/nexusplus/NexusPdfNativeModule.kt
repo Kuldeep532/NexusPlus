@@ -37,12 +37,8 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
             require(inputPaths.size() > 0) { "At least one PDF input is required." }
             val output = File(outputPath)
             output.parentFile?.mkdirs()
-            val merger = PDFMergerUtility().apply {
-                destinationFileName = output.absolutePath
-            }
-            for (index in 0 until inputPaths.size()) {
-                merger.addSource(File(requireArrayString(inputPaths, index)))
-            }
+            val merger = PDFMergerUtility().apply { destinationFileName = output.absolutePath }
+            for (index in 0 until inputPaths.size()) merger.addSource(File(requireArrayString(inputPaths, index)))
             merger.mergeDocuments(null)
             output.absolutePath
         }.onSuccess { promise.resolve(it) }
@@ -59,20 +55,15 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
             PDDocument().use { document ->
                 for (index in 0 until inputPaths.size()) {
                     val imageFile = File(requireArrayString(inputPaths, index))
-                    val bitmap = BitmapFactory.decodeFile(imageFile.absolutePath)
-                        ?: throw IOException("Unable to decode image: ${imageFile.name}")
+                    val bitmap = BitmapFactory.decodeFile(imageFile.absolutePath) ?: throw IOException("Unable to decode image: ${imageFile.name}")
                     try {
                         val width = bitmap.width.toFloat().coerceAtLeast(1f)
                         val height = bitmap.height.toFloat().coerceAtLeast(1f)
                         val page = PDPage(PDRectangle(width, height))
                         document.addPage(page)
                         val image = LosslessFactory.createFromImage(document, bitmap)
-                        com.tom_roush.pdfbox.pdmodel.PDPageContentStream(document, page).use { content ->
-                            content.drawImage(image, 0f, 0f, width, height)
-                        }
-                    } finally {
-                        bitmap.recycle()
-                    }
+                        com.tom_roush.pdfbox.pdmodel.PDPageContentStream(document, page).use { content -> content.drawImage(image, 0f, 0f, width, height) }
+                    } finally { bitmap.recycle() }
                 }
                 FileOutputStream(output).use { document.save(it) }
             }
@@ -89,14 +80,8 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
             val output = File(outputPath)
             output.parentFile?.mkdirs()
             PDDocument.load(File(requireReadablePath(inputPath))).use { document ->
-                val permissions = AccessPermission().apply {
-                    setCanPrint(true)
-                    setCanExtractContent(false)
-                    setCanModify(false)
-                }
-                val policy = StandardProtectionPolicy(password, password, permissions).apply {
-                    encryptionKeyLength = 256
-                }
+                val permissions = AccessPermission().apply { setCanPrint(true); setCanExtractContent(false); setCanModify(false) }
+                val policy = StandardProtectionPolicy(password, password, permissions).apply { encryptionKeyLength = 256 }
                 document.protect(policy)
                 FileOutputStream(output).use { document.save(it) }
             }
@@ -122,22 +107,50 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
     }
 
     @ReactMethod
+    fun split(inputPath: String, outputDirectory: String, pageRanges: ReadableArray, promise: Promise) {
+        runCatching {
+            ensurePdfBoxInitialized()
+            val input = File(requireReadablePath(inputPath))
+            val outputDir = File(outputDirectory).apply { mkdirs() }
+            require(outputDir.isDirectory && outputDir.canWrite()) { "PDF split output directory is unavailable." }
+            require(pageRanges.size() > 0 && pageRanges.size() <= 100) { "At least one page range is required." }
+            PDDocument.load(input).use { source ->
+                val pageCount = source.numberOfPages
+                val results = mutableListOf<String>()
+                for (index in 0 until pageRanges.size()) {
+                    val range = requireArrayString(pageRanges, index).trim()
+                    val match = Regex("^(\\d+)(?:-(\\d+))?$").matchEntire(range) ?: throw IllegalArgumentException("Invalid page range: $range")
+                    val start = match.groupValues[1].toInt()
+                    val end = if (match.groupValues[2].isNullOrEmpty()) start else match.groupValues[2].toInt()
+                    require(start in 1..pageCount && end in 1..pageCount) { "Page range is outside the document: $range" }
+                    val first = minOf(start, end)
+                    val last = maxOf(start, end)
+                    PDDocument().use { part ->
+                        for (pageIndex in first - 1 until last) part.importPage(source.getPage(pageIndex))
+                        val output = File(outputDir, "part-${index + 1}-${first}-${last}.pdf")
+                        FileOutputStream(output).use { part.save(it) }
+                        results += output.absolutePath
+                    }
+                }
+                results
+            }
+        }.onSuccess { promise.resolve(it) }
+            .onFailure { promise.reject("PDF_SPLIT", it.message, it) }
+    }
+
+    @ReactMethod
     fun compress(inputPath: String, outputPath: String, quality: Int, promise: Promise) {
         runCatching {
             ensurePdfBoxInitialized()
             val output = File(outputPath)
             output.parentFile?.mkdirs()
-            PDDocument.load(File(requireReadablePath(inputPath))).use { document ->
-                FileOutputStream(output).use { document.save(it) }
-            }
+            PDDocument.load(File(requireReadablePath(inputPath))).use { document -> FileOutputStream(output).use { document.save(it) } }
             output.absolutePath
         }.onSuccess { promise.resolve(it) }
             .onFailure { promise.reject("PDF_COMPRESS", it.message, it) }
     }
 
-    private fun ensurePdfBoxInitialized() {
-        PDFBoxResourceLoader.init(reactContext)
-    }
+    private fun ensurePdfBoxInitialized() { PDFBoxResourceLoader.init(reactContext) }
 
     private fun requireArrayString(values: ReadableArray, index: Int): String {
         val value = values.getString(index)?.trim()
@@ -147,9 +160,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
 
     private fun requireReadablePath(path: String): String {
         require(path.isNotBlank()) { "A PDF/image path is required." }
-        require(!path.startsWith("content://")) {
-            "Content URI must be materialized to an app-accessible file before native PDF processing."
-        }
+        require(!path.startsWith("content://")) { "Content URI must be materialized to an app-accessible file before native PDF processing." }
         val file = File(path)
         require(file.exists() && file.canRead()) { "Input file is unavailable: $path" }
         return file.absolutePath
