@@ -1,7 +1,6 @@
 import {
   CctvBackendError,
   assertCapability,
-  getCctvAdapter,
   type CctvCameraRecord,
   type CctvRecordingSearch,
 } from './cctvBackend';
@@ -62,10 +61,9 @@ export async function setCctvRecording(camera: CctvCameraRecord, enabled: boolea
 export async function stopCctvLive(camera: CctvCameraRecord): Promise<void> {
   const active = getActiveCctvSession(camera.id);
   if (!active) return;
-  const adapter = getCctvAdapter(camera.protocol);
   await stopCctvLiveView(camera.id);
+  await closeCctvSession(camera.id);
   await updateCctvCameraStatus(camera.id, { connectionState: 'idle', lastErrorCode: undefined });
-  await adapter.disconnect(active.context);
 }
 
 export async function findCctvRecordings(camera: CctvCameraRecord, query: CctvRecordingSearch) {
