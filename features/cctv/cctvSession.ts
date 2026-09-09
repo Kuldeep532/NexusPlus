@@ -35,7 +35,7 @@ export async function openCctvSession(camera: CctvCameraRecord): Promise<CctvLiv
   const adapter = getCctvAdapter(camera.protocol);
   const session = createSession(camera.id);
   const context = await adapter.connect({ ...camera, connectionState: 'connecting' });
-  const value: CctvLiveSession = { session, context, live: false, recording: false };
+  const value: CctvLiveSession = { session: context.session, context, live: false, recording: false };
   activeSessions.set(camera.id, value);
   return value;
 }
@@ -44,8 +44,11 @@ export async function closeCctvSession(cameraId: string): Promise<void> {
   const active = activeSessions.get(cameraId);
   if (!active) return;
   const adapter = getCctvAdapter(active.context.camera.protocol);
-  await adapter.disconnect(active.context);
-  activeSessions.delete(cameraId);
+  try {
+    await adapter.disconnect(active.context);
+  } finally {
+    activeSessions.delete(cameraId);
+  }
 }
 
 export async function startCctvLiveView(camera: CctvCameraRecord): Promise<CctvLiveSession> {
