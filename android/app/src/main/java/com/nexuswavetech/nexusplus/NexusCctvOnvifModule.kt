@@ -158,11 +158,8 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
     }
 
     private fun createRecordingSource(s: Session): String {
-        val ep = s.recordingXaddr ?: throw IllegalStateException("Camera does not expose Recording Control service.")
         val recordings = getRecordings(s)
-        val existing = recordings.firstOrNull()
-        if (existing != null) return existing
-        throw IllegalStateException("Camera does not expose an existing recording source. Recording start is unavailable without a valid recording configuration.")
+        return recordings.firstOrNull() ?: throw IllegalStateException("Camera has no existing recording source. Recording creation is unavailable for this device configuration.")
     }
 
     private fun startRecording(s: Session): RecordingRef {
@@ -178,7 +175,8 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
     private fun stopRecording(s: Session) {
         val ep = s.recordingXaddr ?: throw IllegalStateException("Camera does not expose Recording Control service.")
         val ref = s.recordingRef ?: throw IllegalStateException("No active recording is associated with this session.")
-        soap(ep, ACTION_SET_RECORDING_JOB, "<SetRecordingJob xmlns=\"http://www.onvif.org/ver10/recording/wsdl\"><JobConfiguration><JobToken>${xml(ref.jobToken ?: throw IllegalStateException("No recording job is active."))}</JobToken><Mode>Idle</Mode></JobConfiguration></SetRecordingJob>", s.username, s.password)
+        val jobToken = ref.jobToken ?: throw IllegalStateException("No recording job is active.")
+        soap(ep, ACTION_SET_RECORDING_JOB, "<SetRecordingJob xmlns=\"http://www.onvif.org/ver10/recording/wsdl\"><JobConfiguration><JobToken>${xml(jobToken)}</JobToken><Mode>Idle</Mode></JobConfiguration></SetRecordingJob>", s.username, s.password)
         s.recordingRef = null
     }
 
@@ -193,16 +191,17 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
     private fun searchRecordings(s: Session, payload: ReadableMap?): com.facebook.react.bridge.WritableMap {
         val ep = s.searchXaddr ?: throw IllegalStateException("Camera does not expose Recording Search service.")
         val from = payload?.getDouble("from") ?: throw IllegalArgumentException("Search start time is required.")
-        val to = payload.getDouble("to")
-        if (!from.isFinite() || !to.isFinite() || to < from) throw IllegalArgumentException("Invalid recording search range.")
+        val to = payload?.getDouble("to") ?: throw IllegalArgumentException("Search end time is required.")
+        require(from.isFinite() && to.isFinite() && to >= from) { "Invalid recording search range." }
+        val limit = (payload?.getInt("limit") ?: 50).coerceIn(1, 200)
         val recordingTokens = getRecordings(s)
         if (recordingTokens.isEmpty()) return Arguments.createMap().apply { putArray("recordings", Arguments.createArray()) }
         val token = recordingTokens.first()
         val scope = "<SearchScope><RecordingToken>${xml(token)}</RecordingToken><StartPoint>${xml(Instant.ofEpochMilli(from.toLong()).toString())}</StartPoint><EndPoint>${xml(Instant.ofEpochMilli(to.toLong()).toString())}</EndPoint></SearchScope>"
-        val body = "<FindRecordings xmlns=\"http://www.onvif.org/ver10/search/wsdl\">$scope<MaxMatches>${payload.getInt("limit")}</MaxMatches><KeepAliveTime>PT10S</KeepAliveTime></FindRecordings>"
+        val body = "<FindRecordings xmlns=\"http://www.onvif.org/ver10/search/wsdl\">$scope<MaxMatches>$limit</MaxMatches><KeepAliveTime>PT10S</KeepAliveTime></FindRecordings>"
         val response = soap(ep, ACTION_FIND_RECORDINGS, body, s.username, s.password)
         val searchToken = Regex("(?is)<(?:[A-Za-z0-9_.-]+:)?SearchToken>(.*?)</(?:[A-Za-z0-9_.-]+:)?SearchToken>").find(response)?.groupValues?.getOrNull(1)?.trim() ?: throw IllegalStateException("Camera returned no recording search token.")
-        val results = soap(ep, ACTION_GET_RECORDING_SEARCH_RESULTS, "<GetRecordingSearchResults xmlns=\"http://www.onvif.org/ver10/search/wsdl\"><SearchToken>${xml(searchToken)}</SearchToken><MinResults>0</MinResults><MaxResults>${payload.getInt("limit")}</MaxResults><WaitTime>PT1S</WaitTime></GetRecordingSearchResults>", s.username, s.password)
+        val results = soap(ep, ACTION_GET_RECORDING_SEARCH_RESULTS, "<GetRecordingSearchResults xmlns=\"http://www.onvif.org/ver10/search/wsdl\"><SearchToken>${xml(searchToken)}</SearchToken><MinResults>0</MinResults><MaxResults>$limit</MaxResults><WaitTime>PT1S</WaitTime></GetRecordingSearchResults>", s.username, s.password)
         val entries = Regex("(?is)<(?:[A-Za-z0-9_.-]+:)?RecordingInformation>(.*?)</(?:[A-Za-z0-9_.-]+:)?RecordingInformation>").findAll(results).mapIndexed { index, _ -> index to token }.toList()
         return Arguments.createMap().apply {
             putArray("recordings", Arguments.createArray().apply {
@@ -228,8 +227,7 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
 
     private fun probePtz(s: Session) {
         val ep = s.ptzXaddr ?: throw IllegalStateException("Camera does not expose PTZ service.")
-        val body = "<GetConfigurations xmlns=\"http://www.onvif.org/ver20/ptz/wsdl\"/>"
-        soap(ep, "http://www.onvif.org/ver20/ptz/wsdl/GetConfigurations", body, s.username, s.password)
+        soap(ep, "http://www.onvif.org/ver20/ptz/wsdl/GetConfigurations", "<GetConfigurations xmlns=\"http://www.onvif.org/ver20/ptz/wsdl\"/>", s.username, s.password)
     }
 
     private fun ptz(s: Session, p: ReadableMap?) {
@@ -244,7 +242,7 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
 
     private fun changePassword(s: Session, p: ReadableMap?) {
         val current = p?.getString("currentPassword") ?: throw IllegalArgumentException("Current password is required.")
-        val np = p.getString("newPassword") ?: throw IllegalArgumentException("New password is required.")
+        val np = p?.getString("newPassword") ?: throw IllegalArgumentException("New password is required.")
         require(current == s.password) { "Current password verification failed." }
         require(np.length >= 8) { "New password is too short." }
         require(np != current) { "New password must differ from the current password." }
