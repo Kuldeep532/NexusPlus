@@ -23,10 +23,8 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
 
     @ReactMethod
     fun isAvailable(promise: Promise) {
-        runCatching {
-            ensurePdfBoxInitialized()
-            true
-        }.onSuccess { promise.resolve(it) }
+        runCatching { ensurePdfBoxInitialized(); true }
+            .onSuccess { promise.resolve(it) }
             .onFailure { promise.reject("PDF_INIT", it.message, it) }
     }
 
@@ -41,8 +39,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
             for (index in 0 until inputPaths.size()) merger.addSource(File(requireArrayString(inputPaths, index)))
             merger.mergeDocuments(null)
             output.absolutePath
-        }.onSuccess { promise.resolve(it) }
-            .onFailure { promise.reject("PDF_MERGE", it.message, it) }
+        }.onSuccess { promise.resolve(it) }.onFailure { promise.reject("PDF_MERGE", it.message, it) }
     }
 
     @ReactMethod
@@ -68,8 +65,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
                 FileOutputStream(output).use { document.save(it) }
             }
             output.absolutePath
-        }.onSuccess { promise.resolve(it) }
-            .onFailure { promise.reject("PDF_IMAGE", it.message, it) }
+        }.onSuccess { promise.resolve(it) }.onFailure { promise.reject("PDF_IMAGE", it.message, it) }
     }
 
     @ReactMethod
@@ -86,8 +82,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
                 FileOutputStream(output).use { document.save(it) }
             }
             output.absolutePath
-        }.onSuccess { promise.resolve(it) }
-            .onFailure { promise.reject("PDF_PROTECT", it.message, it) }
+        }.onSuccess { promise.resolve(it) }.onFailure { promise.reject("PDF_PROTECT", it.message, it) }
     }
 
     @ReactMethod
@@ -102,8 +97,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
                 FileOutputStream(output).use { document.save(it) }
             }
             output.absolutePath
-        }.onSuccess { promise.resolve(it) }
-            .onFailure { promise.reject("PDF_UNLOCK", it.message, it) }
+        }.onSuccess { promise.resolve(it) }.onFailure { promise.reject("PDF_UNLOCK", it.message, it) }
     }
 
     @ReactMethod
@@ -121,7 +115,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
                     val range = requireArrayString(pageRanges, index).trim()
                     val match = Regex("^(\\d+)(?:-(\\d+))?$").matchEntire(range) ?: throw IllegalArgumentException("Invalid page range: $range")
                     val start = match.groupValues[1].toInt()
-                    val end = if (match.groupValues[2].isNullOrEmpty()) start else match.groupValues[2].toInt()
+                    val end = if (match.groupValues[2].isEmpty()) start else match.groupValues[2].toInt()
                     require(start in 1..pageCount && end in 1..pageCount) { "Page range is outside the document: $range" }
                     val first = minOf(start, end)
                     val last = maxOf(start, end)
@@ -134,8 +128,31 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
                 }
                 results
             }
-        }.onSuccess { promise.resolve(it) }
-            .onFailure { promise.reject("PDF_SPLIT", it.message, it) }
+        }.onSuccess { promise.resolve(it) }.onFailure { promise.reject("PDF_SPLIT", it.message, it) }
+    }
+
+    @ReactMethod
+    fun reorder(inputPath: String, outputPath: String, pageOrder: ReadableArray, promise: Promise) {
+        runCatching {
+            ensurePdfBoxInitialized()
+            val input = File(requireReadablePath(inputPath))
+            val output = File(outputPath)
+            output.parentFile?.mkdirs()
+            require(pageOrder.size() > 0 && pageOrder.size() <= 1000) { "A valid page order is required." }
+            PDDocument.load(input).use { source ->
+                val pageCount = source.numberOfPages
+                val requested = (0 until pageOrder.size()).map { index ->
+                    pageOrder.getInt(index).also { require(it in 1..pageCount) { "Page number is outside the document: $it" } }
+                }
+                require(requested.size == pageCount) { "Page order must contain every page exactly once." }
+                require(requested.toSet().size == pageCount) { "Page order must contain every page exactly once." }
+                PDDocument().use { reordered ->
+                    for (pageNumber in requested) reordered.importPage(source.getPage(pageNumber - 1))
+                    FileOutputStream(output).use { reordered.save(it) }
+                }
+            }
+            output.absolutePath
+        }.onSuccess { promise.resolve(it) }.onFailure { promise.reject("PDF_REORDER", it.message, it) }
     }
 
     @ReactMethod
@@ -146,8 +163,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
             output.parentFile?.mkdirs()
             PDDocument.load(File(requireReadablePath(inputPath))).use { document -> FileOutputStream(output).use { document.save(it) } }
             output.absolutePath
-        }.onSuccess { promise.resolve(it) }
-            .onFailure { promise.reject("PDF_COMPRESS", it.message, it) }
+        }.onSuccess { promise.resolve(it) }.onFailure { promise.reject("PDF_COMPRESS", it.message, it) }
     }
 
     private fun ensurePdfBoxInitialized() { PDFBoxResourceLoader.init(reactContext) }
