@@ -28,7 +28,6 @@ export interface CctvRecordingSearch { from: number; to: number; query?: string;
 export interface CctvRecordingItem { id: string; cameraId: string; startedAt: number; endedAt: number; label?: string; recordingToken?: string; }
 export type CctvEraseScope = 'all_recordings' | 'selected_recording';
 export type CctvCredentialStore = { save(cameraId: string, username: string, password: string): Promise<void>; read(cameraId: string): Promise<{ username: string; password: string } | null>; withCredentials<T>(cameraId: string, operation: (credentials: { username: string; password: string }) => Promise<T>): Promise<T>; remove(cameraId: string): Promise<void>; };
-
 const CREDENTIAL_OPTIONS: SecureStore.SecureStoreOptions = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY, requireAuthentication: true };
 function ensureNonEmpty(value: string, field: string): string { const normalized = value.trim(); if (!normalized) throw new CctvBackendError({ code: 'INVALID_INPUT', message: `${field} is required.`, retryable: false }); return normalized; }
 function validatePassword(password: string, field: string): string { const normalized = ensureNonEmpty(password, field); if (normalized.length < 6) throw new CctvBackendError({ code: 'INVALID_INPUT', message: `${field} is too short.`, retryable: false }); return normalized; }
@@ -64,10 +63,7 @@ export class OnvifCctvProtocolAdapter implements CctvProtocolAdapter {
       const reported = native.capabilities ?? await this.native.getAuthorizedCapabilities(native.sessionId);
       const capabilities = Object.fromEntries(Object.keys(camera.capabilities).map((key) => [key, reported[key] === true])) as CctvCapabilities;
       return { camera: { ...camera, connectionState: 'connected', lastConnectedAt: Date.now(), capabilities }, session, capabilities, nativeSessionId: native.sessionId, streamUri: native.streamUri };
-    } catch (error) {
-      if (error instanceof CctvBackendError) throw error;
-      throw classifyNativeError(error);
-    }
+    } catch (error) { if (error instanceof CctvBackendError) throw error; throw classifyNativeError(error); }
   }
   async disconnect(context: CctvTransportContext): Promise<void> { if (this.native && context.nativeSessionId) await this.native.disconnect(context.nativeSessionId); }
   private async control(context: CctvTransportContext, control: string, payload?: Record<string, unknown>): Promise<unknown> { if (!this.native || !context.nativeSessionId) throw new CctvBackendError({ code: 'NOT_IMPLEMENTED', message: 'Camera control transport is unavailable.', retryable: false }); try { return await this.native.control(context.nativeSessionId, control, payload); } catch (error) { throw classifyNativeError(error); } }
