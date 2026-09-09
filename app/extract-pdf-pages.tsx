@@ -1,6 +1,5 @@
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 import { Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, BackHandler, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -8,8 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { getPdfInfo } from '@uzimandias/react-native-pdf-to-image';
 import { assertValidPageCount, pageRangeStrings, sanitizePageRangeInput } from '@/features/pdf-native/pdfPageInput';
-import { splitPdfWithNativeEngine } from '@/features/pdf-native/pdfPageOperations';
-import { PdfToolResultPanel, cleanupPdfToolResult } from '@/features/pdf-native/PdfToolResultPanel';
+import { preparePdfOutputPath, splitPdfWithNativeEngine } from '@/features/pdf-native/pdfPageOperations';
+import { PdfToolResultPanel } from '@/features/pdf-native/PdfToolResultPanel';
 
 type PdfInput = { uri: string; name: string; pageCount: number };
 
@@ -27,7 +26,6 @@ export default function ExtractPdfPagesScreen() {
   const [result, setResult] = useState<string | null>(null);
 
   async function pickPdf() {
-    await cleanupPdfToolResult(result);
     const picked = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', multiple: false, copyToCacheDirectory: true });
     if (picked.canceled || !picked.assets?.[0]) return;
     try {
@@ -40,19 +38,25 @@ export default function ExtractPdfPagesScreen() {
   }
 
   function updateSelection(value: string) { if (pdf) setSelection(sanitizePageRangeInput(value, pdf.pageCount)); }
-  function resetTool() { void cleanupPdfToolResult(result); setPdf(null); setSelection(''); setResult(null); setStatus(''); }
+  function resetTool() { setPdf(null); setSelection(''); setResult(null); setStatus(''); }
 
   async function extract() {
     if (!pdf || !selection.trim()) { setStatus(`Enter page numbers or ranges from 1 to ${pdf?.pageCount ?? 0}.`); return; }
     setBusy(true); setResult(null); setStatus('Cutting and extracting selected pages…');
     try {
       const ranges = pageRangeStrings(selection, pdf.pageCount);
-      const directory = `${FileSystem.cacheDirectory || ''}nexus-pdf-cut-extract-${Date.now()}/`;
-      await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
-      const parts = await splitPdfWithNativeEngine(pdf.uri, directory, [ranges.join(',')], pdf.pageCount);
-      const uri = parts[0];
-      if (!uri) throw new Error('The PDF engine did not return an output file.');
-      setResult(uri); setStatus('Pages cut and extracted successfully.');
+      const filename = `${safeBaseName(pdf.name)}-cut-extracted.pdf`;
+      const output = await preparePdfOutputPath('Cut PDFs', filename);
+      const tempDirectory = `${output}.work`;
+      const parts = await splitPdfWithNativeEngine(pdf.uri, tempDirectory, [ranges.join(',')], pdf.pageCount);
+      const temporary = parts[0];
+      if (!temporary) throw new Error('The PDF engine did not return an output file.');
+      const { copyAsync, deleteAsync } = await import('expo-file-system/legacy');
+      await deleteAsync(output, { idempotent: true });
+      await copyAsync({ from: temporary, to: output });
+      await deleteAsync(tempDirectory, { idempotent: true });
+      await deleteAsync(temporary, { idempotent: true });
+      setResult(output); setStatus('Pages cut and extracted successfully.');
     } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not cut and extract the selected pages.'); }
     finally { setBusy(false); }
   }
