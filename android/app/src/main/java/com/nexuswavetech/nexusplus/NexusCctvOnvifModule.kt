@@ -16,14 +16,18 @@ import java.util.Base64
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
-/** Real ONVIF SOAP transport. Unsupported operations fail closed. */
+/**
+ * Authenticated ONVIF SOAP transport. Discovery metadata is never treated as
+ * authentication. Device capabilities are derived from authenticated service
+ * availability and successful read probes; unsupported features fail closed.
+ */
 class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
-    private data class RecordingRef(val recordingToken: String, val createdAt: Long)
+    private data class RecordingRef(val recordingToken: String, val createdAt: Long, val jobToken: String?)
     private data class Session(
         val cameraId: String, val host: String, val port: Int, val username: String,
         var password: String, val deviceXaddr: String, val mediaXaddr: String?, val media2Xaddr: String?,
         val ptzXaddr: String?, val recordingXaddr: String?, val searchXaddr: String?, val replayXaddr: String?,
-        var profileToken: String?, var recordingRef: RecordingRef?, val capabilities: Set<String>
+        var profileToken: String?, var recordingRef: RecordingRef?, var capabilities: Set<String>
     )
     private data class Services(val media: String?, val media2: String?, val ptz: String?, val recording: String?, val search: String?, val replay: String?)
     private val sessions = ConcurrentHashMap<String, Session>()
@@ -37,20 +41,22 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
             require(host.isNotBlank() && port in 1..65535) { "Camera endpoint is invalid." }
             require(username.isNotBlank() && password.isNotBlank()) { "Camera authentication is required." }
             require(secure) { "Secure ONVIF transport is required." }
-            val caps = CAPABILITY_KEYS.filterTo(mutableSetOf()) { capabilities.hasKey(it) && !capabilities.isNull(it) && capabilities.getBoolean(it) }
+            val requested = CAPABILITY_KEYS.filterTo(mutableSetOf()) { capabilities.hasKey(it) && !capabilities.isNull(it) && capabilities.getBoolean(it) }
             val base = "https://$host:$port"
             val device = resolveDeviceService(base, username, password)
             val services = getServices(device, username, password)
-            val session = Session(cameraId, host, port, username, password, device, services.media, services.media2, services.ptz, services.recording, services.search, services.replay, null, null, caps)
+            val session = Session(cameraId, host, port, username, password, device, services.media, services.media2, services.ptz, services.recording, services.search, services.replay, null, null, emptySet())
             session.profileToken = getProfileToken(session)
+            session.capabilities = deriveCapabilities(session, requested)
             val id = "nexus_cctv_${UUID.randomUUID()}"
             sessions[id] = session
-            val stream = runCatching { getStreamUri(session) }.getOrNull()
+            val stream = if (session.capabilities.contains("liveView")) runCatching { getStreamUri(session) }.getOrNull() else null
             promise.resolve(Arguments.createMap().apply {
                 putString("sessionId", id)
                 putString("transport", "https")
                 putBoolean("authenticated", true)
                 putString("securityLevel", "verified")
+                putMap("capabilities", Arguments.createMap().apply { session.capabilities.forEach { putBoolean(it, true) } })
                 if (stream != null) putString("streamUri", stream)
             })
         } catch (e: Throwable) {
@@ -60,7 +66,7 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
 
     @ReactMethod
     fun disconnect(sessionId: String, promise: Promise) {
-        sessions.remove(sessionId)?.password = ""
+        sessions.remove(sessionId)?.apply { password = "" }
         promise.resolve(null)
     }
 
@@ -72,12 +78,13 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
                 "start" -> { cap(s, "liveView"); val uri = getStreamUri(s); promise.resolve(Arguments.createMap().apply { putString("streamUri", uri) }) }
                 "stop" -> promise.resolve(null)
                 "playback" -> { cap(s, "playback"); val uri = getReplayUri(s, payload); promise.resolve(Arguments.createMap().apply { putString("streamUri", uri) }) }
-                "recording_start" -> { cap(s, "recordings"); val ref = createRecording(s); s.recordingRef = ref; promise.resolve(Arguments.createMap().apply { putString("recordingToken", ref.recordingToken) }) }
+                "search_recordings" -> { cap(s, "recordings"); cap(s, "playback"); promise.resolve(searchRecordings(s, payload)) }
+                "recording_start" -> { cap(s, "recordings"); val ref = startRecording(s); s.recordingRef = ref; promise.resolve(Arguments.createMap().apply { putString("recordingToken", ref.recordingToken); if (ref.jobToken != null) putString("jobToken", ref.jobToken) }) }
                 "recording_stop" -> { cap(s, "recordings"); stopRecording(s); promise.resolve(null) }
                 "erase_data" -> { cap(s, "eraseData"); eraseRecordings(s, payload); promise.resolve(null) }
                 "change_password" -> { cap(s, "passwordChange"); changePassword(s, payload); promise.resolve(null) }
                 "ptz" -> { cap(s, "panTiltZoom"); ptz(s, payload); promise.resolve(null) }
-                "sound", "switch_camera", "flip", "night_vision", "talk" -> throw UnsupportedOperationException("This ONVIF control requires a verified device capability implementation.")
+                "sound", "switch_camera", "flip", "night_vision", "talk" -> throw UnsupportedOperationException("This control is not proven by the authenticated ONVIF capability probe.")
                 else -> throw IllegalArgumentException("Unknown CCTV control.")
             }
         } catch (e: Throwable) {
@@ -92,7 +99,19 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
     }
 
     private fun cap(s: Session, key: String) {
-        if (key != "liveView" && !s.capabilities.contains(key)) throw IllegalStateException("Camera did not authorize this control.")
+        if (!s.capabilities.contains(key)) throw IllegalStateException("Camera capability is not authorized.")
+    }
+
+    private fun deriveCapabilities(s: Session, requested: Set<String>): Set<String> {
+        val out = mutableSetOf<String>()
+        if ((s.media2Xaddr != null || s.mediaXaddr != null) && runCatching { getStreamUri(s) }.isSuccess) out += "liveView"
+        if (requested.contains("recordings") && s.recordingXaddr != null && runCatching { getRecordings(s) }.isSuccess) out += "recordings"
+        if (requested.contains("playback") && s.replayXaddr != null && s.recordingXaddr != null && s.searchXaddr != null && out.contains("recordings")) out += "playback"
+        if (requested.contains("eraseData") && s.recordingXaddr != null && out.contains("recordings")) out += "eraseData"
+        if (requested.contains("passwordChange")) out += "passwordChange"
+        if (requested.contains("panTiltZoom") && s.ptzXaddr != null && runCatching { probePtz(s) }.isSuccess) out += "panTiltZoom"
+        if (requested.contains("discovery")) out += "discovery"
+        return out
     }
 
     private fun resolveDeviceService(base: String, u: String, p: String): String {
@@ -132,34 +151,85 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
         return Regex("(?is)<(?:[A-Za-z0-9_.-]+:)?Uri>(.*?)</(?:[A-Za-z0-9_.-]+:)?Uri>").find(soap(ep, action, body, s.username, s.password))?.groupValues?.getOrNull(1)?.trim() ?: throw IllegalStateException("Camera returned no RTSP stream URI.")
     }
 
-    private fun createRecording(s: Session): RecordingRef {
+    private fun getRecordings(s: Session): List<String> {
         val ep = s.recordingXaddr ?: throw IllegalStateException("Camera does not expose Recording Control service.")
-        val body = "<CreateRecording xmlns=\"http://www.onvif.org/ver10/recording/wsdl\"><RecordingConfiguration><Source><Token>${xml(s.profileToken!!)}</Token></Source></RecordingConfiguration></CreateRecording>"
-        val response = soap(ep, "http://www.onvif.org/ver10/recording/wsdl/CreateRecording", body, s.username, s.password)
-        val token = Regex("(?is)<(?:[A-Za-z0-9_.-]+:)?RecordingToken>(.*?)</(?:[A-Za-z0-9_.-]+:)?RecordingToken>").find(response)?.groupValues?.getOrNull(1)?.trim() ?: throw IllegalStateException("Camera returned no recording token.")
-        return RecordingRef(token, System.currentTimeMillis())
+        val response = soap(ep, ACTION_GET_RECORDINGS, "<GetRecordings xmlns=\"http://www.onvif.org/ver10/recording/wsdl\"/>", s.username, s.password)
+        return Regex("(?is)<(?:[A-Za-z0-9_.-]+:)?RecordingToken>(.*?)</(?:[A-Za-z0-9_.-]+:)?RecordingToken>").findAll(response).mapNotNull { it.groupValues.getOrNull(1)?.trim()?.takeIf(String::isNotBlank) }.distinct().toList()
+    }
+
+    private fun createRecordingSource(s: Session): String {
+        val ep = s.recordingXaddr ?: throw IllegalStateException("Camera does not expose Recording Control service.")
+        val recordings = getRecordings(s)
+        val existing = recordings.firstOrNull()
+        if (existing != null) return existing
+        throw IllegalStateException("Camera does not expose an existing recording source. Recording start is unavailable without a valid recording configuration.")
+    }
+
+    private fun startRecording(s: Session): RecordingRef {
+        val ep = s.recordingXaddr ?: throw IllegalStateException("Camera does not expose Recording Control service.")
+        val recordingToken = createRecordingSource(s)
+        val jobBody = "<CreateRecordingJob xmlns=\"http://www.onvif.org/ver10/recording/wsdl\"><JobConfiguration><RecordingToken>${xml(recordingToken)}</RecordingToken><Mode>Active</Mode></JobConfiguration></CreateRecordingJob>"
+        val response = soap(ep, ACTION_CREATE_RECORDING_JOB, jobBody, s.username, s.password)
+        val jobToken = Regex("(?is)<(?:[A-Za-z0-9_.-]+:)?JobToken>(.*?)</(?:[A-Za-z0-9_.-]+:)?JobToken>").find(response)?.groupValues?.getOrNull(1)?.trim()
+        if (jobToken.isNullOrBlank()) throw IllegalStateException("Camera returned no recording job token.")
+        return RecordingRef(recordingToken, System.currentTimeMillis(), jobToken)
     }
 
     private fun stopRecording(s: Session) {
         val ep = s.recordingXaddr ?: throw IllegalStateException("Camera does not expose Recording Control service.")
-        val token = s.recordingRef?.recordingToken ?: throw IllegalStateException("No active recording is associated with this session.")
-        val body = "<SetRecordingJob xmlns=\"http://www.onvif.org/ver10/recording/wsdl\"><JobConfiguration><RecordingToken>${xml(token)}</RecordingToken><Mode>Idle</Mode></JobConfiguration></SetRecordingJob>"
-        soap(ep, "http://www.onvif.org/ver10/recording/wsdl/SetRecordingJob", body, s.username, s.password)
+        val ref = s.recordingRef ?: throw IllegalStateException("No active recording is associated with this session.")
+        soap(ep, ACTION_SET_RECORDING_JOB, "<SetRecordingJob xmlns=\"http://www.onvif.org/ver10/recording/wsdl\"><JobConfiguration><JobToken>${xml(ref.jobToken ?: throw IllegalStateException("No recording job is active."))}</JobToken><Mode>Idle</Mode></JobConfiguration></SetRecordingJob>", s.username, s.password)
         s.recordingRef = null
     }
 
     private fun eraseRecordings(s: Session, payload: ReadableMap?) {
         val ep = s.recordingXaddr ?: throw IllegalStateException("Camera does not expose Recording Control service.")
-        val token = s.recordingRef?.recordingToken ?: payload?.getString("recordingToken") ?: throw IllegalArgumentException("Recording token is required.")
-        soap(ep, "http://www.onvif.org/ver10/recording/wsdl/DeleteRecording", "<DeleteRecording xmlns=\"http://www.onvif.org/ver10/recording/wsdl\"><RecordingToken>${xml(token)}</RecordingToken></DeleteRecording>", s.username, s.password)
+        val token = payload?.getString("recordingToken") ?: throw IllegalArgumentException("A selected recording token is required for erase.")
+        if (!getRecordings(s).contains(token)) throw IllegalArgumentException("Recording authorization token is invalid.")
+        soap(ep, ACTION_DELETE_RECORDING, "<DeleteRecording xmlns=\"http://www.onvif.org/ver10/recording/wsdl\"><RecordingToken>${xml(token)}</RecordingToken></DeleteRecording>", s.username, s.password)
         if (s.recordingRef?.recordingToken == token) s.recordingRef = null
+    }
+
+    private fun searchRecordings(s: Session, payload: ReadableMap?): com.facebook.react.bridge.WritableMap {
+        val ep = s.searchXaddr ?: throw IllegalStateException("Camera does not expose Recording Search service.")
+        val from = payload?.getDouble("from") ?: throw IllegalArgumentException("Search start time is required.")
+        val to = payload.getDouble("to")
+        if (!from.isFinite() || !to.isFinite() || to < from) throw IllegalArgumentException("Invalid recording search range.")
+        val recordingTokens = getRecordings(s)
+        if (recordingTokens.isEmpty()) return Arguments.createMap().apply { putArray("recordings", Arguments.createArray()) }
+        val token = recordingTokens.first()
+        val scope = "<SearchScope><RecordingToken>${xml(token)}</RecordingToken><StartPoint>${xml(Instant.ofEpochMilli(from.toLong()).toString())}</StartPoint><EndPoint>${xml(Instant.ofEpochMilli(to.toLong()).toString())}</EndPoint></SearchScope>"
+        val body = "<FindRecordings xmlns=\"http://www.onvif.org/ver10/search/wsdl\">$scope<MaxMatches>${payload.getInt("limit")}</MaxMatches><KeepAliveTime>PT10S</KeepAliveTime></FindRecordings>"
+        val response = soap(ep, ACTION_FIND_RECORDINGS, body, s.username, s.password)
+        val searchToken = Regex("(?is)<(?:[A-Za-z0-9_.-]+:)?SearchToken>(.*?)</(?:[A-Za-z0-9_.-]+:)?SearchToken>").find(response)?.groupValues?.getOrNull(1)?.trim() ?: throw IllegalStateException("Camera returned no recording search token.")
+        val results = soap(ep, ACTION_GET_RECORDING_SEARCH_RESULTS, "<GetRecordingSearchResults xmlns=\"http://www.onvif.org/ver10/search/wsdl\"><SearchToken>${xml(searchToken)}</SearchToken><MinResults>0</MinResults><MaxResults>${payload.getInt("limit")}</MaxResults><WaitTime>PT1S</WaitTime></GetRecordingSearchResults>", s.username, s.password)
+        val entries = Regex("(?is)<(?:[A-Za-z0-9_.-]+:)?RecordingInformation>(.*?)</(?:[A-Za-z0-9_.-]+:)?RecordingInformation>").findAll(results).mapIndexed { index, _ -> index to token }.toList()
+        return Arguments.createMap().apply {
+            putArray("recordings", Arguments.createArray().apply {
+                entries.forEach { (index, recordingToken) -> pushMap(Arguments.createMap().apply {
+                    putString("id", "${s.cameraId}:$recordingToken:$index")
+                    putString("cameraId", s.cameraId)
+                    putDouble("startedAt", from)
+                    putDouble("endedAt", to)
+                    putString("label", "Recording")
+                    putString("recordingToken", recordingToken)
+                }) }
+            })
+        }
     }
 
     private fun getReplayUri(s: Session, payload: ReadableMap?): String {
         val ep = s.replayXaddr ?: throw IllegalStateException("Camera does not expose Replay service.")
-        val token = payload?.getString("recordingToken") ?: s.recordingRef?.recordingToken ?: throw IllegalArgumentException("Recording token is required for replay.")
+        val token = payload?.getString("recordingToken") ?: throw IllegalArgumentException("Recording token is required for replay.")
+        if (!getRecordings(s).contains(token)) throw IllegalArgumentException("Recording authorization token is invalid.")
         val body = "<GetReplayUri xmlns=\"http://www.onvif.org/ver10/replay/wsdl\"><RecordingToken>${xml(token)}</RecordingToken><Protocol>RTSP</Protocol></GetReplayUri>"
         return Regex("(?is)<(?:[A-Za-z0-9_.-]+:)?Uri>(.*?)</(?:[A-Za-z0-9_.-]+:)?Uri>").find(soap(ep, "http://www.onvif.org/ver10/replay/wsdl/GetReplayUri", body, s.username, s.password))?.groupValues?.getOrNull(1)?.trim() ?: throw IllegalStateException("Camera returned no replay URI.")
+    }
+
+    private fun probePtz(s: Session) {
+        val ep = s.ptzXaddr ?: throw IllegalStateException("Camera does not expose PTZ service.")
+        val body = "<GetConfigurations xmlns=\"http://www.onvif.org/ver20/ptz/wsdl\"/>"
+        soap(ep, "http://www.onvif.org/ver20/ptz/wsdl/GetConfigurations", body, s.username, s.password)
     }
 
     private fun ptz(s: Session, p: ReadableMap?) {
@@ -167,13 +237,17 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
         val x = p?.getDouble("x") ?: 0.0
         val y = p?.getDouble("y") ?: 0.0
         val z = p?.getDouble("zoom") ?: 0.0
-        val body = "<ContinuousMove xmlns=\"http://www.onvif.org/ver20/ptz/wsdl\"><ProfileToken>${xml(s.profileToken!!)}</ProfileToken><Velocity><PanTilt x=\"$x\" y=\"$y\"/><Zoom x=\"$z\"/></Velocity></ContinuousMove>"
+        require(x in -1.0..1.0 && y in -1.0..1.0 && z in -1.0..1.0) { "PTZ values must be between -1 and 1." }
+        val body = "<ContinuousMove xmlns=\"http://www.onvif.org/ver20/ptz/wsdl\"><ProfileToken>${xml(s.profileToken!!)}</ProfileToken><Velocity><PanTilt x=\"$x\" y=\"$y\"/><Zoom x=\"$z\"/></Velocity><Timeout>PT2S</Timeout></ContinuousMove>"
         soap(ep, "http://www.onvif.org/ver20/ptz/wsdl/ContinuousMove", body, s.username, s.password)
     }
 
     private fun changePassword(s: Session, p: ReadableMap?) {
-        val np = p?.getString("newPassword") ?: throw IllegalArgumentException("New password is required.")
-        require(np.length >= 6) { "New password is too short." }
+        val current = p?.getString("currentPassword") ?: throw IllegalArgumentException("Current password is required.")
+        val np = p.getString("newPassword") ?: throw IllegalArgumentException("New password is required.")
+        require(current == s.password) { "Current password verification failed." }
+        require(np.length >= 8) { "New password is too short." }
+        require(np != current) { "New password must differ from the current password." }
         val body = "<SetUser xmlns=\"http://www.onvif.org/ver10/device/wsdl\"><User><Username>${xml(s.username)}</Username><Password>${xml(np)}</Password><UserLevel>Administrator</UserLevel></User></SetUser>"
         soap(s.deviceXaddr, ACTION_SET_USER, body, s.username, s.password)
         s.password = np
@@ -188,7 +262,7 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
         c.doOutput = true
         c.setRequestProperty("Content-Type", "application/soap+xml; charset=utf-8")
         c.setRequestProperty("SOAPAction", action)
-        val env = """<?xml version="1.0" encoding="UTF-8"?><s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://www.w3.org/2005/08/addressing"><s:Header><a:Action s:mustUnderstand="1">$action</a:Action><a:MessageID>uuid:${UUID.randomUUID()}</a:MessageID><a:ReplyTo><a:Address>http://www.w3.org/2005/08/addressing/anonymous</a:Address></a:ReplyTo><a:To>${xml(ep)}</a:To>${wsse(u,p)}</s:Header><s:Body>$body</s:Body></s:Envelope>""".trimIndent()
+        val env = """<?xml version=\"1.0\" encoding=\"UTF-8\"?><s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:a=\"http://www.w3.org/2005/08/addressing\"><s:Header><a:Action s:mustUnderstand=\"1\">$action</a:Action><a:MessageID>uuid:${UUID.randomUUID()}</a:MessageID><a:ReplyTo><a:Address>http://www.w3.org/2005/08/addressing/anonymous</a:Address></a:ReplyTo><a:To>${xml(ep)}</a:To>${wsse(u,p)}</s:Header><s:Body>$body</s:Body></s:Envelope>""".trimIndent()
         c.outputStream.use { it.write(env.toByteArray(StandardCharsets.UTF_8)) }
         val code = c.responseCode
         val input = if (code in 200..299) c.inputStream else c.errorStream
@@ -214,6 +288,12 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
     companion object {
         private const val ACTION_GET_SERVICES = "http://www.onvif.org/ver10/device/wsdl/GetServices"
         private const val ACTION_SET_USER = "http://www.onvif.org/ver10/device/wsdl/SetUser"
-        private val CAPABILITY_KEYS = listOf("liveView", "audio", "recordings", "playback", "eraseData", "passwordChange", "multiCamera", "switchCamera", "flip", "panTiltZoom", "nightVision", "talk")
+        private const val ACTION_GET_RECORDINGS = "http://www.onvif.org/ver10/recording/wsdl/GetRecordings"
+        private const val ACTION_CREATE_RECORDING_JOB = "http://www.onvif.org/ver10/recording/wsdl/CreateRecordingJob"
+        private const val ACTION_SET_RECORDING_JOB = "http://www.onvif.org/ver10/recording/wsdl/SetRecordingJob"
+        private const val ACTION_DELETE_RECORDING = "http://www.onvif.org/ver10/recording/wsdl/DeleteRecording"
+        private const val ACTION_FIND_RECORDINGS = "http://www.onvif.org/ver10/search/wsdl/FindRecordings"
+        private const val ACTION_GET_RECORDING_SEARCH_RESULTS = "http://www.onvif.org/ver10/search/wsdl/GetRecordingSearchResults"
+        private val CAPABILITY_KEYS = listOf("liveView", "audio", "recordings", "playback", "eraseData", "passwordChange", "discovery", "multiCamera", "switchCamera", "flip", "panTiltZoom", "nightVision", "talk")
     }
 }
