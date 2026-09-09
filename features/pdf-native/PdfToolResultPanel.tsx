@@ -11,33 +11,31 @@ type Props = {
   filename?: string;
   onClose: () => void;
   onReset?: () => void;
+  onSave?: () => Promise<void> | void;
 };
 
-export function PdfToolResultPanel({
-  resultUri,
-  title = 'PDF saved successfully',
-  filename,
-  onClose,
-  onReset,
-}: Props) {
+export async function sharePdfResult(resultUri: string, title = 'Share PDF'): Promise<void> {
+  try {
+    if (!(await Sharing.isAvailableAsync())) {
+      Alert.alert('Sharing unavailable', 'The processed PDF is stored in the app cache. Sharing is unavailable on this device.');
+      return;
+    }
+    await Sharing.shareAsync(resultUri, { mimeType: 'application/pdf', dialogTitle: title });
+  } catch {
+    Alert.alert('Share unavailable', 'The processed PDF could not be shared.');
+  }
+}
+
+export function PdfToolResultPanel({ resultUri, title = 'PDF saved successfully', filename, onClose, onReset, onSave }: Props) {
   const colors = useColors();
 
-  async function share() {
-    if (!resultUri) return;
-    try {
-      if (!(await Sharing.isAvailableAsync())) {
-        Alert.alert('Sharing unavailable', 'The PDF is saved in the app cache but sharing is unavailable on this device.');
-        return;
-      }
-      await Sharing.shareAsync(resultUri, { mimeType: 'application/pdf', dialogTitle: 'Share PDF' });
-    } catch {
-      Alert.alert('Share unavailable', 'The PDF could not be shared.');
+  async function save() {
+    if (onSave) {
+      await onSave();
+      return;
     }
-  }
-
-  async function saveToDevice() {
     if (!resultUri) return;
-    Alert.alert('PDF ready', `${filename ?? 'The processed PDF'} is available to share. This PDF is currently stored in the app cache until you close or reset this tool.`);
+    Alert.alert('PDF ready', `${filename ?? 'Processed PDF'} is available at the generated file location. Use Share to export it outside the app.`);
   }
 
   function close() {
@@ -49,43 +47,22 @@ export function PdfToolResultPanel({
 
   return (
     <View accessibilityViewIsModal style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}> 
-      <View style={[styles.successIcon, { backgroundColor: colors.secondary }]}>
-        <Feather name="check" size={24} color={colors.primary} />
-      </View>
+      <View style={[styles.successIcon, { backgroundColor: colors.secondary }]}><Feather name="check" size={24} color={colors.primary} /></View>
       <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>{title}</Text>
       <Text accessibilityLiveRegion="polite" style={[styles.detail, { color: colors.mutedForeground }]}>{filename ?? 'Processed PDF'} is ready.</Text>
-
       <View style={styles.actions}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Share processed PDF" onPress={() => void share()} style={[styles.action, { backgroundColor: colors.primary }]}>
-          <Feather name="share-2" size={18} color={colors.primaryForeground} />
-          <Text style={[styles.actionText, { color: colors.primaryForeground }]}>Share</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Save processed PDF" onPress={() => void saveToDevice()} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Feather name="download" size={18} color={colors.primary} />
-          <Text style={[styles.actionText, { color: colors.foreground }]}>Save</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close PDF tool" onPress={close} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Feather name="x" size={18} color={colors.foreground} />
-          <Text style={[styles.actionText, { color: colors.foreground }]}>Close</Text>
-        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Share processed PDF" onPress={() => void sharePdfResult(resultUri, 'Share PDF')} style={[styles.action, { backgroundColor: colors.primary }]}> <Feather name="share-2" size={18} color={colors.primaryForeground} /><Text style={[styles.actionText, { color: colors.primaryForeground }]}>Share</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Save processed PDF" onPress={() => void save()} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }]}> <Feather name="download" size={18} color={colors.primary} /><Text style={[styles.actionText, { color: colors.foreground }]}>Save</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close PDF tool" onPress={close} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }]}> <Feather name="x" size={18} color={colors.foreground} /><Text style={[styles.actionText, { color: colors.foreground }]}>Close</Text></Pressable>
       </View>
-
-      {!!onReset && (
-        <Pressable accessibilityRole="button" accessibilityLabel="Process another PDF" onPress={onReset} style={styles.reset}>
-          <Text style={[styles.resetText, { color: colors.primary }]}>Process another PDF</Text>
-        </Pressable>
-      )}
+      {!!onReset && <Pressable accessibilityRole="button" accessibilityLabel="Process another PDF" onPress={onReset} style={styles.reset}><Text style={[styles.resetText, { color: colors.primary }]}>Process another PDF</Text></Pressable>}
     </View>
   );
 }
 
 export async function cleanupPdfToolResult(uri: string | null): Promise<void> {
   if (!uri || !uri.startsWith(FileSystem.cacheDirectory ?? '___never___')) return;
-  try {
-    await FileSystem.deleteAsync(uri, { idempotent: true });
-  } catch {
-    // Best-effort cache cleanup.
-  }
+  try { await FileSystem.deleteAsync(uri, { idempotent: true }); } catch { /* best effort */ }
 }
 
 const styles = StyleSheet.create({
