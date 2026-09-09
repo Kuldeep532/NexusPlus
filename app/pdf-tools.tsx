@@ -13,8 +13,8 @@ type Tool = {
 };
 
 const tools: Tool[] = [
+  { key: 'lock-unlock-pdf', title: 'Lock & Unlock PDF', description: 'Password-protect PDFs or remove existing password protection.', icon: 'shield-lock-outline', route: '/lock-unlock-pdf' },
   { key: 'pdf-to-images', title: 'PDF to Images', description: 'Convert PDF pages into PNG or JPG files.', icon: 'file-image-outline', route: '/pdf-to-images' },
-  { key: 'unlock-pdf', title: 'Unlock PDF', description: 'Remove password protection after authenticating the document.', icon: 'lock-open-outline', route: '/unlock-pdf' },
 ];
 
 export default function PdfToolsScreen() {
@@ -26,7 +26,7 @@ export default function PdfToolsScreen() {
       <Stack.Screen options={{ title: 'PDF Tools' }} />
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 18, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <View style={[styles.headerIcon, { backgroundColor: colors.secondary }]}> 
+          <View style={[styles.headerIcon, { backgroundColor: colors.secondary }]}>
             <MaterialCommunityIcons name="file-pdf-box" size={30} color={colors.primary} />
           </View>
           <View style={styles.headerCopy}>
