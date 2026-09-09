@@ -1,9 +1,11 @@
 import { z } from 'zod';
 
 const AiSketchResponseSchema = z.object({
+  dataUrl: z.string().startsWith('data:').optional(),
   imageUrl: z.string().url().optional(),
   svg: z.string().optional(),
   mimeType: z.string().optional(),
+  model: z.string().optional(),
 });
 
 export type AiSketchRequest = {
@@ -29,9 +31,12 @@ export async function generateAiSketch(request: AiSketchRequest, signal?: AbortS
     body: JSON.stringify(request),
     signal,
   });
-  if (!response.ok) throw new Error(`Sketch AI gateway returned HTTP ${response.status}.`);
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`Sketch AI gateway returned HTTP ${response.status}${detail ? `: ${detail.slice(0, 180)}` : ''}.`);
+  }
   const parsed = AiSketchResponseSchema.safeParse(await response.json());
   if (!parsed.success) throw new Error('Sketch AI gateway returned an invalid response.');
-  if (!parsed.data.imageUrl && !parsed.data.svg) throw new Error('Sketch AI gateway returned no sketch asset.');
+  if (!parsed.data.dataUrl && !parsed.data.imageUrl && !parsed.data.svg) throw new Error('Sketch AI gateway returned no sketch asset.');
   return parsed.data;
 }
