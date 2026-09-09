@@ -5,8 +5,10 @@ type PdfNativeApi = {
   merge(inputPaths: string[], outputPath: string): Promise<string>;
   imageToPdf(inputPaths: string[], outputPath: string, quality: number): Promise<string>;
   unlock(inputPath: string, outputPath: string, password: string): Promise<string>;
+  protect(inputPath: string, outputPath: string, password: string): Promise<string>;
   compress(inputPath: string, outputPath: string, quality: number): Promise<string>;
   split(inputPath: string, outputDirectory: string, pageRanges: string[]): Promise<string[]>;
+  reorder(inputPath: string, outputPath: string, pageOrder: number[]): Promise<string>;
 };
 
 const nativeModule = NativeModules.NexusPdfNative as PdfNativeApi | undefined;
@@ -30,6 +32,13 @@ function validatePaths(paths: string[]): void {
   paths.forEach(validatePath);
 }
 
+function validatePageOrder(pageOrder: number[]): void {
+  if (!Array.isArray(pageOrder) || pageOrder.length === 0 || pageOrder.length > 1000) throw new Error('Invalid page order.');
+  pageOrder.forEach((page, index) => {
+    if (!Number.isInteger(page) || page < 1) throw new Error(`Invalid page number at position ${index + 1}.`);
+  });
+}
+
 export const PdfNativeBridge = {
   isAvailable: async () => {
     if (!nativeModule) return false;
@@ -42,6 +51,10 @@ export const PdfNativeBridge = {
     validatePaths(inputPaths); validatePath(outputPath); if (!Number.isFinite(quality)) throw new Error('Invalid image quality.');
     return (await requireNative()).imageToPdf(inputPaths, outputPath, Math.max(1, Math.min(100, Math.round(quality))));
   },
+  protect: async (inputPath: string, outputPath: string, password: string) => {
+    validatePath(inputPath); validatePath(outputPath); if (!password) throw new Error('PDF password is required.');
+    return (await requireNative()).protect(inputPath, outputPath, password);
+  },
   unlock: async (inputPath: string, outputPath: string, password: string) => {
     validatePath(inputPath); validatePath(outputPath); if (!password) throw new Error('PDF password is required.');
     return (await requireNative()).unlock(inputPath, outputPath, password);
@@ -52,8 +65,11 @@ export const PdfNativeBridge = {
   },
   split: async (inputPath: string, outputDirectory: string, pageRanges: string[]) => {
     validatePath(inputPath); validatePath(outputDirectory);
-    if (!Array.isArray(pageRanges) || pageRanges.length === 0 || pageRanges.length > 100) throw new Error('Select at least one page range.');
-    pageRanges.forEach((range) => { if (!range.trim() || !/^\d+(?:-\d+)?$/.test(range.trim())) throw new Error(`Invalid page range: ${range}`); });
+    if (!Array.isArray(pageRanges) || pageRanges.length === 0 || pageRanges.length > 100) throw new Error('Invalid PDF page ranges.');
     return (await requireNative()).split(inputPath, outputDirectory, pageRanges);
+  },
+  reorder: async (inputPath: string, outputPath: string, pageOrder: number[]) => {
+    validatePath(inputPath); validatePath(outputPath); validatePageOrder(pageOrder);
+    return (await requireNative()).reorder(inputPath, outputPath, pageOrder);
   },
 };
