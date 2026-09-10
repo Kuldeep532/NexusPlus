@@ -1,6 +1,8 @@
 export type EPaperPaperSize = 'a4' | 'letter' | 'tabloid' | 'a3' | 'custom';
 export type EPaperOrientation = 'portrait' | 'landscape';
-export type EPaperElementType = 'headline' | 'subheadline' | 'body' | 'image' | 'caption' | 'quote' | 'divider' | 'spacer';
+export type EPaperElementType = 'headline' | 'subheadline' | 'body' | 'image' | 'caption' | 'quote' | 'divider' | 'spacer' | 'label';
+export type EPaperTextAlign = 'left' | 'center' | 'right' | 'justify';
+export type EPaperFit = 'cover' | 'contain' | 'fill';
 
 export type EPaperElementBase = {
   id: string;
@@ -9,28 +11,41 @@ export type EPaperElementBase = {
   y: number;
   width: number;
   height: number;
+  rotation?: number;
+  opacity?: number;
   locked?: boolean;
+  visible?: boolean;
+  zIndex?: number;
 };
 
 export type EPaperTextElement = EPaperElementBase & {
-  type: 'headline' | 'subheadline' | 'body' | 'caption' | 'quote';
+  type: 'headline' | 'subheadline' | 'body' | 'caption' | 'quote' | 'label';
   text: string;
   fontSize: number;
   fontWeight: '400' | '600' | '700' | '800';
   lineHeight: number;
-  align: 'left' | 'center' | 'right';
+  letterSpacing?: number;
+  fontFamily?: string;
+  color?: string;
+  align: EPaperTextAlign;
 };
 
 export type EPaperImageElement = EPaperElementBase & {
   type: 'image';
   uri: string;
   name: string;
-  fit: 'cover' | 'contain';
+  fit: EPaperFit;
   caption?: string;
+  linkedChunkId?: string;
+  linkedSectionId?: string;
+  matchScore?: number;
+  matchReasons?: string[];
 };
 
 export type EPaperShapeElement = EPaperElementBase & {
   type: 'divider' | 'spacer';
+  color?: string;
+  thickness?: number;
 };
 
 export type EPaperElement = EPaperTextElement | EPaperImageElement | EPaperShapeElement;
@@ -38,6 +53,7 @@ export type EPaperElement = EPaperTextElement | EPaperImageElement | EPaperShape
 export type EPaperPage = {
   id: string;
   elements: EPaperElement[];
+  background?: string;
 };
 
 export type EPaperDocument = {

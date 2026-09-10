@@ -13,7 +13,7 @@ const registry: HomeFeatureDefinition[] = [
   { id: 'talking-calculator', title: 'AI Calculator', description: 'AI-assisted math, finance, investment, salary, currency and market analysis.', route: '/calculator', icon: 'cpu', category: 'utility' },
   { id: 'qr-code-tools', title: 'QR Code Tools', description: 'Generate customizable Text, URL, WhatsApp, Wi‑Fi and UPI QR codes or scan QR codes.', route: '/utilities/qr-tools', icon: 'qrcode', category: 'utility' },
   { id: 'sketch-generator', title: 'Sketch Generator', description: 'Create custom sketches traditionally or generate sketch assets through a secured AI gateway.', route: '/sketch-generator', icon: 'edit-3', category: 'utility', order: 35 },
-  { id: 'e-paper-generator', title: 'E-Paper Generator', description: 'Turn your text and images into a customizable newspaper-style e-paper without AI.', route: '/categories/e-paper-generator', icon: 'layout', category: 'productivity', featured: true, order: 68 },
+  { id: 'e-paper-generator', title: 'E-Paper Generator Studio', description: 'Turn mixed articles and images into a customizable newspaper layout.', route: '/categories/e-paper-generator', icon: 'layout', category: 'productivity', featured: true, order: 68 },
   { id: 'reminders', title: 'My Reminders', description: 'Plan, schedule and manage accessible voice reminders.', route: '/reminders', icon: 'bell', category: 'productivity', order: 78 },
   { id: 'time-announcer', title: 'Time Announcer', description: 'Configure time announcements.', route: '/time-announcer', icon: 'volume-2', category: 'utility' },
   { id: 'clock', title: 'Clock', description: 'Announce and work with the current time.', route: '/time-announcer', icon: 'clock', category: 'utility' },
@@ -33,5 +33,5 @@ export const FEATURE_CATEGORY_META: Record<FeatureCategory, { title: string; des
   pdf: { title: 'PDF Tools', description: 'Convert, protect, lock, unlock and manage PDFs.', icon: 'file-text', route: '/categories/pdf-tools' },
   media: { title: 'Media Tools', description: 'Audio and radio tools.', icon: 'film', route: '/categories/media-tools' },
   security: { title: 'Security Tools', description: 'Additional security and privacy utilities. File encryption lives in File Manager.', icon: 'shield', route: '/categories/security-tools' },
-  productivity: { title: 'Productivity Tools', description: 'Planning, reading and focused workflows.', icon: 'grid', route: '/categories/productivity-tools' },
+  productivity: { title: 'Productivity Tools', description: 'Planning, publishing, reading and focused workflows.', icon: 'grid', route: '/categories/productivity-tools' },
 };
