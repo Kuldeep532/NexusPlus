@@ -27,8 +27,11 @@ create index if not exists epapers_expiry_idx on public.epapers(expires_at);
 alter table public.epapers enable row level security;
 
 revoke all on public.epapers from anon;
-grants? 
 revoke all on public.epapers from authenticated;
+
+drop policy if exists "owners can read their e-papers" on public.epapers;
+drop policy if exists "owners can create their e-papers" on public.epapers;
+drop policy if exists "owners can update their e-papers" on public.epapers;
 
 create policy "owners can read their e-papers"
   on public.epapers for select
@@ -93,6 +96,14 @@ begin
   where status <> 'TAMPERED';
 end;
 $$;
+
+select cron.unschedule(jobid)
+from cron.job
+where jobname = 'epaper-window-refresh';
+
+select cron.unschedule(jobid)
+from cron.job
+where jobname = 'epaper-expiry-cleanup';
 
 select cron.schedule(
   'epaper-window-refresh',
