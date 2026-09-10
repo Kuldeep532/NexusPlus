@@ -15,6 +15,8 @@ type PdfNativeApi = {
   rotate(inputPath: string, outputPath: string, pageRanges: string[], angle: number): Promise<string>;
   preparePdfOutput(category: string, filename: string): Promise<string>;
   preparePdfToolOutput(category: string, filename: string): Promise<string>;
+  renderEPaperToPdf(documentJson: string, outputPath: string, dpi: number): Promise<string>;
+  printPdf(inputPath: string, jobName: string): Promise<boolean>;
 };
 
 const nativeModule = NativeModules.NexusPdfNative as PdfNativeApi | undefined;
@@ -52,4 +54,6 @@ export const PdfNativeBridge = {
   rotate: async (inputPath: string, outputPath: string, pageRanges: string[], angle: number, pageCount?: number) => { validatePath(inputPath); validatePath(outputPath); validateRotation(angle); const safeRanges = pageCount === undefined ? pageRanges : pageRangeStrings(pageRanges.join(', '), pageCount); return (await requireNative()).rotate(inputPath, outputPath, safeRanges, angle); },
   preparePdfOutput: async (category: string, filename: string) => { if (!category.trim() || !filename.trim()) throw new Error('PDF output category and filename are required.'); return (await requireNative()).preparePdfOutput(category, filename); },
   preparePdfToolOutput: async (category: string, filename: string) => { if (!category.trim() || !filename.trim()) throw new Error('PDF output category and filename are required.'); return (await requireNative()).preparePdfToolOutput(category, filename); },
+  renderEPaperToPdf: async (documentJson: string, outputPath: string, dpi = 180) => { validatePath(outputPath); if (!documentJson.trim()) throw new Error('E-paper document is empty.'); return (await requireNative()).renderEPaperToPdf(documentJson, outputPath, Math.max(72, Math.min(300, Math.round(Number(dpi) || 180)))); },
+  printPdf: async (inputPath: string, jobName: string) => { validatePath(inputPath); if (!jobName.trim()) throw new Error('Print job name is required.'); return (await requireNative()).printPdf(inputPath, jobName.trim()); },
 };
