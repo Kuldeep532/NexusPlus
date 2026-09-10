@@ -1,4 +1,4 @@
-import type { ExamPaperLevel, ExamQuestion, ExamPaperSpec, ExamSubject } from './examPaperTypes';
+import type { ExamQuestion, ExamPaperSpec, ExamSubject, ExamPaperLevel } from './examPaperTypes';
 
 export const EXAM_SUBJECTS: ExamSubject[] = [
   { id: 'mathematics', name: 'Mathematics', levels: ['school-1-5','school-6-8','school-9-10','school-11-12','undergraduate','postgraduate','competitive'], topics: ['number systems','algebra','geometry','trigonometry','calculus','statistics','probability'] },
@@ -39,18 +39,24 @@ function hashSeed(seed: string): number {
 }
 
 function pick<T>(items: T[], seed: number, index: number): T {
-  return items[(seed + index * 2654435761) % items.length];
+  return items[((seed + index * 2654435761) >>> 0) % items.length];
 }
 
 export function generatePatternQuestions(spec: ExamPaperSpec, sourceQuestions: ExamQuestion[]): ExamQuestion[] {
-  if (!sourceQuestions.length) return [];
-  const seed = hashSeed(spec.seed);
+  const filtered = sourceQuestions.filter((question) => !spec.sections.length || spec.sections.some((section) => section.questionType === question.type));
+  if (!filtered.length) return [];
+  const seed = hashSeed(spec.seed || `${spec.subjectId}:${spec.level}`);
   const result: ExamQuestion[] = [];
+  const used = new Set<string>();
   for (let index = 0; index < spec.questionCount; index += 1) {
-    const base = pick(sourceQuestions, seed, index);
+    let offset = 0;
+    let base = pick(filtered, seed, index);
+    while (used.has(base.id) && offset < filtered.length) { offset += 1; base = filtered[(filtered.indexOf(base) + offset) % filtered.length]; }
+    used.add(base.id);
     result.push({ ...base, id: `generated-${seed}-${index + 1}`, marks: Math.max(1, base.marks), difficulty: index % 5 === 0 ? 'hard' : index % 2 === 0 ? 'medium' : base.difficulty });
   }
   return result;
 }
 
 export function subjectById(id: string): ExamSubject | undefined { return EXAM_SUBJECTS.find((subject) => subject.id === id); }
+export function levelsForSubject(id: string): ExamPaperLevel[] { return subjectById(id)?.levels ?? []; }
