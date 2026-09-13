@@ -11,12 +11,13 @@ import java.nio.ByteBuffer
 
 internal object AudioTrimProcessor {
   fun trim(
-    context: Context,
+    context: Context?,
     inputPath: String,
     outputPath: String,
     startMs: Double,
     endMs: Double,
   ): Map<String, Any?> {
+    require(context != null) { "Audio editor context is unavailable." }
     require(startMs.isFinite() && endMs.isFinite()) { "Trim bounds must be finite." }
     require(startMs >= 0.0) { "Trim start must be at least 0 ms." }
     require(endMs > startMs) { "Trim end must be greater than trim start." }
@@ -42,11 +43,16 @@ internal object AudioTrimProcessor {
         }
       }
       require(audioTrack >= 0 && format != null) { "No supported audio track was found." }
-
-      extractor.selectTrack(audioTrack)
+      val sourceDurationUs = if (format.containsKey(MediaFormat.KEY_DURATION)) format.getLong(MediaFormat.KEY_DURATION) else 0L
       val startUs = (startMs * 1000.0).toLong()
       val endUs = (endMs * 1000.0).toLong()
+      require(startUs < endUs) { "Trim end must be greater than trim start." }
+      if (sourceDurationUs > 0L) require(startUs < sourceDurationUs) { "Trim start is outside the source duration." }
+
+      extractor.selectTrack(audioTrack)
       extractor.seekTo(startUs, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
+      val firstSampleUs = extractor.sampleTime
+      require(firstSampleUs >= 0L) { "The selected range contains no writable audio samples." }
 
       muxer = MediaMuxer(outputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
       val outputTrack = muxer.addTrack(format)
@@ -61,10 +67,10 @@ internal object AudioTrimProcessor {
       while (true) {
         buffer.clear()
         val timeUs = extractor.sampleTime
-        if (timeUs < 0 || timeUs >= endUs) break
+        if (timeUs < 0L || timeUs >= endUs) break
         val size = extractor.readSampleData(buffer, 0)
         if (size < 0) break
-        info.set(0, size, (timeUs - startUs).coerceAtLeast(0L), extractor.sampleFlags)
+        info.set(0, size, (timeUs - firstSampleUs).coerceAtLeast(0L), extractor.sampleFlags)
         muxer.writeSampleData(outputTrack, buffer, info)
         samples++
         extractor.advance()
