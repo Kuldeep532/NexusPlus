@@ -15,6 +15,6 @@ export interface TimelineRangeMs {
 export interface AudioEffectClip extends TimelineRangeMs {
   id: string;
   name: string;
-  uri?: string;
+  uri: string;
   volume: number;
 }
