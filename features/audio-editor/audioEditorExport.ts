@@ -14,8 +14,13 @@ export async function ensureAudioEditorExportFolder(category = 'Audio Trims'): P
   return categoryPath;
 }
 
-export async function createAudioEditorOutputPath(category: string, sourceName: string): Promise<string> {
+export async function createAudioEditorOutputPath(
+  category: string,
+  sourceName: string,
+  suffix = 'audio',
+): Promise<string> {
   const folder = await ensureAudioEditorExportFolder(category);
   const baseName = sanitizeName(sourceName).replace(/\.[^.]+$/, '') || 'audio';
-  return `${folder}${baseName}-trimmed-${Date.now()}.m4a`;
+  const safeSuffix = sanitizeName(suffix).toLowerCase() || 'audio';
+  return `${folder}${baseName}-${safeSuffix}-${Date.now()}.m4a`;
 }
