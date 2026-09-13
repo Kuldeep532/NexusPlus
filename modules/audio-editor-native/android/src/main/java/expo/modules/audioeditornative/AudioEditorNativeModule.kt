@@ -41,6 +41,25 @@ class AudioEditorNativeModule : Module() {
         promise.reject("AUDIO_DECODE_FAILED", error.message ?: "Unable to decode audio", error)
       }
     }
+
+    AsyncFunction("mix") { input: Map<String, Any?>, promise: Promise ->
+      try {
+        val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
+        val basePath = input["inputPath"] as? String ?: error("Base audio path is required.")
+        val overlayPath = input["overlayPath"] as? String ?: error("Overlay audio path is required.")
+        val outputPath = input["outputPath"] as? String ?: error("Output audio path is required.")
+        val startMs = (input["overlayStartMs"] as? Number)?.toDouble() ?: 0.0
+        val volume = (input["overlayVolume"] as? Number)?.toDouble() ?: 1.0
+        promise.resolve(AudioMixProcessor.mix(
+          context,
+          basePath,
+          AudioMixProcessor.Clip(overlayPath, startMs, volume),
+          outputPath,
+        ))
+      } catch (error: Exception) {
+        promise.reject("AUDIO_MIX_FAILED", error.message ?: "Unable to mix audio", error)
+      }
+    }
   }
 
   private fun probeAudio(inputPath: String): Map<String, Any?> {
