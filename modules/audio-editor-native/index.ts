@@ -23,10 +23,27 @@ export type AudioTrimResult = {
   samples?: number;
 };
 
+export type AudioMixInput = {
+  inputPath: string;
+  overlayPath: string;
+  overlayStartMs: number;
+  overlayVolume: number;
+  outputPath: string;
+};
+
+export type AudioMixResult = {
+  outputPath: string;
+  durationMs: number;
+  sampleRate: number;
+  channels: number;
+  mimeType: string | null;
+};
+
 type AudioEditorNativeModuleType = {
   probe(inputPath: string): Promise<AudioProbeResult>;
   decode(inputPath: string): Promise<DecodedAudioResult>;
   trim(inputPath: string, outputPath: string, startMs: number, endMs: number): Promise<AudioTrimResult>;
+  mix(input: AudioMixInput): Promise<AudioMixResult>;
 };
 
 export const AudioEditorNative = requireOptionalNativeModule<AudioEditorNativeModuleType>('AudioEditorNative');
