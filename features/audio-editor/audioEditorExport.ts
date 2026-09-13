@@ -7,7 +7,8 @@ function sanitizeName(value: string): string {
 }
 
 export async function ensureAudioEditorExportFolder(category = 'Audio Trims'): Promise<string> {
-  const base = FileSystem.documentDirectory ?? '';
+  const base = FileSystem.documentDirectory;
+  if (!base) throw new Error('Nexus Plus storage is unavailable on this device.');
   const categoryPath = `${base}${ROOT_FOLDER}/${sanitizeName(category)}/`;
   await FileSystem.makeDirectoryAsync(categoryPath, { intermediates: true });
   return categoryPath;
