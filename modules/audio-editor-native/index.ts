@@ -7,6 +7,13 @@ export type AudioProbeResult = {
   mimeType: string | null;
 };
 
+export type DecodedAudioResult = {
+  sampleRate: number;
+  channels: number;
+  durationMs: number;
+  samples: number[];
+};
+
 export type AudioTrimResult = {
   outputPath: string;
   startMs: number;
@@ -18,6 +25,7 @@ export type AudioTrimResult = {
 
 type AudioEditorNativeModuleType = {
   probe(inputPath: string): Promise<AudioProbeResult>;
+  decode(inputPath: string): Promise<DecodedAudioResult>;
   trim(inputPath: string, outputPath: string, startMs: number, endMs: number): Promise<AudioTrimResult>;
 };
 
