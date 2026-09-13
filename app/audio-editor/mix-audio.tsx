@@ -135,7 +135,7 @@ export default function MixAudioScreen() {
     setLoading(true);
     setMessage('Mixing audio…');
     try {
-      const outputPath = await createAudioEditorOutputPath('Audio Mixes', base.source.name);
+      const outputPath = await createAudioEditorOutputPath('Audio Mixes', base.source.name, 'mixed');
       const result = await mixAudio({
         inputPath: base.source.uri,
         overlayPath: overlay.source.uri,
@@ -160,49 +160,37 @@ export default function MixAudioScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <Stack.Screen options={{ title: 'Mix Audio' }} />
-
       <View style={styles.headerRow}>
         <View style={[styles.heroIcon, { backgroundColor: colors.secondary }]}>
           <Feather name="layers" size={24} color={colors.primary} />
         </View>
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Mix Audio</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Combine two audio tracks without adding a separate component library. Set the overlay start point and level, then export.</Text>
+          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Combine two audio tracks. Choose a base track, overlay a second track, set its timing and level, then export.</Text>
         </View>
       </View>
-
       <View style={styles.selectorRow}>
-        <Pressable onPress={() => setPickerMode('base')} style={[styles.modeButton, { borderColor: pickerMode === 'base' ? colors.primary : colors.border, backgroundColor: pickerMode === 'base' ? colors.secondary : colors.card }]}>
+        <Pressable onPress={() => setPickerMode('base')} accessibilityRole="button" style={[styles.modeButton, { borderColor: pickerMode === 'base' ? colors.primary : colors.border, backgroundColor: pickerMode === 'base' ? colors.secondary : colors.card }]}>
           <Text style={[styles.modeButtonText, { color: pickerMode === 'base' ? colors.primary : colors.foreground }]}>Base audio</Text>
         </Pressable>
-        <Pressable onPress={() => setPickerMode('overlay')} style={[styles.modeButton, { borderColor: pickerMode === 'overlay' ? colors.primary : colors.border, backgroundColor: pickerMode === 'overlay' ? colors.secondary : colors.card }]}>
+        <Pressable onPress={() => setPickerMode('overlay')} accessibilityRole="button" style={[styles.modeButton, { borderColor: pickerMode === 'overlay' ? colors.primary : colors.border, backgroundColor: pickerMode === 'overlay' ? colors.secondary : colors.card }]}>
           <Text style={[styles.modeButtonText, { color: pickerMode === 'overlay' ? colors.primary : colors.foreground }]}>Overlay audio</Text>
         </Pressable>
       </View>
-
       <Pressable onPress={() => chooseFromManager(pickerMode)} accessibilityRole="button" style={[styles.primaryButton, { backgroundColor: colors.primary }]}>
         <Feather name="folder" size={19} color={colors.primaryForeground} />
         <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Choose {activePickerLabel} from File Manager</Text>
       </Pressable>
-
       <View style={styles.searchRow}>
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search local audio"
-          placeholderTextColor={colors.mutedForeground}
-          style={[styles.searchInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]}
-          accessibilityLabel="Search local audio"
-        />
+        <TextInput value={query} onChangeText={setQuery} placeholder="Search local audio" placeholderTextColor={colors.mutedForeground} style={[styles.searchInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]} accessibilityLabel="Search local audio" />
         <Pressable onPress={discover} accessibilityRole="button" style={[styles.scanButton, { backgroundColor: colors.secondary }]}>
           <Feather name="search" size={19} color={colors.primary} />
         </Pressable>
       </View>
-
       {library.length > 0 && (
         <View style={styles.libraryList}>
           {library.map((item) => (
-            <Pressable key={item.id} onPress={() => loadSource(item, pickerMode)} style={[styles.libraryItem, { borderColor: colors.border, backgroundColor: colors.card }]}>
+            <Pressable key={item.id} onPress={() => loadSource(item, pickerMode)} accessibilityRole="button" style={[styles.libraryItem, { borderColor: colors.border, backgroundColor: colors.card }]}>
               <Feather name="music" size={18} color={colors.primary} />
               <View style={styles.libraryCopy}>
                 <Text numberOfLines={1} style={[styles.itemTitle, { color: colors.foreground }]}>{item.name}</Text>
@@ -212,15 +200,7 @@ export default function MixAudioScreen() {
           ))}
         </View>
       )}
-
-      <TrackCard
-        label="Base track"
-        track={base}
-        metadata={baseProbe}
-        colors={colors}
-        icon="music"
-      />
-
+      <TrackCard label="Base track" track={base} metadata={baseProbe} colors={colors} icon="music" />
       {overlay && (
         <View style={[styles.editorCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.cardHeaderRow}>
@@ -233,54 +213,39 @@ export default function MixAudioScreen() {
               <Text style={[styles.muteText, { color: colors.foreground }]}>{overlay.muted ? 'Muted' : 'Active'}</Text>
             </Pressable>
           </View>
-
           <View style={[styles.timeline, { backgroundColor: colors.secondary }]}>
             <View style={[styles.timelineBase, { backgroundColor: colors.border }]} />
-            <View style={[styles.timelineOverlay, { backgroundColor: colors.primary, left: mixDuration ? `${(overlay.startMs / mixDuration) * 100}%` : '0%', width: mixDuration ? `${(overlay.source.durationMs / mixDuration) * 100}%` : '0%' }]} />
+            <View style={[styles.timelineOverlay, { backgroundColor: colors.primary, left: mixDuration ? `${Math.min(100, (overlay.startMs / mixDuration) * 100)}%` : '0%', width: mixDuration ? `${Math.min(100, (overlay.source.durationMs / mixDuration) * 100)}%` : '0%' }]} />
           </View>
-
           <View style={styles.controlBlock}>
             <Text style={[styles.controlLabel, { color: colors.foreground }]}>Overlay start</Text>
             <View style={styles.inputsRow}>
               <TextInput value={overlayStartText} onChangeText={setOverlayStartText} onBlur={applyOverlayStart} keyboardType="numbers-and-punctuation" placeholder="0:00" placeholderTextColor={colors.mutedForeground} style={[styles.timeInput, { color: colors.foreground, borderColor: colors.border }]} accessibilityLabel="Overlay start time" />
-              <Pressable onPress={() => { const next = Math.max(0, overlay.startMs - 1000); updateOverlay({ startMs: next }); setOverlayStartText(formatTime(next)); }} style={[styles.smallButton, { borderColor: colors.border }]}>
-                <Text style={[styles.smallButtonText, { color: colors.foreground }]}>−1s</Text>
-              </Pressable>
-              <Pressable onPress={() => { const next = overlay.startMs + 1000; updateOverlay({ startMs: next }); setOverlayStartText(formatTime(next)); }} style={[styles.smallButton, { borderColor: colors.border }]}>
-                <Text style={[styles.smallButtonText, { color: colors.foreground }]}>+1s</Text>
-              </Pressable>
+              <Pressable onPress={() => { const next = Math.max(0, overlay.startMs - 1000); updateOverlay({ startMs: next }); setOverlayStartText(formatTime(next)); }} accessibilityRole="button" style={[styles.smallButton, { borderColor: colors.border }]}><Text style={[styles.smallButtonText, { color: colors.foreground }]}>−1s</Text></Pressable>
+              <Pressable onPress={() => { const next = overlay.startMs + 1000; updateOverlay({ startMs: next }); setOverlayStartText(formatTime(next)); }} accessibilityRole="button" style={[styles.smallButton, { borderColor: colors.border }]}><Text style={[styles.smallButtonText, { color: colors.foreground }]}>+1s</Text></Pressable>
             </View>
           </View>
-
           <View style={styles.controlBlock}>
             <Text style={[styles.controlLabel, { color: colors.foreground }]}>Overlay volume (%)</Text>
             <View style={styles.inputsRow}>
               <TextInput value={overlayVolumeText} onChangeText={setOverlayVolumeText} onBlur={applyOverlayVolume} keyboardType="numeric" placeholder="100" placeholderTextColor={colors.mutedForeground} style={[styles.timeInput, { color: colors.foreground, borderColor: colors.border }]} accessibilityLabel="Overlay volume percent" />
-              <Pressable onPress={() => { const next = Math.max(0, overlay.volume - 0.1); updateOverlay({ volume: next }); setOverlayVolumeText(String(Math.round(next * 100))); }} style={[styles.smallButton, { borderColor: colors.border }]}>
-                <Text style={[styles.smallButtonText, { color: colors.foreground }]}>−10%</Text>
-              </Pressable>
-              <Pressable onPress={() => { const next = Math.min(2, overlay.volume + 0.1); updateOverlay({ volume: next }); setOverlayVolumeText(String(Math.round(next * 100))); }} style={[styles.smallButton, { borderColor: colors.border }]}>
-                <Text style={[styles.smallButtonText, { color: colors.foreground }]}>+10%</Text>
-              </Pressable>
+              <Pressable onPress={() => { const next = Math.max(0, overlay.volume - 0.1); updateOverlay({ volume: next }); setOverlayVolumeText(String(Math.round(next * 100))); }} accessibilityRole="button" style={[styles.smallButton, { borderColor: colors.border }]}><Text style={[styles.smallButtonText, { color: colors.foreground }]}>−10%</Text></Pressable>
+              <Pressable onPress={() => { const next = Math.min(2, overlay.volume + 0.1); updateOverlay({ volume: next }); setOverlayVolumeText(String(Math.round(next * 100))); }} accessibilityRole="button" style={[styles.smallButton, { borderColor: colors.border }]}><Text style={[styles.smallButtonText, { color: colors.foreground }]}>+10%</Text></Pressable>
             </View>
           </View>
-
           {baseProbe && overlayProbe && (baseProbe.sampleRate !== overlayProbe.sampleRate || baseProbe.channels !== overlayProbe.channels) && (
             <View style={[styles.warningBox, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
               <Feather name="alert-circle" size={18} color={colors.primary} />
-              <Text style={[styles.warningText, { color: colors.foreground }]}>The two tracks have different audio formats ({baseProbe.sampleRate} Hz / {baseProbe.channels} ch vs {overlayProbe.sampleRate} Hz / {overlayProbe.channels} ch). The current native mixer requires matching sample rate and channel count.</Text>
+              <Text style={[styles.warningText, { color: colors.foreground }]}>The two tracks have different audio formats ({baseProbe.sampleRate} Hz / {baseProbe.channels} ch vs {overlayProbe.sampleRate} Hz / {overlayProbe.channels} ch). Choose matching audio sources for the current native mixer.</Text>
             </View>
           )}
-
           <Text style={[styles.durationText, { color: colors.mutedForeground }]}>Estimated output length: {formatTime(mixDuration)}</Text>
         </View>
       )}
-
-      <Pressable disabled={!valid || loading} onPress={exportMix} style={[styles.primaryButton, { backgroundColor: valid ? colors.primary : colors.muted, marginTop: 16 }]} accessibilityRole="button">
+      <Pressable disabled={!valid || loading} onPress={exportMix} accessibilityRole="button" style={[styles.primaryButton, { backgroundColor: valid ? colors.primary : colors.muted, marginTop: 16 }]}>
         {loading ? <ActivityIndicator color={colors.primaryForeground} /> : <Feather name="layers" size={19} color={colors.primaryForeground} />}
         <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{loading ? 'Mixing…' : 'Mix & Export Audio'}</Text>
       </Pressable>
-
       {!!message && <Text accessibilityLiveRegion="polite" style={[styles.message, { color: colors.mutedForeground }]}>{message}</Text>}
     </ScrollView>
   );
@@ -288,19 +253,14 @@ export default function MixAudioScreen() {
 
 function TrackCard({ label, track, metadata, colors, icon }: { label: string; track: AudioMixTrack | null; metadata: AudioProbeResult | null; colors: ReturnType<typeof useColors>; icon: 'music' | 'layers' }) {
   return (
-    <View style={[styles.editorCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={[styles.trackBadge, { backgroundColor: colors.secondary }]}>
-        <Feather name={icon} size={18} color={colors.primary} />
+    <View style={[styles.editorCard, { backgroundColor: colors.card, borderColor: colors.border }]} accessibilityLabel={track ? `${label}: ${track.source.name}` : `${label}: not selected`}>
+      <View style={styles.cardHeaderRow}>
+        <View style={[styles.trackBadge, { backgroundColor: colors.secondary }]}><Feather name={icon} size={17} color={colors.primary} /></View>
+        <View style={styles.cardTitleWrap}>
+          <Text style={[styles.sourceTitle, { color: colors.foreground }]}>{label}</Text>
+          <Text style={[styles.metadata, { color: colors.mutedForeground }]} numberOfLines={1}>{track ? `${track.source.name} • ${formatTime(track.source.durationMs)} • ${metadata?.sampleRate ?? 0} Hz` : 'Not selected yet'}</Text>
+        </View>
       </View>
-      <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>{label}</Text>
-      {track ? (
-        <>
-          <Text style={[styles.sourceTitle, { color: colors.foreground }]} numberOfLines={1}>{track.source.name}</Text>
-          <Text style={[styles.metadata, { color: colors.mutedForeground }]}>{formatTime(track.source.durationMs)} • {metadata?.sampleRate ?? 0} Hz • {metadata?.channels ?? 0} channel(s)</Text>
-        </>
-      ) : (
-        <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No base track selected yet.</Text>
-      )}
     </View>
   );
 }
@@ -312,8 +272,8 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1, marginLeft: 14 },
   title: { fontSize: 27, fontFamily: 'Inter_700Bold', marginBottom: 5 },
   subtitle: { fontSize: 11.5, lineHeight: 17 },
-  selectorRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  modeButton: { flex: 1, minHeight: 46, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  selectorRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  modeButton: { flex: 1, minHeight: 44, borderWidth: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   modeButtonText: { fontSize: 12, fontFamily: 'Inter_700Bold' },
   primaryButton: { minHeight: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9, paddingHorizontal: 16 },
   buttonText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
@@ -325,27 +285,25 @@ const styles = StyleSheet.create({
   libraryCopy: { flex: 1, marginLeft: 10 },
   itemTitle: { fontSize: 12.5, fontFamily: 'Inter_700Bold' },
   itemMeta: { fontSize: 10.5, marginTop: 3 },
-  editorCard: { marginTop: 16, borderWidth: 1, borderRadius: 18, padding: 14, gap: 10 },
-  trackBadge: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  cardLabel: { fontSize: 10.5, fontFamily: 'Inter_700Bold', textTransform: 'uppercase' },
-  sourceTitle: { fontSize: 15, fontFamily: 'Inter_700Bold' },
-  metadata: { fontSize: 10.5 },
-  emptyText: { fontSize: 12 },
+  editorCard: { marginTop: 16, borderWidth: 1, borderRadius: 18, padding: 14, gap: 12 },
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  cardTitleWrap: { flex: 1, gap: 3 },
-  muteButton: { minHeight: 40, borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  cardTitleWrap: { flex: 1 },
+  trackBadge: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  sourceTitle: { fontSize: 15, fontFamily: 'Inter_700Bold' },
+  metadata: { fontSize: 10.5, marginTop: 3 },
+  timeline: { height: 54, borderRadius: 12, overflow: 'hidden', position: 'relative' },
+  timelineBase: { position: 'absolute', left: 0, right: 0, top: 24, height: 6 },
+  timelineOverlay: { position: 'absolute', top: 14, height: 26, borderRadius: 7 },
+  muteButton: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 4 },
   muteText: { fontSize: 10.5, fontFamily: 'Inter_700Bold' },
-  timeline: { height: 56, borderRadius: 12, overflow: 'hidden', position: 'relative', marginTop: 2 },
-  timelineBase: { position: 'absolute', left: 0, right: 0, top: 25, height: 6, borderRadius: 3 },
-  timelineOverlay: { position: 'absolute', top: 15, height: 26, borderRadius: 8, minWidth: 4 },
   controlBlock: { gap: 7 },
-  controlLabel: { fontSize: 11, fontFamily: 'Inter_700Bold' },
+  controlLabel: { fontSize: 11.5, fontFamily: 'Inter_700Bold' },
   inputsRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   timeInput: { flex: 1, minHeight: 46, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, fontSize: 13 },
-  smallButton: { minHeight: 44, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
-  smallButtonText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
-  warningBox: { borderWidth: 1, borderRadius: 12, padding: 10, flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  smallButton: { minHeight: 46, borderWidth: 1, borderRadius: 12, paddingHorizontal: 11, alignItems: 'center', justifyContent: 'center' },
+  smallButtonText: { fontSize: 10.5, fontFamily: 'Inter_700Bold' },
+  warningBox: { borderWidth: 1, borderRadius: 12, padding: 11, flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
   warningText: { flex: 1, fontSize: 10.5, lineHeight: 15 },
-  durationText: { fontSize: 10.5 },
-  message: { marginTop: 12, fontSize: 11, lineHeight: 16 },
+  durationText: { fontSize: 11 },
+  message: { marginTop: 12, fontSize: 10.5, lineHeight: 15 },
 });
