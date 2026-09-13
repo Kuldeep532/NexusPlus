@@ -49,9 +49,9 @@ export default function MixAudioScreen() {
     );
   }, [activeOverlays, base]);
 
-  const setOverlay = (id: string, patch: Partial<AudioMixTrack>) => {
+  const setOverlay = useCallback((id: string, patch: Partial<AudioMixTrack>) => {
     setOverlays((current) => current.map((track) => track.id === id ? { ...track, ...patch } : track));
-  };
+  }, []);
 
   const loadSource = useCallback(async (next: AudioEditorSource, mode: 'base' | 'overlay') => {
     setLoading(true);
@@ -66,16 +66,19 @@ export default function MixAudioScreen() {
         setOverlayProbes({});
         setMessage('Base audio loaded. Add as many overlay tracks as needed.');
       } else {
-        setOverlays((current) => [...current, createAudioMixTrack(source, current.length + 1)]);
+        setOverlays((current) => {
+          const nextTrack = createAudioMixTrack(source, current.length + 1);
+          return [...current, nextTrack];
+        });
         setOverlayProbes((current) => ({ ...current, [source.id]: metadata }));
-        setMessage(`Track added: ${source.name}. Total active tracks: ${overlays.filter((track) => !track.muted).length + 2}.`);
+        setMessage(`Track added: ${source.name}.`);
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to inspect this audio file.');
     } finally {
       setLoading(false);
     }
-  }, [overlays]);
+  }, []);
 
   const chooseFromManager = useCallback(async (mode: 'base' | 'overlay') => {
     const picked = await pickAudioFromFileManager();
@@ -96,7 +99,7 @@ export default function MixAudioScreen() {
     }
   }, [query]);
 
-  const removeOverlay = (id: string) => {
+  const removeOverlay = useCallback((id: string) => {
     setOverlays((current) => current.filter((track) => track.id !== id));
     setOverlayProbes((current) => {
       const next = { ...current };
@@ -104,14 +107,14 @@ export default function MixAudioScreen() {
       return next;
     });
     setMessage('Track removed.');
-  };
+  }, []);
 
-  const exportMix = async () => {
+  const exportMix = useCallback(async () => {
     if (!base || activeOverlays.length === 0 || loading) return;
     setLoading(true);
     setMessage('Mixing all tracks natively…');
     try {
-      const outputPath = await createAudioEditorOutputPath('Audio Mixes', base.source.name, 'mixed');
+      const outputPath = await createAudioEditorOutputPath('Audio Mixes', base.source.name, 'mixed', 'wav');
       const result = await mixAudioProject({ base, overlays: activeOverlays }, outputPath);
       setMessage(`Mix complete: ${result.outputPath}`);
     } catch (error) {
@@ -119,7 +122,7 @@ export default function MixAudioScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeOverlays, base, loading]);
 
   const renderOverlay = ({ item, index }: { item: AudioMixTrack; index: number }) => {
     const probe = overlayProbes[item.source.id];
@@ -207,24 +210,24 @@ const styles = StyleSheet.create({
   searchRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   searchInput: { flex: 1, minHeight: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, fontSize: 13 },
   scanButton: { width: 48, minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  libraryList: { gap: 8, marginTop: 12, marginBottom: 12 },
+  libraryList: { gap: 8, marginTop: 12 },
   libraryItem: { borderWidth: 1, borderRadius: 14, padding: 12, flexDirection: 'row', alignItems: 'center' },
   libraryCopy: { flex: 1, marginLeft: 10 },
   itemTitle: { fontSize: 12.5, fontFamily: 'Inter_700Bold' },
   itemMeta: { fontSize: 10.5, marginTop: 3 },
-  editorCard: { borderWidth: 1, borderRadius: 18, padding: 14, gap: 10, marginBottom: 10 },
+  editorCard: { marginTop: 12, borderWidth: 1, borderRadius: 18, padding: 14, gap: 12 },
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center' },
-  trackBadge: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  trackBadge: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   trackBadgeText: { fontSize: 12, fontFamily: 'Inter_700Bold' },
-  cardTitleWrap: { flex: 1, marginLeft: 10, marginRight: 8 },
-  sourceTitle: { fontSize: 15, fontFamily: 'Inter_700Bold' },
-  metadata: { fontSize: 10.5 },
-  controlLabel: { fontSize: 11, fontFamily: 'Inter_700Bold' },
-  inputsRow: { flexDirection: 'row', gap: 7 },
-  timeInput: { flex: 1, minHeight: 44, borderWidth: 1, borderRadius: 11, paddingHorizontal: 10, fontSize: 12 },
-  smallButton: { borderWidth: 1, borderRadius: 10, minHeight: 40, paddingHorizontal: 9, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4 },
-  smallButtonText: { fontSize: 10.5, fontFamily: 'Inter_700Bold' },
-  secondaryButton: { minHeight: 48, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, paddingHorizontal: 14, marginTop: 4 },
-  secondaryButtonText: { fontSize: 12.5, fontFamily: 'Inter_700Bold' },
-  message: { fontSize: 11, lineHeight: 17, marginTop: 12 },
+  cardTitleWrap: { flex: 1, marginLeft: 9, marginRight: 8 },
+  sourceTitle: { fontSize: 12.5, fontFamily: 'Inter_700Bold' },
+  metadata: { fontSize: 10.5, lineHeight: 15 },
+  controlLabel: { fontSize: 11.5, fontFamily: 'Inter_700Bold' },
+  inputsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  timeInput: { flex: 1, minHeight: 42, borderWidth: 1, borderRadius: 11, paddingHorizontal: 11, fontSize: 12 },
+  smallButton: { minWidth: 44, minHeight: 42, borderWidth: 1, borderRadius: 11, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  smallButtonText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
+  secondaryButton: { minHeight: 48, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginTop: 12 },
+  secondaryButtonText: { fontSize: 12, fontFamily: 'Inter_700Bold' },
+  message: { fontSize: 10.5, lineHeight: 15, marginTop: 12 },
 });
