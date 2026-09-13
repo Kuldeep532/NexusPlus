@@ -7,19 +7,23 @@ export interface AudioEditorToolDefinition {
   order?: number;
 }
 
-/**
- * All Audio Editor tools belong to this registry. Do not add child tools to
- * the global Home feature registry; Home should register only the parent
- * Audio Editor feature.
- */
+/** All child Audio Editor tools belong here. Home registers only the parent editor. */
 const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
   {
     id: 'add-sound-effects',
     title: 'Add Sound Effects',
-    description: 'Add custom sound effects over your audio or between sections with precise timeline and controls.',
+    description: 'Add sound effects over your audio or between sections with precise timeline controls.',
     route: '/audio-editor/add-sound-effects',
     icon: 'volume-2',
     order: 10,
+  },
+  {
+    id: 'audio-trimmer',
+    title: 'Audio Trimmer',
+    description: 'Trim audio manually or use smart ringtone cut suggestions based on detected audio patterns.',
+    route: '/audio-editor/audio-trimmer',
+    icon: 'scissors',
+    order: 20,
   },
 ];
 
