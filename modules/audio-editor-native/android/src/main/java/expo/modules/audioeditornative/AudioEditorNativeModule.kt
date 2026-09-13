@@ -20,7 +20,7 @@ class AudioEditorNativeModule : Module() {
 
     AsyncFunction("trim") { inputPath: String, outputPath: String, startMs: Double, endMs: Double, promise: Promise ->
       try {
-        promise.resolve(AudioTrimProcessor.trim(inputPath, outputPath, startMs, endMs))
+        promise.resolve(AudioTrimProcessor.trim(appContext.reactContext, inputPath, outputPath, startMs, endMs))
       } catch (error: Exception) {
         promise.reject("AUDIO_TRIM_FAILED", error.message ?: "Unable to trim audio", error)
       }
@@ -30,7 +30,16 @@ class AudioEditorNativeModule : Module() {
   private fun probeAudio(inputPath: String): Map<String, Any?> {
     val extractor = MediaExtractor()
     try {
-      extractor.setDataSource(inputPath)
+      when {
+        inputPath.startsWith("content://") || inputPath.startsWith("file://") -> {
+          val uri = android.net.Uri.parse(inputPath)
+          appContext.reactContext?.contentResolver?.openFileDescriptor(uri, "r").use { descriptor ->
+            requireNotNull(descriptor) { "Unable to open selected audio file." }
+            extractor.setDataSource(descriptor.fileDescriptor)
+          }
+        }
+        else -> extractor.setDataSource(inputPath)
+      }
       var audioTrack = -1
       var durationUs = 0L
       var sampleRate = 0
