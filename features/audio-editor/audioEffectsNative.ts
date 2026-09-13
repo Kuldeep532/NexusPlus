@@ -1,4 +1,4 @@
-import { requireOptionalNativeModule } from 'expo-modules-core';
+import { AudioEditorNative, assertAudioEditorNative, type AudioMixInput, type AudioMixResult } from '@/modules/audio-editor-native';
 
 export type AudioEffectMix = {
   inputPath: string;
@@ -9,20 +9,23 @@ export type AudioEffectMix = {
   volume: number;
 };
 
-export type AudioEffectMixResult = {
-  outputPath: string;
-  durationMs: number;
-};
+export type AudioEffectMixResult = AudioMixResult;
 
-type AudioEffectsNativeApi = {
-  mix(input: AudioEffectMix): Promise<AudioEffectMixResult>;
-};
+export function assertAudioEffectsNative() {
+  return {
+    mix: (input: AudioEffectMix) => {
+      const request: AudioMixInput = {
+        inputPath: input.inputPath,
+        overlayPath: input.effectPath,
+        outputPath: input.outputPath,
+        overlayStartMs: input.effectStartMs,
+        overlayVolume: input.volume,
+      };
+      return assertAudioEditorNative().mix(request);
+    },
+  };
+}
 
-const nativeModule = requireOptionalNativeModule<AudioEffectsNativeApi>('AudioEditorNative');
-
-export function assertAudioEffectsNative(): AudioEffectsNativeApi {
-  if (!nativeModule) {
-    throw new Error('Audio Effects native module is not available in this build.');
-  }
-  return nativeModule;
+export function isAudioEffectsNativeAvailable(): boolean {
+  return Boolean(AudioEditorNative);
 }
