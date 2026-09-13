@@ -17,6 +17,14 @@ const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
     icon: 'scissors',
     order: 20,
   },
+  {
+    id: 'mix-audio',
+    title: 'Mix Audio',
+    description: 'Combine a base track with another audio track, set its start time and volume, and export the mix.',
+    route: '/audio-editor/mix-audio',
+    icon: 'layers',
+    order: 30,
+  },
 ];
 
 export function getAudioEditorTools(): AudioEditorToolDefinition[] {
