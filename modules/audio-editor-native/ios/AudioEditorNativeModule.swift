@@ -39,31 +39,19 @@ public final class AudioEditorNativeModule: Module {
       guard tracks.contains(where: { $0.mediaType == .audio }) else {
         throw NSError(domain: "AudioEditorNative", code: 3, userInfo: [NSLocalizedDescriptionKey: "No supported audio track was found."])
       }
-      if FileManager.default.fileExists(atPath: outputURL.path) {
-        try FileManager.default.removeItem(at: outputURL)
-      }
+      if FileManager.default.fileExists(atPath: outputURL.path) { try FileManager.default.removeItem(at: outputURL) }
       try FileManager.default.createDirectory(at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-
       guard let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
         throw NSError(domain: "AudioEditorNative", code: 4, userInfo: [NSLocalizedDescriptionKey: "Audio export is unavailable on this device."])
       }
       exporter.outputURL = outputURL
       exporter.outputFileType = .m4a
       exporter.shouldOptimizeForNetworkUse = false
-      exporter.timeRange = CMTimeRange(
-        start: CMTime(seconds: startMs / 1000.0, preferredTimescale: 600),
-        duration: CMTime(seconds: (endMs - startMs) / 1000.0, preferredTimescale: 600)
-      )
+      exporter.timeRange = CMTimeRange(start: CMTime(seconds: startMs / 1000.0, preferredTimescale: 600), duration: CMTime(seconds: (endMs - startMs) / 1000.0, preferredTimescale: 600))
       await exporter.export()
       switch exporter.status {
       case .completed:
-        return [
-          "outputPath": outputURL.path,
-          "startMs": startMs,
-          "endMs": endMs,
-          "durationMs": endMs - startMs,
-          "mimeType": "audio/mp4",
-        ]
+        return ["outputPath": outputURL.path, "startMs": startMs, "endMs": endMs, "durationMs": endMs - startMs, "mimeType": "audio/mp4"]
       case .failed, .cancelled:
         throw exporter.error ?? NSError(domain: "AudioEditorNative", code: 5, userInfo: [NSLocalizedDescriptionKey: "Audio export failed."])
       default:
@@ -72,107 +60,89 @@ public final class AudioEditorNativeModule: Module {
     }
 
     AsyncFunction("mix") { (input: [String: Any?]) async throws -> [String: Any?] in
-      guard let inputPath = input["inputPath"] as? String, !inputPath.isEmpty else {
-        throw NSError(domain: "AudioEditorNative", code: 10, userInfo: [NSLocalizedDescriptionKey: "Base audio path is required."])
-      }
-      guard let overlayPath = input["overlayPath"] as? String, !overlayPath.isEmpty else {
-        throw NSError(domain: "AudioEditorNative", code: 11, userInfo: [NSLocalizedDescriptionKey: "Overlay audio path is required."])
-      }
-      guard let outputPath = input["outputPath"] as? String, !outputPath.isEmpty else {
-        throw NSError(domain: "AudioEditorNative", code: 12, userInfo: [NSLocalizedDescriptionKey: "Output audio path is required."])
-      }
+      guard let inputPath = input["inputPath"] as? String, !inputPath.isEmpty else { throw NSError(domain: "AudioEditorNative", code: 10, userInfo: [NSLocalizedDescriptionKey: "Base audio path is required."]) }
+      guard let overlayPath = input["overlayPath"] as? String, !overlayPath.isEmpty else { throw NSError(domain: "AudioEditorNative", code: 11, userInfo: [NSLocalizedDescriptionKey: "Overlay audio path is required."]) }
+      guard let outputPath = input["outputPath"] as? String, !outputPath.isEmpty else { throw NSError(domain: "AudioEditorNative", code: 12, userInfo: [NSLocalizedDescriptionKey: "Output audio path is required."]) }
       let startMs = (input["overlayStartMs"] as? NSNumber)?.doubleValue ?? 0
       let volume = (input["overlayVolume"] as? NSNumber)?.doubleValue ?? 1
-      guard startMs.isFinite, startMs >= 0 else {
-        throw NSError(domain: "AudioEditorNative", code: 13, userInfo: [NSLocalizedDescriptionKey: "Overlay start time must be valid."])
-      }
-      guard volume.isFinite, volume >= 0, volume <= 2 else {
-        throw NSError(domain: "AudioEditorNative", code: 14, userInfo: [NSLocalizedDescriptionKey: "Overlay volume must be between 0 and 2."])
-      }
-
-      let base = AVURLAsset(url: URL(fileURLWithPath: inputPath))
-      let overlay = AVURLAsset(url: URL(fileURLWithPath: overlayPath))
-      let baseTracks = try await base.load(.tracks)
-      let overlayTracks = try await overlay.load(.tracks)
-      guard let baseTrack = baseTracks.first(where: { $0.mediaType == .audio }) else {
-        throw NSError(domain: "AudioEditorNative", code: 15, userInfo: [NSLocalizedDescriptionKey: "No supported base audio track was found."])
-      }
-      guard let overlayTrack = overlayTracks.first(where: { $0.mediaType == .audio }) else {
-        throw NSError(domain: "AudioEditorNative", code: 16, userInfo: [NSLocalizedDescriptionKey: "No supported overlay audio track was found."])
-      }
-
-      let baseDuration = try await base.load(.duration)
-      let overlayDuration = try await overlay.load(.duration)
-      let baseDescriptions = try await baseTrack.load(.formatDescriptions)
-      let overlayDescriptions = try await overlayTrack.load(.formatDescriptions)
-      guard let baseDescription = baseDescriptions.first,
-            let overlayDescription = overlayDescriptions.first,
-            let baseStream = CMAudioFormatDescriptionGetStreamBasicDescription(baseDescription),
-            let overlayStream = CMAudioFormatDescriptionGetStreamBasicDescription(overlayDescription) else {
-        throw NSError(domain: "AudioEditorNative", code: 17, userInfo: [NSLocalizedDescriptionKey: "Unable to read audio format information."])
-      }
-      let baseSampleRate = baseStream.pointee.mSampleRate
-      let overlaySampleRate = overlayStream.pointee.mSampleRate
-      let baseChannels = Int(baseStream.pointee.mChannelsPerFrame)
-      let overlayChannels = Int(overlayStream.pointee.mChannelsPerFrame)
-      guard abs(baseSampleRate - overlaySampleRate) < 0.5 else {
-        throw NSError(domain: "AudioEditorNative", code: 18, userInfo: [NSLocalizedDescriptionKey: "Base and overlay sample rates must match."])
-      }
-      guard baseChannels == overlayChannels else {
-        throw NSError(domain: "AudioEditorNative", code: 19, userInfo: [NSLocalizedDescriptionKey: "Base and overlay channel counts must match."])
-      }
-
-      let composition = AVMutableComposition()
-      guard let compositionBase = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid),
-            let compositionOverlay = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
-        throw NSError(domain: "AudioEditorNative", code: 20, userInfo: [NSLocalizedDescriptionKey: "Unable to create audio composition."])
-      }
-      try compositionBase.insertTimeRange(
-        CMTimeRange(start: .zero, duration: baseDuration),
-        of: baseTrack,
-        at: .zero
-      )
-      let overlayInsertDuration = CMTimeMinimum(overlayDuration, CMTimeSubtract(baseDuration, CMTime(seconds: startMs / 1000.0, preferredTimescale: 600)))
-      guard overlayInsertDuration.isValid, overlayInsertDuration.seconds > 0 else {
-        throw NSError(domain: "AudioEditorNative", code: 21, userInfo: [NSLocalizedDescriptionKey: "Overlay starts after the base audio ends."])
-      }
-      try compositionOverlay.insertTimeRange(
-        CMTimeRange(start: .zero, duration: overlayInsertDuration),
-        of: overlayTrack,
-        at: CMTime(seconds: startMs / 1000.0, preferredTimescale: 600)
-      )
-
-      let audioMix = AVMutableAudioMix()
-      let baseParameters = AVMutableAudioMixInputParameters(track: compositionBase)
-      let overlayParameters = AVMutableAudioMixInputParameters(track: compositionOverlay)
-      overlayParameters.setVolume(Float(volume), at: .zero)
-      audioMix.inputParameters = [baseParameters, overlayParameters]
-
-      if FileManager.default.fileExists(atPath: outputPath) {
-        try FileManager.default.removeItem(atPath: outputPath)
-      }
-      let outputURL = URL(fileURLWithPath: outputPath)
-      try FileManager.default.createDirectory(at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-
-      guard let exporter = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetAppleM4A) else {
-        throw NSError(domain: "AudioEditorNative", code: 22, userInfo: [NSLocalizedDescriptionKey: "Audio mix export is unavailable on this device."])
-      }
-      exporter.outputURL = outputURL
-      exporter.outputFileType = .m4a
-      exporter.audioMix = audioMix
-      exporter.shouldOptimizeForNetworkUse = false
-      await exporter.export()
-      guard exporter.status == .completed else {
-        throw exporter.error ?? NSError(domain: "AudioEditorNative", code: 23, userInfo: [NSLocalizedDescriptionKey: "Audio mix export failed."])
-      }
-
-      return [
-        "outputPath": outputURL.path,
-        "durationMs": baseDuration.seconds * 1000,
-        "sampleRate": Int(baseSampleRate),
-        "channels": baseChannels,
-        "mimeType": "audio/mp4",
-      ]
+      let result = try await mixProjectInternal(basePath: inputPath, overlays: [["path": overlayPath, "startMs": startMs, "volume": volume]], outputPath: outputPath)
+      return result
     }
+
+    AsyncFunction("mixProject") { (input: [String: Any?]) async throws -> [String: Any?] in
+      guard let basePath = input["basePath"] as? String, !basePath.isEmpty else { throw NSError(domain: "AudioEditorNative", code: 30, userInfo: [NSLocalizedDescriptionKey: "Base audio path is required."]) }
+      guard let outputPath = input["outputPath"] as? String, !outputPath.isEmpty else { throw NSError(domain: "AudioEditorNative", code: 31, userInfo: [NSLocalizedDescriptionKey: "Output audio path is required."]) }
+      let overlays = (input["overlays"] as? [[String: Any?]]) ?? []
+      guard !overlays.isEmpty else { throw NSError(domain: "AudioEditorNative", code: 32, userInfo: [NSLocalizedDescriptionKey: "At least one overlay audio track is required."]) }
+      return try await mixProjectInternal(basePath: basePath, overlays: overlays, outputPath: outputPath)
+    }
+  }
+
+  private func mixProjectInternal(basePath: String, overlays: [[String: Any?]], outputPath: String) async throws -> [String: Any?] {
+    let base = AVURLAsset(url: URL(fileURLWithPath: basePath))
+    let baseTracks = try await base.load(.tracks)
+    guard let baseTrack = baseTracks.first(where: { $0.mediaType == .audio }) else {
+      throw NSError(domain: "AudioEditorNative", code: 33, userInfo: [NSLocalizedDescriptionKey: "No supported base audio track was found."])
+    }
+    let baseDuration = try await base.load(.duration)
+    let baseDescriptions = try await baseTrack.load(.formatDescriptions)
+    guard let baseDescription = baseDescriptions.first,
+          let baseStream = CMAudioFormatDescriptionGetStreamBasicDescription(baseDescription) else {
+      throw NSError(domain: "AudioEditorNative", code: 34, userInfo: [NSLocalizedDescriptionKey: "Unable to read base audio format information."])
+    }
+    let baseSampleRate = baseStream.pointee.mSampleRate
+    let baseChannels = Int(baseStream.pointee.mChannelsPerFrame)
+
+    let composition = AVMutableComposition()
+    guard let compositionBase = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+      throw NSError(domain: "AudioEditorNative", code: 35, userInfo: [NSLocalizedDescriptionKey: "Unable to create base audio composition track."])
+    }
+    try compositionBase.insertTimeRange(CMTimeRange(start: .zero, duration: baseDuration), of: baseTrack, at: .zero)
+
+    var compositionTracks: [AVMutableCompositionTrack] = [compositionBase]
+    for (index, raw) in overlays.enumerated() {
+      guard let path = raw["path"] as? String, !path.isEmpty else { throw NSError(domain: "AudioEditorNative", code: 36, userInfo: [NSLocalizedDescriptionKey: "Audio track \(index + 1) path is required."]) }
+      let startMs = (raw["startMs"] as? NSNumber)?.doubleValue ?? 0
+      let volume = (raw["volume"] as? NSNumber)?.doubleValue ?? 1
+      guard startMs.isFinite, startMs >= 0, volume.isFinite, volume >= 0, volume <= 2 else { throw NSError(domain: "AudioEditorNative", code: 37, userInfo: [NSLocalizedDescriptionKey: "Audio track \(index + 1) settings are invalid."]) }
+
+      let overlay = AVURLAsset(url: URL(fileURLWithPath: path))
+      let overlayTracks = try await overlay.load(.tracks)
+      guard let overlayTrack = overlayTracks.first(where: { $0.mediaType == .audio }) else { throw NSError(domain: "AudioEditorNative", code: 38, userInfo: [NSLocalizedDescriptionKey: "No supported audio track found for item \(index + 1)."]) }
+      let overlayDescriptions = try await overlayTrack.load(.formatDescriptions)
+      guard let description = overlayDescriptions.first,
+            let stream = CMAudioFormatDescriptionGetStreamBasicDescription(description) else { throw NSError(domain: "AudioEditorNative", code: 39, userInfo: [NSLocalizedDescriptionKey: "Unable to read audio format for item \(index + 1)."] ) }
+      guard abs(baseSampleRate - stream.pointee.mSampleRate) < 0.5 else { throw NSError(domain: "AudioEditorNative", code: 40, userInfo: [NSLocalizedDescriptionKey: "Audio track \(index + 1) sample rate does not match the base audio."]) }
+      guard baseChannels == Int(stream.pointee.mChannelsPerFrame) else { throw NSError(domain: "AudioEditorNative", code: 41, userInfo: [NSLocalizedDescriptionKey: "Audio track \(index + 1) channel count does not match the base audio."]) }
+      let overlayDuration = try await overlay.load(.duration)
+      guard overlayDuration.seconds > 0 else { throw NSError(domain: "AudioEditorNative", code: 42, userInfo: [NSLocalizedDescriptionKey: "Audio track \(index + 1) is empty."]) }
+      let compositionTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!
+      try compositionTrack.insertTimeRange(CMTimeRange(start: .zero, duration: overlayDuration), of: overlayTrack, at: CMTime(seconds: startMs / 1000.0, preferredTimescale: 600))
+      compositionTracks.append(compositionTrack)
+    }
+
+    let audioMix = AVMutableAudioMix()
+    let baseParameters = AVMutableAudioMixInputParameters(track: compositionBase)
+    var parameters: [AVAudioMixInputParameters] = [baseParameters]
+    for (index, raw) in overlays.enumerated() {
+      let volume = (raw["volume"] as? NSNumber)?.floatValue ?? 1
+      let parameter = AVMutableAudioMixInputParameters(track: compositionTracks[index + 1])
+      parameter.setVolume(volume, at: .zero)
+      parameters.append(parameter)
+    }
+    audioMix.inputParameters = parameters
+
+    if FileManager.default.fileExists(atPath: outputPath) { try FileManager.default.removeItem(atPath: outputPath) }
+    let outputURL = URL(fileURLWithPath: outputPath)
+    try FileManager.default.createDirectory(at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+    guard let exporter = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetAppleM4A) else { throw NSError(domain: "AudioEditorNative", code: 43, userInfo: [NSLocalizedDescriptionKey: "Audio mix export is unavailable on this device."]) }
+    exporter.outputURL = outputURL
+    exporter.outputFileType = .m4a
+    exporter.audioMix = audioMix
+    exporter.shouldOptimizeForNetworkUse = false
+    await exporter.export()
+    guard exporter.status == .completed else { throw exporter.error ?? NSError(domain: "AudioEditorNative", code: 44, userInfo: [NSLocalizedDescriptionKey: "Audio mix export failed."]) }
+
+    return ["outputPath": outputURL.path, "durationMs": composition.duration.seconds * 1000, "sampleRate": Int(baseSampleRate), "channels": baseChannels, "mimeType": "audio/mp4"]
   }
 }
