@@ -18,9 +18,11 @@ export async function createAudioEditorOutputPath(
   category: string,
   sourceName: string,
   suffix = 'audio',
+  extension = 'm4a',
 ): Promise<string> {
   const folder = await ensureAudioEditorExportFolder(category);
   const baseName = sanitizeName(sourceName).replace(/\.[^.]+$/, '') || 'audio';
   const safeSuffix = sanitizeName(suffix).toLowerCase() || 'audio';
-  return `${folder}${baseName}-${safeSuffix}-${Date.now()}.m4a`;
+  const safeExtension = sanitizeName(extension).toLowerCase().replace(/^\./, '') || 'm4a';
+  return `${folder}${baseName}-${safeSuffix}-${Date.now()}.${safeExtension}`;
 }
