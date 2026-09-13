@@ -1,4 +1,9 @@
-import { assertAudioEditorNative, type AudioProbeResult, type AudioTrimResult } from '@/modules/audio-editor-native';
+import {
+  assertAudioEditorNative,
+  AudioEditorNative,
+  type AudioProbeResult,
+  type AudioTrimResult,
+} from '@/modules/audio-editor-native';
 
 export async function probeAudioSource(uri: string): Promise<AudioProbeResult> {
   return assertAudioEditorNative().probe(uri);
@@ -21,5 +26,5 @@ export async function trimAudioSource(
 }
 
 export function isAudioProcessingAvailable(): boolean {
-  return Boolean(require('@/modules/audio-editor-native').AudioEditorNative);
+  return Boolean(AudioEditorNative);
 }
