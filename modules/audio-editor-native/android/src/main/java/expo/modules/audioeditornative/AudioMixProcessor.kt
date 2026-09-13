@@ -21,46 +21,68 @@ internal object AudioMixProcessor {
     basePath: String,
     overlay: Clip,
     outputPath: String,
+  ): Map<String, Any?> = mixProject(context, basePath, listOf(overlay), outputPath)
+
+  fun mixProject(
+    context: Context?,
+    basePath: String,
+    overlays: List<Clip>,
+    outputPath: String,
   ): Map<String, Any?> {
-    require(context != null) { "Audio editor context is unavailable." }
+    requireNotNull(context) { "Audio editor context is unavailable." }
     require(basePath.isNotBlank()) { "Base audio path is required." }
-    require(overlay.path.isNotBlank()) { "Overlay audio path is required." }
     require(outputPath.isNotBlank()) { "Output audio path is required." }
-    require(overlay.startMs.isFinite() && overlay.startMs >= 0.0) { "Overlay start time is invalid." }
-    require(overlay.volume.isFinite() && overlay.volume >= 0.0 && overlay.volume <= 2.0) {
-      "Overlay volume must be between 0 and 2."
-    }
+    require(overlays.isNotEmpty()) { "At least one overlay audio track is required." }
 
     val base = decodePcm16(context, basePath)
-    val overlayAudio = decodePcm16(context, overlay.path)
-    require(base.sampleRate == overlayAudio.sampleRate) {
-      "Base audio and overlay sample rates must match."
-    }
-    require(base.channels == overlayAudio.channels) {
-      "Base audio and overlay channel counts must match."
+    var outputFrames = base.samples.size / base.channels
+    val decodedOverlays = ArrayList<Pair<Clip, Pcm>>()
+
+    for ((index, overlay) in overlays.withIndex()) {
+      require(overlay.path.isNotBlank()) { "Audio track ${index + 1} path is required." }
+      require(overlay.startMs.isFinite() && overlay.startMs >= 0.0) { "Audio track ${index + 1} start time is invalid." }
+      require(overlay.volume.isFinite() && overlay.volume >= 0.0 && overlay.volume <= 2.0) {
+        "Audio track ${index + 1} volume must be between 0 and 2."
+      }
+
+      val decoded = decodePcm16(context, overlay.path)
+      require(base.sampleRate == decoded.sampleRate) {
+        "Audio track ${index + 1} sample rate does not match the base audio."
+      }
+      require(base.channels == decoded.channels) {
+        "Audio track ${index + 1} channel count does not match the base audio."
+      }
+
+      val startFrame = (overlay.startMs * base.sampleRate / 1000.0).toLong().coerceAtLeast(0L)
+      val endFrame = startFrame + decoded.samples.size.toLong() / base.channels
+      require(endFrame <= Int.MAX_VALUE / base.channels.toLong()) {
+        "The mixed audio project is too large to fit in memory."
+      }
+      outputFrames = maxOf(outputFrames, endFrame.toInt())
+      decodedOverlays += overlay to decoded
     }
 
-    val startFrame = (overlay.startMs * base.sampleRate / 1000.0)
-      .toLong()
-      .coerceAtLeast(0L)
-    val startSampleLong = startFrame * base.channels.toLong()
-    val startSample = startSampleLong.coerceAtMost(base.samples.size.toLong()).toInt()
-    val mixed = base.samples.copyOf()
-    val availableSamples = (mixed.size - startSample).coerceAtLeast(0)
-    val mixSamples = minOf(overlayAudio.samples.size, availableSamples)
+    val mixed = ShortArray(outputFrames * base.channels)
+    base.samples.copyInto(mixed)
 
-    for (index in 0 until mixSamples) {
-      val baseValue = mixed[startSample + index].toInt()
-      val overlayValue = Math.round(overlayAudio.samples[index].toInt() * overlay.volume).toInt()
-      mixed[startSample + index] = (baseValue + overlayValue)
-        .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
-        .toShort()
+    for ((clip, audio) in decodedOverlays) {
+      val startFrame = (clip.startMs * base.sampleRate / 1000.0).toLong().coerceAtLeast(0L).toInt()
+      val startSample = startFrame * base.channels
+      for (sampleIndex in audio.samples.indices) {
+        val destinationIndex = startSample + sampleIndex
+        if (destinationIndex >= mixed.size) break
+        val baseValue = mixed[destinationIndex].toInt()
+        val overlayValue = Math.round(audio.samples[sampleIndex].toInt() * clip.volume).toInt()
+        mixed[destinationIndex] = (baseValue + overlayValue)
+          .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+          .toShort()
+      }
     }
 
     writeWav(outputPath, mixed, base.sampleRate, base.channels)
     return mapOf(
       "outputPath" to outputPath,
-      "durationMs" to base.durationMs,
+      "durationMs" to (outputFrames * 1000.0 / base.sampleRate),
       "sampleRate" to base.sampleRate,
       "channels" to base.channels,
       "mimeType" to "audio/wav",
@@ -71,10 +93,7 @@ internal object AudioMixProcessor {
     val sampleRate: Int,
     val channels: Int,
     val samples: ShortArray,
-  ) {
-    val durationMs: Double
-      get() = samples.size.toDouble() / (sampleRate.toDouble() * channels.toDouble()) * 1000.0
-  }
+  )
 
   private fun decodePcm16(context: Context, path: String): Pcm {
     val extractor = MediaExtractor()
@@ -112,28 +131,14 @@ internal object AudioMixProcessor {
           if (!inputEnded) {
             val inputIndex = codec.dequeueInputBuffer(10_000)
             if (inputIndex >= 0) {
-              val inputBuffer = codec.getInputBuffer(inputIndex)
-                ?: error("Decoder input buffer unavailable.")
+              val inputBuffer = codec.getInputBuffer(inputIndex) ?: error("Decoder input buffer unavailable.")
               inputBuffer.clear()
               val size = extractor.readSampleData(inputBuffer, 0)
               if (size < 0) {
-                codec.queueInputBuffer(
-                  inputIndex,
-                  0,
-                  0,
-                  0,
-                  MediaCodec.BUFFER_FLAG_END_OF_STREAM,
-                )
+                codec.queueInputBuffer(inputIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
                 inputEnded = true
               } else {
-                val presentationTimeUs = extractor.sampleTime.coerceAtLeast(0L)
-                codec.queueInputBuffer(
-                  inputIndex,
-                  0,
-                  size,
-                  presentationTimeUs,
-                  extractor.sampleFlags,
-                )
+                codec.queueInputBuffer(inputIndex, 0, size, extractor.sampleTime.coerceAtLeast(0L), extractor.sampleFlags)
                 extractor.advance()
               }
             }
@@ -149,12 +154,10 @@ internal object AudioMixProcessor {
                 outputBuffer.limit(info.offset + info.size)
                 val bytes = ByteArray(info.size)
                 outputBuffer.get(bytes)
-                val shortCount = bytes.size / 2
-                val samples = ShortArray(shortCount)
+                val sampleCount = bytes.size / 2
+                val samples = ShortArray(sampleCount)
                 val littleEndian = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
-                for (index in 0 until shortCount) {
-                  samples[index] = littleEndian.short
-                }
+                for (index in 0 until sampleCount) samples[index] = littleEndian.short
                 chunks.add(samples)
               }
               outputEnded = (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0
@@ -171,30 +174,13 @@ internal object AudioMixProcessor {
           cursor += chunk.size
         }
 
-        val sampleRate = if (audioFormat.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
-          audioFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-        } else {
-          0
-        }
-        val channels = if (audioFormat.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
-          audioFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-        } else {
-          0
-        }
-        require(sampleRate > 0 && channels > 0) {
-          "Decoder did not provide valid audio format information."
-        }
-        require(samples.size % channels == 0) {
-          "Decoded audio data is not channel-aligned."
-        }
-
+        val sampleRate = if (audioFormat.containsKey(MediaFormat.KEY_SAMPLE_RATE)) audioFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE) else 0
+        val channels = if (audioFormat.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) audioFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT) else 0
+        require(sampleRate > 0 && channels > 0) { "Decoder did not provide valid audio format information." }
+        require(samples.size % channels == 0) { "Decoded audio data is not channel-aligned." }
         return Pcm(sampleRate, channels, samples)
       } finally {
-        try {
-          codec.stop()
-        } catch (_: Exception) {
-          // Decoder may already be stopped after an output failure.
-        }
+        try { codec.stop() } catch (_: Exception) { }
         codec.release()
       }
     } finally {
@@ -207,26 +193,24 @@ internal object AudioMixProcessor {
       path.startsWith("content://") || path.startsWith("file://") -> {
         val uri = Uri.parse(path)
         context.contentResolver.openFileDescriptor(uri, "r").use { descriptor ->
-          requireNotNull(descriptor) { "Unable to open selected overlay audio." }
+          requireNotNull(descriptor) { "Unable to open selected audio." }
           extractor.setDataSource(descriptor.fileDescriptor)
         }
       }
       File(path).isFile -> extractor.setDataSource(path)
-      else -> throw IllegalArgumentException("Overlay audio file was not found.")
+      else -> throw IllegalArgumentException("Audio file was not found.")
     }
   }
 
   private fun writeWav(path: String, samples: ShortArray, sampleRate: Int, channels: Int) {
     val file = File(path)
     file.parentFile?.mkdirs()
-
     file.outputStream().buffered().use { output ->
-      fun writeLittleEndian16(value: Int) {
+      fun writeLe16(value: Int) {
         output.write(value and 0xFF)
         output.write((value ushr 8) and 0xFF)
       }
-
-      fun writeLittleEndian32(value: Int) {
+      fun writeLe32(value: Int) {
         output.write(value and 0xFF)
         output.write((value ushr 8) and 0xFF)
         output.write((value ushr 16) and 0xFF)
@@ -235,30 +219,26 @@ internal object AudioMixProcessor {
 
       val dataBytes = samples.size.toLong() * 2L
       require(dataBytes <= Int.MAX_VALUE.toLong()) { "Mixed audio is too large to export." }
-
       output.write("RIFF".toByteArray(Charsets.US_ASCII))
-      writeLittleEndian32((36L + dataBytes).toInt())
+      writeLe32((36L + dataBytes).toInt())
       output.write("WAVE".toByteArray(Charsets.US_ASCII))
       output.write("fmt ".toByteArray(Charsets.US_ASCII))
-      writeLittleEndian32(16)
-      writeLittleEndian16(1)
-      writeLittleEndian16(channels)
-      writeLittleEndian32(sampleRate)
-      writeLittleEndian32(sampleRate * channels * 2)
-      writeLittleEndian16(channels * 2)
-      writeLittleEndian16(16)
+      writeLe32(16)
+      writeLe16(1)
+      writeLe16(channels)
+      writeLe32(sampleRate)
+      writeLe32(sampleRate * channels * 2)
+      writeLe16(channels * 2)
+      writeLe16(16)
       output.write("data".toByteArray(Charsets.US_ASCII))
-      writeLittleEndian32(dataBytes.toInt())
+      writeLe32(dataBytes.toInt())
 
       val buffer = ByteArray(8192)
       var offset = 0
       while (offset < samples.size) {
         val count = minOf(buffer.size / 2, samples.size - offset)
         val byteBuffer = ByteBuffer.wrap(buffer).order(ByteOrder.LITTLE_ENDIAN)
-        repeat(count) { index ->
-          val pcm = samples[offset + index].toInt()
-          byteBuffer.putShort(index * 2, pcm.toShort())
-        }
+        repeat(count) { index -> byteBuffer.putShort(index * 2, samples[offset + index]) }
         output.write(buffer, 0, count * 2)
         offset += count
       }
