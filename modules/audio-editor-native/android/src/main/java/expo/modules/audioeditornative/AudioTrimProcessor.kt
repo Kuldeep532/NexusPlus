@@ -1,14 +1,17 @@
 package expo.modules.audioeditornative
 
+import android.content.Context
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import android.net.Uri
 import java.io.File
 import java.nio.ByteBuffer
 
 internal object AudioTrimProcessor {
   fun trim(
+    context: Context,
     inputPath: String,
     outputPath: String,
     startMs: Double,
@@ -17,7 +20,6 @@ internal object AudioTrimProcessor {
     require(startMs.isFinite() && endMs.isFinite()) { "Trim bounds must be finite." }
     require(startMs >= 0.0) { "Trim start must be at least 0 ms." }
     require(endMs > startMs) { "Trim end must be greater than trim start." }
-    require(File(inputPath).isFile) { "Input audio file was not found." }
 
     val destination = File(outputPath)
     destination.parentFile?.mkdirs()
@@ -27,7 +29,7 @@ internal object AudioTrimProcessor {
     var muxer: MediaMuxer? = null
     var started = false
     try {
-      extractor.setDataSource(inputPath)
+      setDataSource(context, extractor, inputPath)
       var audioTrack = -1
       var format: MediaFormat? = null
       for (index in 0 until extractor.trackCount) {
@@ -51,11 +53,7 @@ internal object AudioTrimProcessor {
       muxer.start()
       started = true
 
-      val maxInput = if (format.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) {
-        format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
-      } else {
-        256 * 1024
-      }
+      val maxInput = if (format.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE) else 256 * 1024
       val buffer = ByteBuffer.allocateDirect(maxOf(maxInput, 64 * 1024))
       val info = MediaCodec.BufferInfo()
       var samples = 0
@@ -75,6 +73,8 @@ internal object AudioTrimProcessor {
       require(samples > 0) { "The selected range contains no writable audio samples." }
       return mapOf(
         "outputPath" to outputPath,
+        "startMs" to startMs,
+        "endMs" to endMs,
         "durationMs" to (endMs - startMs),
         "mimeType" to format.getString(MediaFormat.KEY_MIME),
         "samples" to samples,
@@ -83,6 +83,20 @@ internal object AudioTrimProcessor {
       if (started) try { muxer?.stop() } catch (_: Exception) { }
       muxer?.release()
       extractor.release()
+    }
+  }
+
+  private fun setDataSource(context: Context, extractor: MediaExtractor, inputPath: String) {
+    when {
+      inputPath.startsWith("content://") || inputPath.startsWith("file://") -> {
+        val uri = Uri.parse(inputPath)
+        context.contentResolver.openFileDescriptor(uri, "r").use { descriptor ->
+          requireNotNull(descriptor) { "Unable to open selected audio file." }
+          extractor.setDataSource(descriptor.fileDescriptor)
+        }
+      }
+      File(inputPath).isFile -> extractor.setDataSource(inputPath)
+      else -> throw IllegalArgumentException("Input audio file was not found.")
     }
   }
 }
