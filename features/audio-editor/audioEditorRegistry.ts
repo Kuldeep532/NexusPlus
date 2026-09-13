@@ -20,10 +20,18 @@ const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
   {
     id: 'mix-audio',
     title: 'Mix Audio',
-    description: 'Combine a base track with another audio track, set its start time and volume, and export the mix.',
+    description: 'Combine multiple audio tracks with native timing, volume and export processing.',
     route: '/audio-editor/mix-audio',
     icon: 'layers',
     order: 30,
+  },
+  {
+    id: 'audio-to-video',
+    title: 'Audio to Video',
+    description: 'Create an image-based video timeline whose image durations are constrained by the selected audio.',
+    route: '/audio-editor/audio-to-video',
+    icon: 'film',
+    order: 40,
   },
 ];
 
