@@ -1,11 +1,11 @@
 import { Feather } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { createAudioEditorOutputPath } from '@/features/audio-editor/audioEditorExport';
+import { exportAudioToVideo } from '@/features/audio-editor/audioToVideoExport';
 import { discoverLocalAudio, pickAudioFromFileManager } from '@/features/audio-editor/audioEditorSource';
 import { canAddImage, clampImageDuration, getImageTimelineDuration, getRemainingAudioTime, type AudioToVideoImage } from '@/features/audio-editor/audioToVideoTypes';
 import type { AudioEditorSource } from '@/features/audio-editor/types';
@@ -96,37 +96,37 @@ export default function AudioToVideoScreen() {
     setMessage(`Image added for ${formatTime(defaultDuration)}. ${formatTime(Math.max(0, remaining - defaultDuration))} remains.`);
   }, [audio, audioDurationMs, imageUploadEnabled, images]);
 
-  const removeImage = (id: string) => {
+  const removeImage = useCallback((id: string) => {
     setImages((current) => current.filter((image) => image.id !== id));
     setMessage('Image removed. The freed audio time is available again.');
-  };
+  }, []);
 
-  const changeDuration = (index: number, nextMs: number) => {
+  const changeDuration = useCallback((index: number, nextMs: number) => {
     setImages((current) => current.map((image, imageIndex) => imageIndex === index ? { ...image, durationMs: clampImageDuration(nextMs, audioDurationMs, current, index) } : image));
-  };
+  }, [audioDurationMs]);
 
-  const nudgeDuration = (index: number, deltaMs: number) => {
-    const image = images[index];
-    if (!image) return;
-    changeDuration(index, image.durationMs + deltaMs);
-  };
+  const nudgeDuration = useCallback((index: number, deltaMs: number) => {
+    setImages((current) => {
+      const image = current[index];
+      if (!image) return current;
+      const nextMs = clampImageDuration(image.durationMs + deltaMs, audioDurationMs, current, index);
+      return current.map((item, itemIndex) => itemIndex === index ? { ...item, durationMs: nextMs } : item);
+    });
+  }, [audioDurationMs]);
 
-  const exportVideo = async () => {
+  const exportVideo = useCallback(async () => {
     if (!audio || !timelineComplete || loading || timelineOverrun) return;
     setLoading(true);
-    setMessage('Preparing Audio to Video export…');
+    setMessage('Rendering Audio to Video…');
     try {
-      // The existing repository exposes native video editing operations, but does not yet expose
-      // an image-sequence + audio render operation through the stable TypeScript adapter. Do not fake export success.
-      const outputPath = await createAudioEditorOutputPath('Audio to Video', audio.name, 'video');
-      void outputPath;
-      throw new Error('Audio to Video render is not yet wired to the stable native video-export adapter. The timeline and validation are ready, but no fake export is performed.');
+      const output = await exportAudioToVideo({ audio, images });
+      setMessage(`Video created: ${output}`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to export Audio to Video.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [audio, images, loading, timelineComplete, timelineOverrun]);
 
   const timingLabel = timelineComplete ? 'The images are uploaded with audio timing.' : timelineOverrun ? 'Images exceed the audio duration. Remove or shorten an image.' : `${formatTime(remainingMs)} of audio timing remains.`;
 
