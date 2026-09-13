@@ -19,120 +19,182 @@ internal object AudioMixProcessor {
   fun mix(
     context: Context?,
     basePath: String,
-    effect: Clip,
+    overlay: Clip,
     outputPath: String,
   ): Map<String, Any?> {
     require(context != null) { "Audio editor context is unavailable." }
-    require(effect.startMs >= 0.0 && effect.startMs.isFinite()) { "Effect start time is invalid." }
-    require(effect.volume.isFinite() && effect.volume >= 0.0 && effect.volume <= 2.0) { "Effect volume must be between 0 and 2." }
-    require(File(outputPath).parentFile?.mkdirs() != false || File(outputPath).parentFile == null) { "Unable to create output folder." }
-
-    val base = decodePcm16(context, basePath)
-    val fx = decodePcm16(context, effect.path)
-    require(base.sampleRate == fx.sampleRate) { "Base audio and sound effect sample rates must match." }
-    require(base.channels == fx.channels) { "Base audio and sound effect channel counts must match." }
-
-    val startFrame = ((effect.startMs / 1000.0) * base.sampleRate).toLong().coerceAtLeast(0L)
-    val startSample = (startFrame * base.channels).coerceAtMost(base.samples.size.toLong()).toInt()
-    val copy = base.samples.copyOf()
-    val mixSamples = minOf(fx.samples.size, copy.size - startSample)
-    for (index in 0 until mixSamples) {
-      val mixed = copy[startSample + index].toInt() + kotlin.math.round(fx.samples[index].toInt() * effect.volume).toInt()
-      copy[startSample + index] = mixed.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+    require(basePath.isNotBlank()) { "Base audio path is required." }
+    require(overlay.path.isNotBlank()) { "Overlay audio path is required." }
+    require(outputPath.isNotBlank()) { "Output audio path is required." }
+    require(overlay.startMs.isFinite() && overlay.startMs >= 0.0) { "Overlay start time is invalid." }
+    require(overlay.volume.isFinite() && overlay.volume >= 0.0 && overlay.volume <= 2.0) {
+      "Overlay volume must be between 0 and 2."
     }
 
-    writeWav(outputPath, copy, base.sampleRate, base.channels)
+    val base = decodePcm16(context, basePath)
+    val overlayAudio = decodePcm16(context, overlay.path)
+    require(base.sampleRate == overlayAudio.sampleRate) {
+      "Base audio and overlay sample rates must match."
+    }
+    require(base.channels == overlayAudio.channels) {
+      "Base audio and overlay channel counts must match."
+    }
+
+    val startFrame = (overlay.startMs * base.sampleRate / 1000.0)
+      .toLong()
+      .coerceAtLeast(0L)
+    val startSampleLong = startFrame * base.channels.toLong()
+    val startSample = startSampleLong.coerceAtMost(base.samples.size.toLong()).toInt()
+    val mixed = base.samples.copyOf()
+    val availableSamples = (mixed.size - startSample).coerceAtLeast(0)
+    val mixSamples = minOf(overlayAudio.samples.size, availableSamples)
+
+    for (index in 0 until mixSamples) {
+      val baseValue = mixed[startSample + index].toInt()
+      val overlayValue = Math.round(overlayAudio.samples[index].toInt() * overlay.volume).toInt()
+      mixed[startSample + index] = (baseValue + overlayValue)
+        .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+        .toShort()
+    }
+
+    writeWav(outputPath, mixed, base.sampleRate, base.channels)
     return mapOf(
       "outputPath" to outputPath,
-      "durationMs" to (copy.size.toDouble() / (base.sampleRate * base.channels.toDouble()) * 1000.0),
+      "durationMs" to base.durationMs,
       "sampleRate" to base.sampleRate,
       "channels" to base.channels,
+      "mimeType" to "audio/wav",
     )
   }
 
-  private data class Pcm(val sampleRate: Int, val channels: Int, val samples: ShortArray)
+  private data class Pcm(
+    val sampleRate: Int,
+    val channels: Int,
+    val samples: ShortArray,
+  ) {
+    val durationMs: Double
+      get() = samples.size.toDouble() / (sampleRate.toDouble() * channels.toDouble()) * 1000.0
+  }
 
   private fun decodePcm16(context: Context, path: String): Pcm {
     val extractor = MediaExtractor()
     try {
       setDataSource(context, extractor, path)
-      var track = -1
+
+      var trackIndex = -1
       var format: MediaFormat? = null
       for (index in 0 until extractor.trackCount) {
         val candidate = extractor.getTrackFormat(index)
         val mime = candidate.getString(MediaFormat.KEY_MIME) ?: continue
         if (mime.startsWith("audio/")) {
-          track = index
+          trackIndex = index
           format = candidate
           break
         }
       }
-      require(track >= 0 && format != null) { "No supported audio track was found." }
-      val mime = format.getString(MediaFormat.KEY_MIME) ?: error("Audio MIME type is missing.")
+
+      require(trackIndex >= 0 && format != null) { "No supported audio track was found." }
+      val audioFormat = requireNotNull(format)
+      val mime = audioFormat.getString(MediaFormat.KEY_MIME) ?: error("Audio MIME type is missing.")
       val codec = MediaCodec.createDecoderByType(mime)
-      val inputIndex: MutableList<Int> = mutableListOf()
-      val outputIndex: MutableList<Int> = mutableListOf()
+
       try {
-        codec.configure(format, null, null, 0)
+        codec.configure(audioFormat, null, null, 0)
         codec.start()
-        extractor.selectTrack(track)
+        extractor.selectTrack(trackIndex)
+
         val chunks = ArrayList<ShortArray>()
         val info = MediaCodec.BufferInfo()
-        var sawInputEnd = false
-        var sawOutputEnd = false
-        while (!sawOutputEnd) {
-          if (!sawInputEnd) {
-            val inIndex = codec.dequeueInputBuffer(10_000)
-            if (inIndex >= 0) {
-              val input = codec.getInputBuffer(inIndex) ?: error("Decoder input buffer unavailable.")
-              input.clear()
-              val size = extractor.readSampleData(input, 0)
+        var inputEnded = false
+        var outputEnded = false
+
+        while (!outputEnded) {
+          if (!inputEnded) {
+            val inputIndex = codec.dequeueInputBuffer(10_000)
+            if (inputIndex >= 0) {
+              val inputBuffer = codec.getInputBuffer(inputIndex)
+                ?: error("Decoder input buffer unavailable.")
+              inputBuffer.clear()
+              val size = extractor.readSampleData(inputBuffer, 0)
               if (size < 0) {
-                codec.queueInputBuffer(inIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                sawInputEnd = true
+                codec.queueInputBuffer(
+                  inputIndex,
+                  0,
+                  0,
+                  0,
+                  MediaCodec.BUFFER_FLAG_END_OF_STREAM,
+                )
+                inputEnded = true
               } else {
-                codec.queueInputBuffer(inIndex, 0, size, extractor.sampleTime.coerceAtLeast(0), extractor.sampleFlags)
+                val presentationTimeUs = extractor.sampleTime.coerceAtLeast(0L)
+                codec.queueInputBuffer(
+                  inputIndex,
+                  0,
+                  size,
+                  presentationTimeUs,
+                  extractor.sampleFlags,
+                )
                 extractor.advance()
               }
             }
           }
 
-          val outIndex = codec.dequeueOutputBuffer(info, 10_000)
-          when {
-            outIndex >= 0 -> {
-              val output = codec.getOutputBuffer(outIndex)
-              if (output != null && info.size > 0) {
-                output.position(info.offset)
-                output.limit(info.offset + info.size)
+          when (val outputIndex = codec.dequeueOutputBuffer(info, 10_000)) {
+            MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
+            MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> Unit
+            else -> if (outputIndex >= 0) {
+              val outputBuffer = codec.getOutputBuffer(outputIndex)
+              if (outputBuffer != null && info.size > 0) {
+                outputBuffer.position(info.offset)
+                outputBuffer.limit(info.offset + info.size)
                 val bytes = ByteArray(info.size)
-                output.get(bytes)
+                outputBuffer.get(bytes)
                 val shortCount = bytes.size / 2
-                val shorts = ShortArray(shortCount)
-                val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
-                for (i in 0 until shortCount) shorts[i] = buffer.short
-                chunks.add(shorts)
+                val samples = ShortArray(shortCount)
+                val littleEndian = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+                for (index in 0 until shortCount) {
+                  samples[index] = littleEndian.short
+                }
+                chunks.add(samples)
               }
-              if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) sawOutputEnd = true
-              codec.releaseOutputBuffer(outIndex, false)
-            }
-            outIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-              if (sawInputEnd) continue
+              outputEnded = (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0
+              codec.releaseOutputBuffer(outputIndex, false)
             }
           }
         }
-        val total = chunks.sumOf { it.size }
-        val samples = ShortArray(total)
+
+        val totalSamples = chunks.sumOf { it.size }
+        val samples = ShortArray(totalSamples)
         var cursor = 0
         for (chunk in chunks) {
           chunk.copyInto(samples, cursor)
           cursor += chunk.size
         }
-        val rate = if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) format.getInteger(MediaFormat.KEY_SAMPLE_RATE) else 0
-        val channels = if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) format.getInteger(MediaFormat.KEY_CHANNEL_COUNT) else 0
-        require(rate > 0 && channels > 0) { "Decoder did not provide valid audio format information." }
-        return Pcm(rate, channels, samples)
+
+        val sampleRate = if (audioFormat.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
+          audioFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+        } else {
+          0
+        }
+        val channels = if (audioFormat.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
+          audioFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+        } else {
+          0
+        }
+        require(sampleRate > 0 && channels > 0) {
+          "Decoder did not provide valid audio format information."
+        }
+        require(samples.size % channels == 0) {
+          "Decoded audio data is not channel-aligned."
+        }
+
+        return Pcm(sampleRate, channels, samples)
       } finally {
-        try { codec.stop() } catch (_: Exception) { }
+        try {
+          codec.stop()
+        } catch (_: Exception) {
+          // Decoder may already be stopped after an output failure.
+        }
         codec.release()
       }
     } finally {
@@ -145,48 +207,59 @@ internal object AudioMixProcessor {
       path.startsWith("content://") || path.startsWith("file://") -> {
         val uri = Uri.parse(path)
         context.contentResolver.openFileDescriptor(uri, "r").use { descriptor ->
-          requireNotNull(descriptor) { "Unable to open selected sound effect." }
+          requireNotNull(descriptor) { "Unable to open selected overlay audio." }
           extractor.setDataSource(descriptor.fileDescriptor)
         }
       }
       File(path).isFile -> extractor.setDataSource(path)
-      else -> throw IllegalArgumentException("Sound effect file was not found.")
+      else -> throw IllegalArgumentException("Overlay audio file was not found.")
     }
   }
 
   private fun writeWav(path: String, samples: ShortArray, sampleRate: Int, channels: Int) {
-    File(path).outputStream().buffered().use { out ->
-      fun le16(value: Int) {
-        out.write(value and 0xFF)
-        out.write((value ushr 8) and 0xFF)
+    val file = File(path)
+    file.parentFile?.mkdirs()
+
+    file.outputStream().buffered().use { output ->
+      fun writeLittleEndian16(value: Int) {
+        output.write(value and 0xFF)
+        output.write((value ushr 8) and 0xFF)
       }
-      fun le32(value: Int) {
-        out.write(value and 0xFF)
-        out.write((value ushr 8) and 0xFF)
-        out.write((value ushr 16) and 0xFF)
-        out.write((value ushr 24) and 0xFF)
+
+      fun writeLittleEndian32(value: Int) {
+        output.write(value and 0xFF)
+        output.write((value ushr 8) and 0xFF)
+        output.write((value ushr 16) and 0xFF)
+        output.write((value ushr 24) and 0xFF)
       }
-      val dataBytes = samples.size * 2
-      out.write("RIFF".toByteArray())
-      le32(36 + dataBytes)
-      out.write("WAVE".toByteArray())
-      out.write("fmt ".toByteArray())
-      le32(16)
-      le16(1)
-      le16(channels)
-      le32(sampleRate)
-      le32(sampleRate * channels * 2)
-      le16(channels * 2)
-      le16(16)
-      out.write("data".toByteArray())
-      le32(dataBytes)
+
+      val dataBytes = samples.size.toLong() * 2L
+      require(dataBytes <= Int.MAX_VALUE.toLong()) { "Mixed audio is too large to export." }
+
+      output.write("RIFF".toByteArray(Charsets.US_ASCII))
+      writeLittleEndian32((36L + dataBytes).toInt())
+      output.write("WAVE".toByteArray(Charsets.US_ASCII))
+      output.write("fmt ".toByteArray(Charsets.US_ASCII))
+      writeLittleEndian32(16)
+      writeLittleEndian16(1)
+      writeLittleEndian16(channels)
+      writeLittleEndian32(sampleRate)
+      writeLittleEndian32(sampleRate * channels * 2)
+      writeLittleEndian16(channels * 2)
+      writeLittleEndian16(16)
+      output.write("data".toByteArray(Charsets.US_ASCII))
+      writeLittleEndian32(dataBytes.toInt())
+
       val buffer = ByteArray(8192)
       var offset = 0
       while (offset < samples.size) {
         val count = minOf(buffer.size / 2, samples.size - offset)
-        val bb = ByteBuffer.wrap(buffer).order(ByteOrder.LITTLE_ENDIAN)
-        repeat(count) { index -> bb.putShort(index * 2, samples[offset + index]) }
-        out.write(buffer, 0, count * 2)
+        val byteBuffer = ByteBuffer.wrap(buffer).order(ByteOrder.LITTLE_ENDIAN)
+        repeat(count) { index ->
+          val pcm = samples[offset + index].toInt()
+          byteBuffer.putShort(index * 2, pcm.toShort())
+        }
+        output.write(buffer, 0, count * 2)
         offset += count
       }
     }
