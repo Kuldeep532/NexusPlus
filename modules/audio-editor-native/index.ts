@@ -13,6 +13,7 @@ export type AudioTrimResult = {
   endMs: number;
   durationMs: number;
   mimeType: string | null;
+  samples?: number;
 };
 
 type AudioEditorNativeModuleType = {
