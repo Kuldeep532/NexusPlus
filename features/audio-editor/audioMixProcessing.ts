@@ -9,12 +9,13 @@ function validateTrack(track: AudioMixTrack, index: number): void {
 
 /**
  * Mixes any number of tracks by folding native two-input PCM mixes.
- * The fold is sequential, so the JS/UI layer never decodes PCM or holds sample buffers.
+ * Processing stays native; the JS/UI layer only orchestrates file paths and timing metadata.
  */
-export async function mixAudioProject(project: AudioMixProject): Promise<AudioMixResult> {
+export async function mixAudioProject(project: AudioMixProject, outputPathFactory: (index: number, total: number) => Promise<string>): Promise<AudioMixResult> {
   validateTrack(project.base, 0);
   const activeOverlays = project.overlays.filter((track) => !track.muted);
   activeOverlays.forEach((track, index) => validateTrack(track, index + 1));
+  if (activeOverlays.length === 0) throw new Error('Add at least one active audio track to mix.');
 
   const native = assertAudioEditorNative();
   let currentPath = project.base.source.uri;
@@ -22,25 +23,17 @@ export async function mixAudioProject(project: AudioMixProject): Promise<AudioMi
 
   for (let index = 0; index < activeOverlays.length; index += 1) {
     const overlay = activeOverlays[index];
-    const outputPath = index === activeOverlays.length - 1
-      ? project.base.source.uri.replace(/\.([^.]+)$/, `-mixed-${Date.now()}.${project.base.source.uri.match(/\.([^.]+)$/)?.[1] ?? 'wav'}`)
-      : `${project.base.source.uri}-mix-${Date.now()}-${index}.wav`;
-
-    const input: AudioMixInput = {
+    const outputPath = await outputPathFactory(index, activeOverlays.length);
+    result = await native.mix({
       inputPath: currentPath,
       overlayPath: overlay.source.uri,
+      outputPath,
       overlayStartMs: overlay.startMs,
       overlayVolume: overlay.volume,
-      outputPath,
-    };
-    result = await native.mix(input);
+    });
     currentPath = result.outputPath;
   }
-
-  if (!result) {
-    throw new Error('Add at least one audio track to mix.');
-  }
-  return result;
+  return result!;
 }
 
 export async function mixAudio(input: AudioMixInput): Promise<AudioMixResult> {
