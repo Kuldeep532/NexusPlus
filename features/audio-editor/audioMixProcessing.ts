@@ -7,33 +7,23 @@ function validateTrack(track: AudioMixTrack, index: number): void {
   if (!Number.isFinite(track.volume) || track.volume < 0 || track.volume > 2) throw new Error(`Audio track ${index + 1} volume must be between 0 and 2.`);
 }
 
-/**
- * Mixes any number of tracks by folding native two-input PCM mixes.
- * Processing stays native; the JS/UI layer only orchestrates file paths and timing metadata.
- */
-export async function mixAudioProject(project: AudioMixProject, outputPathFactory: (index: number, total: number) => Promise<string>): Promise<AudioMixResult> {
+/** Mix all active overlays in one native pass so JS only manages metadata and remains responsive. */
+export async function mixAudioProject(project: AudioMixProject, outputPath: string): Promise<AudioMixResult> {
   validateTrack(project.base, 0);
-  const activeOverlays = project.overlays.filter((track) => !track.muted);
-  activeOverlays.forEach((track, index) => validateTrack(track, index + 1));
-  if (activeOverlays.length === 0) throw new Error('Add at least one active audio track to mix.');
+  const overlays = project.overlays.filter((track) => !track.muted);
+  overlays.forEach((track, index) => validateTrack(track, index + 1));
+  if (overlays.length === 0) throw new Error('Add at least one active audio track to mix.');
+  if (!outputPath) throw new Error('A mix output path is required.');
 
-  const native = assertAudioEditorNative();
-  let currentPath = project.base.source.uri;
-  let result: AudioMixResult | null = null;
-
-  for (let index = 0; index < activeOverlays.length; index += 1) {
-    const overlay = activeOverlays[index];
-    const outputPath = await outputPathFactory(index, activeOverlays.length);
-    result = await native.mix({
-      inputPath: currentPath,
-      overlayPath: overlay.source.uri,
-      outputPath,
-      overlayStartMs: overlay.startMs,
-      overlayVolume: overlay.volume,
-    });
-    currentPath = result.outputPath;
-  }
-  return result!;
+  return assertAudioEditorNative().mixProject({
+    basePath: project.base.source.uri,
+    overlays: overlays.map((track) => ({
+      path: track.source.uri,
+      startMs: track.startMs,
+      volume: track.volume,
+    })),
+    outputPath,
+  });
 }
 
 export async function mixAudio(input: AudioMixInput): Promise<AudioMixResult> {
