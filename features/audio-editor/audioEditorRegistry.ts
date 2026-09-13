@@ -7,8 +7,17 @@ export interface AudioEditorToolDefinition {
   order?: number;
 }
 
-/** Child tools are registered here only after their real implementation is ready. */
-const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [];
+/** Only completed child tools are registered here. Home registers the parent Audio Editor. */
+const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
+  {
+    id: 'audio-trimmer',
+    title: 'Audio Trimmer',
+    description: 'Trim audio with exact start/end values and export the selected range.',
+    route: '/audio-editor/audio-trimmer',
+    icon: 'scissors',
+    order: 20,
+  },
+];
 
 export function getAudioEditorTools(): AudioEditorToolDefinition[] {
   return [...AUDIO_EDITOR_TOOLS].sort((a, b) => (a.order ?? 1000) - (b.order ?? 1000));
