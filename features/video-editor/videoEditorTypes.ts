@@ -26,7 +26,6 @@ export type VideoEditorToolKey =
   | 'equalizer'
   | 'loudness'
   | 'speed-ramp'
-  | 'frame-interpolation'
   | 'letterbox';
 
 export type VideoClip = {
