@@ -25,6 +25,22 @@ class AudioEditorNativeModule : Module() {
         promise.reject("AUDIO_TRIM_FAILED", error.message ?: "Unable to trim audio", error)
       }
     }
+
+    AsyncFunction("decode") { inputPath: String, promise: Promise ->
+      try {
+        val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
+        val decoded = AndroidAudioDecoder(context).decode(inputPath)
+        promise.resolve(mapOf(
+          "sampleRate" to decoded.sampleRate,
+          "channels" to decoded.channels,
+          "frameCount" to decoded.frameCount,
+          "durationMs" to decoded.durationMs,
+          "samples" to decoded.samples.toList(),
+        ))
+      } catch (error: Exception) {
+        promise.reject("AUDIO_DECODE_FAILED", error.message ?: "Unable to decode audio", error)
+      }
+    }
   }
 
   private fun probeAudio(inputPath: String): Map<String, Any?> {
