@@ -78,7 +78,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
                 val pages = (0 until pageNumbers.size()).map { index -> pageNumbers.getInt(index).also { require(it in 1..pageCount) { "Page number is outside the document: $it" } } }
                 val renderer = PDFRenderer(document)
                 pages.map { pageNumber ->
-                    val probe = renderSafely(renderer, pageNumber - 1, safeDpi)
+                    val probe = renderSafely(renderer, document, pageNumber - 1, safeDpi)
                     try {
                         val output = uniqueImageFile(outputDir, "page-${pageNumber.toString().padStart(4, '0')}.$ext")
                         FileOutputStream(output).use { stream ->
@@ -194,15 +194,12 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
     private fun maxSafeBitmapBytes(): Long = (Runtime.getRuntime().maxMemory() * 0.18).toLong().coerceAtMost(64L * 1024L * 1024L)
     private fun uniqueImageFile(directory: File, desired: String): File { if (!File(directory, desired).exists()) return File(directory, desired); val dot = desired.lastIndexOf('.'); val base = if (dot > 0) desired.substring(0, dot) else desired; val ext = if (dot > 0) desired.substring(dot) else ""; var n = 2; var candidate = File(directory, "$base-$n$ext"); while (candidate.exists()) { n++; candidate = File(directory, "$base-$n$ext") }; return candidate }
     private fun uniqueFilename(directory: File, desired: String): String { if (!File(directory, desired).exists()) return desired; val dot = desired.lastIndexOf('.'); val base = if (dot > 0) desired.substring(0, dot) else desired; val ext = if (dot > 0) desired.substring(dot) else ""; var n = 2; var candidate = "$base-$n$ext"; while (File(directory, candidate).exists()) { n++; candidate = "$base-$n$ext" }; return candidate }
-    private fun sanitizePathSegment(value: String, fallback: String): String { val sanitized = value.replace(Regex("[^a-zA-Z0-9 _-]"), "_").trim().trim('.') ; return sanitized.ifEmpty { fallback } }
-    private fun sanitizeFilename(value: String, fallback: String): String { val sanitized = value.replace(Regex("[^a-zA-Z0-9._ -]"), "_").trim().trim('.') ; return sanitized.ifEmpty { fallback } }
-    private fun requireReadablePath(path: String): String { val file = File(path); require(file.isFile && file.canRead()) { "PDF input is unavailable." }; return file.absolutePath }
-    private fun requireArrayString(values: ReadableArray, index: Int): String = values.getString(index).also { require(it.isNotBlank()) { "Array item at index $index is blank." } }
+    private fun sanitizePathSegment(value: String, fallback: String): String { val sanitized = value.replace(Regex("[^a-zA-Z0-9 _-]"), "_").trim().take(80); return sanitized.ifEmpty { fallback } }
+    private fun sanitizeFilename(value: String, fallback: String): String { val sanitized = value.replace(Regex("[^a-zA-Z0-9._ -]"), "_").trim().take(140); return sanitized.ifEmpty { fallback } }
+    private fun requireReadablePath(path: String): String { require(path.isNotBlank()) { "A PDF/image path is required." }; require(!path.startsWith("content://")) { "Content URI must be materialized to an app-accessible file before native PDF processing." }; val file = File(path); require(file.exists() && file.canRead()) { "Input file is unavailable: $path" }; return file.absolutePath }
+    private fun requireArrayString(values: ReadableArray, index: Int): String { val value = values.getString(index)?.trim(); require(!value.isNullOrEmpty()) { "Input path at index $index is missing." }; return value }
     private fun ReadableArray.toListOfPaths(): List<String> = (0 until size()).map { requireReadablePath(requireArrayString(this, it)) }
     private fun ensurePdfBoxInitialized() { PDFBoxResourceLoader.init(reactContext) }
 
-    companion object {
-        private const val MAX_PDF_PAGE_POINTS = 14400f
-        private const val MAX_BITMAP_DIMENSION = 8192
-    }
+    companion object { private const val MAX_BITMAP_DIMENSION = 32768; private const val MAX_PDF_PAGE_POINTS = 14400f }
 }
