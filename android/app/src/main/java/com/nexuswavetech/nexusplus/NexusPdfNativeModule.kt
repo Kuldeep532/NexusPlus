@@ -176,9 +176,9 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
         runCatching { ensurePdfBoxInitialized(); require(password.isNotEmpty()) { "PDF password is required." }; val output = File(outputPath); output.parentFile?.mkdirs(); PDDocument.load(File(requireReadablePath(inputPath)), password).use { document -> document.setAllSecurityToBeRemoved(true); FileOutputStream(output).use { document.save(it) } }; output.absolutePath }.onSuccess { promise.resolve(it) }.onFailure { promise.reject("PDF_UNLOCK", it.message, it) }
     }
 
-    private fun renderSafely(renderer: PDFRenderer, pageIndex: Int, dpi: Int): Bitmap {
+    private fun renderSafely(renderer: PDFRenderer, document: PDDocument, pageIndex: Int, dpi: Int): Bitmap {
         val scale = dpi / 72f
-        val pageSize = renderer.document.getPage(pageIndex).mediaBox
+        val pageSize = document.getPage(pageIndex).mediaBox
         val width = (pageSize.width * scale).toInt().coerceAtLeast(1)
         val height = (pageSize.height * scale).toInt().coerceAtLeast(1)
         require(width <= MAX_BITMAP_DIMENSION && height <= MAX_BITMAP_DIMENSION) { "PDF page is too large to render safely at ${dpi} DPI." }
@@ -194,11 +194,15 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
     private fun maxSafeBitmapBytes(): Long = (Runtime.getRuntime().maxMemory() * 0.18).toLong().coerceAtMost(64L * 1024L * 1024L)
     private fun uniqueImageFile(directory: File, desired: String): File { if (!File(directory, desired).exists()) return File(directory, desired); val dot = desired.lastIndexOf('.'); val base = if (dot > 0) desired.substring(0, dot) else desired; val ext = if (dot > 0) desired.substring(dot) else ""; var n = 2; var candidate = File(directory, "$base-$n$ext"); while (candidate.exists()) { n++; candidate = File(directory, "$base-$n$ext") }; return candidate }
     private fun uniqueFilename(directory: File, desired: String): String { if (!File(directory, desired).exists()) return desired; val dot = desired.lastIndexOf('.'); val base = if (dot > 0) desired.substring(0, dot) else desired; val ext = if (dot > 0) desired.substring(dot) else ""; var n = 2; var candidate = "$base-$n$ext"; while (File(directory, candidate).exists()) { n++; candidate = "$base-$n$ext" }; return candidate }
-    private fun sanitizePathSegment(value: String, fallback: String): String { val sanitized = value.replace(Regex("[^a-zA-Z0-9 _-]"), "_").trim().take(80); return sanitized.ifEmpty { fallback } }
-    private fun sanitizeFilename(value: String, fallback: String): String { val sanitized = value.replace(Regex("[^a-zA-Z0-9._ -]"), "_").trim().take(140); return sanitized.ifEmpty { fallback } }
+    private fun sanitizePathSegment(value: String, fallback: String): String { val sanitized = value.replace(Regex("[^a-zA-Z0-9 _-]"), "_").trim().trim('.') ; return sanitized.ifEmpty { fallback } }
+    private fun sanitizeFilename(value: String, fallback: String): String { val sanitized = value.replace(Regex("[^a-zA-Z0-9._ -]"), "_").trim().trim('.') ; return sanitized.ifEmpty { fallback } }
+    private fun requireReadablePath(path: String): String { val file = File(path); require(file.isFile && file.canRead()) { "PDF input is unavailable." }; return file.absolutePath }
+    private fun requireArrayString(values: ReadableArray, index: Int): String = values.getString(index).also { require(it.isNotBlank()) { "Array item at index $index is blank." } }
+    private fun ReadableArray.toListOfPaths(): List<String> = (0 until size()).map { requireReadablePath(requireArrayString(this, it)) }
     private fun ensurePdfBoxInitialized() { PDFBoxResourceLoader.init(reactContext) }
-    private fun requireArrayString(values: ReadableArray, index: Int): String { val value = values.getString(index)?.trim(); require(!value.isNullOrEmpty()) { "Input path at index $index is missing." }; return requireReadablePath(value) }
-    private fun ReadableArray.toListOfPaths(): List<String> = (0 until size()).map { requireArrayString(this, it) }
-    private fun requireReadablePath(path: String): String { require(path.isNotBlank()) { "A PDF/image path is required." }; require(!path.startsWith("content://")) { "Content URI must be materialized to an app-accessible file before native PDF processing." }; val file = File(path); require(file.exists() && file.canRead()) { "Input file is unavailable: $path" }; return file.absolutePath }
-    companion object { private const val MAX_BITMAP_DIMENSION = 32768; private const val MAX_PDF_PAGE_POINTS = 14400f }
+
+    companion object {
+        private const val MAX_PDF_PAGE_POINTS = 14400f
+        private const val MAX_BITMAP_DIMENSION = 8192
+    }
 }
