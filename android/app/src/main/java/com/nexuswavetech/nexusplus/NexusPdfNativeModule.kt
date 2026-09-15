@@ -120,14 +120,10 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
     }
 
     @ReactMethod
-    fun preparePdfOutput(category: String, filename: String, promise: Promise) {
-        prepareToolOutput(category, filename, promise)
-    }
+    fun preparePdfOutput(category: String, filename: String, promise: Promise) { prepareToolOutput(category, filename, promise) }
 
     @ReactMethod
-    fun preparePdfToolOutput(category: String, filename: String, promise: Promise) {
-        prepareToolOutput(category, filename, promise)
-    }
+    fun preparePdfToolOutput(category: String, filename: String, promise: Promise) { prepareToolOutput(category, filename, promise) }
 
     @ReactMethod
     fun split(inputPath: String, outputDirectory: String, pageRanges: ReadableArray, promise: Promise) {
@@ -151,7 +147,11 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
     fun reorder(inputPath: String, outputPath: String, pageOrder: ReadableArray, promise: Promise) {
         runCatching {
             ensurePdfBoxInitialized(); val input = File(requireReadablePath(inputPath)); val output = File(outputPath); output.parentFile?.mkdirs(); require(pageOrder.size() in 1..1000) { "A valid page order is required." }
-            PDDocument.load(input).use { source -> val pageCount = source.numberOfPages; val requested = (0 until pageOrder.size()).map { index -> pageOrder.getInt(index).also { require(it in 1..pageCount) { "Page number is outside the document: $it" } } }; require(requested.size == pageCount && requested.toSet().size == pageCount) { "Page order must contain every page exactly once." }; PDDocument().use { reordered -> requested.forEach { reordered.importPage(source.getPage(it - 1)) }; FileOutputStream(output).use { reordered.save(it) } } }
+            PDDocument.load(input).use { source ->
+                val pageCount = source.numberOfPages; val requested = (0 until pageOrder.size()).map { index -> pageOrder.getInt(index).also { require(it in 1..pageCount) { "Page number is outside the document: $it" } } }
+                require(requested.size == pageCount && requested.toSet().size == pageCount) { "Page order must contain every page exactly once." }
+                PDDocument().use { reordered -> requested.forEach { reordered.importPage(source.getPage(it - 1)) }; FileOutputStream(output).use { reordered.save(it) } }
+            }
             output.absolutePath
         }.onSuccess { promise.resolve(it) }.onFailure { promise.reject("PDF_REORDER", it.message, it) }
     }
@@ -173,7 +173,7 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
 
     @ReactMethod
     fun unlock(inputPath: String, outputPath: String, password: String, promise: Promise) {
-        runCatching { ensurePdfBoxInitialized(); require(password.isNotEmpty()) { "PDF password is required." }; val output = File(outputPath); output.parentFile?.mkdirs(); PDDocument.load(File(requireReadablePath(inputPath)), password).use { document -> document.setAllSecurityToBeRemoved(true); FileOutputStream(output).use { document.save(it) } }; output.absolutePath }.onSuccess { promise.resolve(it) }.onFailure { promise.reject("PDF_UNLOCK", it.message, it) }
+        runCatching { ensurePdfBoxInitialized(); require(password.isNotEmpty()) { "PDF password is required." }; val output = File(outputPath); output.parentFile?.mkdirs(); PDDocument.load(File(requireReadablePath(inputPath), password)).use { document -> document.setAllSecurityToBeRemoved(true); FileOutputStream(output).use { document.save(it) } }; output.absolutePath }.onSuccess { promise.resolve(it) }.onFailure { promise.reject("PDF_UNLOCK", it.message, it) }
     }
 
     private fun renderSafely(renderer: PDFRenderer, document: PDDocument, pageIndex: Int, dpi: Int): Bitmap {
@@ -201,5 +201,8 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
     private fun ReadableArray.toListOfPaths(): List<String> = (0 until size()).map { requireReadablePath(requireArrayString(this, it)) }
     private fun ensurePdfBoxInitialized() { PDFBoxResourceLoader.init(reactContext) }
 
-    companion object { private const val MAX_BITMAP_DIMENSION = 32768; private const val MAX_PDF_PAGE_POINTS = 14400f }
+    companion object {
+        private const val MAX_BITMAP_DIMENSION = 8192
+        private const val MAX_PDF_PAGE_POINTS = 14400f
+    }
 }
