@@ -8,7 +8,8 @@ import { executeCctvLiveControl } from '@/features/cctv/cctvControls';
 import { getActiveCctvSession, closeCctvSession } from '@/features/cctv/cctvSession';
 import { CctvBackendError, type CctvCameraRecord } from '@/features/cctv/cctvBackend';
 
-const CONTROLS = [
+type Control = { id: string; label: string; icon: string; capability?: keyof CctvCameraRecord['capabilities'] };
+const CONTROLS: readonly Control[] = [
   { id: 'start', label: 'Start', icon: 'play' },
   { id: 'stop', label: 'Stop', icon: 'square' },
   { id: 'sound', label: 'Sound', icon: 'volume-2', capability: 'audio' },
@@ -18,16 +19,16 @@ const CONTROLS = [
   { id: 'ptz', label: 'PTZ', icon: 'move', capability: 'panTiltZoom' },
   { id: 'night_vision', label: 'Night Vision', icon: 'moon', capability: 'nightVision' },
   { id: 'talk', label: 'Talk', icon: 'mic', capability: 'talk' },
-] as const;
+];
 
 export default function CctvLiveViewScreen() {
   const colors = useColors(); const router = useRouter(); const { cameraId } = useLocalSearchParams<{ cameraId?: string }>();
   const { cameras } = useCctvCameras();
-  const camera = useMemo(() => cameras.find((item) => item.id === cameraId), [cameras, cameraId]) as CctvCameraRecord | undefined;
+  const camera = useMemo(() => cameras.find((item) => item.id === cameraId), [cameras, cameraId]);
   const [running, setRunning] = useState(false); const [recording, setRecording] = useState(false); const [message, setMessage] = useState<string | null>(null);
   useEffect(() => () => { if (camera) void closeCctvSession(camera.id); }, [camera]);
   if (!camera) return <View style={[styles.root,{backgroundColor:colors.background}]}><Text style={[styles.error,{color:colors.foreground}]}>Camera not found.</Text></View>;
-  const runControl = async (control: typeof CONTROLS[number]['id']) => {
+  const runControl = async (control: Control['id']) => {
     setMessage(null);
     try {
       await executeCctvLiveControl(camera, control);
@@ -46,7 +47,7 @@ export default function CctvLiveViewScreen() {
       <Text style={[styles.feedText,{color:colors.mutedForeground}]}>{running ? 'The authenticated native transport is active. Stream endpoints are kept out of the application UI.' : 'Start performs secure camera authorization before enabling controls.'}</Text>
     </View>
     {message && <View accessibilityRole="alert" style={[styles.messageCard,{backgroundColor:colors.card,borderColor:colors.border}]}><Text style={[styles.messageTitle,{color:colors.foreground}]}>Camera control</Text><Text style={[styles.feedText,{color:colors.mutedForeground}]}>{message}</Text></View>}
-    <View style={styles.controls}>{CONTROLS.map((item)=>{ const supported = item.capability ? Boolean(camera.capabilities[item.capability as keyof CctvCameraRecord['capabilities']]) : true; const disabled = item.id==='start' ? running || !camera.capabilities.liveView : item.id==='stop' ? !running : !running || !supported; return <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`${item.label}${supported?'':' unavailable on this camera'}`} accessibilityState={{disabled}} disabled={disabled} onPress={()=>void runControl(item.id)} style={[styles.control,{backgroundColor:colors.card,borderColor:colors.border,opacity:disabled?0.45:1}]}><Feather name={item.icon as never} size={19} color={colors.foreground}/><Text style={[styles.controlText,{color:colors.foreground}]}>{item.label}</Text></Pressable>; })}</View>
+    <View style={styles.controls}>{CONTROLS.map((item)=>{ const supported = item.capability ? Boolean(camera.capabilities[item.capability]) : true; const disabled = item.id==='start' ? running || !camera.capabilities.liveView : item.id==='stop' ? !running : !running || !supported; return <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`${item.label}${supported?'':' unavailable on this camera'}`} accessibilityState={{disabled}} disabled={disabled} onPress={()=>void runControl(item.id)} style={[styles.control,{backgroundColor:colors.card,borderColor:colors.border,opacity:disabled?0.45:1}]}><Feather name={item.icon as never} size={19} color={colors.foreground}/><Text style={[styles.controlText,{color:colors.foreground}]}>{item.label}</Text></Pressable>; })}</View>
     <View style={styles.secondaryControls}><Pressable disabled={!camera.capabilities.playback} accessibilityRole="button" accessibilityLabel="Open recordings" accessibilityState={{disabled:!camera.capabilities.playback}} onPress={()=>router.push({pathname:'/cctv-recordings',params:{cameraId:camera.id}})} style={[styles.secondaryButton,{backgroundColor:colors.card,borderColor:colors.border,opacity:camera.capabilities.playback?1:0.45}]}><Feather name="archive" size={18} color={colors.primary}/><Text style={[styles.secondaryText,{color:colors.foreground}]}>Recordings</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Open security" onPress={()=>router.push({pathname:'/cctv-security',params:{cameraId:camera.id}})} style={[styles.secondaryButton,{backgroundColor:colors.card,borderColor:colors.border}]}><Feather name="shield" size={18} color={colors.primary}/><Text style={[styles.secondaryText,{color:colors.foreground}]}>Security</Text></Pressable></View>
   </ScrollView></View>;
 }
