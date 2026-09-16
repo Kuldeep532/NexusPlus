@@ -32,6 +32,7 @@ catalog:
   vite: ^7.3.2
   wouter: ^3.3.5
   zod: ^3.25.76
+  expo-modules-core: ~3.0.30
 
 autoInstallPeers: false
 
