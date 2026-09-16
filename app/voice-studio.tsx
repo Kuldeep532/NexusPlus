@@ -5,7 +5,7 @@ import { Stack } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { importVoiceStudioOnnx, syncVoiceStudioFolder, type VoiceStudioModel } from '@/features/audio-editor/voiceStudio';
+import { getVoiceStudioDisplayName, importVoiceStudioOnnx, syncVoiceStudioFolder, type VoiceStudioModel } from '@/features/audio-editor/voiceStudio';
 import { getVoiceStudioTtsCapability, validateVoiceStudioTtsRequest } from '@/features/audio-editor/voiceStudioTts';
 
 export default function VoiceStudioScreen() {
@@ -70,7 +70,7 @@ export default function VoiceStudioScreen() {
     <Pressable onPress={refresh} disabled={loading} accessibilityRole="button" style={[styles.secondaryButton, { borderColor: colors.border }]}><Feather name="refresh-cw" size={18} color={colors.primary} /><Text style={[styles.secondaryButtonText, { color: colors.foreground }]}>Detect Local Voice Models</Text></Pressable>
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Cloned voices</Text>
-      {models.length === 0 ? <Text style={[styles.empty, { color: colors.mutedForeground }]}>No ONNX voice models detected.</Text> : models.map((model) => <Pressable key={model.id} onPress={() => setSelected(model)} accessibilityRole="radio" accessibilityState={{ selected: selected?.id === model.id }} style={[styles.model, { borderColor: selected?.id === model.id ? colors.primary : colors.border, backgroundColor: selected?.id === model.id ? colors.secondary : colors.background }]}><View style={[styles.modelIcon, { backgroundColor: colors.secondary }]}><Feather name="volume-2" size={17} color={colors.primary} /></View><View style={styles.modelCopy}><Text style={[styles.modelName, { color: colors.foreground }]}>{model.name}</Text><Text style={[styles.modelMeta, { color: colors.mutedForeground }]}>ONNX • {model.source === 'device-folder' ? 'Detected locally' : 'Added in Voice Studio'}</Text></View></Pressable>)}
+      {models.length === 0 ? <Text style={[styles.empty, { color: colors.mutedForeground }]}>No ONNX voice models detected.</Text> : models.map((model, index) => <Pressable key={model.id} onPress={() => setSelected(model)} accessibilityRole="radio" accessibilityState={{ selected: selected?.id === model.id }} style={[styles.model, { borderColor: selected?.id === model.id ? colors.primary : colors.border, backgroundColor: selected?.id === model.id ? colors.secondary : colors.background }]}><View style={[styles.modelIcon, { backgroundColor: colors.secondary }]}><Feather name="volume-2" size={17} color={colors.primary} /></View><View style={styles.modelCopy}><Text style={[styles.modelName, { color: colors.foreground }]}>{getVoiceStudioDisplayName(model, index)}</Text><Text style={[styles.modelMeta, { color: colors.mutedForeground }]}>ONNX • {model.source === 'device-folder' ? 'Detected locally' : 'Added in Voice Studio'}</Text></View></Pressable>)}
     </View>
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Generate speech</Text>
