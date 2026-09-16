@@ -47,6 +47,15 @@ class AudioEditorNativeModule : Module() {
       try { val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }; promise.resolve(AudioEffectProcessor.process(context, inputPath, outputPath, effect, amount).let { mapOf("outputPath" to it.outputPath, "durationMs" to it.durationMs, "sampleRate" to it.sampleRate, "channels" to it.channels, "mimeType" to it.mimeType) }) }
       catch (error: Exception) { promise.reject("AUDIO_EFFECT_FAILED", error.message ?: "Unable to apply audio effect", error) }
     }
+    AsyncFunction("removeSilence") { inputPath: String, outputPath: String, settings: Map<String, Any?>, promise: Promise ->
+      try {
+        val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
+        val thresholdDb = (settings["thresholdDb"] as? Number)?.toDouble() ?: -40.0
+        val minSilenceMs = (settings["minSilenceMs"] as? Number)?.toDouble() ?: 350.0
+        val paddingMs = (settings["paddingMs"] as? Number)?.toDouble() ?: 80.0
+        promise.resolve(RemoveSilenceProcessor.process(context, inputPath, outputPath, thresholdDb, minSilenceMs, paddingMs).let { mapOf("outputPath" to it.outputPath, "durationMs" to it.durationMs, "sampleRate" to it.sampleRate, "channels" to it.channels, "mimeType" to it.mimeType, "removedSilenceMs" to it.removedSilenceMs) })
+      } catch (error: Exception) { promise.reject("AUDIO_REMOVE_SILENCE_FAILED", error.message ?: "Unable to remove silence", error) }
+    }
   }
 
   private fun probeAudio(inputPath: String): Map<String, Any?> {
