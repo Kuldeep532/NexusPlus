@@ -33,6 +33,10 @@ export function getVoiceStudioDisplayName(model: Pick<VoiceStudioModel, 'name' |
   return `Voice ${position}`;
 }
 
+export function isVoiceStudioModelUri(uri: string): boolean {
+  return uri.startsWith(VOICE_MODELS_DIR) && uri.toLowerCase().endsWith('.onnx');
+}
+
 async function ensureDirectory(): Promise<void> {
   if (!FileSystem.documentDirectory) throw new Error('Nexus Plus local storage is unavailable.');
   await FileSystem.makeDirectoryAsync(VOICE_MODELS_DIR, { intermediates: true });
@@ -66,13 +70,14 @@ export async function importVoiceStudioOnnx(
   const baseName = sanitizeName(displayName || uri.split('/').pop()?.replace(/\.onnx$/i, '') || 'Voice Model');
   const destination = `${VOICE_MODELS_DIR}${baseName}-${Date.now()}.onnx`;
   await FileSystem.copyAsync({ from: uri, to: destination });
+  const now = Date.now();
   const model: VoiceStudioModel = {
-    id: `onnx-${Date.now()}`,
+    id: `onnx-${now}`,
     name: baseName,
     uri: destination,
     kind: 'onnx',
     source: 'app',
-    createdAt: Date.now(),
+    createdAt: now,
     ...(gender ? { gender } : {}),
   };
   const current = await loadVoiceStudioModels();
@@ -100,7 +105,7 @@ export async function syncVoiceStudioFolder(): Promise<VoiceStudioModel[]> {
       });
     }
   }
-  const models = Array.from(byUri.values());
+  const models = Array.from(byUri.values()).sort((a, b) => b.createdAt - a.createdAt);
   await saveIndex(models);
   return models;
 }
