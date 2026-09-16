@@ -62,6 +62,14 @@ export type AudioCompressResult = {
   outputBytes?: number;
 };
 
+export type VoicePitchNativeResult = {
+  outputPath: string;
+  durationMs: number;
+  sampleRate: number;
+  channels: number;
+  mimeType: string | null;
+};
+
 type AudioEditorNativeModuleType = {
   probe(inputPath: string): Promise<AudioProbeResult>;
   decode(inputPath: string): Promise<DecodedAudioResult>;
@@ -69,6 +77,7 @@ type AudioEditorNativeModuleType = {
   mix(input: AudioMixInput): Promise<AudioMixResult>;
   mixProject(input: AudioMixProjectInput): Promise<AudioMixResult>;
   compress(inputPath: string, outputPath: string, bitrate: number, sampleRate: number): Promise<AudioCompressResult>;
+  pitchShift(inputPath: string, outputPath: string, pitchSemitones: number, formantShift: number, timbre: number): Promise<VoicePitchNativeResult>;
 };
 
 export const AudioEditorNative = requireOptionalNativeModule<AudioEditorNativeModuleType>('AudioEditorNative');
