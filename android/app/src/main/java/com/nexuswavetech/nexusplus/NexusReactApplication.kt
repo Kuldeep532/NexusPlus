@@ -21,6 +21,7 @@ class NexusReactApplication : Application(), ReactApplication {
             add(NexusNativeSecurityPackage())
             add(NexusIntegrityPackage())
             add(NexusAlarmPackage())
+            add(NexusDocumentReaderPackage())
             add(NexusCctvDiscoveryPackage())
             add(NexusCctvOnvifPackage())
             add(NexusPdfNativePackage())
