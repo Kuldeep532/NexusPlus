@@ -67,9 +67,14 @@ class AudioEditorNativeModule : Module() {
     }
 
     AsyncFunction("synthesizeTts") { text: String, modelPath: String, configPath: String, outputPath: String, lengthScale: Double, pitchScale: Double, emotion: String, clone: Boolean, promise: Promise ->
+      try { promise.resolve(mapOf("outputPath" to PiperTtsProcessor.synthesize(appContext.reactContext, text, modelPath, configPath, outputPath, lengthScale, pitchScale, emotion, clone))) } catch (error: Exception) { promise.reject("PIPER_TTS_SYNTHESIS_FAILED", error.message ?: "Unable to synthesize speech", error) }
+    }
+
+    AsyncFunction("speedAndPitch") { inputPath: String, outputPath: String, speed: Double, pitchSemitones: Double, promise: Promise ->
       try {
-        promise.resolve(mapOf("outputPath" to PiperTtsProcessor.synthesize(appContext.reactContext, text, modelPath, configPath, outputPath, lengthScale, pitchScale, emotion, clone)))
-      } catch (error: Exception) { promise.reject("PIPER_TTS_SYNTHESIS_FAILED", error.message ?: "Unable to synthesize speech", error) }
+        val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
+        promise.resolve(SpeedPitchProcessor.process(context, inputPath, outputPath, speed, pitchSemitones).let { mapOf("outputPath" to it.outputPath, "durationMs" to it.durationMs, "sampleRate" to it.sampleRate, "channels" to it.channels, "mimeType" to it.mimeType) })
+      } catch (error: Exception) { promise.reject("AUDIO_SPEED_PITCH_FAILED", error.message ?: "Unable to change audio speed and pitch", error) }
     }
   }
 
