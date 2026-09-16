@@ -23,12 +23,45 @@ export default function KaraokeScreen() {
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState('Choose a karaoke track to begin.');
   const [output, setOutput] = useState<{ path: string; uri: string } | null>(null);
+  const startedRef = useRef(false);
+  const recordingRef = useRef(false);
   const player = useAudioPlayer(track?.uri ?? null, { updateInterval: 100 });
   const status = useAudioPlayerStatus(player);
 
-  useEffect(() => setPosition(status.currentTime * 1000), [status.currentTime]);
-  useEffect(() => { if (track) setLyrics(track.lyrics ?? []); }, [track]);
-  useEffect(() => () => { void cancelKaraokeRecording(); }, []);
+  useEffect(() => {
+    setPosition(status.currentTime * 1000);
+  }, [status.currentTime]);
+
+  useEffect(() => {
+    if (track) setLyrics(track.lyrics ?? []);
+  }, [track]);
+
+  useEffect(() => {
+    const durationMs = track?.durationMs ?? 0;
+    if (!track || !startedRef.current || !status.playing || durationMs <= 0) return;
+    if (status.currentTime * 1000 < Math.max(0, durationMs - 250)) return;
+    startedRef.current = false;
+    player.pause();
+    if (!recordingRef.current) return;
+    recordingRef.current = false;
+    setRecording(false);
+    setWorking(true);
+    void stopKaraokeRecording()
+      .then((result) => {
+        setOutput({ path: result.outputPath, uri: `file://${result.outputPath}` });
+        setMessage('Song finished. Vocal recording stopped and saved.');
+      })
+      .catch((error) => setMessage(error instanceof Error ? error.message : 'Unable to finish the vocal recording.'))
+      .finally(() => setWorking(false));
+  }, [player, status.currentTime, status.playing, track]);
+
+  useEffect(() => {
+    return () => {
+      startedRef.current = false;
+      recordingRef.current = false;
+      void cancelKaraokeRecording();
+    };
+  }, []);
 
   const activeLyric = useMemo(() => findActiveLyric(lyrics, position), [lyrics, position]);
 
@@ -38,61 +71,80 @@ export default function KaraokeScreen() {
     setWorking(true);
     try {
       const inspected = await inspectKaraokeTrack({ uri: picked.uri, name: picked.name, durationMs: picked.durationMs ?? 0 });
+      player.pause();
+      await cancelKaraokeRecording();
+      startedRef.current = false;
+      recordingRef.current = false;
+      setRecording(false);
       setTrack(inspected);
       setPosition(0);
-      setLyrics([]);
+      setLyrics(inspected.lyrics ?? []);
       setOutput(null);
-      setMessage(`${inspected.name} loaded. Choose Listen or Record.`);
+      setMessage(`${inspected.name} loaded. Choose Sing or Sing + Record.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to load this karaoke track.');
-    } finally { setWorking(false); }
-  }, []);
+    } finally {
+      setWorking(false);
+    }
+  }, [player]);
 
   const startPlayback = useCallback(async () => {
-    if (!track || working || recording) return;
+    if (!track || working || startedRef.current) return;
     try {
+      setOutput(null);
+      player.seekTo(0);
       if (mode === 'record-vocal') {
         const permission = await AudioModule.requestRecordingPermissionsAsync();
-        if (!permission.granted) { setMessage('Microphone permission is required for vocal recording.'); return; }
+        if (!permission.granted) {
+          setMessage('Microphone permission is required for vocal recording.');
+          return;
+        }
         setWorking(true);
         const path = await createKaraokeOutputPath(track.name);
         await startKaraokeRecording(track.uri, path, true, headphones, 48_000, 1);
-        // Start both sessions only after recorder initialization succeeds, keeping their start edge aligned.
-        player.seekTo(0);
-        player.play();
+        recordingRef.current = true;
         setRecording(true);
-        setPosition(0);
-        setMessage('Karaoke track started. Vocal recording is aligned to the track start.');
         setWorking(false);
-      } else {
-        player.seekTo(0);
-        player.play();
-        setPosition(0);
-        setMessage('Karaoke playback started.');
       }
+      // Karaoke playback is the master transport: start immediately after recorder setup.
+      player.play();
+      startedRef.current = true;
+      setPosition(0);
+      setMessage(mode === 'record-vocal' ? 'Karaoke started. Recording is synchronized to the track.' : 'Karaoke playback started.');
     } catch (error) {
       setWorking(false);
+      startedRef.current = false;
+      recordingRef.current = false;
+      setRecording(false);
       await cancelKaraokeRecording();
       setMessage(error instanceof Error ? error.message : 'Unable to start karaoke.');
     }
-  }, [headphones, mode, player, recording, track, working]);
+  }, [headphones, mode, player, track, working]);
 
   const stopPlayback = useCallback(async () => {
+    const wasStarted = startedRef.current || recordingRef.current || status.playing;
+    startedRef.current = false;
     player.pause();
-    if (!recording) return;
+    if (!wasStarted || !recordingRef.current) return;
+    recordingRef.current = false;
     setWorking(true);
     try {
       const result = await stopKaraokeRecording();
       setRecording(false);
       setOutput({ path: result.outputPath, uri: `file://${result.outputPath}` });
-      setMessage('Vocal recording processed and saved.');
+      setMessage('Karaoke stopped. Vocal recording is ready.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to finish the vocal recording.');
-    } finally { setWorking(false); }
-  }, [player, recording]);
+    } finally {
+      setWorking(false);
+    }
+  }, [player, status.playing]);
 
-  const reset = useCallback(() => {
+  const reset = useCallback(async () => {
+    startedRef.current = false;
+    recordingRef.current = false;
     player.pause();
+    await cancelKaraokeRecording();
     setTrack(null);
     setLyrics([]);
     setOutput(null);
@@ -131,14 +183,14 @@ export default function KaraokeScreen() {
 
           <Text style={[styles.progressText, { color: colors.mutedForeground }]}>{Math.floor(position / 1000)} / {Math.floor(track.durationMs / 1000)} sec</Text>
           <View style={styles.transportRow}>
-            <Pressable onPress={startPlayback} disabled={working || recording} accessibilityRole="button" accessibilityLabel={mode === 'record-vocal' ? 'Start karaoke and vocal recording' : 'Start karaoke playback'} accessibilityState={{ disabled: working || recording }} style={[styles.transportButton, { backgroundColor: colors.primary }]}><Feather name="play" size={19} color={colors.primaryForeground} /><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{mode === 'record-vocal' ? 'Start Recording' : 'Start Singing'}</Text></Pressable>
+            <Pressable onPress={startPlayback} disabled={working || startedRef.current} accessibilityRole="button" accessibilityLabel={mode === 'record-vocal' ? 'Start karaoke and vocal recording' : 'Start karaoke playback'} accessibilityState={{ disabled: working || startedRef.current }} style={[styles.transportButton, { backgroundColor: colors.primary }]}><Feather name="play" size={19} color={colors.primaryForeground} /><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{mode === 'record-vocal' ? 'Start Recording' : 'Start Singing'}</Text></Pressable>
             <Pressable onPress={stopPlayback} disabled={working || (!status.playing && !recording)} accessibilityRole="button" accessibilityState={{ disabled: working || (!status.playing && !recording) }} style={[styles.transportButton, { borderColor: colors.primary, borderWidth: 1 }]}><Feather name="square" size={18} color={colors.primary} /><Text style={[styles.modeText, { color: colors.primary }]}>Stop</Text></Pressable>
           </View>
           {recording && <Text accessibilityLiveRegion="polite" style={[styles.recording, { color: colors.primary }]}>Recording vocal • karaoke track playing</Text>}
         </View>}
       </>}
 
-      {output && <AudioEditorResultPanel outputPath={output.path} resultUri={output.uri} message="Karaoke vocal recording saved locally." onClose={reset} />}
+      {output && <AudioEditorResultPanel outputPath={output.path} resultUri={output.uri} message="Karaoke vocal recording saved locally." onClose={() => void reset()} />}
       {!!message && <Text accessibilityLiveRegion="polite" style={[styles.message, { color: colors.mutedForeground }]}>{message}</Text>}
       {working && <ActivityIndicator accessibilityLabel="Karaoke processing" style={{ marginTop: 12 }} color={colors.primary} />}
     </ScrollView>
