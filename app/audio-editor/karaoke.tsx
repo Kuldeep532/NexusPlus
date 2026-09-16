@@ -1,5 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAudioPlayer, useAudioPlayerStatus, AudioModule } from 'expo-audio';
@@ -9,7 +11,7 @@ import { AudioEditorResultPanel } from '@/features/audio-editor/AudioEditorResul
 import { AudioEditorTransport } from '@/features/audio-editor/AudioEditorTransport';
 import { pickAudioFromFileManager } from '@/features/audio-editor/audioEditorSource';
 import { createKaraokeOutputPath, inspectKaraokeTrack, startKaraokeRecording, pauseKaraokeRecording, resumeKaraokeRecording, stopKaraokeRecording, cancelKaraokeRecording } from '@/features/audio-editor/karaokeEngine';
-import { findActiveLyric } from '@/features/audio-editor/karaokeLyrics';
+import { findActiveLyric, parseKaraokeLyrics } from '@/features/audio-editor/karaokeLyrics';
 import type { KaraokeLyricsLine, KaraokeTrack } from '@/features/audio-editor/karaokeTypes';
 
 export default function KaraokeScreen() {
@@ -131,6 +133,32 @@ export default function KaraokeScreen() {
     }
   }, [player]);
 
+  const chooseLyrics = useCallback(async () => {
+    if (!track || working || singing || recording) return;
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['text/plain', 'text/*', 'application/octet-stream'],
+        multiple: false,
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      setWorking(true);
+      const asset = result.assets[0];
+      const text = await FileSystem.readAsStringAsync(asset.uri);
+      const parsed = parseKaraokeLyrics(text);
+      if (!parsed.length) {
+        setMessage('No valid timestamped LRC lyrics were found in that file.');
+        return;
+      }
+      setLyrics(parsed);
+      setMessage(`${asset.name || 'Lyrics file'} loaded. ${parsed.length} timed lyric lines are ready.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to load the lyrics file.');
+    } finally {
+      setWorking(false);
+    }
+  }, [recording, singing, track, working]);
+
   const startSinging = useCallback(async (record = false) => {
     if (!track || working || startedRef.current) return;
     try {
@@ -219,7 +247,7 @@ export default function KaraokeScreen() {
           <Pressable onPress={() => setMode('listen-only')} disabled={working} accessibilityRole="button" accessibilityState={{ selected: mode === 'listen-only', disabled: working }} style={[styles.modeButton, { borderColor: mode === 'listen-only' ? colors.primary : colors.border, backgroundColor: mode === 'listen-only' ? colors.secondary : colors.background }]}><Feather name="headphones" size={17} color={colors.primary} /><Text style={[styles.modeText, { color: colors.foreground }]}>Sing only</Text></Pressable>
           <Pressable onPress={() => setMode('record-vocal')} disabled={working} accessibilityRole="button" accessibilityState={{ selected: mode === 'record-vocal', disabled: working }} style={[styles.modeButton, { borderColor: mode === 'record-vocal' ? colors.primary : colors.border, backgroundColor: mode === 'record-vocal' ? colors.secondary : colors.background }]}><Feather name="mic" size={17} color={colors.primary} /><Text style={[styles.modeText, { color: colors.foreground }]}>Sing + Record</Text></Pressable>
         </View>{mode === 'record-vocal' && <Pressable onPress={() => setHeadphones((v) => !v)} disabled={working} accessibilityRole="button" accessibilityState={{ checked: headphones, disabled: working }} style={[styles.headphoneRow, { borderColor: colors.border, backgroundColor: colors.secondary }]}><Feather name={headphones ? 'check-circle' : 'circle'} size={18} color={colors.primary} /><View style={styles.copy}><Text style={[styles.modeText, { color: colors.foreground }]}>Headphones connected</Text><Text style={[styles.meta, { color: colors.mutedForeground }]}>Uses headphone-aware vocal capture and stronger cleanup.</Text></View></Pressable>}</>}
-        <View style={[styles.lyricBox, { borderColor: colors.border, backgroundColor: colors.background }]}><View style={styles.lyricHeader}><Text accessibilityRole="header" style={[styles.sectionTitle, { color: colors.foreground }]}>Lyrics</Text><Text style={[styles.linkText, { color: colors.mutedForeground }]}>LRC-ready</Text></View>{lyrics.length === 0 ? <Text style={[styles.meta, { color: colors.mutedForeground }]}>No timestamped lyrics loaded. Playback and recording are still available.</Text> : <><Text style={[styles.activeLyric, { color: colors.primary }]}>{lyrics[activeLyric]?.text ?? ''}</Text><Text style={[styles.nextLyric, { color: colors.mutedForeground }]}>{lyrics[activeLyric + 1]?.text ?? ''}</Text></>}</View>
+        <View style={[styles.lyricBox, { borderColor: colors.border, backgroundColor: colors.background }]}><View style={styles.lyricHeader}><Text accessibilityRole="header" style={[styles.sectionTitle, { color: colors.foreground }]}>Lyrics</Text><Pressable onPress={() => void chooseLyrics()} disabled={working || singing || recording} accessibilityRole="button" accessibilityState={{ disabled: working || singing || recording }} style={styles.lyricButton}><Feather name="file-text" size={15} color={colors.primary} /><Text style={[styles.linkText, { color: colors.primary }]}>Load LRC</Text></Pressable></View>{lyrics.length === 0 ? <Text style={[styles.meta, { color: colors.mutedForeground }]}>Load a timestamped .lrc file before singing. Playback and recording are also available without lyrics.</Text> : <><Text style={[styles.activeLyric, { color: colors.primary }]}>{lyrics[activeLyric]?.text ?? ''}</Text><Text style={[styles.nextLyric, { color: colors.mutedForeground }]}>{lyrics[activeLyric + 1]?.text ?? ''}</Text></>}</View>
         <Text style={[styles.progressText, { color: colors.mutedForeground }]}>{Math.floor(position / 1000)} / {Math.floor(track.durationMs / 1000)} sec</Text>
         <AudioEditorTransport active={singing} paused={paused} recording={recording} working={working} onStart={() => void startSinging(mode === 'record-vocal')} onTogglePause={togglePause} onFinish={finishSinging} startLabel={mode === 'record-vocal' ? 'Start Recording' : 'Start Singing'} />
         {recording && <Text accessibilityLiveRegion="polite" style={[styles.recording, { color: colors.primary }]}>{paused ? 'Recording paused • karaoke paused' : 'Recording vocal • karaoke track playing'}</Text>}
@@ -232,4 +260,4 @@ export default function KaraokeScreen() {
   );
 }
 
-const styles = StyleSheet.create({ root: { flex: 1 }, headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 }, heroIcon: { width: 54, height: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, headerCopy: { flex: 1, marginLeft: 14 }, title: { fontSize: 27, fontFamily: 'Inter_700Bold', marginBottom: 5 }, subtitle: { fontSize: 11.5, lineHeight: 17 }, primaryButton: { minHeight: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9, paddingHorizontal: 15 }, buttonText: { fontSize: 13, fontFamily: 'Inter_700Bold' }, card: { marginTop: 16, borderWidth: 1, borderRadius: 18, padding: 14, gap: 10 }, trackTitle: { fontSize: 15, fontFamily: 'Inter_700Bold' }, meta: { fontSize: 10.5, lineHeight: 15 }, sectionTitle: { fontSize: 13.5, fontFamily: 'Inter_700Bold' }, modeRow: { flexDirection: 'row', gap: 8 }, modeButton: { flex: 1, minHeight: 44, borderWidth: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 }, modeText: { fontSize: 12.5, fontFamily: 'Inter_700Bold' }, headphoneRow: { minHeight: 52, borderWidth: 1, borderRadius: 14, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }, copy: { flex: 1 }, lyricBox: { borderWidth: 1, borderRadius: 14, padding: 12, minHeight: 86 }, lyricHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, linkText: { fontSize: 10 }, activeLyric: { fontSize: 18, lineHeight: 25, fontFamily: 'Inter_700Bold', marginTop: 9 }, nextLyric: { fontSize: 12, lineHeight: 18, marginTop: 4 }, progressText: { fontSize: 11, textAlign: 'center' }, recording: { fontSize: 11.5, lineHeight: 17, textAlign: 'center' }, message: { fontSize: 11.5, lineHeight: 17, marginTop: 12 } });
+const styles = StyleSheet.create({ root: { flex: 1 }, headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 }, heroIcon: { width: 54, height: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, headerCopy: { flex: 1, marginLeft: 14 }, title: { fontSize: 27, fontFamily: 'Inter_700Bold', marginBottom: 5 }, subtitle: { fontSize: 11.5, lineHeight: 17 }, primaryButton: { minHeight: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9, paddingHorizontal: 15 }, buttonText: { fontSize: 13, fontFamily: 'Inter_700Bold' }, card: { marginTop: 16, borderWidth: 1, borderRadius: 18, padding: 14, gap: 10 }, trackTitle: { fontSize: 15, fontFamily: 'Inter_700Bold' }, meta: { fontSize: 10.5, lineHeight: 15 }, sectionTitle: { fontSize: 13.5, fontFamily: 'Inter_700Bold' }, modeRow: { flexDirection: 'row', gap: 8 }, modeButton: { flex: 1, minHeight: 44, borderWidth: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 }, modeText: { fontSize: 12.5, fontFamily: 'Inter_700Bold' }, headphoneRow: { minHeight: 52, borderWidth: 1, borderRadius: 14, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }, copy: { flex: 1 }, lyricBox: { borderWidth: 1, borderRadius: 14, padding: 12, minHeight: 86 }, lyricHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, lyricButton: { minHeight: 36, paddingHorizontal: 9, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 5 }, linkText: { fontSize: 10.5, fontFamily: 'Inter_700Bold' }, activeLyric: { fontSize: 18, lineHeight: 25, fontFamily: 'Inter_700Bold', marginTop: 9 }, nextLyric: { fontSize: 12, lineHeight: 18, marginTop: 4 }, progressText: { fontSize: 11, textAlign: 'center' }, recording: { fontSize: 11.5, lineHeight: 17, textAlign: 'center' }, message: { fontSize: 11.5, lineHeight: 17, marginTop: 12 } });
