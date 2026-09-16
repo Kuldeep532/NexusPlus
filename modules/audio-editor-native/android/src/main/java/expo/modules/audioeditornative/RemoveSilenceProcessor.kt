@@ -8,7 +8,7 @@ import android.media.MediaMuxer
 import android.net.Uri
 import java.io.File
 import kotlin.math.abs
-import kotlin.math.ln
+import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 
@@ -86,12 +86,10 @@ internal object RemoveSilenceProcessor {
       var f = frame
       while (f < end) {
         var channel = 0
-        var framePeak = 0.0
         while (channel < channels) {
-          framePeak = max(framePeak, abs(samples[f * channels + channel].toDouble()))
+          peak = max(peak, abs(samples[f * channels + channel].toDouble()))
           channel++
         }
-        peak = max(peak, framePeak)
         f++
       }
       val isSilent = peak < threshold
@@ -113,43 +111,20 @@ internal object RemoveSilenceProcessor {
       val start = cursor
       while (cursor < frameCount && silent[cursor]) cursor++
       val end = cursor
-      if (end - start >= minSilentFrames) {
-        runs.add(Range(start, end))
-      }
+      if (end - start >= minSilentFrames) runs.add(Range(start, end))
     }
 
     if (runs.isEmpty()) return listOf(Range(0, frameCount))
 
     val keep = ArrayList<Range>()
-    var cursorFrame = 0
+    var previousEnd = 0
     for (run in runs) {
-      val cutStart = min(run.endFrame, run.startFrame + max(0, run.endFrame - run.startFrame - paddingFrames))
-      val cutEnd = max(run.startFrame, run.endFrame - max(0, run.endFrame - run.startFrame - paddingFrames))
-      val leftKeepEnd = max(cursorFrame, run.startFrame + paddingFrames)
-      if (leftKeepEnd > cursorFrame) keep.add(Range(cursorFrame, leftKeepEnd))
-      cursorFrame = max(cursorFrame, cutEnd)
-      if (cutStart > cursorFrame) cursorFrame = cutStart
+      val leftKeepEnd = min(frameCount, run.startFrame + paddingFrames)
+      if (leftKeepEnd > previousEnd) keep.add(Range(previousEnd, leftKeepEnd))
+      previousEnd = max(previousEnd, max(run.startFrame, run.endFrame - paddingFrames))
     }
-    if (cursorFrame < frameCount) keep.add(Range(cursorFrame, frameCount))
-
-    return mergeRanges(keep, frameCount)
-  }
-
-  private fun mergeRanges(ranges: List<Range>, frameCount: Int): List<Range> {
-    val sorted = ranges.filter { it.endFrame > it.startFrame }.sortedBy { it.startFrame }
-    if (sorted.isEmpty()) return listOf(Range(0, frameCount))
-    val merged = ArrayList<Range>()
-    var current = sorted.first()
-    for (next in sorted.drop(1)) {
-      if (next.startFrame <= current.endFrame) {
-        current = Range(current.startFrame, max(current.endFrame, next.endFrame))
-      } else {
-        merged.add(current)
-        current = next
-      }
-    }
-    merged.add(current)
-    return merged
+    if (previousEnd < frameCount) keep.add(Range(previousEnd, frameCount))
+    return keep.filter { it.endFrame > it.startFrame }
   }
 
   private fun compact(samples: FloatArray, channels: Int, ranges: List<Range>): FloatArray {
@@ -183,7 +158,6 @@ internal object RemoveSilenceProcessor {
         }
       }
       require(audioTrack >= 0 && inputFormat != null) { "No supported audio track was found." }
-
       val format = inputFormat!!
       val mime = format.getString(MediaFormat.KEY_MIME) ?: error("Audio codec MIME type is missing.")
       val sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
@@ -215,7 +189,6 @@ internal object RemoveSilenceProcessor {
               }
             }
           }
-
           when (val outputIndex = decoder.dequeueOutputBuffer(info, 10_000)) {
             MediaCodec.INFO_TRY_AGAIN_LATER, MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> Unit
             else -> if (outputIndex >= 0) {
@@ -244,7 +217,7 @@ internal object RemoveSilenceProcessor {
     when {
       inputPath.startsWith("content://") || inputPath.startsWith("file://") -> {
         val descriptor = context.contentResolver.openFileDescriptor(Uri.parse(inputPath), "r")
-        requireNotNull(descriptor) { "Unable to open selected audio file." }
+        requireNotNull(descriptor) { "Unable to open audio file." }
         descriptor.use { extractor.setDataSource(it.fileDescriptor) }
       }
       File(inputPath).isFile -> extractor.setDataSource(inputPath)
@@ -298,7 +271,6 @@ internal object RemoveSilenceProcessor {
             }
           }
         }
-
         when (val outputIndex = encoder.dequeueOutputBuffer(info, 10_000)) {
           MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
           MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> if (!started) {
@@ -329,5 +301,5 @@ internal object RemoveSilenceProcessor {
     return file.absolutePath
   }
 
-  private fun Double.powDb(value: Double): Double = kotlin.math.exp(value * ln(10.0) / 20.0)
+  private fun Double.powDb(value: Double): Double = exp(value * kotlin.math.ln(10.0) / 20.0)
 }
