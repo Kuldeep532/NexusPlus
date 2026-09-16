@@ -1,5 +1,6 @@
 export type Point = { x: number; y: number };
 export type ToolKind = 'pen' | 'pencil' | 'marker' | 'highlighter' | 'brush' | 'airbrush' | 'crayon' | 'charcoal' | 'eraser' | 'line' | 'rectangle' | 'ellipse' | 'arrow' | 'fill';
+export type SketchSettings = { color: string; width: number; opacity: number; tool: ToolKind };
 export type Stroke = { id: string; tool: ToolKind; points: Point[]; color: string; width: number; opacity: number; fill?: string };
 export type SketchDocument = { version: 4; width: number; height: number; background: string; strokes: Stroke[] };
 export const COLOR_FAMILIES = [
@@ -22,7 +23,7 @@ export const COLOR_FAMILIES = [
 export const BRUSH_SIZES = [1,2,4,6,10,16,24,32,48,64,96];
 export const OPACITIES = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1];
 export function createSketchDocument(width=1024,height=1024,background='#FFFFFF'):SketchDocument{return{version:4,width,height,background,strokes:[]};}
-export function createStroke(points:Point[],settings:{color:string;width:number;opacity:number;tool:ToolKind}):Stroke{return{id:`stroke-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,points,color:settings.color,width:Math.max(1,settings.width),opacity:Math.min(1,Math.max(.05,settings.opacity)),tool:settings.tool};}
+export function createStroke(points:Point[],settings:SketchSettings):Stroke{return{id:`stroke-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,points,color:settings.color,width:Math.max(1,settings.width),opacity:Math.min(1,Math.max(.05,settings.opacity)),tool:settings.tool};}
 export function addStroke(document:SketchDocument,stroke:Stroke):SketchDocument{return{...document,strokes:[...document.strokes,stroke]};}
 export function undoLastStroke(document:SketchDocument):SketchDocument{return{...document,strokes:document.strokes.slice(0,-1)};}
 export function clearSketch(document:SketchDocument):SketchDocument{return{...document,strokes:[]};}
