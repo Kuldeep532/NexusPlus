@@ -11,10 +11,10 @@ export type AudioDoctorSettings = {
 export type AudioDoctorReport = AudioDoctorNativeResult;
 
 export const DEFAULT_AUDIO_DOCTOR_SETTINGS: AudioDoctorSettings = {
-  noiseReduction: 0.75,
-  voiceClarity: 0.55,
-  humRemoval: 0.6,
-  deClip: 0.4,
+  noiseReduction: 0.9,
+  voiceClarity: 0.65,
+  humRemoval: 0.85,
+  deClip: 0.65,
   autoGain: true,
 };
 
@@ -33,6 +33,5 @@ export async function diagnoseAndRepairAudio(
   outputPath: string,
   settings: AudioDoctorSettings = DEFAULT_AUDIO_DOCTOR_SETTINGS,
 ): Promise<AudioDoctorReport> {
-  const native = assertAudioEditorNative();
-  return native.audioDoctor(inputPath, outputPath, normalizeAudioDoctorSettings(settings));
+  return assertAudioEditorNative().audioDoctor(inputPath, outputPath, normalizeAudioDoctorSettings(settings));
 }
