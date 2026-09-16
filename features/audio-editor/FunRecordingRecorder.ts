@@ -16,3 +16,14 @@ export function formatRecordingDuration(durationMs: number): string {
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
+
+export function describeRecordingState(state: FunRecordingState): string {
+  switch (state) {
+    case 'recording':
+      return 'Recording in progress';
+    case 'recorded':
+      return 'Recording ready';
+    default:
+      return 'Ready to record';
+  }
+}
