@@ -87,6 +87,23 @@ class AudioEditorNativeModule : Module() {
         promise.reject("AUDIO_COMPRESS_FAILED", error.message ?: "Unable to compress audio", error)
       }
     }
+
+    AsyncFunction("pitchShift") { inputPath: String, outputPath: String, pitchSemitones: Double, formantShift: Double, timbre: Double, promise: Promise ->
+      try {
+        val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
+        promise.resolve(VoicePitchProcessor.process(context, inputPath, outputPath, pitchSemitones, formantShift, timbre).let {
+          mapOf(
+            "outputPath" to it.outputPath,
+            "durationMs" to it.durationMs,
+            "sampleRate" to it.sampleRate,
+            "channels" to it.channels,
+            "mimeType" to it.mimeType,
+          )
+        })
+      } catch (error: Exception) {
+        promise.reject("AUDIO_PITCH_SHIFT_FAILED", error.message ?: "Unable to apply voice pitch profile", error)
+      }
+    }
   }
 
   private fun probeAudio(inputPath: String): Map<String, Any?> {
