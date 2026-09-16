@@ -36,10 +36,18 @@ const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
   {
     id: 'fun-recordings',
     title: 'Fun Recordings',
-    description: 'Choose from dynamically generated natural-style voice profiles for recording and future voice-changing stages.',
+    description: 'Record audio, preview it, choose a dynamic voice profile, and apply the voice effect.',
     route: '/audio-editor/fun-recordings',
     icon: 'mic',
     order: 35,
+  },
+  {
+    id: 'voice-changer',
+    title: 'Voice Changer',
+    description: 'Change the voice of an audio file only, using generated profiles or an imported local ONNX model.',
+    route: '/audio-editor/voice-changer',
+    icon: 'mic',
+    order: 37,
   },
   {
     id: 'audio-to-video',
