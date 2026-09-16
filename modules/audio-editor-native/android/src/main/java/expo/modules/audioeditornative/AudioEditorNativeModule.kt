@@ -56,6 +56,40 @@ class AudioEditorNativeModule : Module() {
         promise.resolve(RemoveSilenceProcessor.process(context, inputPath, outputPath, thresholdDb, minSilenceMs, paddingMs).let { mapOf("outputPath" to it.outputPath, "durationMs" to it.durationMs, "sampleRate" to it.sampleRate, "channels" to it.channels, "mimeType" to it.mimeType, "removedSilenceMs" to it.removedSilenceMs) })
       } catch (error: Exception) { promise.reject("AUDIO_REMOVE_SILENCE_FAILED", error.message ?: "Unable to remove silence", error) }
     }
+    AsyncFunction("audioDoctor") { inputPath: String, outputPath: String, settings: Map<String, Any?>, promise: Promise ->
+      try {
+        val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
+        val noiseReduction = (settings["noiseReduction"] as? Number)?.toDouble() ?: 0.75
+        val voiceClarity = (settings["voiceClarity"] as? Number)?.toDouble() ?: 0.55
+        val humRemoval = (settings["humRemoval"] as? Number)?.toDouble() ?: 0.6
+        val deClip = (settings["deClip"] as? Number)?.toDouble() ?: 0.4
+        val autoGain = settings["autoGain"] as? Boolean ?: true
+        promise.resolve(AudioDoctorProcessor.process(context, inputPath, outputPath, noiseReduction, voiceClarity, humRemoval, deClip, autoGain).let {
+          mapOf(
+            "outputPath" to it.outputPath,
+            "durationMs" to it.durationMs,
+            "sampleRate" to it.sampleRate,
+            "channels" to it.channels,
+            "mimeType" to it.mimeType,
+            "originalPeak" to it.originalPeak,
+            "repairedPeak" to it.repairedPeak,
+            "noiseFloorDb" to it.noiseFloorDb,
+            "estimatedSnrDb" to it.estimatedSnrDb,
+            "clippingRatio" to it.clippingRatio,
+            "hasClipping" to it.hasClipping,
+            "hasHum" to it.hasHum,
+            "hasSevereNoise" to it.hasSevereNoise,
+            "hasLikelyCodecDamage" to it.hasLikelyCodecDamage,
+            "repairable" to it.repairable,
+            "repairedNoise" to it.repairedNoise,
+            "repairedClipping" to it.repairedClipping,
+            "repairedHum" to it.repairedHum,
+            "diagnosis" to it.diagnosis,
+            "attribution" to it.attribution,
+          )
+        })
+      } catch (error: Exception) { promise.reject("AUDIO_DOCTOR_FAILED", error.message ?: "Unable to diagnose and repair audio", error) }
+    }
   }
 
   private fun probeAudio(inputPath: String): Map<String, Any?> {
