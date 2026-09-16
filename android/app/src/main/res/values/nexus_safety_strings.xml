@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nexus_safety_accessibility_description">Nexus Plus safety protection status service. It does not read, store, upload, or alter screen content.</string>
+</resources>
