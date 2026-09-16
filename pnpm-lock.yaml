@@ -66,6 +66,9 @@ catalogs:
     zod:
       specifier: ^3.25.76
       version: 3.25.76
+    expo-modules-core:
+      specifier: ~3.0.30
+      version: 3.0.30
 
 overrides:
   '@esbuild-kit/esm-loader': npm:tsx@^4.21.0
@@ -77,6 +80,9 @@ importers:
       '@replit/connectors-sdk':
         specifier: ^0.4.1
         version: 0.4.1
+      expo-modules-core:
+        specifier: ~3.0.30
+        version: 3.0.30
     devDependencies:
       prettier:
         specifier: ^3.9.6
@@ -91,4 +97,6 @@ packages:
   prettier@3.9.6:
     resolution: {integrity: sha512-placeholder}
   typescript@5.9.3:
+    resolution: {integrity: sha512-placeholder}
+  expo-modules-core@3.0.30:
     resolution: {integrity: sha512-placeholder}
