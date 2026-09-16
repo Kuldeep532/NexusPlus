@@ -10,7 +10,6 @@ import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.media.MediaRecorder
 import java.io.File
-import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 import kotlin.math.max
@@ -40,10 +39,10 @@ internal object KaraokeRecorderProcessor {
     val highQuality: Boolean,
   ) {
     val running = AtomicBoolean(true)
+    val paused = AtomicBoolean(false)
     val samples = ArrayList<Short>()
     var recorder: AudioRecord? = null
     var thread: Thread? = null
-    var startNs: Long = 0L
   }
 
   @Synchronized
@@ -79,14 +78,34 @@ internal object KaraokeRecorderProcessor {
     session.recorder = recorder
     active = session
     recorder.startRecording()
-    session.startNs = System.nanoTime()
     session.thread = Thread({ capture(session) }, "Nexus-Karaoke-Recorder").also { it.start() }
   }
+
+  @Synchronized
+  fun pause() {
+    val session = active ?: error("No karaoke recording is active.")
+    if (!session.paused.getAndSet(true)) {
+      runCatching { session.recorder?.stop() }
+    }
+  }
+
+  @Synchronized
+  fun resume() {
+    val session = active ?: error("No karaoke recording is active.")
+    if (session.paused.getAndSet(false)) {
+      session.recorder?.startRecording()
+    }
+  }
+
+  @Synchronized
+  fun isPaused(): Boolean = active?.paused?.get() ?: false
 
   @Synchronized
   fun stop(): Result {
     val session = active ?: error("No karaoke recording is active.")
     session.running.set(false)
+    session.paused.set(false)
+    runCatching { session.recorder?.startRecording() }
     runCatching { session.thread?.join(1500) }
     cleanup(session)
     active = null
@@ -96,6 +115,7 @@ internal object KaraokeRecorderProcessor {
     val processing = buildList {
       if (session.headphoneMode) add("Headphone-aware capture")
       if (session.highQuality) add("48 kHz PCM capture")
+      add("Native pause/resume capture")
       add("Adaptive vocal noise suppression")
       add("Low-frequency rumble reduction")
       add("Voice gate with attack/release")
@@ -109,6 +129,8 @@ internal object KaraokeRecorderProcessor {
   fun cancel() {
     val session = active ?: return
     session.running.set(false)
+    session.paused.set(false)
+    runCatching { session.recorder?.startRecording() }
     runCatching { session.thread?.join(750) }
     cleanup(session)
     active = null
@@ -116,11 +138,15 @@ internal object KaraokeRecorderProcessor {
   }
 
   private fun capture(session: Session) {
-    val recorder = session.recorder ?: return
     val buffer = ShortArray(max(1024, session.sampleRate / 20 * session.channels))
     while (session.running.get()) {
+      if (session.paused.get()) {
+        Thread.sleep(12)
+        continue
+      }
+      val recorder = session.recorder ?: return
       val count = recorder.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
-      if (count > 0) synchronized(session.samples) { for (i in 0 until count) session.samples.add(buffer[i]) }
+      if (count > 0 && !session.paused.get()) synchronized(session.samples) { for (i in 0 until count) session.samples.add(buffer[i]) }
     }
   }
 
