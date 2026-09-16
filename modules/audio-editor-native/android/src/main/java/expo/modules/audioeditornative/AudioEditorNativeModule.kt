@@ -79,6 +79,14 @@ class AudioEditorNativeModule : Module() {
         promise.reject("AUDIO_MIX_PROJECT_FAILED", error.message ?: "Unable to mix audio project", error)
       }
     }
+
+    AsyncFunction("compress") { inputPath: String, outputPath: String, bitrate: Int, sampleRate: Int, promise: Promise ->
+      try {
+        promise.resolve(AudioCompressorProcessor.compress(appContext.reactContext, inputPath, outputPath, bitrate, sampleRate))
+      } catch (error: Exception) {
+        promise.reject("AUDIO_COMPRESS_FAILED", error.message ?: "Unable to compress audio", error)
+      }
+    }
   }
 
   private fun probeAudio(inputPath: String): Map<String, Any?> {
