@@ -26,13 +26,3 @@ export async function createAudioEditorOutputPath(
   const safeExtension = sanitizeName(extension).toLowerCase().replace(/^\./, '') || 'm4a';
   return `${folder}${baseName}-${safeSuffix}-${Date.now()}.${safeExtension}`;
 }
-
-export async function saveAudioEditorOutputToNexusPlus(outputPath: string, sourceName: string, category: string): Promise<string> {
-  const folder = await ensureAudioEditorExportFolder(category);
-  const safeName = sanitizeName(sourceName).replace(/\.[^.]+$/, '') || 'audio';
-  const destination = `${folder}${safeName}-saved-${Date.now()}.m4a`;
-  if (outputPath !== destination) {
-    await FileSystem.copyAsync({ from: outputPath, to: destination });
-  }
-  return destination;
-}
