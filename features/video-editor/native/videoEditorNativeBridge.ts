@@ -1,8 +1,11 @@
+import { NativeModules } from 'react-native';
+
 export type NativeVideoOperation =
   | { type: 'probe'; inputUri: string }
   | { type: 'trim'; inputUri: string; startMs: number; endMs: number; outputUri: string }
   | { type: 'split'; inputUri: string; atMs: number; firstOutputUri: string; secondOutputUri: string }
   | { type: 'merge'; inputUris: string[]; outputUri: string }
+  | { type: 'remove-segment'; inputUri: string; startMs: number; endMs: number; outputUri: string }
   | { type: 'remove-silence'; inputUri: string; thresholdDb: number; minSilenceMs: number; outputUri: string }
   | { type: 'speed'; inputUri: string; factor: number; outputUri: string }
   | { type: 'crop'; inputUri: string; aspectRatio: string; outputUri: string }
@@ -21,16 +24,26 @@ export type NativeVideoResult = {
   outputUri?: string;
   durationMs?: number;
   detectedSilentRanges?: Array<{ startMs: number; endMs: number }>;
+  outputPath?: string;
+  removedStartMs?: number;
+  removedEndMs?: number;
+  sourceDurationMs?: number | null;
+  outputDurationMs?: number | null;
+  samples?: number;
+  hadPostCutSamples?: boolean;
 };
 
-/**
- * Native boundary for video rendering. The feature layer owns metadata only; render work stays native.
- * The current checked-in native bridge does not yet expose a real Android/JNI implementation, so callers
- * receive an explicit capability error instead of a fabricated output file.
- */
+type NativeVideoEditorModule = {
+  isAvailable: () => Promise<boolean>;
+  execute: (operation: NativeVideoOperation) => Promise<NativeVideoResult>;
+};
+
+const NativeVideoEditor = NativeModules.NexusVideoEditor as NativeVideoEditorModule | undefined;
+
+/** Native Android rendering boundary. Never fabricates an output when native processing is unavailable. */
 export async function runNativeVideoOperation(operation: NativeVideoOperation): Promise<NativeVideoResult> {
-  if (operation.type === 'audio-to-video') {
-    throw new Error('Audio to Video native renderer is not installed in this build yet.');
-  }
-  throw new Error(`Native video operation "${operation.type}" is not installed in this build yet.`);
+  if (!NativeVideoEditor) throw new Error('Native video editor module is unavailable in this build.');
+  const available = await NativeVideoEditor.isAvailable();
+  if (!available) throw new Error('Native video editor is unavailable on this Android build.');
+  return NativeVideoEditor.execute(operation);
 }
