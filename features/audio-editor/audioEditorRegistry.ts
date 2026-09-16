@@ -16,6 +16,7 @@ const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
   { id: 'voice-changer', title: 'Voice Changer', description: 'Change the voice of an audio file only, using generated profiles or an imported local ONNX model.', route: '/audio-editor/voice-changer', icon: 'mic', order: 37 },
   { id: 'text-to-speech', title: 'Text to Speech', description: 'Select any device-provided language and voice, enter text, and synthesize speech with playback and regeneration controls.', route: '/audio-editor/text-to-speech', icon: 'volume-2', order: 39 },
   { id: 'speed-pitch', title: 'Speed & Pitch', description: 'Change playback speed and pitch independently and export a real processed audio file.', route: '/audio-editor/speed-pitch', icon: 'sliders', order: 39.5 },
+  { id: 'audio-effects', title: 'Audio Effects', description: 'Apply synthetic DSP effects such as bass boost, treble, vibrato, echo, telephone, robot, reverb and megaphone.', route: '/audio-editor/audio-effects', icon: 'sliders', order: 39.7 },
   { id: 'audio-to-video', title: 'Audio to Video', description: 'Create an image-based video timeline whose image durations are constrained by the selected audio.', route: '/audio-editor/audio-to-video', icon: 'film', order: 40 },
 ];
 
