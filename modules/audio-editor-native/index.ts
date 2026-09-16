@@ -12,6 +12,7 @@ export type VoicePitchNativeResult = { outputPath: string; durationMs: number; s
 export type PiperTtsSynthesisResult = { outputPath: string };
 export type SpeedPitchNativeResult = { outputPath: string; durationMs: number; sampleRate: number; channels: number; mimeType: string | null };
 export type AudioEffectNativeResult = { outputPath: string; durationMs: number; sampleRate: number; channels: number; mimeType: string | null };
+export type RemoveSilenceNativeResult = { outputPath: string; durationMs: number; sampleRate: number; channels: number; mimeType: string | null; removedSilenceMs: number };
 
 type AudioEditorNativeModuleType = {
   probe(inputPath: string): Promise<AudioProbeResult>;
@@ -24,6 +25,7 @@ type AudioEditorNativeModuleType = {
   synthesizeTts(text: string, modelPath: string, configPath: string, outputPath: string, lengthScale: number, pitchScale: number, emotion: string, clone: boolean): Promise<PiperTtsSynthesisResult>;
   speedAndPitch(inputPath: string, outputPath: string, speed: number, pitchSemitones: number): Promise<SpeedPitchNativeResult>;
   audioEffect(inputPath: string, outputPath: string, effect: string, amount: number): Promise<AudioEffectNativeResult>;
+  removeSilence(inputPath: string, outputPath: string, settings: { thresholdDb: number; minSilenceMs: number; paddingMs: number }): Promise<RemoveSilenceNativeResult>;
 };
 
 export const AudioEditorNative = requireOptionalNativeModule<AudioEditorNativeModuleType>('AudioEditorNative');
