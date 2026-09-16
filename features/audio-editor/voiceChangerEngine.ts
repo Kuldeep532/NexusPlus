@@ -24,7 +24,7 @@ export async function changeAudioVoice(input: VoiceChangerInput): Promise<VoiceC
   if (!input.outputPath) throw new Error('Output audio path is required.');
 
   if (input.voiceModel) {
-    throw new Error('This ONNX voice model is stored locally, but its inference contract is not recognized. Select a built-in voice profile or add a compatible ONNX adapter.');
+    throw new Error('The selected Voice Studio ONNX model is available locally, but its TTS/voice-conversion tensor contract is not declared yet. Use a built-in voice profile for offline voice changing.');
   }
 
   if (!input.profile) throw new Error('Choose a voice profile.');
