@@ -65,30 +65,26 @@ class AudioEditorNativeModule : Module() {
         val deClip = (settings["deClip"] as? Number)?.toDouble() ?: 0.4
         val autoGain = settings["autoGain"] as? Boolean ?: true
         promise.resolve(AudioDoctorProcessor.process(context, inputPath, outputPath, noiseReduction, voiceClarity, humRemoval, deClip, autoGain).let {
-          mapOf(
-            "outputPath" to it.outputPath,
-            "durationMs" to it.durationMs,
-            "sampleRate" to it.sampleRate,
-            "channels" to it.channels,
-            "mimeType" to it.mimeType,
-            "originalPeak" to it.originalPeak,
-            "repairedPeak" to it.repairedPeak,
-            "noiseFloorDb" to it.noiseFloorDb,
-            "estimatedSnrDb" to it.estimatedSnrDb,
-            "clippingRatio" to it.clippingRatio,
-            "hasClipping" to it.hasClipping,
-            "hasHum" to it.hasHum,
-            "hasSevereNoise" to it.hasSevereNoise,
-            "hasLikelyCodecDamage" to it.hasLikelyCodecDamage,
-            "repairable" to it.repairable,
-            "repairedNoise" to it.repairedNoise,
-            "repairedClipping" to it.repairedClipping,
-            "repairedHum" to it.repairedHum,
-            "diagnosis" to it.diagnosis,
-            "attribution" to it.attribution,
-          )
+          mapOf("outputPath" to it.outputPath, "durationMs" to it.durationMs, "sampleRate" to it.sampleRate, "channels" to it.channels, "mimeType" to it.mimeType, "originalPeak" to it.originalPeak, "repairedPeak" to it.repairedPeak, "noiseFloorDb" to it.noiseFloorDb, "estimatedSnrDb" to it.estimatedSnrDb, "clippingRatio" to it.clippingRatio, "hasClipping" to it.hasClipping, "hasHum" to it.hasHum, "hasSevereNoise" to it.hasSevereNoise, "hasLikelyCodecDamage" to it.hasLikelyCodecDamage, "repairable" to it.repairable, "repairedNoise" to it.repairedNoise, "repairedClipping" to it.repairedClipping, "repairedHum" to it.repairedHum, "diagnosis" to it.diagnosis, "attribution" to it.attribution)
         })
       } catch (error: Exception) { promise.reject("AUDIO_DOCTOR_FAILED", error.message ?: "Unable to diagnose and repair audio", error) }
+    }
+    AsyncFunction("startKaraokeRecording") { karaokeUri: String, outputPath: String, highQuality: Boolean, headphoneMode: Boolean, sampleRate: Int, channels: Int, promise: Promise ->
+      try {
+        val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
+        KaraokeRecorderProcessor.start(context, karaokeUri, outputPath, highQuality, headphoneMode, sampleRate, channels)
+        promise.resolve(null)
+      } catch (error: Exception) { promise.reject("KARAOKE_START_FAILED", error.message ?: "Unable to start karaoke recording", error) }
+    }
+    AsyncFunction("stopKaraokeRecording") { promise: Promise ->
+      try {
+        val result = KaraokeRecorderProcessor.stop()
+        promise.resolve(mapOf("outputPath" to result.outputPath, "durationMs" to result.durationMs, "sampleRate" to result.sampleRate, "channels" to result.channels, "mimeType" to result.mimeType, "recordingStartedWithTrack" to result.recordingStartedWithTrack, "headphoneModeApplied" to result.headphoneModeApplied, "processing" to result.processing))
+      } catch (error: Exception) { promise.reject("KARAOKE_STOP_FAILED", error.message ?: "Unable to finish karaoke recording", error) }
+    }
+    AsyncFunction("cancelKaraokeRecording") { promise: Promise ->
+      try { KaraokeRecorderProcessor.cancel(); promise.resolve(null) }
+      catch (error: Exception) { promise.reject("KARAOKE_CANCEL_FAILED", error.message ?: "Unable to cancel karaoke recording", error) }
     }
   }
 
