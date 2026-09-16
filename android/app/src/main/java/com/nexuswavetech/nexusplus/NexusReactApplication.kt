@@ -21,10 +21,15 @@ class NexusReactApplication : Application(), ReactApplication {
             add(NexusNativeSecurityPackage())
             add(NexusIntegrityPackage())
             add(NexusAlarmPackage())
+            add(NexusVaultPackage())
             add(NexusDocumentReaderPackage())
+            add(NexusMediaPackage())
+            add(NexusFileUriPackage())
             add(NexusCctvDiscoveryPackage())
             add(NexusCctvOnvifPackage())
             add(NexusPdfNativePackage())
+            add(NexusVideoEditorPackage())
+            add(NexusVocalRemoverPackage())
         }
         override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"
         override fun getUseDeveloperSupport(): Boolean = BuildConfig.DEBUG
