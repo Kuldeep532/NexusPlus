@@ -4,9 +4,12 @@ import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
+import { AudioEditorResultPanel } from '@/features/audio-editor/AudioEditorResultPanel';
+import { createFunRecordingVoiceSelection } from '@/features/audio-editor/FunRecordingsVoiceProfile';
 import { VoicePitchSoundSelector } from '@/features/audio-editor/VoicePitchSoundSelector';
 import type { VoicePitchProfile } from '@/features/audio-editor/voicePitchingEngine';
-import { createFunRecordingVoiceSelection } from '@/features/audio-editor/FunRecordingsVoiceProfile';
+import { processVoicePitch } from '@/features/audio-editor/voicePitchingProcessor';
+import { createAudioEditorOutputPath } from '@/features/audio-editor/audioEditorExport';
 import { formatRecordingDuration, isUsableRecordingUri } from '@/features/audio-editor/FunRecordingRecorder';
 
 export default function FunRecordingsScreen() {
@@ -17,6 +20,8 @@ export default function FunRecordingsScreen() {
   const [permissionStatus, setPermissionStatus] = useState<'unknown' | 'granted' | 'denied'>('unknown');
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
   const [recordedDurationMs, setRecordedDurationMs] = useState(0);
+  const [processing, setProcessing] = useState(false);
+  const [result, setResult] = useState<{ outputUri: string; outputPath: string; profileName: string } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -28,8 +33,21 @@ export default function FunRecordingsScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+    };
+  }, []);
+
   const isRecording = recorderState.isRecording;
   const durationMs = isRecording ? recorderState.durationMillis : recordedDurationMs;
+
+  const reset = () => {
+    setResult(null);
+    setRecordingUri(null);
+    setRecordedDurationMs(0);
+    setProcessing(false);
+  };
 
   const startRecording = async () => {
     if (permissionStatus !== 'granted') {
@@ -45,6 +63,7 @@ export default function FunRecordingsScreen() {
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       setRecordingUri(null);
       setRecordedDurationMs(0);
+      setResult(null);
       await recorder.prepareToRecordAsync();
       recorder.record();
     } catch {
@@ -72,7 +91,44 @@ export default function FunRecordingsScreen() {
     setRecordedDurationMs(0);
   };
 
+  const applyVoicePitch = async () => {
+    if (!recordingUri || !selected) {
+      Alert.alert('Choose a voice profile', 'Record audio and select a voice profile before applying the effect.');
+      return;
+    }
+
+    setProcessing(true);
+    try {
+      const selection = createFunRecordingVoiceSelection(selected.id);
+      const outputPath = await createAudioEditorOutputPath('Fun Recordings', selected.name, 'voice-pitch', 'm4a');
+      const processed = await processVoicePitch({
+        inputPath: recordingUri,
+        outputPath,
+        profile: selection.profile,
+      });
+      setResult({ outputUri: processed.outputPath, outputPath, profileName: selection.profile.name });
+    } catch (error) {
+      Alert.alert('Voice pitch failed', error instanceof Error ? error.message : 'Nexus Plus could not process this recording.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const selection = selected ? createFunRecordingVoiceSelection(selected.id) : null;
+
+  if (result) {
+    return (
+      <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={styles.content} accessibilityLabel="Fun Recordings result">
+        <Stack.Screen options={{ title: 'Fun Recordings' }} />
+        <AudioEditorResultPanel
+          message={`Voice pitch applied successfully with ${result.profileName}.`}
+          outputPath={result.outputPath}
+          resultUri={result.outputUri}
+          onClose={reset}
+        />
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={styles.content} accessibilityLabel="Fun Recordings">
@@ -83,7 +139,7 @@ export default function FunRecordingsScreen() {
         </View>
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Fun Recordings</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Record a clip and choose one of the dynamically generated voice profiles for the next pitch-processing stage.</Text>
+          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Record a clip, choose a dynamic voice profile, and apply it to the recording.</Text>
         </View>
       </View>
 
@@ -99,15 +155,16 @@ export default function FunRecordingsScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={isRecording ? 'Stop recording' : recordingUri ? 'Record again' : 'Start recording'}
+          disabled={processing}
           onPress={isRecording ? stopRecording : startRecording}
-          style={[styles.recordButton, { backgroundColor: isRecording ? colors.destructive : colors.primary }]}
+          style={[styles.recordButton, { backgroundColor: isRecording ? colors.destructive : colors.primary, opacity: processing ? 0.55 : 1 }]}
         >
           <Feather name={isRecording ? 'square' : 'mic'} size={22} color={colors.primaryForeground} />
           <Text style={[styles.recordButtonText, { color: colors.primaryForeground }]}>{isRecording ? 'Stop' : recordingUri ? 'Record Again' : 'Record'}</Text>
         </Pressable>
 
         {recordingUri ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="Discard recorded clip" onPress={resetRecording} style={[styles.secondaryButton, { borderColor: colors.border }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Discard recorded clip" disabled={processing} onPress={resetRecording} style={[styles.secondaryButton, { borderColor: colors.border, opacity: processing ? 0.55 : 1 }]}>
             <Text style={[styles.secondaryButtonText, { color: colors.foreground }]}>Discard recording</Text>
           </Pressable>
         ) : null}
@@ -128,8 +185,19 @@ export default function FunRecordingsScreen() {
         </View>
       ) : null}
 
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Apply voice pitch to recording"
+        disabled={!recordingUri || !selected || processing}
+        onPress={applyVoicePitch}
+        style={[styles.processButton, { backgroundColor: colors.primary, opacity: !recordingUri || !selected || processing ? 0.45 : 1 }]}
+      >
+        <Feather name="sliders" size={19} color={colors.primaryForeground} />
+        <Text style={[styles.processButtonText, { color: colors.primaryForeground }]}>{processing ? 'Applying voice pitch…' : 'Apply Voice Pitch'}</Text>
+      </Pressable>
+
       {recordingUri ? (
-        <Text style={[styles.readyNote, { color: colors.mutedForeground }]}>Recording is ready for Stage 3 voice-pitch processing. The selected profile is retained for the next processing step.</Text>
+        <Text style={[styles.readyNote, { color: colors.mutedForeground }]}>The recording is ready for voice-pitch processing.</Text>
       ) : null}
     </ScrollView>
   );
@@ -157,5 +225,7 @@ const styles = StyleSheet.create({
   selected: { borderWidth: 1, borderRadius: 14, padding: 12 },
   selectedTitle: { fontSize: 13, fontFamily: 'Inter_700Bold' },
   selectedMeta: { fontSize: 10.5, marginTop: 4 },
+  processButton: { minHeight: 52, borderRadius: 15, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9, paddingHorizontal: 14 },
+  processButtonText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
   readyNote: { fontSize: 11, lineHeight: 16, textAlign: 'center' },
 });
