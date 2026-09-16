@@ -35,6 +35,16 @@ export type AudioDoctorNativeResult = {
   diagnosis: string[];
   attribution: 'not-determinable-from-audio-alone';
 };
+export type KaraokeRecordingResult = {
+  outputPath: string;
+  durationMs: number;
+  sampleRate: number;
+  channels: number;
+  mimeType: string;
+  recordingStartedWithTrack: boolean;
+  headphoneModeApplied: boolean;
+  processing: string[];
+};
 
 type AudioEditorNativeModuleType = {
   probe(inputPath: string): Promise<AudioProbeResult>;
@@ -49,6 +59,9 @@ type AudioEditorNativeModuleType = {
   audioEffect(inputPath: string, outputPath: string, effect: string, amount: number): Promise<AudioEffectNativeResult>;
   removeSilence(inputPath: string, outputPath: string, settings: { thresholdDb: number; minSilenceMs: number; paddingMs: number }): Promise<RemoveSilenceNativeResult>;
   audioDoctor(inputPath: string, outputPath: string, settings: { noiseReduction: number; voiceClarity: number; humRemoval: number; deClip: number; autoGain: boolean }): Promise<AudioDoctorNativeResult>;
+  startKaraokeRecording(karaokeUri: string, outputPath: string, highQuality: boolean, headphoneMode: boolean, sampleRate: number, channels: number): Promise<void>;
+  stopKaraokeRecording(): Promise<KaraokeRecordingResult>;
+  cancelKaraokeRecording(): Promise<void>;
 };
 
 export const AudioEditorNative = requireOptionalNativeModule<AudioEditorNativeModuleType>('AudioEditorNative');
