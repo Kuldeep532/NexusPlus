@@ -43,10 +43,6 @@ async function fetchJson<T>(url: string): Promise<T> {
   }
 }
 
-/**
- * No API Gateway is used here. Currency data comes directly from a public HTTPS
- * exchange-rate feed. Calculations remain fully local and deterministic.
- */
 export async function fetchCurrencyQuote(base = 'USD', quote = 'INR'): Promise<CurrencyQuote> {
   const normalizedBase = base.trim().toUpperCase();
   const normalizedQuote = quote.trim().toUpperCase();
@@ -64,15 +60,10 @@ export async function fetchCurrencyQuote(base = 'USD', quote = 'INR'): Promise<C
   };
 }
 
-/**
- * Market quotes deliberately use a direct HTTPS adapter with no secrets in the APK.
- * A symbol only succeeds when the configured public provider returns valid data.
- * If it is unavailable, the UI keeps the last cached quote instead of inventing one.
- */
 export async function fetchMarketQuote(symbol: string): Promise<MarketQuote> {
   const normalized = symbol.trim().toUpperCase();
   if (!normalized) throw new Error('Enter a market symbol.');
-  const data = await fetchJson<{ price?: number; changePercent?: number; timestamp?: string }>(
+  const data = await fetchJson<unknown>(
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(normalized)}?range=1d&interval=1m`,
   );
   const result = (data as { chart?: { result?: Array<{ meta?: { regularMarketPrice?: number; regularMarketChangePercent?: number; regularMarketTime?: number } }> } }).chart?.result?.[0];
@@ -81,8 +72,8 @@ export async function fetchMarketQuote(symbol: string): Promise<MarketQuote> {
   if (!Number.isFinite(price) || !Number.isFinite(changePercent)) throw new Error(`Market quote unavailable for ${normalized}.`);
   return {
     symbol: normalized,
-    price,
-    changePercent,
+    price: price as number,
+    changePercent: changePercent as number,
     asOf: result?.meta?.regularMarketTime ? new Date(result.meta.regularMarketTime * 1000).toISOString() : new Date().toISOString(),
     source: 'live',
   };
@@ -91,8 +82,8 @@ export async function fetchMarketQuote(symbol: string): Promise<MarketQuote> {
 export async function refreshLiveData(base = 'USD', quote = 'INR', symbol = ''): Promise<LiveDataState> {
   const previous = await loadCachedLiveData();
   const errors: string[] = [];
-  let currency = previous.currency;
-  let market = previous.market;
+  let currency: CurrencyQuote | null = previous.currency ?? null;
+  let market: MarketQuote | null = previous.market ?? null;
   try {
     currency = await fetchCurrencyQuote(base, quote);
   } catch (error) {
@@ -107,7 +98,7 @@ export async function refreshLiveData(base = 'USD', quote = 'INR', symbol = ''):
   }
   const fetchedAt = new Date().toISOString();
   if (currency?.source === 'live' || market?.source === 'live') {
-    await saveLiveData({ currency, market, savedAt: fetchedAt });
+    await saveLiveData({ currency: currency ?? undefined, market: market ?? undefined, savedAt: fetchedAt });
   }
   return { currency, market, fetchedAt, error: errors.length ? errors.join(' ') : null };
 }
