@@ -20,6 +20,7 @@ class NexusReactApplication : Application(), ReactApplication {
             add(NexusAssistantVoicePackage())
             add(NexusNativeSecurityPackage())
             add(NexusIntegrityPackage())
+            add(NexusAlarmPackage())
             add(NexusCctvDiscoveryPackage())
             add(NexusCctvOnvifPackage())
             add(NexusPdfNativePackage())
