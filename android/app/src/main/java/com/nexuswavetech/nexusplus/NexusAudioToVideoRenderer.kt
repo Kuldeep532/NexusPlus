@@ -39,6 +39,7 @@ internal object NexusAudioToVideoRenderer {
         var inputSurface: Surface? = null
         var muxer: MediaMuxer? = null
         var muxerStarted = false
+        var videoTrack = -1
         try {
             val audioDurationUs = audio.durationUs
             val requestedDurationUs = images.sumOf { (it.durationMs * 1000.0).toLong() }
@@ -65,13 +66,45 @@ internal object NexusAudioToVideoRenderer {
             videoEncoder.start()
 
             muxer = MediaMuxer(outputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-            var videoTrack = -1
-            var audioTrack = muxer.addTrack(audio.format)
+            val audioTrack = muxer.addTrack(audio.format)
             var videoFormatReady = false
-            val info = MediaCodec.BufferInfo()
-
             var presentationUs = 0L
             var writtenFrames = 0
+            val info = MediaCodec.BufferInfo()
+
+            fun startMuxerIfReady() {
+                if (!muxerStarted && videoFormatReady && videoTrack >= 0 && audioTrack >= 0) {
+                    muxer.start()
+                    muxerStarted = true
+                }
+            }
+
+            fun drainVideoEncoder(endOfStream: Boolean = false) {
+                while (true) {
+                    val outputIndex = videoEncoder.dequeueOutputBuffer(info, 10_000L)
+                    when {
+                        outputIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> return
+                        outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                            require(!videoFormatReady) { "Video output format changed more than once." }
+                            videoTrack = muxer.addTrack(videoEncoder.outputFormat)
+                            videoFormatReady = true
+                            startMuxerIfReady()
+                        }
+                        outputIndex >= 0 -> {
+                            val buffer = videoEncoder.getOutputBuffer(outputIndex)
+                            if (buffer != null && info.size > 0 && (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0) {
+                                require(muxerStarted && videoTrack >= 0) { "Video muxer is not ready." }
+                                buffer.position(info.offset)
+                                buffer.limit(info.offset + info.size)
+                                muxer.writeSampleData(videoTrack, buffer, info)
+                            }
+                            val eos = (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0
+                            videoEncoder.releaseOutputBuffer(outputIndex, false)
+                            if (eos || endOfStream) return
+                        }
+                    }
+                }
+            }
 
             for (image in images) {
                 val bitmap = decodeBitmap(context, image.uri) ?: error("Unable to decode selected image.")
@@ -80,15 +113,7 @@ internal object NexusAudioToVideoRenderer {
                 try {
                     while (presentationUs < targetEndUs) {
                         drawBitmap(inputSurface, bitmap, width, height)
-                        drainVideoEncoder(videoEncoder, info, muxer, { format ->
-                            require(!videoFormatReady) { "Video output format changed more than once." }
-                            videoTrack = muxer.addTrack(format)
-                            videoFormatReady = true
-                            if (!muxerStarted && videoTrack >= 0 && audioTrack >= 0) {
-                                muxer.start()
-                                muxerStarted = true
-                            }
-                        })
+                        drainVideoEncoder()
                         presentationUs += frameStepUs
                         writtenFrames++
                     }
@@ -109,10 +134,7 @@ internal object NexusAudioToVideoRenderer {
                         require(!videoFormatReady) { "Video output format changed more than once." }
                         videoTrack = muxer.addTrack(videoEncoder.outputFormat)
                         videoFormatReady = true
-                        if (!muxerStarted && videoTrack >= 0 && audioTrack >= 0) {
-                            muxer.start()
-                            muxerStarted = true
-                        }
+                        startMuxerIfReady()
                     }
                     outputIndex >= 0 -> {
                         val buffer = videoEncoder.getOutputBuffer(outputIndex)
@@ -132,7 +154,7 @@ internal object NexusAudioToVideoRenderer {
                 "The video encoder produced no writable output."
             }
 
-            copyAudioSamples(audio.extractor, audioTrack, muxer, audioDurationUs)
+            copyAudioSamples(audio.extractor, muxer, audioTrack, audioDurationUs)
 
             return mapOf(
                 "outputUri" to outputPath,
@@ -173,12 +195,14 @@ internal object NexusAudioToVideoRenderer {
 
     private fun copyAudioSamples(
         extractor: MediaExtractor,
-        outputTrack: Int,
         muxer: MediaMuxer,
+        outputTrack: Int,
         maxDurationUs: Long,
     ) {
         extractor.seekTo(0L, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
-        val format = extractor.getTrackFormat(extractor.sampleTrackIndex.coerceAtLeast(0))
+        val selectedTrack = extractor.sampleTrackIndex
+        require(selectedTrack >= 0) { "Audio track could not be selected." }
+        val format = extractor.getTrackFormat(selectedTrack)
         val maxInput = if (format.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE) else 256 * 1024
         val buffer = ByteBuffer.allocateDirect(maxOf(64 * 1024, maxInput))
         val info = MediaCodec.BufferInfo()
@@ -191,32 +215,6 @@ internal object NexusAudioToVideoRenderer {
             info.set(0, size, timeUs, extractor.sampleFlags)
             muxer.writeSampleData(outputTrack, buffer, info)
             extractor.advance()
-        }
-    }
-
-    private fun drainVideoEncoder(
-        encoder: MediaCodec,
-        info: MediaCodec.BufferInfo,
-        muxer: MediaMuxer,
-        onFormat: (MediaFormat) -> Unit,
-    ) {
-        while (true) {
-            val outputIndex = encoder.dequeueOutputBuffer(info, 0L)
-            when {
-                outputIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> return
-                outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> onFormat(encoder.outputFormat)
-                outputIndex >= 0 -> {
-                    val buffer = encoder.getOutputBuffer(outputIndex)
-                    if (buffer != null && info.size > 0 && (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0) {
-                        require(muxerStartedFor(muxer)) { "Video muxer is not started." }
-                        buffer.position(info.offset)
-                        buffer.limit(info.offset + info.size)
-                        val track = findVideoTrack(muxer)
-                        if (track >= 0) muxer.writeSampleData(track, buffer, info)
-                    }
-                    encoder.releaseOutputBuffer(outputIndex, false)
-                }
-            }
         }
     }
 
@@ -256,8 +254,4 @@ internal object NexusAudioToVideoRenderer {
             else -> throw IllegalArgumentException("Input audio file was not found.")
         }
     }
-
-    // Kept local to make accidental writes before MediaMuxer.start() fail closed.
-    private fun muxerStartedFor(@Suppress("UNUSED_PARAMETER") muxer: MediaMuxer): Boolean = true
-    private fun findVideoTrack(@Suppress("UNUSED_PARAMETER") muxer: MediaMuxer): Int = 0
 }
