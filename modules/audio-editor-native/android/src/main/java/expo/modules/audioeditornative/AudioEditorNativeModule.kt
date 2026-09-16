@@ -76,6 +76,14 @@ class AudioEditorNativeModule : Module() {
         promise.resolve(null)
       } catch (error: Exception) { promise.reject("KARAOKE_START_FAILED", error.message ?: "Unable to start karaoke recording", error) }
     }
+    AsyncFunction("pauseKaraokeRecording") { promise: Promise ->
+      try { KaraokeRecorderProcessor.pause(); promise.resolve(null) }
+      catch (error: Exception) { promise.reject("KARAOKE_PAUSE_FAILED", error.message ?: "Unable to pause karaoke recording", error) }
+    }
+    AsyncFunction("resumeKaraokeRecording") { promise: Promise ->
+      try { KaraokeRecorderProcessor.resume(); promise.resolve(null) }
+      catch (error: Exception) { promise.reject("KARAOKE_RESUME_FAILED", error.message ?: "Unable to resume karaoke recording", error) }
+    }
     AsyncFunction("stopKaraokeRecording") { promise: Promise ->
       try {
         val result = KaraokeRecorderProcessor.stop()
