@@ -7,7 +7,7 @@ export interface AudioEditorToolDefinition {
   order?: number;
 }
 
-/** Only completed child tools are registered here. Home registers the parent Audio Editor. */
+/** Only child tools with a complete user-facing flow are registered here. */
 const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
   {
     id: 'audio-trimmer',
@@ -16,6 +16,14 @@ const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
     route: '/audio-editor/audio-trimmer',
     icon: 'scissors',
     order: 20,
+  },
+  {
+    id: 'audio-compressor',
+    title: 'Audio Compressor',
+    description: 'Reduce file size with bitrate and sample-rate presets, then export a compressed M4A file.',
+    route: '/audio-editor/audio-compressor',
+    icon: 'archive',
+    order: 25,
   },
   {
     id: 'mix-audio',
