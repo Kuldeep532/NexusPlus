@@ -13,38 +13,8 @@ export type PiperTtsSynthesisResult = { outputPath: string };
 export type SpeedPitchNativeResult = { outputPath: string; durationMs: number; sampleRate: number; channels: number; mimeType: string | null };
 export type AudioEffectNativeResult = { outputPath: string; durationMs: number; sampleRate: number; channels: number; mimeType: string | null };
 export type RemoveSilenceNativeResult = { outputPath: string; durationMs: number; sampleRate: number; channels: number; mimeType: string | null; removedSilenceMs: number };
-export type AudioDoctorNativeResult = {
-  outputPath: string;
-  durationMs: number;
-  sampleRate: number;
-  channels: number;
-  mimeType: string | null;
-  originalPeak: number;
-  repairedPeak: number;
-  noiseFloorDb: number;
-  estimatedSnrDb: number;
-  clippingRatio: number;
-  hasClipping: boolean;
-  hasHum: boolean;
-  hasSevereNoise: boolean;
-  hasLikelyCodecDamage: boolean;
-  repairable: boolean;
-  repairedNoise: boolean;
-  repairedClipping: boolean;
-  repairedHum: boolean;
-  diagnosis: string[];
-  attribution: 'not-determinable-from-audio-alone';
-};
-export type KaraokeRecordingResult = {
-  outputPath: string;
-  durationMs: number;
-  sampleRate: number;
-  channels: number;
-  mimeType: string;
-  recordingStartedWithTrack: boolean;
-  headphoneModeApplied: boolean;
-  processing: string[];
-};
+export type AudioDoctorNativeResult = { outputPath: string; durationMs: number; sampleRate: number; channels: number; mimeType: string | null; originalPeak: number; repairedPeak: number; noiseFloorDb: number; estimatedSnrDb: number; clippingRatio: number; hasClipping: boolean; hasHum: boolean; hasSevereNoise: boolean; hasLikelyCodecDamage: boolean; repairable: boolean; repairedNoise: boolean; repairedClipping: boolean; repairedHum: boolean; diagnosis: string[]; attribution: 'not-determinable-from-audio-alone' };
+export type KaraokeRecordingResult = { outputPath: string; durationMs: number; sampleRate: number; channels: number; mimeType: string; recordingStartedWithTrack: boolean; headphoneModeApplied: boolean; processing: string[] };
 
 type AudioEditorNativeModuleType = {
   probe(inputPath: string): Promise<AudioProbeResult>;
@@ -60,6 +30,8 @@ type AudioEditorNativeModuleType = {
   removeSilence(inputPath: string, outputPath: string, settings: { thresholdDb: number; minSilenceMs: number; paddingMs: number }): Promise<RemoveSilenceNativeResult>;
   audioDoctor(inputPath: string, outputPath: string, settings: { noiseReduction: number; voiceClarity: number; humRemoval: number; deClip: number; autoGain: boolean }): Promise<AudioDoctorNativeResult>;
   startKaraokeRecording(karaokeUri: string, outputPath: string, highQuality: boolean, headphoneMode: boolean, sampleRate: number, channels: number): Promise<void>;
+  pauseKaraokeRecording(): Promise<void>;
+  resumeKaraokeRecording(): Promise<void>;
   stopKaraokeRecording(): Promise<KaraokeRecordingResult>;
   cancelKaraokeRecording(): Promise<void>;
 };
