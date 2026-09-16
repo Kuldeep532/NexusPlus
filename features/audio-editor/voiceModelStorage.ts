@@ -1,5 +1,4 @@
 import * as FileSystem from 'expo-file-system/legacy';
-import { Audio } from 'expo-av';
 
 export type VoiceModelKind = 'onnx' | 'audio-reference';
 
@@ -22,6 +21,16 @@ async function ensureRoot(): Promise<void> {
   await FileSystem.makeDirectoryAsync(ROOT, { intermediates: true });
 }
 
+function isStoredVoiceModel(value: unknown): value is StoredVoiceModel {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as Partial<StoredVoiceModel>;
+  return typeof item.id === 'string'
+    && typeof item.name === 'string'
+    && typeof item.uri === 'string'
+    && (item.kind === 'onnx' || item.kind === 'audio-reference')
+    && typeof item.createdAt === 'number';
+}
+
 export async function loadStoredVoiceModels(): Promise<StoredVoiceModel[]> {
   await ensureRoot();
   const indexUri = `${ROOT}index.json`;
@@ -29,9 +38,8 @@ export async function loadStoredVoiceModels(): Promise<StoredVoiceModel[]> {
     const info = await FileSystem.getInfoAsync(indexUri);
     if (!info.exists) return [];
     const raw = await FileSystem.readAsStringAsync(indexUri);
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item) => item && typeof item.id === 'string' && typeof item.uri === 'string');
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(isStoredVoiceModel) : [];
   } catch {
     return [];
   }
