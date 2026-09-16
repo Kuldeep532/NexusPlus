@@ -1,29 +1,14 @@
 import type { EPaperDocument, EPaperTextElement } from './ePaperTypes';
 import { getPaperPoints } from './ePaperTypes';
 
-function escapeXml(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
-}
-
-function isTextElement(element: EPaperDocument['pages'][number]['elements'][number]): element is EPaperTextElement {
-  return element.type === 'headline'
-    || element.type === 'subheadline'
-    || element.type === 'body'
-    || element.type === 'caption'
-    || element.type === 'quote';
-}
-
+function escapeXml(value: string): string { return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;'); }
+function isTextElement(element: EPaperDocument['pages'][number]['elements'][number]): element is EPaperTextElement { return element.type === 'headline' || element.type === 'subheadline' || element.type === 'body' || element.type === 'caption' || element.type === 'quote'; }
 export function renderEPaperPageToSvg(doc: EPaperDocument, pageIndex: number): string {
-  const paper = getPaperPoints(doc);
-  const page = doc.pages[pageIndex];
+  const paper = getPaperPoints(doc); const page = doc.pages[pageIndex];
   const content = page.elements.map((element) => {
-    if (element.type === 'image') {
-      return `<rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" rx="4" fill="#E4E4E4"/><text x="${element.x + 6}" y="${element.y + Math.min(18, element.height / 2)}" font-size="9" fill="#666">${escapeXml(element.name)}</text>`;
-    }
+    if (element.type === 'image') return `<rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" rx="4" fill="#E4E4E4"/><text x="${element.x + 6}" y="${element.y + Math.min(18, element.height / 2)}" font-size="9" fill="#666">${escapeXml(element.name)}</text>`;
     if (element.type === 'divider') return `<line x1="${element.x}" y1="${element.y}" x2="${element.x + element.width}" y2="${element.y}" stroke="${doc.ink}" stroke-width="1"/>`;
-    if (element.type === 'spacer') return '';
-    if (!isTextElement(element)) return '';
-
+    if (element.type === 'spacer' || !isTextElement(element)) return '';
     const text = escapeXml(element.text).replace(/\n/g, ' ');
     return `<text x="${element.x}" y="${element.y + element.fontSize}" font-size="${element.fontSize}" font-family="Arial, sans-serif" font-weight="${element.fontWeight}" text-anchor="${element.align === 'center' ? 'middle' : element.align === 'right' ? 'end' : 'start'}" fill="${doc.ink}">${text}</text>`;
   }).join('');
