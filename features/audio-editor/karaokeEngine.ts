@@ -11,10 +11,6 @@ export async function createKaraokeOutputPath(name: string): Promise<string> {
   return createAudioEditorOutputPath('Karaoke Recordings', name, 'vocal', 'm4a');
 }
 
-/**
- * Native recording is exposed separately so the UI can guarantee that capture
- * begins only after the karaoke playback session has reached its start edge.
- */
 export async function startKaraokeRecording(
   karaokeUri: string,
   outputPath: string,
@@ -23,14 +19,15 @@ export async function startKaraokeRecording(
   sampleRate = 48_000,
   channels = 1,
 ): Promise<void> {
-  await assertAudioEditorNative().startKaraokeRecording(
-    karaokeUri,
-    outputPath,
-    highQuality,
-    headphoneMode,
-    sampleRate,
-    channels,
-  );
+  await assertAudioEditorNative().startKaraokeRecording(karaokeUri, outputPath, highQuality, headphoneMode, sampleRate, channels);
+}
+
+export async function pauseKaraokeRecording(): Promise<void> {
+  await assertAudioEditorNative().pauseKaraokeRecording();
+}
+
+export async function resumeKaraokeRecording(): Promise<void> {
+  await assertAudioEditorNative().resumeKaraokeRecording();
 }
 
 export async function stopKaraokeRecording(): Promise<KaraokeRecordingResult> {
