@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const ROOT_FOLDER = 'Nexus Plus Audio Editor';
 
