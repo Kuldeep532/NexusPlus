@@ -41,7 +41,7 @@ onlyBuiltDependencies:
   - msw
   - unrs-resolver
 
-# Keep native/platform overrides minimal and deterministic.
+# Centralize dependency ranges here; concrete versions are resolved during install and recorded in pnpm-lock.yaml.
 overrides:
   '@esbuild-kit/esm-loader': npm:tsx@^4.21.0
   esbuild: 0.27.3
