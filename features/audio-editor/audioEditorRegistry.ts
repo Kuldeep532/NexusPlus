@@ -34,6 +34,14 @@ const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
     order: 30,
   },
   {
+    id: 'fun-recordings',
+    title: 'Fun Recordings',
+    description: 'Choose from dynamically generated natural-style voice profiles for recording and future voice-changing stages.',
+    route: '/audio-editor/fun-recordings',
+    icon: 'mic',
+    order: 35,
+  },
+  {
     id: 'audio-to-video',
     title: 'Audio to Video',
     description: 'Create an image-based video timeline whose image durations are constrained by the selected audio.',
