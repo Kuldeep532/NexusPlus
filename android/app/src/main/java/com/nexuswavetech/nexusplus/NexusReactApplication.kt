@@ -19,6 +19,7 @@ class NexusReactApplication : Application(), ReactApplication {
         override fun getPackages(): List<ReactPackage> = PackageList(this).packages.toMutableList().apply {
             add(NexusAssistantVoicePackage())
             add(NexusNativeSecurityPackage())
+            add(NexusIntegrityPackage())
             add(NexusCctvDiscoveryPackage())
             add(NexusCctvOnvifPackage())
             add(NexusPdfNativePackage())
