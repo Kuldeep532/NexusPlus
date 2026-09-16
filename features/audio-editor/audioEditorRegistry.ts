@@ -19,6 +19,7 @@ const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
   { id: 'audio-effects', title: 'Audio Effects', description: 'Apply synthetic DSP effects such as bass boost, treble, vibrato, echo, telephone, robot, reverb and megaphone.', route: '/audio-editor/audio-effects', icon: 'sliders', order: 39.7 },
   { id: 'remove-silence', title: 'Remove Silence', description: 'Automatically detect sustained quiet gaps and remove them while preserving configurable padding.', route: '/audio-editor/remove-silence', icon: 'volume-x', order: 39.8 },
   { id: 'audio-doctor', title: 'Audio Doctor', description: 'Diagnose common audio damage, reduce noise and hum, soften clipping and generate a repaired copy with evidence-based diagnostics.', route: '/audio-editor/audio-doctor', icon: 'activity', order: 39.9 },
+  { id: 'karaoke', title: 'Karaoke', description: 'Upload a karaoke track, sing along, optionally record a high-quality vocal take, and follow timestamped lyrics.', route: '/audio-editor/karaoke', icon: 'mic', order: 39.95 },
   { id: 'audio-to-video', title: 'Audio to Video', description: 'Create an image-based video timeline whose image durations are constrained by the selected audio.', route: '/audio-editor/audio-to-video', icon: 'film', order: 40 },
 ];
 
