@@ -11,6 +11,7 @@ export type AudioCompressResult = { outputPath: string; durationMs: number; samp
 export type VoicePitchNativeResult = { outputPath: string; durationMs: number; sampleRate: number; channels: number; mimeType: string | null };
 export type PiperTtsSynthesisResult = { outputPath: string };
 export type SpeedPitchNativeResult = { outputPath: string; durationMs: number; sampleRate: number; channels: number; mimeType: string | null };
+export type AudioEffectNativeResult = { outputPath: string; durationMs: number; sampleRate: number; channels: number; mimeType: string | null };
 
 type AudioEditorNativeModuleType = {
   probe(inputPath: string): Promise<AudioProbeResult>;
@@ -22,6 +23,7 @@ type AudioEditorNativeModuleType = {
   pitchShift(inputPath: string, outputPath: string, pitchSemitones: number, formantShift: number, timbre: number): Promise<VoicePitchNativeResult>;
   synthesizeTts(text: string, modelPath: string, configPath: string, outputPath: string, lengthScale: number, pitchScale: number, emotion: string, clone: boolean): Promise<PiperTtsSynthesisResult>;
   speedAndPitch(inputPath: string, outputPath: string, speed: number, pitchSemitones: number): Promise<SpeedPitchNativeResult>;
+  audioEffect(inputPath: string, outputPath: string, effect: string, amount: number): Promise<AudioEffectNativeResult>;
 };
 
 export const AudioEditorNative = requireOptionalNativeModule<AudioEditorNativeModuleType>('AudioEditorNative');
