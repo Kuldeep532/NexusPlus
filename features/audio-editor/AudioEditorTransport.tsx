@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 
 type Props = {
@@ -27,15 +27,8 @@ export function AudioEditorTransport({
   const colors = useColors();
   if (!active) {
     return (
-      <Pressable
-        onPress={onStart}
-        disabled={working}
-        accessibilityRole="button"
-        accessibilityLabel={startLabel}
-        accessibilityState={{ disabled: working }}
-        style={[styles.button, { backgroundColor: colors.primary }]}
-      >
-        <Feather name={recording ? 'mic' : 'play'} size={18} color={colors.primaryForeground} />
+      <Pressable onPress={onStart} disabled={working} accessibilityRole="button" accessibilityLabel={startLabel} accessibilityState={{ disabled: working }} style={[styles.button, { backgroundColor: colors.primary }]}>
+        {working ? <ActivityIndicator color={colors.primaryForeground} /> : <Feather name={recording ? 'mic' : 'play'} size={18} color={colors.primaryForeground} />}
         <Text style={[styles.primaryText, { color: colors.primaryForeground }]}>{startLabel}</Text>
       </Pressable>
     );
@@ -43,25 +36,11 @@ export function AudioEditorTransport({
 
   return (
     <View style={styles.row}>
-      <Pressable
-        onPress={onTogglePause}
-        disabled={working}
-        accessibilityRole="button"
-        accessibilityLabel={recording ? (paused ? 'Resume Recording' : 'Pause Recording') : (paused ? 'Resume Singing' : 'Pause Singing')}
-        accessibilityState={{ disabled: working }}
-        style={[styles.button, { backgroundColor: colors.primary }]}
-      >
-        <Feather name={paused ? 'play' : 'pause'} size={18} color={colors.primaryForeground} />
+      <Pressable onPress={onTogglePause} disabled={working} accessibilityRole="button" accessibilityLabel={recording ? (paused ? 'Resume Recording' : 'Pause Recording') : (paused ? 'Resume Singing' : 'Pause Singing')} accessibilityState={{ disabled: working }} style={[styles.button, { backgroundColor: colors.primary }]}>
+        {working ? <ActivityIndicator color={colors.primaryForeground} /> : <Feather name={paused ? 'play' : 'pause'} size={18} color={colors.primaryForeground} />}
         <Text style={[styles.primaryText, { color: colors.primaryForeground }]}>{recording ? (paused ? 'Resume Recording' : 'Pause Recording') : (paused ? 'Resume Singing' : 'Pause Singing')}</Text>
       </Pressable>
-      <Pressable
-        onPress={onFinish}
-        disabled={working}
-        accessibilityRole="button"
-        accessibilityLabel={recording ? 'Finish Recording' : 'End Singing'}
-        accessibilityState={{ disabled: working }}
-        style={[styles.button, styles.secondary, { borderColor: colors.primary }]}
-      >
+      <Pressable onPress={onFinish} disabled={working} accessibilityRole="button" accessibilityLabel={recording ? 'Finish Recording' : 'End Singing'} accessibilityState={{ disabled: working }} style={[styles.button, styles.secondary, { borderColor: colors.primary }]}>
         <Feather name="square" size={18} color={colors.primary} />
         <Text style={[styles.secondaryText, { color: colors.primary }]}>{recording ? 'Finish Recording' : 'End Singing'}</Text>
       </Pressable>
