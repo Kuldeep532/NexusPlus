@@ -83,12 +83,12 @@ export default function FunRecordingsScreen() {
         </View>
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Fun Recordings</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Record a clip, choose a dynamic voice profile, and keep this flow reusable for future voice-changing stages.</Text>
+          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Record a clip and choose one of the dynamically generated voice profiles for the next pitch-processing stage.</Text>
         </View>
       </View>
 
       <View style={[styles.recorderCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recording</Text>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Record audio</Text>
         <View accessibilityLiveRegion="polite" style={styles.timerWrap}>
           <Text style={[styles.timer, { color: colors.foreground }]}>{formatRecordingDuration(durationMs)}</Text>
           <Text style={[styles.status, { color: colors.mutedForeground }]}>
@@ -115,7 +115,7 @@ export default function FunRecordingsScreen() {
 
       <View style={[styles.selectorCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Voice profile</Text>
-        <Text style={[styles.helper, { color: colors.mutedForeground }]}>Profiles are generated in code, so the selector can scale without shipping thousands of audio assets.</Text>
+        <Text style={[styles.helper, { color: colors.mutedForeground }]}>Profiles are generated in code, so the selector scales without shipping thousands of audio assets.</Text>
         <VoicePitchSoundSelector value={selected?.id} onChange={setSelected} />
       </View>
 
@@ -129,7 +129,7 @@ export default function FunRecordingsScreen() {
       ) : null}
 
       {recordingUri ? (
-        <Text style={[styles.readyNote, { color: colors.mutedForeground }]}>A recording is ready for the next voice-pitch processing stage.</Text>
+        <Text style={[styles.readyNote, { color: colors.mutedForeground }]}>Recording is ready for Stage 3 voice-pitch processing. The selected profile is retained for the next processing step.</Text>
       ) : null}
     </ScrollView>
   );
