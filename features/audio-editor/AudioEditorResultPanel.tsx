@@ -21,7 +21,7 @@ export function AudioEditorResultPanel({ message, outputPath, resultUri, onClose
       }
       await Sharing.shareAsync(resultUri, {
         mimeType: 'audio/mp4',
-        dialogTitle: 'Share compressed audio',
+        dialogTitle: 'Share saved audio',
       });
     } catch {
       Alert.alert('Share unavailable', 'The saved audio could not be shared.');
