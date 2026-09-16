@@ -22,7 +22,6 @@ class NexusReactApplication : Application(), ReactApplication {
             add(NexusIntegrityPackage())
             add(NexusAlarmPackage())
             add(NexusAuthPackage())
-            add(NexusSafetyGatePackage())
             add(NexusVaultPackage())
             add(NexusDocumentReaderPackage())
             add(NexusMediaPackage())
