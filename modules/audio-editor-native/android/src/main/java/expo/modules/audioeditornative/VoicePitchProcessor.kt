@@ -7,15 +7,14 @@ import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.net.Uri
 import java.io.File
-import java.nio.ByteBuffer
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.round
 import kotlin.math.sin
 import kotlin.math.sqrt
-import kotlin.math.tan
 
 internal object VoicePitchProcessor {
   data class Result(
@@ -34,10 +33,13 @@ internal object VoicePitchProcessor {
     require(timbre.isFinite() && timbre in 0.0..1.0) { "Timbre must be between 0 and 1." }
 
     val decoded = decodePcm(context, inputPath)
-    val shiftedRate = pitchShiftRatio(pitchSemitones)
-    val stretched = resampleAndShape(decoded.samples, decoded.sampleRate, decoded.channels, shiftedRate, formantShift, timbre)
-    val output = encodeAac(stretched, decoded.sampleRate, decoded.channels, outputPath)
-    return Result(output, stretched.size.toDouble() / decoded.channels / decoded.sampleRate * 1000.0, decoded.sampleRate, decoded.channels, "audio/mp4")
+    require(decoded.samples.isNotEmpty()) { "The recording contains no audio samples." }
+
+    // Keep duration approximately unchanged while using overlap-add pitch shifting.
+    // This is intentionally dependency-free and runs entirely in the native module.
+    val shifted = pitchShiftOla(decoded.samples, decoded.sampleRate, decoded.channels, pitchSemitones, formantShift, timbre)
+    val output = encodeAac(shifted, decoded.sampleRate, decoded.channels, outputPath)
+    return Result(output, shifted.size.toDouble() / decoded.channels / decoded.sampleRate * 1000.0, decoded.sampleRate, decoded.channels, "audio/mp4")
   }
 
   private data class Decoded(val sampleRate: Int, val channels: Int, val samples: FloatArray)
@@ -62,7 +64,9 @@ internal object VoicePitchProcessor {
       val mime = inputFormat.getString(MediaFormat.KEY_MIME) ?: error("Audio codec MIME type is missing.")
       val sampleRate = inputFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
       val channels = inputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+      require(sampleRate > 0 && channels > 0) { "Audio format has invalid sample rate or channel count." }
       extractor.selectTrack(track)
+
       val decoder = MediaCodec.createDecoderByType(mime)
       decoder.configure(inputFormat, null, null, 0)
       decoder.start()
@@ -123,37 +127,61 @@ internal object VoicePitchProcessor {
     }
   }
 
-  private fun pitchShiftRatio(semitones: Double): Double = 2.0.pow(semitones / 12.0)
-
-  private fun resampleAndShape(input: FloatArray, sampleRate: Int, channels: Int, ratio: Double, formantShift: Double, timbre: Double): FloatArray {
+  private fun pitchShiftOla(input: FloatArray, sampleRate: Int, channels: Int, pitchSemitones: Double, formantShift: Double, timbre: Double): FloatArray {
     if (input.isEmpty()) return input
-    if (abs(ratio - 1.0) < 0.0001 && abs(formantShift) < 0.0001 && abs(timbre - 0.5) < 0.0001) return input
+    val ratio = 2.0.pow(pitchSemitones / 12.0)
+    if (abs(ratio - 1.0) < 0.0001 && abs(formantShift) < 0.0001 && abs(timbre - 0.5) < 0.0001) return input.copyOf()
 
     val frames = input.size / channels
-    val outputFrames = max(1, (frames / ratio).roundToInt())
-    val output = FloatArray(outputFrames * channels)
-    val warmth = 0.85 + timbre * 0.3
-    val brightness = 0.7 + timbre * 0.6
-    val formantRatio = 2.0.pow(formantShift / 12.0)
+    val window = (sampleRate * 0.032).roundToInt().coerceIn(512, 2048)
+    val hopOut = (window * 0.25).roundToInt().coerceAtLeast(64)
+    val hopIn = max(1, (hopOut * ratio).roundToInt())
+    val output = FloatArray(frames * channels)
+    val weights = FloatArray(frames)
 
-    for (frame in 0 until outputFrames) {
-      val sourcePosition = frame * ratio
-      val sourceFrame = min(frames - 1, sourcePosition.toInt())
-      val nextFrame = min(frames - 1, sourceFrame + 1)
-      val fraction = (sourcePosition - sourceFrame).toFloat()
+    var inFrame = 0
+    var outFrame = 0
+    while (inFrame < frames) {
+      val remaining = min(window, frames - inFrame)
+      for (frameOffset in 0 until remaining) {
+        val phase = PI * frameOffset.toDouble() / max(1, remaining - 1)
+        val windowValue = (0.5 - 0.5 * cos(2.0 * phase)).toFloat()
+        val targetFrame = min(frames - 1, outFrame + frameOffset)
+        val envelope = formantEnvelope(windowValue, frameOffset, sampleRate, formantShift)
+        for (channel in 0 until channels) {
+          val source = input[(inFrame + frameOffset) * channels + channel]
+          val shaped = applyTimbre(source, timbre, sampleRate)
+          output[targetFrame * channels + channel] += shaped * envelope
+        }
+        weights[targetFrame] += windowValue
+      }
+      inFrame += hopIn
+      outFrame += hopOut
+      if (outFrame >= frames) break
+    }
+
+    val normalized = FloatArray(input.size)
+    for (frame in 0 until frames) {
+      val gain = if (weights[frame] > 0.0001f) 1f / weights[frame] else 1f
       for (channel in 0 until channels) {
-        val a = input[sourceFrame * channels + channel]
-        val b = input[nextFrame * channels + channel]
-        var sample = a + (b - a) * fraction
-        val previousIndex = max(0, frame - 1) * channels + channel
-        val previous = output[previousIndex]
-        sample = sample * warmth + (sample - previous) * 0.08f * brightness.toFloat()
-        val formantPhase = frame.toDouble() / max(1, sampleRate) * formantRatio
-        sample = (sample * cos(2.0 * PI * formantPhase * 0.5) + previous * sin(2.0 * PI * formantPhase * 0.5)).toFloat() * 0.92f
-        output[frame * channels + channel] = sample.coerceIn(-1f, 1f)
+        normalized[frame * channels + channel] = (output[frame * channels + channel] * gain).coerceIn(-1f, 1f)
       }
     }
-    return output
+    return normalized
+  }
+
+  private fun formantEnvelope(base: Float, frameOffset: Int, sampleRate: Int, formantShift: Double): Float {
+    if (abs(formantShift) < 0.0001) return base
+    val ratio = 2.0.pow(formantShift / 12.0)
+    val frequency = 120.0 + 1800.0 * frameOffset / max(1, sampleRate / 30)
+    val modulation = (0.96 + 0.04 * sin(2.0 * PI * frequency * ratio / max(1, sampleRate))).toFloat()
+    return base * modulation
+  }
+
+  private fun applyTimbre(sample: Float, timbre: Double, sampleRate: Int): Float {
+    val emphasis = ((timbre - 0.5) * 0.3).toFloat()
+    val soft = (sample * (1f - abs(emphasis)) + tanh(sample * (1f + emphasis))).toFloat() * 0.5f
+    return soft.coerceIn(-1f, 1f)
   }
 
   private fun encodeAac(samples: FloatArray, sampleRate: Int, channels: Int, outputPath: String): String {
@@ -186,20 +214,19 @@ internal object VoicePitchProcessor {
             val remainingFrames = totalFrames - inputFrameOffset
             val frames = min(framesCapacity, remainingFrames)
             if (frames <= 0) {
-              val ptsUs = (inputFrameOffset.toLong() * 1_000_000L / sampleRate)
+              val ptsUs = inputFrameOffset.toLong() * 1_000_000L / sampleRate
               encoder.queueInputBuffer(inputIndex, 0, 0, ptsUs, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
               endOfInput = true
             } else {
-              val bytes = ByteArray(frames * channels * 2)
-              var offset = 0
+              var bytesWritten = 0
               for (frame in 0 until frames) for (channel in 0 until channels) {
                 val value = (samples[(inputFrameOffset + frame) * channels + channel].coerceIn(-1f, 1f) * 32767f).toInt().toShort()
-                bytes[offset++] = (value.toInt() and 0xff).toByte()
-                bytes[offset++] = ((value.toInt() shr 8) and 0xff).toByte()
+                buffer.put((value.toInt() and 0xff).toByte())
+                buffer.put(((value.toInt() shr 8) and 0xff).toByte())
+                bytesWritten += 2
               }
-              buffer.put(bytes)
               val ptsUs = inputFrameOffset.toLong() * 1_000_000L / sampleRate
-              encoder.queueInputBuffer(inputIndex, 0, bytes.size, ptsUs, 0)
+              encoder.queueInputBuffer(inputIndex, 0, bytesWritten, ptsUs, 0)
               inputFrameOffset += frames
             }
           }
@@ -207,12 +234,10 @@ internal object VoicePitchProcessor {
 
         when (val outputIndex = encoder.dequeueOutputBuffer(info, 10_000)) {
           MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
-          MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-            if (!muxerStarted) {
-              muxerTrack = muxer.addTrack(encoder.outputFormat)
-              muxer.start()
-              muxerStarted = true
-            }
+          MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> if (!muxerStarted) {
+            muxerTrack = muxer.addTrack(encoder.outputFormat)
+            muxer.start()
+            muxerStarted = true
           }
           else -> if (outputIndex >= 0) {
             val outputBuffer = encoder.getOutputBuffer(outputIndex) ?: error("Encoder output buffer unavailable.")
@@ -237,6 +262,10 @@ internal object VoicePitchProcessor {
     return outFile.absolutePath
   }
 
-  private fun Double.roundToInt(): Int = kotlin.math.round(this).toInt()
   private fun Double.pow(exponent: Double): Double = kotlin.math.exp(exponent * kotlin.math.ln(this))
+  private fun Double.roundToInt(): Int = round(this).toInt()
+  private fun tanh(value: Float): Float {
+    val e2x = kotlin.math.exp((2f * value).toDouble()).toFloat()
+    return ((e2x - 1f) / (e2x + 1f)).coerceIn(-1f, 1f)
+  }
 }
