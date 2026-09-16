@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { createAudioEditorOutputPath, ensureAudioEditorExportFolder } from '@/features/audio-editor/audioEditorExport';
@@ -26,7 +26,7 @@ export default function AudioCompressorScreen() {
   const [probe, setProbe] = useState<AudioProbeResult | null>(null);
   const [preset, setPreset] = useState<AudioCompressionPreset>(AUDIO_COMPRESSION_PRESETS[1]);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState('Audio library ready. Choose an audio file to begin.');
   const [result, setResult] = useState<CompressAudioResult | null>(null);
 
   const reset = useCallback(() => {
@@ -35,6 +35,17 @@ export default function AudioCompressorScreen() {
     setResult(null);
     setMessage('Audio library ready. Choose an audio file to begin.');
   }, []);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (source || result) {
+        reset();
+        return true;
+      }
+      return false;
+    });
+    return () => subscription.remove();
+  }, [reset, result, source]);
 
   const loadSource = useCallback(async (next: AudioEditorSource) => {
     setLoading(true);
@@ -99,11 +110,6 @@ export default function AudioCompressorScreen() {
     }
   }, [loading, preset, probe, source]);
 
-  const handleSave = useCallback(() => {
-    if (!result) return;
-    setMessage('Audio compressed and saved successfully to Nexus Plus // audio // audio compress.');
-  }, [result]);
-
   return (
     <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 18, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 36 }} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: 'Audio Compressor' }} />
@@ -147,8 +153,8 @@ export default function AudioCompressorScreen() {
         </>
       )}
 
-      {result && <AudioEditorResultPanel outputPath="Nexus Plus // audio // audio compress" message="Audio compressed and saved successfully to Nexus Plus // audio // audio compress." onSave={handleSave} onClose={reset} />}
-      {!!message && <Text accessibilityLiveRegion="polite" style={[styles.message, { color: colors.mutedForeground }]}>{message}</Text>}
+      {result && <AudioEditorResultPanel outputPath="Nexus Plus // audio // audio compress" resultUri={result.outputPath} message="Audio compressed and saved successfully to Nexus Plus // audio // audio compress." onClose={reset} />}
+      {!result && !!message && <Text accessibilityLiveRegion="polite" style={[styles.message, { color: colors.mutedForeground }]}>{message}</Text>}
     </ScrollView>
   );
 }
