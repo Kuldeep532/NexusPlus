@@ -31,7 +31,7 @@ export default function CctvLiveViewScreen() {
   const runControl = async (control: Control['id']) => {
     setMessage(null);
     try {
-      await executeCctvLiveControl(camera, control);
+      await executeCctvLiveControl(camera, control as Parameters<typeof executeCctvLiveControl>[1]);
       const active = getActiveCctvSession(camera.id);
       if (control === 'start') setRunning(Boolean(active?.live));
       if (control === 'stop') { setRunning(false); setRecording(false); }
