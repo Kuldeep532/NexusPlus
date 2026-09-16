@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
-import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
+import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioPlayer, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
 import { Stack } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { AudioEditorResultPanel } from '@/features/audio-editor/AudioEditorResultPanel';
@@ -20,8 +20,11 @@ export default function FunRecordingsScreen() {
   const [permissionStatus, setPermissionStatus] = useState<'unknown' | 'granted' | 'denied'>('unknown');
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
   const [recordedDurationMs, setRecordedDurationMs] = useState(0);
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<{ outputUri: string; outputPath: string; profileName: string } | null>(null);
+
+  const player = useAudioPlayer(recordingUri);
 
   useEffect(() => {
     let active = true;
@@ -39,10 +42,20 @@ export default function FunRecordingsScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (isPreviewPlaying && player) {
+      player.addListener('playbackStatusUpdate', (status) => {
+        if (status.didJustFinish) setIsPreviewPlaying(false);
+      });
+    }
+  }, [isPreviewPlaying, player]);
+
   const isRecording = recorderState.isRecording;
   const durationMs = isRecording ? recorderState.durationMillis : recordedDurationMs;
 
   const reset = () => {
+    if (player) player.pause();
+    setIsPreviewPlaying(false);
     setResult(null);
     setRecordingUri(null);
     setRecordedDurationMs(0);
@@ -60,6 +73,8 @@ export default function FunRecordingsScreen() {
     }
 
     try {
+      if (player) player.pause();
+      setIsPreviewPlaying(false);
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       setRecordingUri(null);
       setRecordedDurationMs(0);
@@ -86,10 +101,29 @@ export default function FunRecordingsScreen() {
     }
   };
 
+  const togglePreview = async () => {
+    if (!recordingUri || !player) return;
+    try {
+      if (isPreviewPlaying) {
+        player.pause();
+        setIsPreviewPlaying(false);
+        return;
+      }
+      player.play();
+      setIsPreviewPlaying(true);
+    } catch {
+      Alert.alert('Preview unavailable', 'The recording could not be played back.');
+    }
+  };
+
   const resetRecording = () => {
+    if (player) player.pause();
+    setIsPreviewPlaying(false);
     setRecordingUri(null);
     setRecordedDurationMs(0);
   };
+
+  const selection = useMemo(() => (selected ? createFunRecordingVoiceSelection(selected.id) : null), [selected]);
 
   const applyVoicePitch = async () => {
     if (!recordingUri || !selected) {
@@ -99,22 +133,22 @@ export default function FunRecordingsScreen() {
 
     setProcessing(true);
     try {
-      const selection = createFunRecordingVoiceSelection(selected.id);
-      const outputPath = await createAudioEditorOutputPath('Fun Recordings', selected.name, 'voice-pitch', 'm4a');
+      if (player) player.pause();
+      setIsPreviewPlaying(false);
+      const selectedVoice = createFunRecordingVoiceSelection(selected.id);
+      const outputPath = await createAudioEditorOutputPath('Fun Recordings', selectedVoice.profile.name, 'voice-pitch', 'm4a');
       const processed = await processVoicePitch({
         inputPath: recordingUri,
         outputPath,
-        profile: selection.profile,
+        profile: selectedVoice.profile,
       });
-      setResult({ outputUri: processed.outputPath, outputPath, profileName: selection.profile.name });
+      setResult({ outputUri: processed.outputPath, outputPath, profileName: selectedVoice.profile.name });
     } catch (error) {
       Alert.alert('Voice pitch failed', error instanceof Error ? error.message : 'Nexus Plus could not process this recording.');
     } finally {
       setProcessing(false);
     }
   };
-
-  const selection = selected ? createFunRecordingVoiceSelection(selected.id) : null;
 
   if (result) {
     return (
@@ -139,7 +173,7 @@ export default function FunRecordingsScreen() {
         </View>
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Fun Recordings</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Record a clip, choose a dynamic voice profile, and apply it to the recording.</Text>
+          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Record audio, preview it before saving, then apply a dynamic voice profile.</Text>
         </View>
       </View>
 
@@ -148,7 +182,7 @@ export default function FunRecordingsScreen() {
         <View accessibilityLiveRegion="polite" style={styles.timerWrap}>
           <Text style={[styles.timer, { color: colors.foreground }]}>{formatRecordingDuration(durationMs)}</Text>
           <Text style={[styles.status, { color: colors.mutedForeground }]}>
-            {isRecording ? 'Recording in progress' : recordingUri ? 'Recording ready' : permissionStatus === 'denied' ? 'Microphone permission required' : 'Ready to record'}
+            {isRecording ? 'Recording in progress' : recordingUri ? 'Recording ready — preview it before processing' : permissionStatus === 'denied' ? 'Microphone permission required' : 'Ready to record'}
           </Text>
         </View>
 
@@ -164,9 +198,15 @@ export default function FunRecordingsScreen() {
         </Pressable>
 
         {recordingUri ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="Discard recorded clip" disabled={processing} onPress={resetRecording} style={[styles.secondaryButton, { borderColor: colors.border, opacity: processing ? 0.55 : 1 }]}>
-            <Text style={[styles.secondaryButtonText, { color: colors.foreground }]}>Discard recording</Text>
-          </Pressable>
+          <View style={styles.previewRow}>
+            <Pressable accessibilityRole="button" accessibilityLabel={isPreviewPlaying ? 'Pause recorded audio preview' : 'Play recorded audio preview'} disabled={processing} onPress={togglePreview} style={[styles.previewButton, { backgroundColor: colors.secondary, borderColor: colors.border, opacity: processing ? 0.55 : 1 }]}>
+              <Feather name={isPreviewPlaying ? 'pause' : 'play'} size={18} color={colors.foreground} />
+              <Text style={[styles.previewText, { color: colors.foreground }]}>{isPreviewPlaying ? 'Pause Preview' : 'Play Preview'}</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Discard recorded clip" disabled={processing} onPress={resetRecording} style={[styles.discardButton, { borderColor: colors.border, opacity: processing ? 0.55 : 1 }]}>
+              <Text style={[styles.secondaryButtonText, { color: colors.foreground }]}>Discard</Text>
+            </Pressable>
+          </View>
         ) : null}
       </View>
 
@@ -187,18 +227,14 @@ export default function FunRecordingsScreen() {
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Apply voice pitch to recording"
+        accessibilityLabel="Apply voice pitch to recording and save automatically"
         disabled={!recordingUri || !selected || processing}
         onPress={applyVoicePitch}
         style={[styles.processButton, { backgroundColor: colors.primary, opacity: !recordingUri || !selected || processing ? 0.45 : 1 }]}
       >
         <Feather name="sliders" size={19} color={colors.primaryForeground} />
-        <Text style={[styles.processButtonText, { color: colors.primaryForeground }]}>{processing ? 'Applying voice pitch…' : 'Apply Voice Pitch'}</Text>
+        <Text style={[styles.processButtonText, { color: colors.primaryForeground }]}>{processing ? 'Applying voice pitch…' : 'Apply Voice Pitch & Save'}</Text>
       </Pressable>
-
-      {recordingUri ? (
-        <Text style={[styles.readyNote, { color: colors.mutedForeground }]}>The recording is ready for voice-pitch processing.</Text>
-      ) : null}
     </ScrollView>
   );
 }
@@ -219,7 +255,10 @@ const styles = StyleSheet.create({
   status: { fontSize: 11.5, marginTop: 5, textAlign: 'center' },
   recordButton: { minHeight: 52, borderRadius: 15, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9 },
   recordButtonText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  secondaryButton: { marginTop: 10, minHeight: 46, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  previewRow: { flexDirection: 'row', gap: 9, marginTop: 10 },
+  previewButton: { minHeight: 48, borderRadius: 14, borderWidth: 1, flex: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+  previewText: { fontSize: 12.5, fontFamily: 'Inter_700Bold' },
+  discardButton: { minHeight: 48, borderRadius: 14, borderWidth: 1, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   secondaryButtonText: { fontSize: 12.5, fontFamily: 'Inter_700Bold' },
   helper: { fontSize: 11, lineHeight: 16, marginTop: 6, marginBottom: 10 },
   selected: { borderWidth: 1, borderRadius: 14, padding: 12 },
@@ -227,5 +266,4 @@ const styles = StyleSheet.create({
   selectedMeta: { fontSize: 10.5, marginTop: 4 },
   processButton: { minHeight: 52, borderRadius: 15, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9, paddingHorizontal: 14 },
   processButtonText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  readyNote: { fontSize: 11, lineHeight: 16, textAlign: 'center' },
 });
