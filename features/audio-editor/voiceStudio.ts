@@ -1,5 +1,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 
+export type VoiceStudioGender = 'male' | 'female';
+
 export type VoiceStudioModel = {
   id: string;
   name: string;
@@ -7,6 +9,7 @@ export type VoiceStudioModel = {
   kind: 'onnx';
   source: 'app' | 'device-folder';
   createdAt: number;
+  gender?: VoiceStudioGender;
 };
 
 const VOICE_MODELS_DIR = `${FileSystem.documentDirectory ?? ''}Nexus Plus/Voices/Voice Models/`;
@@ -14,6 +17,20 @@ const INDEX_URI = `${VOICE_MODELS_DIR}index.json`;
 
 function sanitizeName(value: string): string {
   return value.replace(/[\\/:*?"<>|]/g, '_').trim() || 'Voice Model';
+}
+
+function hasUsableVoiceName(value?: string | null): boolean {
+  const normalized = value?.trim();
+  if (!normalized) return false;
+  return !/^(?:voice|voice\s*model|custom\s*voice|model)(?:[\s_-]*\d+)?$/i.test(normalized);
+}
+
+export function getVoiceStudioDisplayName(model: Pick<VoiceStudioModel, 'name' | 'gender'>, index: number): string {
+  if (hasUsableVoiceName(model.name)) return model.name.trim();
+  const position = Math.max(1, index + 1);
+  if (model.gender === 'male') return `Male Voice ${position}`;
+  if (model.gender === 'female') return `Female Voice ${position}`;
+  return `Voice ${position}`;
 }
 
 async function ensureDirectory(): Promise<void> {
@@ -39,13 +56,25 @@ export async function loadVoiceStudioModels(): Promise<VoiceStudioModel[]> {
   }
 }
 
-export async function importVoiceStudioOnnx(uri: string, displayName?: string): Promise<VoiceStudioModel> {
+export async function importVoiceStudioOnnx(
+  uri: string,
+  displayName?: string,
+  gender?: VoiceStudioGender,
+): Promise<VoiceStudioModel> {
   if (!uri) throw new Error('Choose an ONNX voice model file.');
   await ensureDirectory();
   const baseName = sanitizeName(displayName || uri.split('/').pop()?.replace(/\.onnx$/i, '') || 'Voice Model');
   const destination = `${VOICE_MODELS_DIR}${baseName}-${Date.now()}.onnx`;
   await FileSystem.copyAsync({ from: uri, to: destination });
-  const model: VoiceStudioModel = { id: `onnx-${Date.now()}`, name: baseName, uri: destination, kind: 'onnx', source: 'app', createdAt: Date.now() };
+  const model: VoiceStudioModel = {
+    id: `onnx-${Date.now()}`,
+    name: baseName,
+    uri: destination,
+    kind: 'onnx',
+    source: 'app',
+    createdAt: Date.now(),
+    ...(gender ? { gender } : {}),
+  };
   const current = await loadVoiceStudioModels();
   await saveIndex([model, ...current]);
   return model;
@@ -61,7 +90,14 @@ export async function syncVoiceStudioFolder(): Promise<VoiceStudioModel[]> {
     const uri = `${VOICE_MODELS_DIR}${entry}`;
     if (!byUri.has(uri)) {
       const name = sanitizeName(entry.replace(/\.onnx$/i, ''));
-      byUri.set(uri, { id: `device-${entry}`, name, uri, kind: 'onnx', source: 'device-folder', createdAt: Date.now() });
+      byUri.set(uri, {
+        id: `device-${entry}`,
+        name,
+        uri,
+        kind: 'onnx',
+        source: 'device-folder',
+        createdAt: Date.now(),
+      });
     }
   }
   const models = Array.from(byUri.values());
