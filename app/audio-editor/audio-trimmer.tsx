@@ -1,13 +1,14 @@
 import { Feather } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, BackHandler, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { AudioEditorResultPanel } from '@/features/audio-editor/AudioEditorResultPanel';
 import { createAudioEditorOutputPath } from '@/features/audio-editor/audioEditorExport';
 import { discoverLocalAudio, pickAudioFromFileManager } from '@/features/audio-editor/audioEditorSource';
 import type { AudioEditorSource } from '@/features/audio-editor/types';
-import { assertAudioEditorNative, type AudioProbeResult } from '@/modules/audio-editor-native';
+import { assertAudioEditorNative, type AudioProbeResult, type AudioTrimResult } from '@/modules/audio-editor-native';
 
 function formatTime(ms: number): string {
   const totalSeconds = Math.max(0, Math.round(ms / 1000));
@@ -37,11 +38,36 @@ export default function AudioTrimmerScreen() {
   const [query, setQuery] = useState('');
   const [library, setLibrary] = useState<AudioEditorSource[]>([]);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState('Audio library ready. Choose an audio file to begin.');
+  const [result, setResult] = useState<AudioTrimResult | null>(null);
   const durationMs = probe?.durationMs ?? source?.durationMs ?? 0;
+
+  const reset = useCallback(() => {
+    setSource(null);
+    setProbe(null);
+    setResult(null);
+    setStartMs(0);
+    setEndMs(0);
+    setStartText('0:00');
+    setEndText('0:00');
+    setLibrary([]);
+    setMessage('Audio library ready. Choose an audio file to begin.');
+  }, []);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (source || result) {
+        reset();
+        return true;
+      }
+      return false;
+    });
+    return () => subscription.remove();
+  }, [reset, result, source]);
 
   const loadSource = useCallback(async (next: AudioEditorSource) => {
     setLoading(true);
+    setResult(null);
     setMessage('Reading audio metadata…');
     try {
       const native = assertAudioEditorNative();
@@ -70,10 +96,10 @@ export default function AudioTrimmerScreen() {
     setLoading(true);
     setMessage('Scanning local audio…');
     try {
-      const result = await discoverLocalAudio(query);
-      setLibrary(result.audio);
-      if (!result.permissionGranted) setMessage('Music and audio permission is required to scan local audio.');
-      else setMessage(`${result.audio.length} audio file${result.audio.length === 1 ? '' : 's'} found.`);
+      const found = await discoverLocalAudio(query);
+      setLibrary(found.audio);
+      if (!found.permissionGranted) setMessage('Music and audio permission is required to scan local audio.');
+      else setMessage(`${found.audio.length} audio file${found.audio.length === 1 ? '' : 's'} found.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to scan local audio.');
     } finally {
@@ -117,7 +143,7 @@ export default function AudioTrimmerScreen() {
 
   const stepMs = Math.max(100, Math.min(1000, durationMs / 100));
   const cutDuration = Math.max(0, endMs - startMs);
-  const validRange = Boolean(source && durationMs > 0 && startMs >= 0 && endMs > startMs && endMs <= durationMs);
+  const validRange = Boolean(source && durationMs > 0 && startMs >= 0 && endMs > startMs && endMs <= durationMs && !loading && !result);
 
   const smartSuggestion = useMemo(() => {
     if (!durationMs) return null;
@@ -134,21 +160,22 @@ export default function AudioTrimmerScreen() {
     setMessage('Smart ringtone-length suggestion applied. Review the range before exporting.');
   };
 
-  const exportTrim = async () => {
+  const exportTrim = useCallback(async () => {
     if (!source || !validRange) return;
     setLoading(true);
     setMessage('Exporting trimmed audio…');
     try {
       const native = assertAudioEditorNative();
-      const outputPath = await createAudioEditorOutputPath('Audio Trims', source.name);
-      await native.trim(source.uri, outputPath, startMs, endMs);
-      setMessage(`Export complete: ${outputPath}`);
+      const outputPath = await createAudioEditorOutputPath('Audio Trims', source.name, 'trim', 'm4a');
+      const trimmed = await native.trim(source.uri, outputPath, startMs, endMs);
+      setResult(trimmed);
+      setMessage('Audio trimmed and saved successfully to Nexus Plus // audio // audio trims.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to export the trimmed audio.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [endMs, loading, source, startMs, validRange]);
 
   return (
     <ScrollView
@@ -163,87 +190,94 @@ export default function AudioTrimmerScreen() {
         </View>
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Audio Trimmer</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Choose an audio file, set exact boundaries, and export a real trimmed file.</Text>
+          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Choose an audio file, set exact boundaries, and save a real trimmed file.</Text>
         </View>
       </View>
 
-      <Pressable onPress={selectFromFileManager} accessibilityRole="button" style={[styles.primaryButton, { backgroundColor: colors.primary }]}>
-        <Feather name="folder" size={19} color={colors.primaryForeground} />
-        <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Choose from File Manager</Text>
-      </Pressable>
+      {!result && (
+        <>
+          <Pressable onPress={selectFromFileManager} disabled={loading} accessibilityRole="button" accessibilityState={{ disabled: loading }} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: loading ? 0.65 : 1 }]}>
+            <Feather name="folder" size={19} color={colors.primaryForeground} />
+            <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Choose from File Manager</Text>
+          </Pressable>
 
-      <View style={styles.searchRow}>
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search local audio"
-          placeholderTextColor={colors.mutedForeground}
-          style={[styles.searchInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]}
-          accessibilityLabel="Search local audio"
-        />
-        <Pressable onPress={discover} accessibilityRole="button" style={[styles.scanButton, { backgroundColor: colors.secondary }]}>
-          <Feather name="search" size={19} color={colors.primary} />
-        </Pressable>
-      </View>
-
-      {library.length > 0 && (
-        <View style={styles.libraryList}>
-          {library.map((item) => (
-            <Pressable key={item.id} onPress={() => loadSource(item)} style={[styles.libraryItem, { borderColor: colors.border, backgroundColor: colors.card }]}>
-              <Feather name="music" size={18} color={colors.primary} />
-              <View style={styles.libraryCopy}>
-                <Text numberOfLines={1} style={[styles.itemTitle, { color: colors.foreground }]}>{item.name}</Text>
-                <Text style={[styles.itemMeta, { color: colors.mutedForeground }]}>{formatTime(item.durationMs)}</Text>
-              </View>
+          <View style={styles.searchRow}>
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search local audio"
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.searchInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]}
+              accessibilityLabel="Search local audio"
+            />
+            <Pressable onPress={discover} disabled={loading} accessibilityRole="button" accessibilityState={{ disabled: loading }} style={[styles.scanButton, { backgroundColor: colors.secondary, opacity: loading ? 0.65 : 1 }]}>
+              <Feather name="search" size={19} color={colors.primary} />
             </Pressable>
-          ))}
-        </View>
-      )}
-
-      {source && (
-        <View style={[styles.editorCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.sourceTitle, { color: colors.foreground }]} numberOfLines={1}>{source.name}</Text>
-          <Text style={[styles.metadata, { color: colors.mutedForeground }]}>{formatTime(durationMs)} • {probe?.sampleRate ? `${probe.sampleRate} Hz` : 'Unknown sample rate'} • {probe?.channels ?? 0} channel(s)</Text>
-
-          <View style={[styles.timeline, { backgroundColor: colors.secondary }]}>
-            <View style={[styles.timelineSelected, { backgroundColor: colors.primary, left: durationMs ? `${(startMs / durationMs) * 100}%` : '0%', right: durationMs ? `${100 - (endMs / durationMs) * 100}%` : '0%' }]} />
           </View>
 
-          <View style={styles.timeRow}>
-            <Text style={[styles.rangeLabel, { color: colors.mutedForeground }]}>Start</Text>
-            <Text style={[styles.rangeValue, { color: colors.foreground }]}>{formatTime(startMs)}</Text>
-            <Text style={[styles.rangeLabel, { color: colors.mutedForeground }]}>End</Text>
-            <Text style={[styles.rangeValue, { color: colors.foreground }]}>{formatTime(endMs)}</Text>
-          </View>
-
-          <View style={styles.nudgeRow}>
-            <Pressable onPress={() => updateStart(startMs - stepMs)} style={[styles.smallButton, { borderColor: colors.border }]}><Text style={[styles.smallButtonText, { color: colors.foreground }]}>Start −</Text></Pressable>
-            <Pressable onPress={() => updateStart(startMs + stepMs)} style={[styles.smallButton, { borderColor: colors.border }]}><Text style={[styles.smallButtonText, { color: colors.foreground }]}>Start +</Text></Pressable>
-            <Pressable onPress={() => updateEnd(endMs - stepMs)} style={[styles.smallButton, { borderColor: colors.border }]}><Text style={[styles.smallButtonText, { color: colors.foreground }]}>End −</Text></Pressable>
-            <Pressable onPress={() => updateEnd(endMs + stepMs)} style={[styles.smallButton, { borderColor: colors.border }]}><Text style={[styles.smallButtonText, { color: colors.foreground }]}>End +</Text></Pressable>
-          </View>
-
-          <View style={styles.inputsRow}>
-            <TextInput value={startText} onChangeText={setStartText} onBlur={applyStartText} placeholder="0:00" placeholderTextColor={colors.mutedForeground} style={[styles.timeInput, { color: colors.foreground, borderColor: colors.border }]} accessibilityLabel="Trim start time" />
-            <TextInput value={endText} onChangeText={setEndText} onBlur={applyEndText} placeholder={formatTime(durationMs)} placeholderTextColor={colors.mutedForeground} style={[styles.timeInput, { color: colors.foreground, borderColor: colors.border }]} accessibilityLabel="Trim end time" />
-          </View>
-
-          {smartSuggestion && (
-            <Pressable onPress={applySmartSuggestion} style={[styles.secondaryButton, { borderColor: colors.primary }]} accessibilityRole="button">
-              <Feather name="zap" size={18} color={colors.primary} />
-              <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>Suggest ringtone cut ({formatTime(smartSuggestion.start)}–{formatTime(smartSuggestion.end)})</Text>
-            </Pressable>
+          {library.length > 0 && (
+            <View style={styles.libraryList}>
+              {library.map((item) => (
+                <Pressable key={item.id} onPress={() => loadSource(item)} disabled={loading} accessibilityRole="button" accessibilityLabel={`Select ${item.name}`} style={[styles.libraryItem, { borderColor: colors.border, backgroundColor: colors.card, opacity: loading ? 0.65 : 1 }]}>
+                  <Feather name="music" size={18} color={colors.primary} />
+                  <View style={styles.libraryCopy}>
+                    <Text numberOfLines={1} style={[styles.itemTitle, { color: colors.foreground }]}>{item.name}</Text>
+                    <Text style={[styles.itemMeta, { color: colors.mutedForeground }]}>{formatTime(item.durationMs)}</Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
           )}
 
-          <Text style={[styles.durationText, { color: colors.mutedForeground }]}>Selected length: {formatTime(cutDuration)}</Text>
-          <Pressable disabled={!validRange || loading} onPress={exportTrim} style={[styles.primaryButton, { backgroundColor: validRange ? colors.primary : colors.muted }]} accessibilityRole="button">
-            {loading ? <ActivityIndicator color={colors.primaryForeground} /> : <Feather name="download" size={19} color={colors.primaryForeground} />}
-            <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{loading ? 'Working…' : 'Export Trimmed Audio'}</Text>
-          </Pressable>
-        </View>
+          {source && (
+            <View style={[styles.editorCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.sourceTitle, { color: colors.foreground }]} numberOfLines={1}>{source.name}</Text>
+              <Text style={[styles.metadata, { color: colors.mutedForeground }]}>{formatTime(durationMs)} • {probe?.sampleRate ? `${probe.sampleRate} Hz` : 'Unknown sample rate'} • {probe?.channels ?? 0} channel(s)</Text>
+
+              <View style={[styles.timeline, { backgroundColor: colors.secondary }]}>
+                <View style={[styles.timelineSelected, { backgroundColor: colors.primary, left: durationMs ? `${(startMs / durationMs) * 100}%` : '0%', right: durationMs ? `${100 - (endMs / durationMs) * 100}%` : '0%' }]} />
+              </View>
+
+              <View style={styles.timeRow}>
+                <Text style={[styles.rangeLabel, { color: colors.mutedForeground }]}>Start</Text>
+                <Text style={[styles.rangeValue, { color: colors.foreground }]}>{formatTime(startMs)}</Text>
+                <Text style={[styles.rangeLabel, { color: colors.mutedForeground }]}>End</Text>
+                <Text style={[styles.rangeValue, { color: colors.foreground }]}>{formatTime(endMs)}</Text>
+              </View>
+
+              <View style={styles.nudgeRow}>
+                <Pressable onPress={() => updateStart(startMs - stepMs)} disabled={loading} style={[styles.smallButton, { borderColor: colors.border }]}><Text style={[styles.smallButtonText, { color: colors.foreground }]}>Start −</Text></Pressable>
+                <Pressable onPress={() => updateStart(startMs + stepMs)} disabled={loading} style={[styles.smallButton, { borderColor: colors.border }]}><Text style={[styles.smallButtonText, { color: colors.foreground }]}>Start +</Text></Pressable>
+                <Pressable onPress={() => updateEnd(endMs - stepMs)} disabled={loading} style={[styles.smallButton, { borderColor: colors.border }]}><Text style={[styles.smallButtonText, { color: colors.foreground }]}>End −</Text></Pressable>
+                <Pressable onPress={() => updateEnd(endMs + stepMs)} disabled={loading} style={[styles.smallButton, { borderColor: colors.border }]}><Text style={[styles.smallButtonText, { color: colors.foreground }]}>End +</Text></Pressable>
+              </View>
+
+              <View style={styles.inputsRow}>
+                <TextInput value={startText} onChangeText={setStartText} onBlur={applyStartText} placeholder="0:00" placeholderTextColor={colors.mutedForeground} style={[styles.timeInput, { color: colors.foreground, borderColor: colors.border }]} accessibilityLabel="Trim start time" keyboardType="numeric" />
+                <TextInput value={endText} onChangeText={setEndText} onBlur={applyEndText} placeholder={formatTime(durationMs)} placeholderTextColor={colors.mutedForeground} style={[styles.timeInput, { color: colors.foreground, borderColor: colors.border }]} accessibilityLabel="Trim end time" keyboardType="numeric" />
+              </View>
+
+              {smartSuggestion && (
+                <Pressable onPress={applySmartSuggestion} disabled={loading} style={[styles.secondaryButton, { borderColor: colors.primary, opacity: loading ? 0.65 : 1 }]} accessibilityRole="button" accessibilityState={{ disabled: loading }}>
+                  <Feather name="zap" size={18} color={colors.primary} />
+                  <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>Suggest ringtone cut ({formatTime(smartSuggestion.start)}–{formatTime(smartSuggestion.end)})</Text>
+                </Pressable>
+              )}
+
+              <Text style={[styles.durationText, { color: colors.mutedForeground }]}>Selected length: {formatTime(cutDuration)}</Text>
+              <Pressable disabled={!validRange} onPress={exportTrim} style={[styles.primaryButton, { backgroundColor: validRange ? colors.primary : colors.muted }]} accessibilityRole="button" accessibilityState={{ disabled: !validRange }}>
+                {loading ? <ActivityIndicator color={colors.primaryForeground} /> : <Feather name="check" size={19} color={colors.primaryForeground} />}
+                <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{loading ? 'Saving…' : 'Generate Trimmed Audio'}</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {!source && <View style={[styles.emptyCard, { borderColor: colors.border, backgroundColor: colors.card }]}><Feather name="music" size={24} color={colors.primary} /><Text style={[styles.emptyTitle, { color: colors.foreground }]}>Audio library</Text><Text style={[styles.meta, { color: colors.mutedForeground }]}>Choose audio from the file manager or search the local audio library.</Text></View>}
+        </>
       )}
 
-      {!!message && <Text accessibilityLiveRegion="polite" style={[styles.message, { color: colors.mutedForeground }]}>{message}</Text>}
+      {result && <AudioEditorResultPanel outputPath="Nexus Plus // audio // audio trims" resultUri={result.outputPath} message="Audio trimmed and saved successfully to Nexus Plus // audio // audio trims." onClose={reset} />}
+      {!result && !!message && <Text accessibilityLiveRegion="polite" style={[styles.message, { color: colors.mutedForeground }]}>{message}</Text>}
     </ScrollView>
   );
 }
@@ -281,5 +315,8 @@ const styles = StyleSheet.create({
   secondaryButton: { minHeight: 48, borderWidth: 1, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 12 },
   secondaryButtonText: { fontSize: 11.5, fontFamily: 'Inter_700Bold' },
   durationText: { fontSize: 11 },
+  emptyCard: { marginTop: 16, borderWidth: 1, borderRadius: 18, padding: 18, gap: 8 },
+  emptyTitle: { fontSize: 14, fontFamily: 'Inter_700Bold' },
+  meta: { fontSize: 10.5, lineHeight: 15 },
   message: { fontSize: 11, lineHeight: 16, marginTop: 14 },
 });
