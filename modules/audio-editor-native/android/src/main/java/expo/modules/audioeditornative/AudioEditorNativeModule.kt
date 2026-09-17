@@ -11,35 +11,21 @@ class AudioEditorNativeModule : Module() {
     Name("AudioEditorNative")
 
     AsyncFunction("probe") { inputPath: String, promise: Promise ->
-      try {
-        promise.resolve(probeAudio(inputPath))
-      } catch (error: Exception) {
-        promise.reject("AUDIO_PROBE_FAILED", error.message ?: "Unable to inspect audio", error)
-      }
+      try { promise.resolve(probeAudio(inputPath)) }
+      catch (error: Exception) { promise.reject("AUDIO_PROBE_FAILED", error.message ?: "Unable to inspect audio", error) }
     }
 
     AsyncFunction("trim") { inputPath: String, outputPath: String, startMs: Double, endMs: Double, promise: Promise ->
-      try {
-        promise.resolve(AudioTrimProcessor.trim(appContext.reactContext, inputPath, outputPath, startMs, endMs))
-      } catch (error: Exception) {
-        promise.reject("AUDIO_TRIM_FAILED", error.message ?: "Unable to trim audio", error)
-      }
+      try { promise.resolve(AudioTrimProcessor.trim(appContext.reactContext, inputPath, outputPath, startMs, endMs)) }
+      catch (error: Exception) { promise.reject("AUDIO_TRIM_FAILED", error.message ?: "Unable to trim audio", error) }
     }
 
     AsyncFunction("decode") { inputPath: String, promise: Promise ->
       try {
         val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
         val decoded = AndroidAudioDecoder(context).decode(inputPath)
-        promise.resolve(mapOf(
-          "sampleRate" to decoded.sampleRate,
-          "channels" to decoded.channels,
-          "frameCount" to decoded.frameCount,
-          "durationMs" to decoded.durationMs,
-          "samples" to decoded.samples.toList(),
-        ))
-      } catch (error: Exception) {
-        promise.reject("AUDIO_DECODE_FAILED", error.message ?: "Unable to decode audio", error)
-      }
+        promise.resolve(mapOf("sampleRate" to decoded.sampleRate, "channels" to decoded.channels, "frameCount" to decoded.frameCount, "durationMs" to decoded.durationMs, "samples" to decoded.samples.toList()))
+      } catch (error: Exception) { promise.reject("AUDIO_DECODE_FAILED", error.message ?: "Unable to decode audio", error) }
     }
 
     AsyncFunction("mix") { input: Map<String, Any?>, promise: Promise ->
@@ -50,15 +36,8 @@ class AudioEditorNativeModule : Module() {
         val outputPath = input["outputPath"] as? String ?: error("Output audio path is required.")
         val startMs = (input["overlayStartMs"] as? Number)?.toDouble() ?: 0.0
         val volume = (input["overlayVolume"] as? Number)?.toDouble() ?: 1.0
-        promise.resolve(AudioMixProcessor.mix(
-          context,
-          basePath,
-          AudioMixProcessor.Clip(overlayPath, startMs, volume),
-          outputPath,
-        ))
-      } catch (error: Exception) {
-        promise.reject("AUDIO_MIX_FAILED", error.message ?: "Unable to mix audio", error)
-      }
+        promise.resolve(AudioMixProcessor.mix(context, basePath, AudioMixProcessor.Clip(overlayPath, startMs, volume), outputPath))
+      } catch (error: Exception) { promise.reject("AUDIO_MIX_FAILED", error.message ?: "Unable to mix audio", error) }
     }
 
     AsyncFunction("mixProject") { input: Map<String, Any?>, promise: Promise ->
@@ -75,9 +54,22 @@ class AudioEditorNativeModule : Module() {
           AudioMixProcessor.Clip(path, startMs, volume)
         }
         promise.resolve(AudioMixProcessor.mixProject(context, basePath, overlays, outputPath))
-      } catch (error: Exception) {
-        promise.reject("AUDIO_MIX_PROJECT_FAILED", error.message ?: "Unable to mix audio project", error)
-      }
+      } catch (error: Exception) { promise.reject("AUDIO_MIX_PROJECT_FAILED", error.message ?: "Unable to mix audio project", error) }
+    }
+
+    AsyncFunction("synthesizePiper") { input: Map<String, Any?>, promise: Promise ->
+      try {
+        val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
+        val text = input["text"] as? String ?: error("Text is required.")
+        val modelPath = input["modelPath"] as? String ?: error("ONNX voice model path is required.")
+        val configPath = input["configPath"] as? String ?: error("Voice configuration path is required.")
+        val lengthScale = (input["lengthScale"] as? Number)?.toDouble() ?: 1.0
+        val pitchScale = (input["pitchScale"] as? Number)?.toDouble() ?: 1.0
+        val emotion = input["emotion"] as? String ?: "neutral"
+        val clone = input["clone"] as? Boolean ?: false
+        val outputPath = java.io.File(context.cacheDir, "nexus-tts-${System.currentTimeMillis()}.wav").absolutePath
+        promise.resolve(mapOf("outputPath" to PiperTtsProcessor.synthesize(context, text, modelPath, configPath, outputPath, lengthScale, pitchScale, emotion, clone)))
+      } catch (error: Exception) { promise.reject("PIPER_SYNTHESIS_FAILED", error.message ?: "Unable to synthesize speech", error) }
     }
   }
 
@@ -99,7 +91,6 @@ class AudioEditorNativeModule : Module() {
       var sampleRate = 0
       var channels = 0
       var mimeType: String? = null
-
       for (index in 0 until extractor.trackCount) {
         val format = extractor.getTrackFormat(index)
         val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
@@ -113,14 +104,7 @@ class AudioEditorNativeModule : Module() {
         }
       }
       require(audioTrack >= 0) { "No supported audio track was found." }
-      return mapOf(
-        "durationMs" to durationUs / 1000.0,
-        "sampleRate" to sampleRate,
-        "channels" to channels,
-        "mimeType" to mimeType,
-      )
-    } finally {
-      extractor.release()
-    }
+      return mapOf("durationMs" to durationUs / 1000.0, "sampleRate" to sampleRate, "channels" to channels, "mimeType" to mimeType)
+    } finally { extractor.release() }
   }
 }
