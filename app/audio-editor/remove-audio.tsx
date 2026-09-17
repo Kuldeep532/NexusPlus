@@ -2,18 +2,12 @@ import { Feather } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { AudioEditorResultPanel } from '@/features/audio-editor/AudioEditorResultPanel';
+import { VideoEditorResultPanel } from '@/features/audio-editor/VideoEditorResultPanel';
 import { removeAudioFromVideo } from '@/features/audio-editor/removeVideoAudio';
-
-function formatTime(ms: number | null | undefined): string {
-  if (!Number.isFinite(ms)) return 'Unknown duration';
-  const total = Math.max(0, Math.round((ms ?? 0) / 1000));
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
-}
 
 export default function RemoveAudioScreen() {
   const colors = useColors();
@@ -23,15 +17,9 @@ export default function RemoveAudioScreen() {
   const [result, setResult] = useState<string | null>(null);
   const [message, setMessage] = useState('Choose a video to create an audio-free copy.');
 
-  useEffect(() => () => {}, []);
-
   const chooseVideo = useCallback(async () => {
     if (working) return;
-    const picked = await DocumentPicker.getDocumentAsync({
-      type: ['video/*'],
-      multiple: false,
-      copyToCacheDirectory: true,
-    });
+    const picked = await DocumentPicker.getDocumentAsync({ type: ['video/*'], multiple: false, copyToCacheDirectory: true });
     if (picked.canceled || !picked.assets?.[0]) return;
     const asset = picked.assets[0];
     setVideo({ uri: asset.uri, name: asset.name || 'video', mimeType: asset.mimeType });
@@ -62,30 +50,23 @@ export default function RemoveAudioScreen() {
   const reset = useCallback(() => {
     setVideo(null);
     setResult(null);
+    setWorking(false);
     setMessage('Choose a video to create an audio-free copy.');
   }, []);
 
   return (
     <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 18, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 36 }}>
       <Stack.Screen options={{ title: 'Remove Audio from Video' }} />
-      <View style={styles.headerRow}>
-        <View style={[styles.heroIcon, { backgroundColor: colors.secondary }]}><Feather name="volume-x" size={24} color={colors.primary} /></View>
-        <View style={styles.headerCopy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Remove Audio from Video</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Create a copy of a video without its audio tracks. The original file stays unchanged.</Text></View>
-      </View>
-
+      <View style={styles.headerRow}><View style={[styles.heroIcon, { backgroundColor: colors.secondary }]}><Feather name="volume-x" size={24} color={colors.primary} /></View><View style={styles.headerCopy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Remove Audio from Video</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Create a copy of a video without its audio tracks. The original file stays unchanged.</Text></View></View>
       {!result && <>
-        <Pressable onPress={chooseVideo} disabled={working} accessibilityRole="button" accessibilityState={{ disabled: working }} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: working ? 0.65 : 1 }]}>
-          <Feather name="video" size={19} color={colors.primaryForeground} /><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Choose Video</Text>
-        </Pressable>
-
+        <Pressable onPress={chooseVideo} disabled={working} accessibilityRole="button" accessibilityState={{ disabled: working }} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: working ? 0.65 : 1 }]}><Feather name="video" size={19} color={colors.primaryForeground} /><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Choose Video</Text></Pressable>
         {video && <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.fileRow}><View style={[styles.fileIcon, { backgroundColor: colors.secondary }]}><Feather name="file" size={20} color={colors.primary} /></View><View style={styles.fileCopy}><Text numberOfLines={2} style={[styles.fileName, { color: colors.foreground }]}>{video.name}</Text><Text style={[styles.meta, { color: colors.mutedForeground }]}>{video.mimeType || 'Video file'}</Text></View></View>
-          <View style={[styles.infoBox, { borderColor: colors.border, backgroundColor: colors.secondary }]}><Feather name="check-circle" size={18} color={colors.primary} /><Text style={[styles.infoText, { color: colors.foreground }]}>Only the audio track is removed. Video frames are copied to the new MP4 output without video re-encoding.</Text></View>
+          <View style={[styles.infoBox, { borderColor: colors.border, backgroundColor: colors.secondary }]}><Feather name="check-circle" size={18} color={colors.primary} /><Text style={[styles.infoText, { color: colors.foreground }]}>Only audio tracks are removed. Video frames are copied to a new MP4 without video re-encoding.</Text></View>
           <Pressable onPress={removeAudio} disabled={working} accessibilityRole="button" accessibilityState={{ disabled: working }} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: working ? 0.65 : 1 }]}>{working ? <ActivityIndicator color={colors.primaryForeground} /> : <Feather name="volume-x" size={19} color={colors.primaryForeground} />}<Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{working ? 'Removing Audio…' : 'Remove Audio'}</Text></Pressable>
         </View>}
       </>}
-
-      {result && <AudioEditorResultPanel outputPath={result} resultUri={`file://${result}`} message="Audio removed successfully. Audio-free video copy saved locally." onClose={reset} />}
+      {result && <VideoEditorResultPanel outputPath={result} resultUri={`file://${result}`} message="Audio removed successfully. Audio-free video copy saved locally." onClose={reset} />}
       {!!message && <Text accessibilityLiveRegion="polite" style={[styles.message, { color: colors.mutedForeground }]}>{message}</Text>}
       {working && <Text style={[styles.meta, { color: colors.mutedForeground, textAlign: 'center', marginTop: 10 }]}>Processing is running natively.</Text>}
     </ScrollView>
