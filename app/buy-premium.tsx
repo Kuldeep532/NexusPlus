@@ -38,12 +38,10 @@ export default function BuyPremiumScreen() {
     if (!selectedPlan || busy) return;
     setBusy(true);
     try {
-      const transaction = await createPendingTransaction(selectedPlan.planId, selectedPlan.amount);
-      const upiUrl = `upi://pay?pa=${encodeURIComponent(selectedPlan.upiId)}&pn=${encodeURIComponent(selectedPlan.merchantName)}&am=${encodeURIComponent(selectedPlan.amount.toFixed(2))}&cu=INR&tn=${encodeURIComponent(`Nexus Plus ${selectedPlan.planName} ${transaction.transactionId}`)}`;
+      const transaction = await createPendingTransaction(selectedPlan.planId);
+      const upiUrl = `upi://pay?pa=${encodeURIComponent(transaction.upiId)}&pn=${encodeURIComponent(transaction.merchantName)}&am=${encodeURIComponent(transaction.amount.toFixed(2))}&cu=INR&tn=${encodeURIComponent(`Nexus Plus ${selectedPlan.planName} ${transaction.transactionId}`)}`;
       const supported = await Linking.canOpenURL(upiUrl);
-      if (!supported) {
-        throw new Error('NO_UPI_APP_AVAILABLE');
-      }
+      if (!supported) throw new Error('NO_UPI_APP_AVAILABLE');
       await Linking.openURL(upiUrl);
     } catch (error) {
       const code = error instanceof Error ? error.message : '';
@@ -77,15 +75,16 @@ export default function BuyPremiumScreen() {
 
         {loading ? <Text style={[styles.stateText, { color: colors.mutedForeground }]}>Loading Premium plans…</Text> : null}
         {message ? <View style={[styles.errorBox, { borderColor: colors.destructive, backgroundColor: colors.card }]}><Text style={[styles.errorText, { color: colors.destructive }]}>{message}</Text></View> : null}
+        {!loading && !message && plans.length === 0 ? <Text style={[styles.stateText, { color: colors.mutedForeground }]}>No active Premium plans are available right now.</Text> : null}
 
         <View style={styles.planList}>
           {plans.map((plan) => {
             const selected = selectedId === plan.planId;
             return (
-              <Pressable key={plan.planId} accessibilityRole="radio" accessibilityState={{ selected }} accessibilityLabel={`${plan.planName}. ₹${plan.amount.toFixed(2)}`} onPress={() => setSelectedId(plan.planId)} style={[styles.planCard, { backgroundColor: colors.card, borderColor: selected ? colors.primary : colors.border }]}> 
+              <Pressable key={plan.planId} accessibilityRole="radio" accessibilityState={{ selected }} accessibilityLabel={`${plan.planName}. ₹${plan.amount.toFixed(2)}. UPI ${plan.upiId}`} onPress={() => setSelectedId(plan.planId)} style={[styles.planCard, { backgroundColor: colors.card, borderColor: selected ? colors.primary : colors.border }]}> 
                 <View style={styles.planTop}>
                   <View style={styles.planNameWrap}><Text style={[styles.planName, { color: colors.foreground }]}>{plan.planName}</Text><Text style={[styles.planMerchant, { color: colors.mutedForeground }]}>Pay to {plan.merchantName}</Text></View>
-                  <View style={styles.priceWrap}><Text style={[styles.price, { color: colors.foreground }]}>₹{plan.amount.toFixed(2)}</Text><Text style={[styles.cadence, { color: colors.mutedForeground }]}>from Supabase</Text></View>
+                  <View style={styles.priceWrap}><Text style={[styles.price, { color: colors.foreground }]}>₹{plan.amount.toFixed(2)}</Text><Text style={[styles.cadence, { color: colors.mutedForeground }]}>dynamic</Text></View>
                 </View>
                 <View style={[styles.upiBox, { backgroundColor: colors.secondary }]}><Feather name="smartphone" size={15} color={colors.primary} /><Text selectable style={[styles.upiText, { color: colors.secondaryForeground }]}>{plan.upiId}</Text></View>
                 <View style={[styles.radio, { borderColor: selected ? colors.primary : colors.mutedForeground }]}>{selected ? <View style={[styles.radioDot, { backgroundColor: colors.primary }]} /> : null}</View>
@@ -94,14 +93,14 @@ export default function BuyPremiumScreen() {
           })}
         </View>
 
-        {selectedPlan ? <View style={[styles.summary, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.summaryTitle, { color: colors.foreground }]}>Selected plan: {selectedPlan.planName}</Text><Text style={[styles.summaryBody, { color: colors.mutedForeground }]}>Your UPI app receives the exact amount and merchant UPI loaded from Supabase. Premium is activated only after backend verification of the payment and UTR.</Text></View> : null}
+        {selectedPlan ? <View style={[styles.summary, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.summaryTitle, { color: colors.foreground }]}>Selected plan: {selectedPlan.planName}</Text><Text style={[styles.summaryBody, { color: colors.mutedForeground }]}>The payment opens Android's available UPI apps using the merchant UPI and amount returned from Supabase. Premium activation requires trusted backend verification of the UTR.</Text></View> : null}
 
-        <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy || !selectedPlan, busy }} disabled={busy || !selectedPlan} onPress={() => void beginPayment()} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: busy || !selectedPlan ? 0.65 : 1 }]}>
+        <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy || !selectedPlan, busy }} accessibilityLabel={selectedPlan ? `Pay ${selectedPlan.amount.toFixed(2)} rupees with UPI` : 'Select a plan'} disabled={busy || !selectedPlan} onPress={() => void beginPayment()} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: busy || !selectedPlan ? 0.65 : 1 }]}>
           <Feather name="send" size={18} color="#FFFFFF" />
           <Text style={styles.primaryButtonText}>{busy ? 'Opening UPI…' : selectedPlan ? `Pay ₹${selectedPlan.amount.toFixed(2)} with UPI` : 'Select a plan'}</Text>
         </Pressable>
 
-        <Text style={[styles.legal, { color: colors.mutedForeground }]}>After payment, the transaction must be verified server-side before Premium access is granted. Never enter a UPI PIN anywhere except inside your chosen UPI app.</Text>
+        <Text style={[styles.legal, { color: colors.mutedForeground }]}>Never enter your UPI PIN in Nexus Plus. Enter it only inside your selected UPI app. Payment success does not activate Premium until the backend verifies the transaction.</Text>
       </ScrollView>
     </View>
   );
@@ -116,7 +115,7 @@ const styles = StyleSheet.create({
   crown: { width: 58, height: 58, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   heroTitle: { fontSize: 24, lineHeight: 30, fontFamily: 'Inter_700Bold', textAlign: 'center' },
   heroBody: { fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 9, maxWidth: 360 },
-  stateText: { textAlign: 'center', fontSize: 12, paddingVertical: 14 },
+  stateText: { textAlign: 'center', fontSize: 12, paddingHorizontal: 22, paddingVertical: 14 },
   errorBox: { marginHorizontal: 16, marginBottom: 12, borderWidth: 1, borderRadius: 14, padding: 12 },
   errorText: { fontSize: 11, lineHeight: 16 },
   planList: { paddingHorizontal: 16, gap: 12 },
