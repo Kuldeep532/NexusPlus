@@ -1,0 +1,11 @@
+export type TtsProvider = 'piper' | 'clone' | 'system';
+export type TtsEmotion = 'neutral' | 'happy' | 'sad' | 'laughing' | 'crying' | 'excited' | 'calm' | 'angry';
+export type TtsSettings = { speed: number; pitch: number; autoTune: boolean };
+export type TtsAnalysis = { emotion: TtsEmotion; speed: number; pitch: number };
+export type TtsVoiceOption = any;
+export type TtsGenerateResult = { provider: Exclude<TtsProvider, 'system'>; outputUri: string; analysis: TtsAnalysis; voiceId: string };
+export declare function listTtsVoices(): Promise<TtsVoiceOption[]>;
+export declare function analyzeTextEmotion(text: string): TtsAnalysis;
+export declare function generateWithPiper(text: string, voice: any, settings?: TtsSettings): Promise<TtsGenerateResult>;
+export declare function playGeneratedAudio(uri: string): Promise<() => void>;
+export declare function stopSpeech(): Promise<void>;
