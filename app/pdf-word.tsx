@@ -6,10 +6,9 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { preparePdfOutputPath } from '@/features/pdf-native/pdfPageOperations';
-import { convertPdfToWord, convertWordToPdf } from '@/features/pdf-word/pdfWordConversion';
+import { convertWordToPdf } from '@/features/pdf-word/pdfWordConversion';
 import { PdfToolResultPanel } from '@/features/pdf-native/PdfToolResultPanel';
 
-type Direction = 'pdf-to-word' | 'word-to-pdf';
 type PickedFile = { uri: string; name: string };
 
 function safeBaseName(name: string): string {
@@ -19,17 +18,15 @@ function safeBaseName(name: string): string {
 export default function PdfWordScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const [direction, setDirection] = useState<Direction>('pdf-to-word');
   const [file, setFile] = useState<PickedFile | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
 
-  const isPdfToWord = direction === 'pdf-to-word';
-  const inputMime = isPdfToWord ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-  const inputLabel = isPdfToWord ? 'PDF file' : 'Word document';
-  const outputLabel = isPdfToWord ? 'Word document (.docx)' : 'PDF document';
-  const title = 'PDF ⇄ Word';
+  const inputMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  const inputLabel = 'Word document';
+  const outputLabel = 'PDF document';
+  const title = 'Word to PDF';
 
   async function pickFile() {
     setStatus('');
@@ -37,7 +34,7 @@ export default function PdfWordScreen() {
     const picked = await DocumentPicker.getDocumentAsync({ type: inputMime, multiple: false, copyToCacheDirectory: true });
     if (picked.canceled || !picked.assets?.[0]) return;
     const asset = picked.assets[0];
-    setFile({ uri: asset.uri, name: asset.name || (isPdfToWord ? 'document.pdf' : 'document.docx') });
+    setFile({ uri: asset.uri, name: asset.name || 'document.docx' });
     setStatus(`${inputLabel} selected.`);
   }
 
@@ -47,11 +44,9 @@ export default function PdfWordScreen() {
     setResult(null);
     setStatus(`Converting to ${outputLabel}…`);
     try {
-      const base = safeBaseName(file.name);
-      const outputName = isPdfToWord ? `${base}.docx` : `${base}.pdf`;
-      const outputCategory = isPdfToWord ? 'PDF to Word' : 'Word to PDF';
-      const outputPath = await preparePdfOutputPath(outputCategory, outputName);
-      const uri = isPdfToWord ? await convertPdfToWord(file.uri, outputPath) : await convertWordToPdf(file.uri, outputPath);
+      const outputName = `${safeBaseName(file.name)}.pdf`;
+      const outputPath = await preparePdfOutputPath('Word to PDF', outputName);
+      const uri = await convertWordToPdf(file.uri, outputPath);
       setResult(uri);
       setStatus(`Conversion completed. ${outputLabel} saved.`);
     } catch (error) {
@@ -59,14 +54,6 @@ export default function PdfWordScreen() {
     } finally {
       setBusy(false);
     }
-  }
-
-  function switchDirection(next: Direction) {
-    if (direction === next) return;
-    setDirection(next);
-    setFile(null);
-    setResult(null);
-    setStatus('');
   }
 
   function reset() {
@@ -90,26 +77,15 @@ export default function PdfWordScreen() {
             <View style={[styles.icon, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="file-swap-outline" size={29} color={colors.primary} /></View>
             <View style={styles.copy}>
               <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>{title}</Text>
-              <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Document conversion powered by the configured Gotenberg service.</Text>
+              <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Convert Word documents to PDF using the configured Gotenberg service.</Text>
             </View>
-          </View>
-
-          <View accessibilityRole="tablist" style={[styles.segment, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Pressable accessibilityRole="tab" accessibilityState={{ selected: isPdfToWord }} accessibilityLabel="PDF to Word" onPress={() => switchDirection('pdf-to-word')} style={[styles.segmentButton, isPdfToWord && { backgroundColor: colors.primary }]}>
-              <Feather name="file-text" size={17} color={isPdfToWord ? colors.primaryForeground : colors.foreground} />
-              <Text style={[styles.segmentText, { color: isPdfToWord ? colors.primaryForeground : colors.foreground }]}>PDF to Word</Text>
-            </Pressable>
-            <Pressable accessibilityRole="tab" accessibilityState={{ selected: !isPdfToWord }} accessibilityLabel="Word to PDF" onPress={() => switchDirection('word-to-pdf')} style={[styles.segmentButton, !isPdfToWord && { backgroundColor: colors.primary }]}>
-              <Feather name="file" size={17} color={!isPdfToWord ? colors.primaryForeground : colors.foreground} />
-              <Text style={[styles.segmentText, { color: !isPdfToWord ? colors.primaryForeground : colors.foreground }]}>Word to PDF</Text>
-            </Pressable>
           </View>
 
           <Pressable accessibilityRole="button" accessibilityLabel={`Choose ${inputLabel}`} accessibilityHint={`Select the source ${inputLabel.toLowerCase()} to convert.`} onPress={() => void pickFile()} style={({ pressed }) => [styles.pick, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]}>
             <Feather name="file-plus" size={20} color={colors.primary} />
             <View style={styles.pickCopy}>
               <Text style={[styles.pickTitle, { color: colors.foreground }]}>Choose {inputLabel}</Text>
-              <Text numberOfLines={1} style={[styles.pickDetail, { color: colors.mutedForeground }]}>{file?.name || `Select a ${inputLabel.toLowerCase()}`}</Text>
+              <Text numberOfLines={1} style={[styles.pickDetail, { color: colors.mutedForeground }]}>{file?.name || 'Select a Word document'}</Text>
             </View>
             <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
           </Pressable>
@@ -123,7 +99,7 @@ export default function PdfWordScreen() {
 
           {!!status && <Text accessibilityLiveRegion="polite" style={[styles.status, { color: status.includes('completed') ? colors.primary : colors.mutedForeground }]}>{status}</Text>}
 
-          <PdfToolResultPanel resultUri={result} filename={result ? (isPdfToWord ? 'document.docx' : 'document.pdf') : undefined} mimeType={isPdfToWord ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf'} onClose={reset} onReset={reset} title="Conversion completed" />
+          <PdfToolResultPanel resultUri={result} filename={result ? 'document.pdf' : undefined} mimeType="application/pdf" onClose={reset} onReset={reset} title="Conversion completed" />
         </ScrollView>
       )}
     </View>
@@ -137,9 +113,6 @@ const styles = StyleSheet.create({
   copy: { flex: 1, marginLeft: 13 },
   title: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 5 },
   subtitle: { fontSize: 12, lineHeight: 18 },
-  segment: { marginHorizontal: 20, borderWidth: 1, borderRadius: 15, padding: 4, flexDirection: 'row', gap: 4 },
-  segmentButton: { flex: 1, minHeight: 46, borderRadius: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  segmentText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
   pick: { marginHorizontal: 20, marginTop: 14, minHeight: 72, borderWidth: 1, borderRadius: 16, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center' },
   pickCopy: { flex: 1, marginHorizontal: 12 },
   pickTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', marginBottom: 4 },
