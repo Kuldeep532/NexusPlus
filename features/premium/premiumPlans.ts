@@ -1,52 +1,29 @@
-export type PremiumPlanCode = 'lifeline_monthly' | 'super_monthly' | 'pro_monthly';
-
 export interface PremiumPlan {
-  planCode: PremiumPlanCode;
-  name: string;
-  priceInr: number;
-  durationDays: number;
-  tagline: string;
-  blocksAds: boolean;
-  unlocksPremiumFeatures: boolean;
-  razorpayPlanId?: string;
+  planId: string;
+  planName: string;
+  amount: number;
+  upiId: string;
+  merchantName: string;
 }
 
-/**
- * Product catalogue. Razorpay plan ids are deliberately injected from server configuration
- * instead of being hard-coded into the client once production plans are created.
- */
-export const PREMIUM_PLANS: PremiumPlan[] = [
-  {
-    planCode: 'lifeline_monthly',
-    name: 'Lifeline',
-    priceInr: 49,
-    durationDays: 30,
-    tagline: 'Ad-free Nexus Plus with essential member perks.',
-    blocksAds: true,
-    unlocksPremiumFeatures: false,
-  },
-  {
-    planCode: 'super_monthly',
-    name: 'Super',
-    priceInr: 149,
-    durationDays: 30,
-    tagline: 'Premium toolkit access for everyday power users.',
-    blocksAds: true,
-    unlocksPremiumFeatures: true,
-  },
-  {
-    planCode: 'pro_monthly',
-    name: 'Pro',
-    priceInr: 399,
-    durationDays: 30,
-    tagline: 'Full Premium access for intensive media and AI workflows.',
-    blocksAds: true,
-    unlocksPremiumFeatures: true,
-  },
-];
+/** Premium plans are loaded exclusively from the Supabase app_subscription_plans table. */
+export type PremiumPlanRow = {
+  plan_id: number;
+  plan_name: string;
+  amount: number;
+  upi_id: string;
+  merchant_name?: string | null;
+};
 
-export function getPremiumPlan(planCode: PremiumPlanCode): PremiumPlan {
-  const plan = PREMIUM_PLANS.find((item) => item.planCode === planCode);
-  if (!plan) throw new Error('PREMIUM_PLAN_NOT_FOUND');
-  return plan;
+export function mapPremiumPlan(row: PremiumPlanRow): PremiumPlan {
+  if (!row?.plan_id || !row.plan_name || !Number.isFinite(Number(row.amount)) || !row.upi_id) {
+    throw new Error('INVALID_PREMIUM_PLAN');
+  }
+  return {
+    planId: String(row.plan_id),
+    planName: row.plan_name,
+    amount: Number(row.amount),
+    upiId: row.upi_id.trim(),
+    merchantName: row.merchant_name?.trim() || 'Nexus Wave',
+  };
 }
