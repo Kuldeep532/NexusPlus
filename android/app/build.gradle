@@ -19,14 +19,10 @@ react {
     autolinkLibrariesWithApp()
 }
 
-// Release signing is supplied only at CI runtime through android/key.properties.
-// No keystore or passwords are committed to the repository.
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('key.properties')
 if (keystorePropertiesFile.exists()) {
-    keystoreProperties.with {
-        load(new FileInputStream(keystorePropertiesFile.absolutePath))
-    }
+    keystoreProperties.with { load(new FileInputStream(keystorePropertiesFile.absolutePath)) }
 }
 
 def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBuilds') ?: true).toBoolean()
@@ -36,7 +32,6 @@ def enablePngCrunchInReleaseBuilds = (findProperty('android.enablePngCrunchInRel
 android {
     namespace 'com.nexuswavetech.nexusplus'
     compileSdk 35
-
     defaultConfig {
         applicationId 'com.nexuswavetech.nexusplus'
         minSdk 26
@@ -45,22 +40,10 @@ android {
         versionName '1.0.0'
         def integrityProject = project.findProperty('PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER') ?: '0'
         buildConfigField 'long', 'PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER', integrityProject
-        externalNativeBuild {
-            cmake { cppFlags '-std=c++20' }
-        }
+        externalNativeBuild { cmake { cppFlags '-std=c++20' } }
     }
-
-    buildFeatures {
-        buildConfig true
-    }
-
-    externalNativeBuild {
-        cmake {
-            path file('src/main/cpp/CMakeLists.txt')
-            version '3.22.1'
-        }
-    }
-
+    buildFeatures { buildConfig true }
+    externalNativeBuild { cmake { path file('src/main/cpp/CMakeLists.txt'); version '3.22.1' } }
     signingConfigs {
         release {
             if (keystorePropertiesFile.exists()) {
@@ -71,23 +54,12 @@ android {
             }
         }
     }
-
     packaging {
         jniLibs { useLegacyPackaging = false }
-        resources {
-            excludes += [
-                'META-INF/DEPENDENCIES',
-                'META-INF/LICENSE*',
-                'META-INF/NOTICE*',
-                'META-INF/*.version'
-            ]
-        }
+        resources { excludes += ['META-INF/DEPENDENCIES','META-INF/LICENSE*','META-INF/NOTICE*','META-INF/*.version'] }
     }
-
     buildTypes {
-        debug {
-            minifyEnabled false
-        }
+        debug { minifyEnabled false }
         release {
             minifyEnabled enableMinifyInReleaseBuilds
             shrinkResources enableShrinkResourcesInReleaseBuilds
@@ -104,6 +76,7 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.biometric:biometric:1.1.0'
     implementation 'com.google.android.play:integrity:1.6.0'
+    implementation 'com.google.android.gms:play-services-nearby:19.3.0'
     implementation 'com.tom-roush:pdfbox-android:2.0.27.0'
     implementation 'com.facebook.react:react-android'
     implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.22.0'
