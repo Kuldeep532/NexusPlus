@@ -1,29 +1,29 @@
+export interface PremiumPlanRow {
+  plan_id: number | string;
+  plan_name: string;
+  amount: number | string;
+  upi_id: string;
+  merchant_name?: string | null;
+}
+
 export interface PremiumPlan {
   planId: string;
-  planName: string;
-  amount: number;
+  name: string;
+  amountInr: number;
   upiId: string;
   merchantName: string;
 }
 
-/** Premium plans are loaded exclusively from the Supabase app_subscription_plans table. */
-export type PremiumPlanRow = {
-  plan_id: number;
-  plan_name: string;
-  amount: number;
-  upi_id: string;
-  merchant_name?: string | null;
-};
-
 export function mapPremiumPlan(row: PremiumPlanRow): PremiumPlan {
-  if (!row?.plan_id || !row.plan_name || !Number.isFinite(Number(row.amount)) || !row.upi_id) {
-    throw new Error('INVALID_PREMIUM_PLAN');
-  }
+  const amountInr = Number(row.amount);
+  if (!Number.isFinite(amountInr) || amountInr <= 0) throw new Error('PREMIUM_PLAN_AMOUNT_INVALID');
+  const upiId = row.upi_id.trim();
+  if (!upiId) throw new Error('PREMIUM_PLAN_UPI_INVALID');
   return {
     planId: String(row.plan_id),
-    planName: row.plan_name,
-    amount: Number(row.amount),
-    upiId: row.upi_id.trim(),
+    name: row.plan_name.trim() || 'Premium plan',
+    amountInr,
+    upiId,
     merchantName: row.merchant_name?.trim() || 'Nexus Wave',
   };
 }
