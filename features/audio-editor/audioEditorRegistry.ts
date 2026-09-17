@@ -25,6 +25,7 @@ const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
   { id: 'channel-manipulation', title: 'Channel Manipulation', description: 'Convert, isolate or swap audio channels and export a new processed copy.', route: '/audio-editor/channel-manipulation', icon: 'columns', order: 39.99 },
   { id: 'audio-normalizer', title: 'Audio Normalizer', description: 'Analyze the source peak and create a new copy at a controlled peak level with safety headroom.', route: '/audio-editor/audio-normalizer', icon: 'bar-chart-2', order: 39.995 },
   { id: 'audio-to-video', title: 'Audio to Video', description: 'Create an image-based video timeline whose image durations are constrained by the selected audio.', route: '/audio-editor/audio-to-video', icon: 'film', order: 40 },
+  { id: 'audio-format-converter', title: 'Format Converter', description: 'Convert audio between MP3, AAC, WAV, FLAC, OGG, M4A and other supported formats with native capability checks.', route: '/audio-editor/audio-format-converter', icon: 'repeat', order: 40.01 },
 ];
 
 export function getAudioEditorTools(): AudioEditorToolDefinition[] {
