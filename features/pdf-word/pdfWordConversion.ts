@@ -1,5 +1,6 @@
 import { NativeModules, Platform } from 'react-native';
 
+/** Existing Gotenberg service already configured in Nexus Plus. */
 export const GOTENBERG_BASE_URL = 'https://gotenberg-8-gm77.onrender.com';
 const GOTENBERG_LIBREOFFICE_ROUTE = '/forms/libreoffice/convert';
 
@@ -25,11 +26,11 @@ function requireNativeMethod<K extends keyof PdfWordApi>(method: K): NonNullable
   return fn as NonNullable<PdfWordApi[K]>;
 }
 
-/**
- * Returns whether a real document conversion engine is present in the native build.
- */
 export async function isDocumentEngineAvailable(): Promise<boolean> {
-  return true;
+  if (nativeModule?.isDocumentEngineAvailable) {
+    return nativeModule.isDocumentEngineAvailable();
+  }
+  return typeof nativeModule?.pdfToWord === 'function' && typeof nativeModule?.wordToPdf === 'function';
 }
 
 async function uploadToGotenberg(inputPath: string, outputFilename: string): Promise<string> {
@@ -52,21 +53,30 @@ async function uploadToGotenberg(inputPath: string, outputFilename: string): Pro
     throw new Error(`Gotenberg conversion failed (${response.status}).${message ? ` ${message.slice(0, 300)}` : ''}`);
   }
   const blob = await response.blob();
-  const outputUri = URL.createObjectURL(blob);
-  return outputUri;
+  return URL.createObjectURL(blob);
 }
 
 export async function convertPdfToWord(inputPath: string, outputPath: string): Promise<string> {
   validatePath(inputPath);
   validatePath(outputPath);
-  // Gotenberg 8's LibreOffice route is DOCX -> PDF only. Keep PDF -> Word fail-closed
-  // until a server endpoint capable of producing DOCX is deployed.
-  throw new Error('PDF to Word conversion endpoint is not available on the configured Gotenberg service.');
+  const nativeConvert = requireNativeMethod('pdfToWord');
+  return nativeConvert(inputPath, outputPath);
 }
 
 export async function convertWordToPdf(inputPath: string, outputPath: string): Promise<string> {
   validatePath(inputPath);
   validatePath(outputPath);
+  const nativeConvert = nativeModule?.wordToPdf;
+  if (nativeConvert) return nativeConvert(inputPath, outputPath);
   const baseName = inputPath.split('/').pop() || 'document.docx';
   return uploadToGotenberg(inputPath, baseName.replace(/\.docx$/i, ''));
+}
+
+/**
+ * Shared entry point for PDF tools that need the already-configured Gotenberg service.
+ * No second Gotenberg URL is introduced.
+ */
+export async function convertOfficeDocumentWithExistingGotenberg(inputPath: string, outputFilename: string): Promise<string> {
+  validatePath(inputPath);
+  return uploadToGotenberg(inputPath, outputFilename);
 }
