@@ -1,4 +1,4 @@
-import { requireNativeModule } from 'expo-modules-core';
+import { requireOptionalNativeModule } from 'expo-modules-core';
 
 export type NearbyDevice = { id: string; name: string };
 export type PendingConnection = { id: string; name: string; code: string };
@@ -14,7 +14,7 @@ export type FileTransferState = {
   received: Array<{ name: string; path: string; mime?: string; size: number }>;
 };
 
-const Native = requireNativeModule('NexusFileTransfer') as {
+type NativeApi = {
   start(role: 'send' | 'receive'): Promise<boolean>;
   connect(endpointId: string): Promise<boolean>;
   accept(endpointId: string): Promise<boolean>;
@@ -24,4 +24,15 @@ const Native = requireNativeModule('NexusFileTransfer') as {
   stop(): Promise<boolean>;
 };
 
-export const NexusFileTransfer = Native;
+const native = requireOptionalNativeModule<NativeApi>('NexusFileTransfer');
+const unavailable = async (): Promise<never> => { throw new Error('Send File is available in the Android native build of Nexus Plus.'); };
+
+export const NexusFileTransfer: NativeApi = native ?? {
+  start: unavailable,
+  connect: unavailable,
+  accept: unavailable,
+  reject: unavailable,
+  queueFile: unavailable,
+  getState: async () => ({ mode: 'idle', status: 'unavailable', devices: [], pending: [], connected: false, progress: 0, total: 0, received: [] }),
+  stop: async () => true,
+};
