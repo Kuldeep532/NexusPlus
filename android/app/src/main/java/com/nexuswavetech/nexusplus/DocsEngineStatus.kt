@@ -1,23 +1,13 @@
 package com.nexuswavetech.nexusplus
 
-/**
- * Runtime capability boundary for the bundled LibreOffice/LibreOfficeKit engine.
- *
- * Conversion is enabled only when a real LibreOfficeKit JNI implementation is
- * present in the Android artifact. The app never falls back to placeholder
- * documents, renamed files, or lossy pseudo-conversion.
- */
+/** Runtime capability boundary for the bundled LibreOfficeKit engine. */
 object DocsEngineStatus {
     const val ENGINE_NAME = "LibreOfficeKit"
     const val REQUIRED_CAPABILITY = "DOCX<->PDF"
-
     private const val JNI_LIBRARY = "lo-native-code"
 
-    @Volatile
-    private var loadAttempted = false
-
-    @Volatile
-    private var loaded = false
+    @Volatile private var loadAttempted = false
+    @Volatile private var loaded = false
 
     @JvmStatic
     fun ensureLoaded(): Boolean {
