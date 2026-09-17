@@ -13,10 +13,7 @@ type Direction = 'pdf-to-word' | 'word-to-pdf';
 type PickedFile = { uri: string; name: string };
 
 function safeBaseName(name: string): string {
-  return name
-    .replace(/\.(pdf|docx)$/i, '')
-    .replace(/[^a-zA-Z0-9._-]/g, '_')
-    .slice(0, 128) || 'document';
+  return name.replace(/\.(pdf|docx)$/i, '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 128) || 'document';
 }
 
 export default function PdfWordScreen() {
@@ -65,6 +62,7 @@ export default function PdfWordScreen() {
   }
 
   function switchDirection(next: Direction) {
+    if (direction === next) return;
     setDirection(next);
     setFile(null);
     setResult(null);
@@ -89,9 +87,7 @@ export default function PdfWordScreen() {
       ) : (
         <ScrollView contentContainerStyle={{ paddingTop: insets.top + 18, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
-            <View style={[styles.icon, { backgroundColor: colors.secondary }]}>
-              <MaterialCommunityIcons name="file-swap-outline" size={29} color={colors.primary} />
-            </View>
+            <View style={[styles.icon, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="file-swap-outline" size={29} color={colors.primary} /></View>
             <View style={styles.copy}>
               <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>{title}</Text>
               <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>One tool for both PDF to Word and Word to PDF conversion.</Text>
@@ -99,23 +95,11 @@ export default function PdfWordScreen() {
           </View>
 
           <View accessibilityRole="tablist" style={[styles.segment, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Pressable
-              accessibilityRole="tab"
-              accessibilityState={{ selected: isPdfToWord }}
-              accessibilityLabel="PDF to Word"
-              onPress={() => switchDirection('pdf-to-word')}
-              style={[styles.segmentButton, isPdfToWord && { backgroundColor: colors.primary }]}
-            >
+            <Pressable accessibilityRole="tab" accessibilityState={{ selected: isPdfToWord }} accessibilityLabel="PDF to Word" onPress={() => switchDirection('pdf-to-word')} style={[styles.segmentButton, isPdfToWord && { backgroundColor: colors.primary }]}>
               <Feather name="file-text" size={17} color={isPdfToWord ? colors.primaryForeground : colors.foreground} />
               <Text style={[styles.segmentText, { color: isPdfToWord ? colors.primaryForeground : colors.foreground }]}>PDF to Word</Text>
             </Pressable>
-            <Pressable
-              accessibilityRole="tab"
-              accessibilityState={{ selected: !isPdfToWord }}
-              accessibilityLabel="Word to PDF"
-              onPress={() => switchDirection('word-to-pdf')}
-              style={[styles.segmentButton, !isPdfToWord && { backgroundColor: colors.primary }]}
-            >
+            <Pressable accessibilityRole="tab" accessibilityState={{ selected: !isPdfToWord }} accessibilityLabel="Word to PDF" onPress={() => switchDirection('word-to-pdf')} style={[styles.segmentButton, !isPdfToWord && { backgroundColor: colors.primary }]}>
               <Feather name="file" size={17} color={!isPdfToWord ? colors.primaryForeground : colors.foreground} />
               <Text style={[styles.segmentText, { color: !isPdfToWord ? colors.primaryForeground : colors.foreground }]}>Word to PDF</Text>
             </Pressable>
@@ -130,10 +114,7 @@ export default function PdfWordScreen() {
             <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
           </Pressable>
 
-          {!!file && !result && <View style={[styles.info, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>OUTPUT</Text>
-            <Text style={[styles.infoValue, { color: colors.foreground }]}>{outputLabel}</Text>
-          </View>}
+          {!!file && !result && <View style={[styles.info, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>OUTPUT</Text><Text style={[styles.infoValue, { color: colors.foreground }]}>{outputLabel}</Text></View>}
 
           {!result && <Pressable accessibilityRole="button" accessibilityLabel={`Convert ${inputLabel} to ${outputLabel}`} onPress={() => void convert()} disabled={!file} style={({ pressed }) => [styles.primary, { backgroundColor: colors.primary }, (!file || pressed) && styles.disabled]}>
             <MaterialCommunityIcons name="file-swap-outline" size={19} color={colors.primaryForeground} />
@@ -142,7 +123,7 @@ export default function PdfWordScreen() {
 
           {!!status && <Text accessibilityLiveRegion="polite" style={[styles.status, { color: status.includes('completed') ? colors.primary : colors.mutedForeground }]}>{status}</Text>}
 
-          <PdfToolResultPanel resultUri={result} filename={result ? (isPdfToWord ? 'document.docx' : 'document.pdf') : undefined} onClose={reset} onReset={reset} title="Conversion completed" />
+          <PdfToolResultPanel resultUri={result} filename={result ? (isPdfToWord ? 'document.docx' : 'document.pdf') : undefined} mimeType={isPdfToWord ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf'} onClose={reset} onReset={reset} title="Conversion completed" />
         </ScrollView>
       )}
     </View>
