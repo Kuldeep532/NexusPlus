@@ -25,7 +25,7 @@ class AudioEditorNativeModule : Module() {
       catch (error: Exception) { promise.reject("AUDIO_MIX_FAILED", error.message ?: "Unable to mix audio", error) }
     }
     AsyncFunction("mixProject") { input: Map<String, Any?>, promise: Promise ->
-      try { val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }; val basePath = input["basePath"] as? String ?: error("Base audio path is required."); val outputPath = input["outputPath"] as? String ?: error("Output audio path is required."); val rawOverlays = input["overlays"] as? List<*> ?: emptyList<Any?>(); val overlays = rawOverlays.mapIndexed { index, raw -> val clip = raw as? Map<*, *> ?: error("Audio track ${index + 1} is invalid."); val path = clip["path"] as? String ?: error("Audio track ${index + 1} path is required."); val startMs = (clip["startMs"] as? Number)?.toDouble() ?: 0.0; val volume = (clip["volume"] as? Number)?.toDouble() ?: 1.0; AudioMixProcessor.Clip(path, startMs, volume) }; promise.resolve(AudioMixProcessor.mixProject(context, basePath, overlays, outputPath)) }
+      try { val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }; val basePath = input["basePath"] as? String ?: error("Base audio path is required."); val outputPath = input["outputPath"] as? String ?: error("Output path is required."); val rawOverlays = input["overlays"] as? List<*> ?: emptyList<Any?>(); val overlays = rawOverlays.mapIndexed { index, raw -> val clip = raw as? Map<*, *> ?: error("Audio track ${index + 1} is invalid."); val path = clip["path"] as? String ?: error("Audio track ${index + 1} path is required."); val startMs = (clip["startMs"] as? Number)?.toDouble() ?: 0.0; val volume = (clip["volume"] as? Number)?.toDouble() ?: 1.0; AudioMixProcessor.Clip(path, startMs, volume) }; promise.resolve(AudioMixProcessor.mixProject(context, basePath, overlays, outputPath)) }
       catch (error: Exception) { promise.reject("AUDIO_MIX_PROJECT_FAILED", error.message ?: "Unable to mix audio project", error) }
     }
     AsyncFunction("compress") { inputPath: String, outputPath: String, bitrate: Int, sampleRate: Int, promise: Promise ->
@@ -48,51 +48,27 @@ class AudioEditorNativeModule : Module() {
       catch (error: Exception) { promise.reject("AUDIO_EFFECT_FAILED", error.message ?: "Unable to apply audio effect", error) }
     }
     AsyncFunction("removeSilence") { inputPath: String, outputPath: String, settings: Map<String, Any?>, promise: Promise ->
-      try {
-        val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
-        val thresholdDb = (settings["thresholdDb"] as? Number)?.toDouble() ?: -40.0
-        val minSilenceMs = (settings["minSilenceMs"] as? Number)?.toDouble() ?: 350.0
-        val paddingMs = (settings["paddingMs"] as? Number)?.toDouble() ?: 80.0
-        promise.resolve(RemoveSilenceProcessor.process(context, inputPath, outputPath, thresholdDb, minSilenceMs, paddingMs).let { mapOf("outputPath" to it.outputPath, "durationMs" to it.durationMs, "sampleRate" to it.sampleRate, "channels" to it.channels, "mimeType" to it.mimeType, "removedSilenceMs" to it.removedSilenceMs) })
-      } catch (error: Exception) { promise.reject("AUDIO_REMOVE_SILENCE_FAILED", error.message ?: "Unable to remove silence", error) }
+      try { val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }; val thresholdDb = (settings["thresholdDb"] as? Number)?.toDouble() ?: -40.0; val minSilenceMs = (settings["minSilenceMs"] as? Number)?.toDouble() ?: 350.0; val paddingMs = (settings["paddingMs"] as? Number)?.toDouble() ?: 80.0; promise.resolve(RemoveSilenceProcessor.process(context, inputPath, outputPath, thresholdDb, minSilenceMs, paddingMs).let { mapOf("outputPath" to it.outputPath, "durationMs" to it.durationMs, "sampleRate" to it.sampleRate, "channels" to it.channels, "mimeType" to it.mimeType, "removedSilenceMs" to it.removedSilenceMs) }) }
+      catch (error: Exception) { promise.reject("AUDIO_REMOVE_SILENCE_FAILED", error.message ?: "Unable to remove silence", error) }
     }
     AsyncFunction("audioDoctor") { inputPath: String, outputPath: String, settings: Map<String, Any?>, promise: Promise ->
-      try {
-        val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
-        val noiseReduction = (settings["noiseReduction"] as? Number)?.toDouble() ?: 0.75
-        val voiceClarity = (settings["voiceClarity"] as? Number)?.toDouble() ?: 0.55
-        val humRemoval = (settings["humRemoval"] as? Number)?.toDouble() ?: 0.6
-        val deClip = (settings["deClip"] as? Number)?.toDouble() ?: 0.4
-        val autoGain = settings["autoGain"] as? Boolean ?: true
-        promise.resolve(AudioDoctorProcessor.process(context, inputPath, outputPath, noiseReduction, voiceClarity, humRemoval, deClip, autoGain).let {
-          mapOf("outputPath" to it.outputPath, "durationMs" to it.durationMs, "sampleRate" to it.sampleRate, "channels" to it.channels, "mimeType" to it.mimeType, "originalPeak" to it.originalPeak, "repairedPeak" to it.repairedPeak, "noiseFloorDb" to it.noiseFloorDb, "estimatedSnrDb" to it.estimatedSnrDb, "clippingRatio" to it.clippingRatio, "hasClipping" to it.hasClipping, "hasHum" to it.hasHum, "hasSevereNoise" to it.hasSevereNoise, "hasLikelyCodecDamage" to it.hasLikelyCodecDamage, "repairable" to it.repairable, "repairedNoise" to it.repairedNoise, "repairedClipping" to it.repairedClipping, "repairedHum" to it.repairedHum, "diagnosis" to it.diagnosis, "attribution" to it.attribution)
-        })
-      } catch (error: Exception) { promise.reject("AUDIO_DOCTOR_FAILED", error.message ?: "Unable to diagnose and repair audio", error) }
+      try { val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }; val noiseReduction = (settings["noiseReduction"] as? Number)?.toDouble() ?: 0.75; val voiceClarity = (settings["voiceClarity"] as? Number)?.toDouble() ?: 0.55; val humRemoval = (settings["humRemoval"] as? Number)?.toDouble() ?: 0.6; val deClip = (settings["deClip"] as? Number)?.toDouble() ?: 0.4; val autoGain = settings["autoGain"] as? Boolean ?: true; promise.resolve(AudioDoctorProcessor.process(context, inputPath, outputPath, noiseReduction, voiceClarity, humRemoval, deClip, autoGain).let { mapOf("outputPath" to it.outputPath, "durationMs" to it.durationMs, "sampleRate" to it.sampleRate, "channels" to it.channels, "mimeType" to it.mimeType, "originalPeak" to it.originalPeak, "repairedPeak" to it.repairedPeak, "noiseFloorDb" to it.noiseFloorDb, "estimatedSnrDb" to it.estimatedSnrDb, "clippingRatio" to it.clippingRatio, "hasClipping" to it.hasClipping, "hasHum" to it.hasHum, "hasSevereNoise" to it.hasSevereNoise, "hasLikelyCodecDamage" to it.hasLikelyCodecDamage, "repairable" to it.repairable, "repairedNoise" to it.repairedNoise, "repairedClipping" to it.repairedClipping, "repairedHum" to it.repairedHum, "diagnosis" to it.diagnosis, "attribution" to it.attribution) }) }
+      catch (error) { promise.reject("AUDIO_DOCTOR_FAILED", error.message ?: "Unable to diagnose and repair audio", error) }
     }
     AsyncFunction("startKaraokeRecording") { karaokeUri: String, outputPath: String, highQuality: Boolean, headphoneMode: Boolean, sampleRate: Int, channels: Int, promise: Promise ->
-      try {
-        val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
-        KaraokeRecorderProcessor.start(context, karaokeUri, outputPath, highQuality, headphoneMode, sampleRate, channels)
-        promise.resolve(null)
-      } catch (error: Exception) { promise.reject("KARAOKE_START_FAILED", error.message ?: "Unable to start karaoke recording", error) }
+      try { val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }; KaraokeRecorderProcessor.start(context, karaokeUri, outputPath, highQuality, headphoneMode, sampleRate, channels); promise.resolve(null) }
+      catch (error: Exception) { promise.reject("KARAOKE_START_FAILED", error.message ?: "Unable to start karaoke recording", error) }
     }
-    AsyncFunction("pauseKaraokeRecording") { promise: Promise ->
-      try { KaraokeRecorderProcessor.pause(); promise.resolve(null) }
-      catch (error: Exception) { promise.reject("KARAOKE_PAUSE_FAILED", error.message ?: "Unable to pause karaoke recording", error) }
-    }
-    AsyncFunction("resumeKaraokeRecording") { promise: Promise ->
-      try { KaraokeRecorderProcessor.resume(); promise.resolve(null) }
-      catch (error: Exception) { promise.reject("KARAOKE_RESUME_FAILED", error.message ?: "Unable to resume karaoke recording", error) }
-    }
+    AsyncFunction("pauseKaraokeRecording") { promise: Promise -> try { KaraokeRecorderProcessor.pause(); promise.resolve(null) } catch (error: Exception) { promise.reject("KARAOKE_PAUSE_FAILED", error.message ?: "Unable to pause karaoke recording", error) } }
+    AsyncFunction("resumeKaraokeRecording") { promise: Promise -> try { KaraokeRecorderProcessor.resume(); promise.resolve(null) } catch (error: Exception) { promise.reject("KARAOKE_RESUME_FAILED", error.message ?: "Unable to resume karaoke recording", error) } }
     AsyncFunction("stopKaraokeRecording") { promise: Promise ->
-      try {
-        val result = KaraokeRecorderProcessor.stop()
-        promise.resolve(mapOf("outputPath" to result.outputPath, "durationMs" to result.durationMs, "sampleRate" to result.sampleRate, "channels" to result.channels, "mimeType" to result.mimeType, "recordingStartedWithTrack" to result.recordingStartedWithTrack, "headphoneModeApplied" to result.headphoneModeApplied, "processing" to result.processing))
-      } catch (error: Exception) { promise.reject("KARAOKE_STOP_FAILED", error.message ?: "Unable to finish karaoke recording", error) }
+      try { val result = KaraokeRecorderProcessor.stop(); promise.resolve(mapOf("outputPath" to result.outputPath, "durationMs" to result.durationMs, "sampleRate" to result.sampleRate, "channels" to result.channels, "mimeType" to result.mimeType, "recordingStartedWithTrack" to result.recordingStartedWithTrack, "headphoneModeApplied" to result.headphoneModeApplied, "processing" to result.processing)) }
+      catch (error: Exception) { promise.reject("KARAOKE_STOP_FAILED", error.message ?: "Unable to finish karaoke recording", error) }
     }
-    AsyncFunction("cancelKaraokeRecording") { promise: Promise ->
-      try { KaraokeRecorderProcessor.cancel(); promise.resolve(null) }
-      catch (error: Exception) { promise.reject("KARAOKE_CANCEL_FAILED", error.message ?: "Unable to cancel karaoke recording", error) }
+    AsyncFunction("cancelKaraokeRecording") { promise: Promise -> try { KaraokeRecorderProcessor.cancel(); promise.resolve(null) } catch (error: Exception) { promise.reject("KARAOKE_CANCEL_FAILED", error.message ?: "Unable to cancel karaoke recording", error) } }
+    AsyncFunction("removeVideoAudio") { inputPath: String, outputPath: String, promise: Promise ->
+      try { val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }; promise.resolve(RemoveVideoAudioProcessor.process(context, inputPath, outputPath)) }
+      catch (error: Exception) { promise.reject("VIDEO_REMOVE_AUDIO_FAILED", error.message ?: "Unable to remove audio from video", error) }
     }
   }
 
