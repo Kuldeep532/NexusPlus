@@ -16,6 +16,7 @@ const tools: Tool[] = [
   { key: 'reorder-pdf', title: 'Reorder PDF', description: 'Change the order of pages and save a new PDF.', icon: 'swap-vertical', route: '/reorder-pdf' },
   { key: 'delete-pages', title: 'Delete PDF Pages', description: 'Remove unwanted pages from a PDF.', icon: 'file-remove-outline', route: '/delete-pdf-pages' },
   { key: 'extract-pages', title: 'Cut & Extract Pages', description: 'Cut selected pages and save them as a new PDF.', icon: 'file-export-outline', route: '/extract-pdf-pages' },
+  { key: 'gotenberg-pdf', title: 'Gotenberg PDF Tool', description: 'Create a PDF from a supported document using the existing Gotenberg service already configured in Nexus Plus.', icon: 'file-pdf-box', route: '/pdf-gotenberg' },
 ];
 
 export const PDF_TOOL_COUNT = tools.length;
@@ -29,7 +30,7 @@ export default function PdfToolsScreen() {
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 18, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={[styles.headerIcon, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="file-pdf-box" size={30} color={colors.primary} /></View>
-          <View style={styles.headerCopy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>PDF Tools</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Available PDF utilities. PDF ⇄ Word conversion is currently source-only until the LibreOfficeKit Android engine is bundled.</Text></View>
+          <View style={styles.headerCopy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>PDF Tools</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>PDF utilities including the existing Gotenberg-powered document-to-PDF tool.</Text></View>
         </View>
         <View style={styles.list}>
           {tools.map((tool) => <Pressable key={tool.key} accessibilityRole="button" accessibilityLabel={`Open ${tool.title}`} accessibilityHint={tool.description} onPress={() => router.push(tool.route as never)} style={({ pressed }) => [styles.row, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]}>
