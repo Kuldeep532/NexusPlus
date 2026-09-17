@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,6 +30,7 @@ const THEME_OPTIONS: Array<{ value: ThemeColor; title: string; description: stri
 
 export default function SettingsScreen() {
   const colors = useColors();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [themeColor, setThemeColor] = useState<ThemeColor>('ocean-blue');
 
@@ -52,6 +54,20 @@ export default function SettingsScreen() {
         <View style={styles.headerRow}>
           <View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Settings</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Control Nexus Plus appearance and behavior.</Text></View>
         </View>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Buy Premium. Open Nexus Plus membership plans."
+          onPress={() => router.push('/buy-premium')}
+          style={[styles.premiumBanner, { backgroundColor: colors.secondary, borderColor: colors.primary }]}
+        >
+          <View style={[styles.premiumIcon, { backgroundColor: colors.card }]}><Feather name="star" size={21} color={colors.primary} /></View>
+          <View style={styles.copy}>
+            <View style={styles.premiumTitleRow}><Text style={[styles.premiumTitle, { color: colors.foreground }]}>Buy Premium</Text><View style={[styles.premiumBadge, { backgroundColor: colors.primary }]}><Text style={styles.premiumBadgeText}>PREMIUM</Text></View></View>
+            <Text style={[styles.body, { color: colors.mutedForeground }]}>Unlock Premium-only features and remove ads with a membership plan.</Text>
+          </View>
+          <Feather name="chevron-right" size={20} color={colors.primary} accessibilityElementsHidden />
+        </Pressable>
 
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}> 
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Choose Theme Color</Text>
@@ -77,16 +93,20 @@ export default function SettingsScreen() {
 
         <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 20 }]}>Feature settings</Text>
         <View style={styles.list}>
-          {SETTINGS.map((item) => <Pressable key={item.route} accessibilityRole="button" accessibilityLabel={`${item.title}. ${item.description}`} onPress={() => {}} style={[styles.item, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name={item.icon} size={19} color={colors.primary} /></View><View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{item.title}</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>{item.description}</Text></View><Feather name="chevron-right" size={19} color={colors.mutedForeground} accessibilityElementsHidden /></Pressable>)}
+          {SETTINGS.map((item) => <Pressable key={item.route} accessibilityRole="button" accessibilityLabel={`${item.title}. ${item.description}`} onPress={() => router.push(item.route as never)} style={[styles.item, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name={item.icon} size={19} color={colors.primary} /></View><View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{item.title}</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>{item.description}</Text></View><Feather name="chevron-right" size={19} color={colors.mutedForeground} accessibilityElementsHidden /></Pressable>)}
         </View>
 
         <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 22 }]}>Privacy & About</Text>
         <View style={styles.list}>
-          {LEGAL_SETTINGS.map((item) => <Pressable key={item.route} accessibilityRole="button" accessibilityLabel={`${item.title}. ${item.description}`} onPress={() => {}} style={[styles.item, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name={item.icon} size={19} color={colors.primary} /></View><View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{item.title}</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>{item.description}</Text></View><Feather name="chevron-right" size={19} color={colors.mutedForeground} accessibilityElementsHidden /></Pressable>)}
+          {LEGAL_SETTINGS.map((item) => <Pressable key={item.route} accessibilityRole="button" accessibilityLabel={`${item.title}. ${item.description}`} onPress={() => router.push(item.route as never)} style={[styles.item, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name={item.icon} size={19} color={colors.primary} /></View><View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{item.title}</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>{item.description}</Text></View><Feather name="chevron-right" size={19} color={colors.mutedForeground} accessibilityElementsHidden /></Pressable>)}
         </View>
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({ root: { flex: 1 }, content: { paddingHorizontal: 18 }, headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 }, copy: { flex: 1, marginRight: 12 }, title: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 6 }, subtitle: { fontSize: 12, lineHeight: 18 }, card: { marginTop: 18, borderRadius: 18, borderWidth: 1, padding: 16 }, sectionTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', marginBottom: 8 }, body: { fontSize: 11, lineHeight: 16 }, list: { gap: 10 }, modeList: { gap: 10, marginTop: 8 }, modeItem: { minHeight: 72, borderRadius: 15, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center' }, radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' }, radioDot: { width: 10, height: 10, borderRadius: 5 }, rowTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', marginBottom: 3 }, item: { minHeight: 70, borderRadius: 17, borderWidth: 1, padding: 13, flexDirection: 'row', alignItems: 'center' }, icon: { width: 43, height: 43, borderRadius: 13, alignItems: 'center', justifyContent: 'center' } });
+const styles = StyleSheet.create({
+  root: { flex: 1 }, content: { paddingHorizontal: 18 }, headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 }, copy: { flex: 1, marginRight: 12 }, title: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 6 }, subtitle: { fontSize: 12, lineHeight: 18 },
+  premiumBanner: { marginTop: 14, minHeight: 88, borderRadius: 18, borderWidth: 1.5, padding: 13, flexDirection: 'row', alignItems: 'center' }, premiumIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 11 }, premiumTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 3 }, premiumTitle: { fontSize: 15, fontFamily: 'Inter_700Bold' }, premiumBadge: { borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 }, premiumBadgeText: { color: '#FFFFFF', fontSize: 7.5, fontFamily: 'Inter_700Bold' },
+  card: { marginTop: 18, borderRadius: 18, borderWidth: 1, padding: 16 }, sectionTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', marginBottom: 8 }, body: { fontSize: 11, lineHeight: 16 }, list: { gap: 10 }, modeList: { gap: 10, marginTop: 8 }, modeItem: { minHeight: 72, borderRadius: 15, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center' }, radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' }, radioDot: { width: 10, height: 10, borderRadius: 5 }, rowTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', marginBottom: 3 }, item: { minHeight: 70, borderRadius: 17, borderWidth: 1, padding: 13, flexDirection: 'row', alignItems: 'center' }, icon: { width: 43, height: 43, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }
+});
