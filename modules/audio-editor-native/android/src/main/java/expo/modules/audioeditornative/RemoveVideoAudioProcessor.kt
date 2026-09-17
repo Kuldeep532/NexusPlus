@@ -1,13 +1,14 @@
 package expo.modules.audioeditornative
 
 import android.content.Context
+import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaMuxer
 import android.net.Uri
 import java.io.File
 import java.nio.ByteBuffer
 
-/** Copies every non-audio track into a new MP4 while omitting all audio tracks. */
+/** Copies video samples into a new MP4 while omitting every audio track. */
 internal object RemoveVideoAudioProcessor {
   fun process(context: Context, inputPath: String, outputPath: String): Map<String, Any?> {
     val destination = File(outputPath)
@@ -20,9 +21,11 @@ internal object RemoveVideoAudioProcessor {
     try {
       setDataSource(context, extractor, inputPath)
       val videoTracks = mutableListOf<Int>()
+      var sourceDurationUs = 0L
       for (index in 0 until extractor.trackCount) {
         val format = extractor.getTrackFormat(index)
-        val mime = format.getString("mime") ?: continue
+        val mime = format.getString(MediaExtractor.METADATA_KEY_MIMETYPE) ?: continue
+        if (format.containsKey("durationUs")) sourceDurationUs = maxOf(sourceDurationUs, format.getLong("durationUs"))
         if (mime.startsWith("video/")) videoTracks += index
       }
       require(videoTracks.isNotEmpty()) { "No video track was found." }
@@ -41,7 +44,7 @@ internal object RemoveVideoAudioProcessor {
         if (format.containsKey("max-input-size")) format.getInteger("max-input-size") else 1024 * 1024
       } ?: 1024 * 1024
       val buffer = ByteBuffer.allocateDirect(maxOf(maxInputSize, 64 * 1024))
-      val info = android.media.MediaCodec.BufferInfo()
+      val info = MediaCodec.BufferInfo()
       var writtenSamples = 0
 
       while (true) {
@@ -51,8 +54,7 @@ internal object RemoveVideoAudioProcessor {
         if (sourceTrack < 0 || timeUs < 0L) break
         val size = extractor.readSampleData(buffer, 0)
         if (size < 0) break
-        val outputTrack = outputTrackMap[sourceTrack]
-        if (outputTrack != null) {
+        outputTrackMap[sourceTrack]?.let { outputTrack ->
           info.set(0, size, timeUs, extractor.sampleFlags)
           muxer.writeSampleData(outputTrack, buffer, info)
           writtenSamples++
@@ -61,14 +63,10 @@ internal object RemoveVideoAudioProcessor {
       }
 
       require(writtenSamples > 0) { "The video track contains no writable samples." }
-      val durationMs = videoTracks.mapNotNull { index ->
-        val format = extractor.getTrackFormat(index)
-        if (format.containsKey("durationUs")) format.getLong("durationUs") / 1000.0 else null
-      }.maxOrNull()
-
+      val outputDurationMs = if (sourceDurationUs > 0L) sourceDurationUs / 1000.0 else null
       return mapOf(
         "outputPath" to outputPath,
-        "durationMs" to durationMs,
+        "durationMs" to outputDurationMs,
         "videoTracks" to videoTracks.size,
         "audioRemoved" to true,
         "samples" to writtenSamples,
