@@ -17,7 +17,7 @@ internal object AudioEffectProcessor {
   private data class Decoded(val sampleRate: Int, val channels: Int, val samples: FloatArray)
 
   fun process(context: Context, inputPath: String, outputPath: String, effect: String, amount: Double): Result {
-    val supported = setOf("bass-boost", "treble", "vibrato", "echo", "telephone", "robot", "reverb", "megaphone", "channel-mono", "channel-stereo", "channel-swap", "channel-left", "channel-right")
+    val supported = setOf("bass-boost", "treble", "vibrato", "echo", "telephone", "robot", "reverb", "megaphone", "normalize", "channel-mono", "channel-stereo", "channel-swap", "channel-left", "channel-right")
     require(effect in supported) { "Unknown audio effect." }
     require(amount.isFinite() && amount in 0.0..1.0) { "Effect amount must be between 0 and 1." }
     val decoded = decodePcm(context, inputPath)
@@ -43,6 +43,7 @@ internal object AudioEffectProcessor {
         "telephone" -> telephone(decoded.samples, decoded.sampleRate, decoded.channels, amount)
         "robot" -> robot(decoded.samples, decoded.sampleRate, decoded.channels, amount)
         "reverb" -> reverb(decoded.samples, decoded.sampleRate, decoded.channels, amount)
+        "normalize" -> normalize(decoded.samples, amount)
         else -> megaphone(decoded.samples, decoded.sampleRate, decoded.channels, amount)
       }
       outputChannels = decoded.channels
@@ -102,6 +103,15 @@ internal object AudioEffectProcessor {
     val out = FloatArray(frames)
     for (f in 0 until frames) out[f] = input[f * channels + 1]
     return out to 1
+  }
+
+  private fun normalize(input: FloatArray, target: Double): FloatArray {
+    require(input.isNotEmpty()) { "Audio contains no samples." }
+    var peak = 0f
+    for (sample in input) peak = maxOf(peak, kotlin.math.abs(sample))
+    if (peak <= 0.000001f) return input.copyOf()
+    val gain = (target.toFloat() / peak).coerceAtMost(8f)
+    return FloatArray(input.size) { index -> (input[index] * gain).coerceIn(-1f, 1f) }
   }
 
   private fun decodePcm(context: Context, inputPath: String): Decoded {
