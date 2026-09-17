@@ -13,6 +13,7 @@ import org.json.JSONObject
  */
 class NexusVisionAccessibilityService : AccessibilityService() {
     companion object {
+        @Volatile var instance: NexusVisionAccessibilityService? = null
         private const val PREFS = "nexus_vision_assist"
         private const val SNAPSHOT = "accessibility_snapshot"
         private const val MAX_NODES = 500
@@ -21,14 +22,24 @@ class NexusVisionAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        publishSnapshot(rootInActiveWindow)
+        instance = this
+        refreshSnapshot()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        publishSnapshot(event?.source ?: rootInActiveWindow)
+        refreshSnapshot(event?.source ?: rootInActiveWindow)
     }
 
     override fun onInterrupt() = Unit
+
+    override fun onDestroy() {
+        if (instance === this) instance = null
+        super.onDestroy()
+    }
+
+    fun refreshSnapshot(source: AccessibilityNodeInfo? = rootInActiveWindow) {
+        publishSnapshot(source)
+    }
 
     private fun publishSnapshot(root: AccessibilityNodeInfo?) {
         if (root == null) return
