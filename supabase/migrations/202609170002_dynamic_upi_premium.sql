@@ -29,7 +29,7 @@ create table if not exists public.payment_transactions (
   transaction_id uuid default gen_random_uuid() primary key,
   app_id uuid references public.applications(app_id) on delete cascade,
   plan_id bigint not null references public.app_subscription_plans(plan_id),
-  user_id uuid references auth.users(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
   utr_number text unique,
   amount_paid numeric(10,2) not null check (amount_paid > 0),
   payment_status text not null default 'PENDING' check (payment_status in ('PENDING','SUCCESS','FAILED')),
@@ -56,8 +56,7 @@ create policy "Users can view own payment transactions"
   to authenticated
   using (auth.uid() = user_id);
 
--- Users must never be able to self-upgrade by writing SUCCESS, UTR, verified_at, or changing amount.
--- There is intentionally no authenticated UPDATE policy. A trusted verification worker owns those writes.
+-- No authenticated UPDATE policy is granted. SUCCESS/UTR/verified_at changes are trusted-server-only.
 
 create or replace function public.create_upi_payment_transaction(p_plan_id bigint, p_app_id uuid default null)
 returns jsonb
@@ -71,12 +70,9 @@ declare
 begin
   select * into plan_row
   from public.app_subscription_plans
-  where plan_id = p_plan_id
-    and is_active = true;
+  where plan_id = p_plan_id and is_active = true;
 
-  if not found then
-    raise exception 'PREMIUM_PLAN_NOT_FOUND';
-  end if;
+  if not found then raise exception 'PREMIUM_PLAN_NOT_FOUND'; end if;
 
   insert into public.payment_transactions (app_id, plan_id, user_id, amount_paid, payment_status)
   values (p_app_id, plan_row.plan_id, auth.uid(), plan_row.amount, 'PENDING')
@@ -96,8 +92,9 @@ $$;
 revoke all on function public.create_upi_payment_transaction(bigint, uuid) from public;
 grant execute on function public.create_upi_payment_transaction(bigint, uuid) to authenticated;
 
--- IMPORTANT: Do not auto-activate Premium from a client-controlled SUCCESS row.
--- The final trigger is intentionally replaced by a trusted verification function contract.
+-- Trusted verification contract.
+-- The caller must first reconcile the UTR with the actual UPI payment and exact receiver/amount.
+-- This function alone updates the transaction to SUCCESS; it is not granted to authenticated users.
 create or replace function public.verify_and_activate_premium(p_transaction_id uuid, p_utr text)
 returns jsonb
 language plpgsql
@@ -108,17 +105,17 @@ declare
   tx public.payment_transactions;
   plan_row public.app_subscription_plans;
 begin
+  if nullif(trim(p_utr), '') is null then raise exception 'UTR_REQUIRED'; end if;
+
   select * into tx from public.payment_transactions where transaction_id = p_transaction_id for update;
   if not found then raise exception 'PAYMENT_TRANSACTION_NOT_FOUND'; end if;
-  if tx.utr_number is not null then raise exception 'PAYMENT_ALREADY_VERIFIED'; end if;
+  if tx.payment_status = 'SUCCESS' then raise exception 'PAYMENT_ALREADY_VERIFIED'; end if;
 
   select * into plan_row from public.app_subscription_plans where plan_id = tx.plan_id;
   if not found then raise exception 'PREMIUM_PLAN_NOT_FOUND'; end if;
 
-  -- This function is a server-side verification contract. It MUST only be executable
-  -- by a trusted role/service that has already reconciled the UTR against the UPI payment.
   update public.payment_transactions
-     set utr_number = nullif(trim(p_utr), ''),
+     set utr_number = trim(p_utr),
          payment_status = 'SUCCESS',
          verified_at = now(),
          updated_at = now()
@@ -129,7 +126,6 @@ end;
 $$;
 
 revoke all on function public.verify_and_activate_premium(uuid, text) from public;
--- Grant this function only to your trusted verification role/service in Supabase.
 
 comment on column public.app_subscription_plans.upi_id is 'Merchant UPI VPA controlled by Admin/Supabase Dashboard; never hard-code in the mobile app.';
 comment on column public.payment_transactions.utr_number is 'UPI UTR/reference recorded only after trusted payment reconciliation.';
