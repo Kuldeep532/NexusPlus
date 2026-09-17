@@ -12,6 +12,7 @@ const SETTINGS = [
   { title: 'Biometric Vault', description: 'Manage secure biometric protection.', route: '/biometric-vault', icon: 'shield' as const },
   { title: 'Payment Announcer', description: 'Configure secure payment announcements.', route: '/payment-announcer', icon: 'volume-2' as const },
   { title: 'Expense Tracker', description: 'Manage expense detection and financial privacy.', route: '/expense-tracker', icon: 'credit-card' as const },
+  { title: 'App Health', description: 'Run lightweight release-readiness diagnostics.', route: '/app-health', icon: 'activity' as const },
 ];
 
 const LEGAL_SETTINGS = [
@@ -55,7 +56,7 @@ export default function SettingsScreen() {
           <View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Settings</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Control Nexus Plus appearance and behavior.</Text></View>
         </View>
 
-        {/* Billing is intentionally archived for now. Backend/Supabase billing remains available for a later re-enable. */}
+        {/* Premium/payment frontend is archived for this release. Backend billing contracts remain preserved. */}
 
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}> 
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Choose Theme Color</Text>
