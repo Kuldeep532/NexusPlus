@@ -38,50 +38,21 @@ async function resolveSpokenVoice(role: VoiceRole, locale: string) {
   return { profile, voice: installed.find((item) => item.id === profile.id) };
 }
 
-export function createStage7VoiceBridge(
-  onStatus?: (status: VoiceRuntimeStatus) => void,
-  onTranscript?: (text: string) => void,
-): { bridge: Stage6VoiceBridge; dispose: () => void } {
+export function createStage7VoiceBridge(onStatus?: (status: VoiceRuntimeStatus) => void, onTranscript?: (text: string) => void): { bridge: Stage6VoiceBridge; dispose: () => void } {
   if (!nativeVoice) {
-    return {
-      bridge: {
-        async isAvailable() { return false; },
-        async startListening() { throw new Error('VOICE_NATIVE_MODULE_UNAVAILABLE'); },
-        async stopListening() {},
-        async stopOutput() { await Speech.stop(); },
-        async speak(text: string) { await Speech.speak(text, { language: 'en-US' }); },
-      },
-      dispose() {},
-    };
+    return { bridge: { async isAvailable() { return false; }, async startListening() { throw new Error('VOICE_NATIVE_MODULE_UNAVAILABLE'); }, async stopListening() {}, async stopOutput() { await Speech.stop(); }, async speak(text: string) { await Speech.speak(text, { language: 'en-US' }); } }, dispose() {} };
   }
-
   const emitter = new NativeEventEmitter(NativeModules.NexusAssistantVoice);
-  const subscription = emitter.addListener('NexusAssistantVoiceState', (payload: VoiceRuntimeStatus & { transcript?: string }) => {
-    onStatus?.(payload);
-    if (payload.transcript) onTranscript?.(payload.transcript);
-  });
-
+  const subscription = emitter.addListener('NexusAssistantVoiceState', (payload: VoiceRuntimeStatus & { transcript?: string }) => { onStatus?.(payload); if (payload.transcript) onTranscript?.(payload.transcript); });
   return {
     bridge: {
       async isAvailable() { return (await getVoiceCommandsEnabled()) && (await ensureMicrophonePermission()) && nativeVoice.isAvailable(); },
-      async startListening() {
-        if (!(await getVoiceCommandsEnabled())) throw new Error('VOICE_COMMANDS_DISABLED');
-        if (!(await ensureMicrophonePermission())) throw new Error('MIC_PERMISSION_REQUIRED');
-        await nativeVoice.startListening();
-      },
+      async startListening() { if (!(await getVoiceCommandsEnabled())) throw new Error('VOICE_COMMANDS_DISABLED'); if (!(await ensureMicrophonePermission())) throw new Error('MIC_PERMISSION_REQUIRED'); await nativeVoice.startListening(); },
       async stopListening() { await nativeVoice.stopListening(); onStatus?.({ state: 'idle' }); },
-      async stopOutput() {
-        await nativeVoice.stopOutput().catch(() => undefined);
-        await Speech.stop().catch(() => undefined);
-      },
-      async speak(text: string) {
-        await nativeVoice.speak(text);
-      },
+      async stopOutput() { await nativeVoice.stopOutput().catch(() => undefined); await Speech.stop().catch(() => undefined); },
+      async speak(text: string) { await nativeVoice.speak(text); },
     },
-    dispose() {
-      subscription.remove();
-      void Speech.stop().catch(() => undefined);
-    },
+    dispose() { subscription.remove(); void Speech.stop().catch(() => undefined); },
   };
 }
 
@@ -92,29 +63,13 @@ export async function handleVoiceTranscriptCommand(text: string): Promise<boolea
   return executeSystemMediaVoiceCommand(action);
 }
 
-export async function speakAssistant(
-  text: string,
-  locale = 'en-US',
-  role: VoiceRole = 'assistant',
-): Promise<'piper' | 'system'> {
+export async function speakAssistant(text: string, locale = 'en-US', role: VoiceRole = 'assistant'): Promise<'piper' | 'system'> {
   const normalized = text.trim();
   if (!normalized) return 'system';
-
   const { voice } = await resolveSpokenVoice(role, locale);
   if (nativeVoice && voice) {
-    try {
-      await nativeVoice.speak(normalized, { modelPath: voice.modelPath, configPath: voice.configPath });
-      return 'piper';
-    } catch {
-      // Safe system-TTS fallback below.
-    }
+    try { await nativeVoice.speak(normalized, { modelPath: voice.modelPath, configPath: voice.configPath }); return 'piper'; } catch { }
   }
-
-  try {
-    await Speech.stop().catch(() => undefined);
-    await Speech.speak(normalized, { language: locale });
-  } catch {
-    // Speech is best-effort; callers keep their successful text response.
-  }
+  try { await Speech.stop().catch(() => undefined); await Speech.speak(normalized, { language: locale }); } catch { }
   return 'system';
 }
