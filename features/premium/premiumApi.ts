@@ -1,65 +1,60 @@
 import { getSupabaseAccessToken } from '@/features/auth/supabaseAuthAdapter';
-import type { PremiumPlanCode } from './premiumPlans';
+import { mapPremiumPlan, type PremiumPlan, type PremiumPlanRow } from './premiumPlans';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL?.replace(/\/$/, '') ?? '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? '';
 
-function assertConfigured(): void {
+function assertConfigured() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error('SUPABASE_PREMIUM_NOT_CONFIGURED');
 }
 
-async function callRpc<T>(name: string, body: Record<string, unknown>): Promise<T> {
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
   assertConfigured();
-  const accessToken = await getSupabaseAccessToken();
-  if (!accessToken) throw new Error('AUTH_REQUIRED');
-
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
-    method: 'POST',
+  const token = await getSupabaseAccessToken();
+  if (!token) throw new Error('AUTH_REQUIRED');
+  const response = await fetch(`${SUPABASE_URL}${path}`, {
+    ...options,
     headers: {
       apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options?.headers ?? {}),
     },
-    body: JSON.stringify(body),
   });
-
-  if (!response.ok) {
-    let message = `SUPABASE_RPC_${name}_${response.status}`;
-    try {
-      const payload = await response.json();
-      message = String(payload?.message ?? payload?.msg ?? payload?.error ?? message);
-    } catch {
-      // Keep stable status-based error.
-    }
-    throw new Error(message);
-  }
+  if (!response.ok) throw new Error(`SUPABASE_PREMIUM_REQUEST_${response.status}`);
   return response.json() as Promise<T>;
 }
 
-export type PremiumCheckoutSession = {
-  checkoutUrl?: string;
-  razorpayKeyId?: string;
-  razorpaySubscriptionId?: string;
-  paymentId?: string;
-  planCode: PremiumPlanCode;
-};
-
-/**
- * Starts a server-authoritative Premium checkout. The server creates the Razorpay
- * subscription/order and returns only public checkout data to the app.
- */
-export async function createPremiumCheckout(planCode: PremiumPlanCode): Promise<PremiumCheckoutSession> {
-  return callRpc<PremiumCheckoutSession>('create_premium_checkout', { p_plan_code: planCode });
+export async function getActivePremiumPlans(): Promise<PremiumPlan[]> {
+  const rows = await request<PremiumPlanRow[]>('/rest/v1/app_subscription_plans?select=plan_id,plan_name,amount,upi_id,merchant_name&is_active=eq.true&order=amount.asc');
+  return rows.map(mapPremiumPlan);
 }
 
-export type PremiumEntitlement = {
-  status: 'ACTIVE' | 'PAUSED' | 'CANCELLED' | 'EXPIRED' | null;
-  planCode: PremiumPlanCode | null;
-  expiresAt: string | null;
-  blocksAds: boolean;
-  unlocksPremiumFeatures: boolean;
+export type PaymentTransaction = {
+  transactionId: string;
+  planId: string;
+  amount: number;
+  status: 'PENDING' | 'SUCCESS' | 'FAILED';
 };
 
-export async function getPremiumEntitlement(): Promise<PremiumEntitlement> {
-  return callRpc<PremiumEntitlement>('get_my_premium_entitlement', {});
+export async function createPendingTransaction(planId: string, amount: number): Promise<PaymentTransaction> {
+  const rows = await request<Array<{ transaction_id: string; plan_id: number; amount_paid: number; payment_status: PaymentTransaction['status'] }>>('/rest/v1/payment_transactions', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify({ plan_id: Number(planId), amount_paid: amount, payment_status: 'PENDING' }),
+  });
+  const row = rows[0];
+  if (!row) throw new Error('PAYMENT_TRANSACTION_NOT_CREATED');
+  return { transactionId: row.transaction_id, planId: String(row.plan_id), amount: Number(row.amount_paid), status: row.payment_status };
+}
+
+export async function getTransaction(transactionId: string): Promise<PaymentTransaction> {
+  const rows = await request<Array<{ transaction_id: string; plan_id: number; amount_paid: number; payment_status: PaymentTransaction['status'] }>>(`/rest/v1/payment_transactions?select=transaction_id,plan_id,amount_paid,payment_status&transaction_id=eq.${encodeURIComponent(transactionId)}&limit=1`);
+  const row = rows[0];
+  if (!row) throw new Error('PAYMENT_TRANSACTION_NOT_FOUND');
+  return { transactionId: row.transaction_id, planId: String(row.plan_id), amount: Number(row.amount_paid), status: row.payment_status };
+}
+
+export async function getPremiumEntitlement(): Promise<{ status: 'ACTIVE' | 'PAUSED' | 'CANCELLED' | 'EXPIRED' | null; expiresAt: string | null; blocksAds: boolean; unlocksPremiumFeatures: boolean }> {
+  const rows = await request<Array<{ status: string | null; expiresAt: string | null; blocksAds: boolean; unlocksPremiumFeatures: boolean }>>('/rest/v1/rpc/get_my_premium_entitlement', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+  return rows as never;
 }
