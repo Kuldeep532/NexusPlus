@@ -16,6 +16,7 @@ export type RemoveSilenceNativeResult = { outputPath: string; durationMs: number
 export type AudioDoctorNativeResult = { outputPath: string; durationMs: number; sampleRate: number; channels: number; mimeType: string | null; originalPeak: number; repairedPeak: number; noiseFloorDb: number; estimatedSnrDb: number; clippingRatio: number; hasClipping: boolean; hasHum: boolean; hasSevereNoise: boolean; hasLikelyCodecDamage: boolean; repairable: boolean; repairedNoise: boolean; repairedClipping: boolean; repairedHum: boolean; diagnosis: string[]; attribution: 'not-determinable-from-audio-alone' };
 export type KaraokeRecordingResult = { outputPath: string; durationMs: number; sampleRate: number; channels: number; mimeType: string; recordingStartedWithTrack: boolean; headphoneModeApplied: boolean; processing: string[] };
 export type RemoveVideoAudioResult = { outputPath: string; durationMs: number | null; videoTracks: number; audioRemoved: boolean; samples: number; mimeType: string };
+export type ChannelManipulationResult = { outputPath: string; durationMs: number; sampleRate: number; channels: number; mimeType: string; mode: string };
 
 type AudioEditorNativeModuleType = {
   probe(inputPath: string): Promise<AudioProbeResult>;
@@ -36,6 +37,7 @@ type AudioEditorNativeModuleType = {
   stopKaraokeRecording(): Promise<KaraokeRecordingResult>;
   cancelKaraokeRecording(): Promise<void>;
   removeVideoAudio(inputPath: string, outputPath: string): Promise<RemoveVideoAudioResult>;
+  channelManipulation(inputPath: string, outputPath: string, mode: string): Promise<ChannelManipulationResult>;
 };
 
 export const AudioEditorNative = requireOptionalNativeModule<AudioEditorNativeModuleType>('AudioEditorNative');
