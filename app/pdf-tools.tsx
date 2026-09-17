@@ -19,6 +19,8 @@ const tools: Tool[] = [
   { key: 'add-watermark', title: 'Add PDF Watermark', description: 'Add a text watermark using the existing Gotenberg PDF Engines watermark API.', icon: 'water-outline', route: '/remove-pdf-watermark' },
   { key: 'flatten-pdf', title: 'Flatten PDF', description: 'Flatten interactive form fields and annotations using the existing Gotenberg PDF Engine.', icon: 'layers-triple-outline', route: '/flatten-pdf' },
   { key: 'pdf-a', title: 'PDF/A Converter', description: 'Convert a PDF into an archival PDF/A document using the existing Gotenberg PDF Engine.', icon: 'archive-arrow-down-outline', route: '/pdf-a' },
+  { key: 'pdf-metadata', title: 'PDF Metadata', description: 'Read and edit PDF metadata using the existing Gotenberg PDF Engine.', icon: 'file-document-edit-outline', route: '/pdf-metadata' },
+  { key: 'pdf-preflight', title: 'PDF Preflight & Optimize', description: 'Run a single Gotenberg PDF-engine workflow to normalize and optimize PDF output.', icon: 'tune-variant', route: '/pdf-preflight' },
 ];
 
 export const PDF_TOOL_COUNT = tools.length;
@@ -32,7 +34,7 @@ export default function PdfToolsScreen() {
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 18, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={[styles.headerIcon, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="file-pdf-box" size={30} color={colors.primary} /></View>
-          <View style={styles.headerCopy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>PDF Tools</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>PDF utilities, including Gotenberg-powered watermark, flattening and PDF/A tools.</Text></View>
+          <View style={styles.headerCopy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>PDF Tools</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>PDF utilities, including Gotenberg-powered tools.</Text></View>
         </View>
         <View style={styles.list}>
           {tools.map((tool) => <Pressable key={tool.key} accessibilityRole="button" accessibilityLabel={`Open ${tool.title}`} accessibilityHint={tool.description} onPress={() => router.push(tool.route as never)} style={({ pressed }) => [styles.row, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]}>
