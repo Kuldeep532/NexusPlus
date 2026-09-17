@@ -5,6 +5,7 @@ import { describeCurrentScreen } from '@/features/nexus-vision-assist/visionAssi
 import { planVisionAssistIntent } from '@/features/nexus-vision-assist/visionAssistAgent';
 import { readCaptchaText } from '@/features/nexus-vision-assist/visionAssistCaptcha';
 import { copyAccessibleText } from '@/features/nexus-vision-assist/visionAssistClipboard';
+import { handleVoiceTranscriptCommand } from './stage7VoiceBridge';
 
 export type Stage3AgentInput = {
   sessionId: string;
@@ -19,8 +20,16 @@ function unsupportedVisionResult(message: string): ExecutionResult {
   return { capabilityId: 'device-info', success: false, message };
 }
 
-/** Shared execution entry point for Nexus Assistant + Vision Assist. */
+/** Shared execution entry point for Nexus Assistant + Vision/Focus Assist. */
 export async function runStage3Agent(input: Stage3AgentInput): Promise<ExecutionResult | null> {
+  const voiceHandled = await handleVoiceTranscriptCommand(input.userText).catch(() => false);
+  if (voiceHandled) {
+    const message = 'Media voice command executed.';
+    await addMessage(input.sessionId, 'assistant', message);
+    input.onStatus?.(message);
+    return { capabilityId: 'play-media', success: true, message };
+  }
+
   const visionIntent = planVisionAssistIntent(input.userText);
 
   if (visionIntent?.capability.id === 'describe-screen') {
@@ -44,9 +53,10 @@ export async function runStage3Agent(input: Stage3AgentInput): Promise<Execution
       return unsupportedVisionResult(captcha.message);
     }
     if (visionIntent.capability.id === 'read-captcha') {
-      await addMessage(input.sessionId, 'assistant', `CAPTCHA text: ${captcha.text}`);
+      const message = `CAPTCHA text: ${captcha.text}`;
+      await addMessage(input.sessionId, 'assistant', message);
       input.onStatus?.('Accessible CAPTCHA text read.');
-      return unsupportedVisionResult(`CAPTCHA text: ${captcha.text}`);
+      return unsupportedVisionResult(message);
     }
     const copied = await copyAccessibleText(captcha.text);
     const message = copied ? `CAPTCHA text copied: ${captcha.text}` : 'The CAPTCHA text could not be copied.';
