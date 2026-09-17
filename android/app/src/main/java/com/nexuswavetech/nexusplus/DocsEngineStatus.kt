@@ -1,16 +1,48 @@
 package com.nexuswavetech.nexusplus
 
 /**
- * Capability boundary for the bundled LibreOffice/LibreOfficeKit document engine.
+ * Runtime capability boundary for the bundled LibreOffice/LibreOfficeKit engine.
  *
- * The app must not fake DOCX/PDF conversion when the engine is absent from the
- * Android artifact. This boundary is activated only after the engine binaries
- * and their licensing notices are bundled for the target ABIs.
+ * Conversion is enabled only when a real LibreOfficeKit JNI implementation is
+ * present in the Android artifact. The app never falls back to placeholder
+ * documents, renamed files, or lossy pseudo-conversion.
  */
 object DocsEngineStatus {
     const val ENGINE_NAME = "LibreOfficeKit"
     const val REQUIRED_CAPABILITY = "DOCX<->PDF"
 
+    private const val JNI_LIBRARY = "lo-native-code"
+
+    @Volatile
+    private var loadAttempted = false
+
+    @Volatile
+    private var loaded = false
+
+    @JvmStatic
+    fun ensureLoaded(): Boolean {
+        if (loaded) return true
+        if (loadAttempted) return false
+        synchronized(this) {
+            if (loaded) return true
+            if (loadAttempted) return false
+            loadAttempted = true
+            loaded = runCatching {
+                System.loadLibrary(JNI_LIBRARY)
+                true
+            }.getOrDefault(false)
+            return loaded
+        }
+    }
+
+    @JvmStatic
+    fun isAvailable(): Boolean = ensureLoaded()
+
+    @JvmStatic
     fun unavailableMessage(): String =
-        "$ENGINE_NAME is not bundled in this Android build. DOCX/PDF conversion is unavailable."
+        if (loadAttempted && !loaded) {
+            "$ENGINE_NAME native engine is not available for this Android ABI. DOCX/PDF conversion is unavailable."
+        } else {
+            "$ENGINE_NAME is not bundled in this Android build. DOCX/PDF conversion is unavailable."
+        }
 }
