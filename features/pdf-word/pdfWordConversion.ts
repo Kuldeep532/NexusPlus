@@ -1,4 +1,5 @@
 import { NativeModules, Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 
 /** Existing Gotenberg service already configured in Nexus Plus. */
 export const GOTENBERG_BASE_URL = 'https://gotenberg-8-gm77.onrender.com';
@@ -27,13 +28,11 @@ function requireNativeMethod<K extends keyof PdfWordApi>(method: K): NonNullable
 }
 
 export async function isDocumentEngineAvailable(): Promise<boolean> {
-  if (nativeModule?.isDocumentEngineAvailable) {
-    return nativeModule.isDocumentEngineAvailable();
-  }
+  if (nativeModule?.isDocumentEngineAvailable) return nativeModule.isDocumentEngineAvailable();
   return typeof nativeModule?.pdfToWord === 'function' && typeof nativeModule?.wordToPdf === 'function';
 }
 
-async function uploadToGotenberg(inputPath: string, outputFilename: string): Promise<string> {
+async function uploadToGotenberg(inputPath: string, outputFilename: string, inputMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'): Promise<string> {
   validatePath(inputPath);
   const response = await fetch(`${GOTENBERG_BASE_URL}${GOTENBERG_LIBREOFFICE_ROUTE}`, {
     method: 'POST',
@@ -42,7 +41,7 @@ async function uploadToGotenberg(inputPath: string, outputFilename: string): Pro
       form.append('files', {
         uri: inputPath,
         name: inputPath.split('/').pop() || 'document.docx',
-        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        type: inputMimeType,
       } as unknown as Blob);
       return form;
     })(),
@@ -59,8 +58,7 @@ async function uploadToGotenberg(inputPath: string, outputFilename: string): Pro
 export async function convertPdfToWord(inputPath: string, outputPath: string): Promise<string> {
   validatePath(inputPath);
   validatePath(outputPath);
-  const nativeConvert = requireNativeMethod('pdfToWord');
-  return nativeConvert(inputPath, outputPath);
+  return requireNativeMethod('pdfToWord')(inputPath, outputPath);
 }
 
 export async function convertWordToPdf(inputPath: string, outputPath: string): Promise<string> {
@@ -69,14 +67,31 @@ export async function convertWordToPdf(inputPath: string, outputPath: string): P
   const nativeConvert = nativeModule?.wordToPdf;
   if (nativeConvert) return nativeConvert(inputPath, outputPath);
   const baseName = inputPath.split('/').pop() || 'document.docx';
-  return uploadToGotenberg(inputPath, baseName.replace(/\.docx$/i, ''));
+  return convertOfficeDocumentWithExistingGotenberg(inputPath, `${baseName.replace(/\.[^.]+$/, '')}.pdf`);
 }
 
 /**
- * Shared entry point for PDF tools that need the already-configured Gotenberg service.
- * No second Gotenberg URL is introduced.
+ * Reuse the same Gotenberg service already used by PDF ⇄ Word.
+ * The returned PDF is persisted into the caller-provided output path.
  */
-export async function convertOfficeDocumentWithExistingGotenberg(inputPath: string, outputFilename: string): Promise<string> {
+export async function convertOfficeDocumentWithExistingGotenberg(inputPath: string, outputFilename: string, inputMimeType?: string): Promise<string> {
   validatePath(inputPath);
-  return uploadToGotenberg(inputPath, outputFilename);
+  const outputUri = await uploadToGotenberg(inputPath, outputFilename, inputMimeType);
+  try {
+    const outputPath = `${FileSystem.cacheDirectory ?? ''}${outputFilename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    if (!outputPath || !FileSystem.cacheDirectory) return outputUri;
+    const base64Response = await fetch(outputUri);
+    const base64 = await base64Response.arrayBuffer();
+    const bytes = new Uint8Array(base64);
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let index = 0; index < bytes.length; index += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(index, Math.min(index + chunkSize, bytes.length)));
+    }
+    const encoded = globalThis.btoa(binary);
+    await FileSystem.writeAsStringAsync(outputPath, encoded, { encoding: FileSystem.EncodingType.Base64 });
+    return outputPath;
+  } finally {
+    URL.revokeObjectURL(outputUri);
+  }
 }
