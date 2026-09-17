@@ -11,9 +11,18 @@ export type ChannelManipulationResult = {
   mode: ChannelMode;
 };
 
+const NATIVE_MODE: Record<ChannelMode, string> = {
+  mono: 'channel-mono',
+  stereo: 'channel-stereo',
+  swap: 'channel-swap',
+  left: 'channel-left',
+  right: 'channel-right',
+};
+
 export async function manipulateChannels(inputPath: string, outputPath: string, mode: ChannelMode): Promise<ChannelManipulationResult> {
   if (!inputPath) throw new Error('Input audio path is required.');
   if (!outputPath) throw new Error('Output audio path is required.');
-  if (!['mono', 'stereo', 'swap', 'left', 'right'].includes(mode)) throw new Error('Unsupported channel mode.');
-  return assertAudioEditorNative().channelManipulation(inputPath, outputPath, mode);
+  if (!(mode in NATIVE_MODE)) throw new Error('Unsupported channel mode.');
+  const result = await assertAudioEditorNative().audioEffect(inputPath, outputPath, NATIVE_MODE[mode], 1);
+  return { ...result, mode };
 }
