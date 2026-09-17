@@ -1,13 +1,23 @@
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
+import { createPremiumCheckout } from '@/features/premium/premiumApi';
+import type { PremiumPlanCode } from '@/features/premium/premiumPlans';
 
-const PLANS = [
+const PLANS: Array<{
+  id: PremiumPlanCode;
+  name: string;
+  price: string;
+  cadence: string;
+  description: string;
+  features: string[];
+  popular?: boolean;
+}> = [
   {
-    id: 'lifeline',
+    id: 'lifeline_monthly',
     name: 'Lifeline',
     price: '₹49',
     cadence: '/month',
@@ -15,7 +25,7 @@ const PLANS = [
     features: ['Remove ads across Nexus Plus', 'Member-only settings & perks', 'Cancel anytime'],
   },
   {
-    id: 'super',
+    id: 'super_monthly',
     name: 'Super',
     price: '₹149',
     cadence: '/month',
@@ -24,35 +34,53 @@ const PLANS = [
     popular: true,
   },
   {
-    id: 'pro',
+    id: 'pro_monthly',
     name: 'Pro',
     price: '₹399',
     cadence: '/month',
     description: 'Full Premium access for intensive media and AI workflows.',
     features: ['Everything in Super', 'Highest Premium access tier', 'Early access to selected advanced tools'],
   },
-] as const;
+];
 
 export default function BuyPremiumScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [selectedId, setSelectedId] = useState<(typeof PLANS)[number]['id']>('super');
+  const [selectedId, setSelectedId] = useState<PremiumPlanCode>('super_monthly');
+  const [busy, setBusy] = useState(false);
   const selectedPlan = useMemo(() => PLANS.find((plan) => plan.id === selectedId) ?? PLANS[1], [selectedId]);
+
+  const beginCheckout = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const session = await createPremiumCheckout(selectedPlan.id);
+      if (session.checkoutUrl) {
+        // Hosted checkout is intentionally opened only when the trusted backend supplies it.
+        const { Linking } = await import('react-native');
+        const canOpen = await Linking.canOpenURL(session.checkoutUrl);
+        if (!canOpen) throw new Error('PAYMENT_CHECKOUT_URL_UNAVAILABLE');
+        await Linking.openURL(session.checkoutUrl);
+        return;
+      }
+      Alert.alert(
+        'Payment setup required',
+        'The Premium billing backend is not configured for live checkout yet. No payment was taken and no Premium access was granted.',
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'We could not start checkout.';
+      Alert.alert('Payment unavailable', message === 'AUTH_REQUIRED' ? 'Please sign in before buying Premium.' : message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <ScrollView
-        contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 32 }}
-        accessibilityLabel="Buy Premium"
-      >
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 32 }} accessibilityLabel="Buy Premium">
         <View style={styles.header}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            onPress={() => router.back()}
-            style={styles.iconButton}
-          >
+          <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} style={styles.iconButton}>
             <Feather name="arrow-left" size={22} color={colors.foreground} />
           </Pressable>
           <Text accessibilityRole="header" style={[styles.headerTitle, { color: colors.foreground }]}>Buy Premium</Text>
@@ -83,11 +111,7 @@ export default function BuyPremiumScreen() {
                   <View style={styles.planNameWrap}>
                     <View style={styles.planNameRow}>
                       <Text style={[styles.planName, { color: colors.foreground }]}>{plan.name}</Text>
-                      {plan.popular ? (
-                        <View style={[styles.badge, { backgroundColor: colors.secondary }]}>
-                          <Text style={[styles.badgeText, { color: colors.primary }]}>POPULAR</Text>
-                        </View>
-                      ) : null}
+                      {plan.popular ? <View style={[styles.badge, { backgroundColor: colors.secondary }]}><Text style={[styles.badgeText, { color: colors.primary }]}>POPULAR</Text></View> : null}
                     </View>
                     <Text style={[styles.planDescription, { color: colors.mutedForeground }]}>{plan.description}</Text>
                   </View>
@@ -96,40 +120,30 @@ export default function BuyPremiumScreen() {
                     <Text style={[styles.cadence, { color: colors.mutedForeground }]}>{plan.cadence}</Text>
                   </View>
                 </View>
-
                 <View style={styles.features}>
-                  {plan.features.map((feature) => (
-                    <View key={feature} style={styles.featureRow}>
-                      <Feather name="check" size={16} color={colors.primary} />
-                      <Text style={[styles.featureText, { color: colors.foreground }]}>{feature}</Text>
-                    </View>
-                  ))}
+                  {plan.features.map((feature) => <View key={feature} style={styles.featureRow}><Feather name="check" size={16} color={colors.primary} /><Text style={[styles.featureText, { color: colors.foreground }]}>{feature}</Text></View>)}
                 </View>
-
-                <View style={[styles.radio, { borderColor: selected ? colors.primary : colors.mutedForeground }]}>
-                  {selected ? <View style={[styles.radioDot, { backgroundColor: colors.primary }]} /> : null}
-                </View>
+                <View style={[styles.radio, { borderColor: selected ? colors.primary : colors.mutedForeground }]}>{selected ? <View style={[styles.radioDot, { backgroundColor: colors.primary }]} /> : null}</View>
               </Pressable>
             );
           })}
         </View>
 
         <View style={[styles.summary, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.summaryTitleRow}>
-            <Text style={[styles.summaryTitle, { color: colors.foreground }]}>Selected plan</Text>
-            <Text style={[styles.summaryPlan, { color: colors.primary }]}>{selectedPlan.name}</Text>
-          </View>
-          <Text style={[styles.summaryBody, { color: colors.mutedForeground }]}>This screen currently handles plan selection only. Payment gateway, entitlement activation, auto-pay mandate, and Supabase subscription writes will be wired in the purchase step.</Text>
+          <View style={styles.summaryTitleRow}><Text style={[styles.summaryTitle, { color: colors.foreground }]}>Selected plan</Text><Text style={[styles.summaryPlan, { color: colors.primary }]}>{selectedPlan.name}</Text></View>
+          <Text style={[styles.summaryBody, { color: colors.mutedForeground }]}>Payment is processed by the configured gateway. Premium access is granted only after the trusted backend verifies the payment or subscription event.</Text>
         </View>
 
         <Pressable
           accessibilityRole="button"
+          accessibilityState={{ disabled: busy, busy }}
           accessibilityLabel={`Continue with ${selectedPlan.name}`}
-          onPress={() => {}}
-          style={[styles.primaryButton, { backgroundColor: colors.primary }]}
+          disabled={busy}
+          onPress={() => void beginCheckout()}
+          style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: busy ? 0.7 : 1 }]}
         >
-          <Text style={styles.primaryButtonText}>Continue with {selectedPlan.name}</Text>
-          <Feather name="arrow-right" size={18} color="#FFFFFF" />
+          <Text style={styles.primaryButtonText}>{busy ? 'Starting checkout…' : `Continue with ${selectedPlan.name}`}</Text>
+          {!busy ? <Feather name="arrow-right" size={18} color="#FFFFFF" /> : null}
         </Pressable>
 
         <Text style={[styles.legal, { color: colors.mutedForeground }]}>Subscriptions are subject to the final pricing, billing, cancellation and payment terms shown at checkout.</Text>
