@@ -26,5 +26,24 @@ target_link_options(nexus_security PRIVATE
   -Wl,--build-id=sha1
 )
 
+add_library(nexus_docs_engine_jni SHARED
+  nexus_docs_engine_jni.cpp
+)
+
+target_compile_options(nexus_docs_engine_jni PRIVATE
+  -fvisibility=hidden
+  -fvisibility-inlines-hidden
+  -ffunction-sections
+  -fdata-sections
+  -fstack-protector-strong
+  -D_FORTIFY_SOURCE=2
+)
+target_link_options(nexus_docs_engine_jni PRIVATE
+  -Wl,--gc-sections
+  -Wl,--exclude-libs,ALL
+  -Wl,--build-id=sha1
+)
+
 find_library(log-lib log)
 target_link_libraries(nexus_security ${log-lib})
+target_link_libraries(nexus_docs_engine_jni ${log-lib})
