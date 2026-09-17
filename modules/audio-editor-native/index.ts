@@ -51,12 +51,27 @@ export type AudioMixResult = {
   mimeType: string | null;
 };
 
+export type PiperSynthesizeInput = {
+  text: string;
+  modelPath: string;
+  configPath: string;
+  lengthScale?: number;
+  pitchScale?: number;
+  emotion?: string;
+  clone?: boolean;
+};
+
+export type PiperSynthesizeResult = {
+  outputPath: string;
+};
+
 type AudioEditorNativeModuleType = {
   probe(inputPath: string): Promise<AudioProbeResult>;
   decode(inputPath: string): Promise<DecodedAudioResult>;
   trim(inputPath: string, outputPath: string, startMs: number, endMs: number): Promise<AudioTrimResult>;
   mix(input: AudioMixInput): Promise<AudioMixResult>;
   mixProject(input: AudioMixProjectInput): Promise<AudioMixResult>;
+  synthesizePiper(input: PiperSynthesizeInput): Promise<PiperSynthesizeResult>;
 };
 
 export const AudioEditorNative = requireOptionalNativeModule<AudioEditorNativeModuleType>('AudioEditorNative');
