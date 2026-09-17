@@ -19,6 +19,8 @@ react {
     autolinkLibrariesWithApp()
 }
 
+// Release signing is supplied only at CI runtime through android/key.properties.
+// No keystore or passwords are committed to the repository.
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('key.properties')
 if (keystorePropertiesFile.exists()) {
