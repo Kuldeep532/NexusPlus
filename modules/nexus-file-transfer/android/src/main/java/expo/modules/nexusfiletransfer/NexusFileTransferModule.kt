@@ -16,17 +16,25 @@ import java.util.concurrent.ConcurrentHashMap
 class NexusFileTransferModule : Module() {
   private val serviceId = "com.nexuswavetech.nexusplus.filetransfer"
   private val strategy = Strategy.P2P_POINT_TO_POINT
+  private val safeExtensions = setOf(
+    "pdf", "jpg", "jpeg", "png", "gif", "webp", "txt", "md", "csv", "json",
+    "mp3", "wav", "m4a", "aac", "ogg", "flac", "mp4", "m4v", "mov", "webm",
+    "docx", "xlsx", "pptx", "epub"
+  )
+
   private var mode = "idle"
   private var connectedEndpoint: String? = null
   private val devices = ConcurrentHashMap<String, String>()
   private val pending = ConcurrentHashMap<String, Map<String, String>>()
   private val incoming = ConcurrentHashMap<Long, Payload>()
+  private val completedFiles = ConcurrentHashMap<Long, Payload>()
   private val incomingMeta = ConcurrentHashMap<Long, Map<String, String>>()
   private var progress = 0L
   private var progressTotal = 0L
   private var status = "idle"
   private var error: String? = null
   private val received = mutableListOf<Map<String, Any?>>()
+  private var queuedFile: Map<String, String>? = null
 
   private val payloadCallback = object : PayloadCallback() {
     override fun onPayloadReceived(endpointId: String, payload: Payload) {
@@ -34,12 +42,14 @@ class NexusFileTransferModule : Module() {
         try {
           val json = JSONObject(String(payload.asBytes(), Charsets.UTF_8))
           if (json.optString("kind") == "file-meta") {
-            incomingMeta[json.getLong("payloadId")] = mapOf(
+            val id = json.getLong("payloadId")
+            incomingMeta[id] = mapOf(
               "name" to json.optString("name", "received-file"),
               "mime" to json.optString("mime", "application/octet-stream"),
               "size" to json.optString("size", "0"),
               "sha256" to json.optString("sha256", "")
             )
+            processWhenReady(id)
           }
         } catch (_: Exception) { }
       } else if (payload.type == Payload.Type.FILE) {
@@ -53,7 +63,8 @@ class NexusFileTransferModule : Module() {
       if (update.status == PayloadTransferUpdate.Status.SUCCESS) {
         val payload = incoming.remove(update.payloadId)
         if (payload != null && payload.type == Payload.Type.FILE) {
-          processReceivedFile(update.payloadId, payload)
+          completedFiles[update.payloadId] = payload
+          processWhenReady(update.payloadId)
         }
       } else if (update.status == PayloadTransferUpdate.Status.ERROR) {
         status = "transfer_failed"
@@ -65,8 +76,8 @@ class NexusFileTransferModule : Module() {
   private val lifecycleCallback = object : ConnectionLifecycleCallback() {
     override fun onConnectionInitiated(endpointId: String, info: ConnectionInfo) {
       pending[endpointId] = mapOf("name" to info.endpointName, "code" to info.authenticationDigits)
-      // Sender-side connection is accepted automatically. Receiver must explicitly accept after
-      // seeing the authentication code in the accessible UI.
+      // Keep the sender flow simple: the sender accepts its side automatically. The receiver
+      // explicitly accepts after confirming the authentication code shown on both phones.
       if (mode == "send") {
         Nearby.getConnectionsClient(context()).acceptConnection(endpointId, payloadCallback)
       }
@@ -91,13 +102,12 @@ class NexusFileTransferModule : Module() {
     }
   }
 
-  private var queuedFile: Map<String, String>? = null
-
   override fun definition() = ModuleDefinition {
     Name("NexusFileTransfer")
 
     AsyncFunction("start") { role: String, promise: Promise ->
       try {
+        require(role == "send" || role == "receive") { "Invalid file transfer mode." }
         stopInternal()
         mode = role
         status = "starting"
@@ -110,7 +120,7 @@ class NexusFileTransferModule : Module() {
             lifecycleCallback,
             AdvertisingOptions.Builder().setStrategy(strategy).build()
           ).addOnSuccessListener { status = "ready" }
-           .addOnFailureListener { status = "error"; error = it.message ?: "Unable to start receiving." }
+            .addOnFailureListener { status = "error"; error = it.message ?: "Unable to start receiving." }
         } else {
           client.startDiscovery(
             serviceId,
@@ -122,11 +132,13 @@ class NexusFileTransferModule : Module() {
             },
             DiscoveryOptions.Builder().setStrategy(strategy).build()
           ).addOnSuccessListener { status = "ready" }
-           .addOnFailureListener { status = "error"; error = it.message ?: "Unable to find nearby devices." }
+            .addOnFailureListener { status = "error"; error = it.message ?: "Unable to find nearby devices." }
         }
         promise.resolve(true)
       } catch (e: Exception) {
-        status = "error"; error = e.message ?: "Unable to start file transfer."; promise.reject("START_FAILED", error, e)
+        status = "error"
+        error = e.message ?: "Unable to start file transfer."
+        promise.reject("START_FAILED", error, e)
       }
     }
 
@@ -155,28 +167,25 @@ class NexusFileTransferModule : Module() {
         status = "file_ready"
         promise.resolve(meta)
       } catch (e: Exception) {
-        error = e.message ?: "This file type is not allowed."; status = "blocked"; promise.reject("UNSAFE_FILE", error, e)
+        error = e.message ?: "This file type is not allowed."
+        status = "blocked"
+        promise.reject("UNSAFE_FILE", error, e)
       }
     }
 
     AsyncFunction("getState") { promise: Promise -> promise.resolve(stateMap()) }
 
-    AsyncFunction("stop") { promise: Promise ->
-      stopInternal(); promise.resolve(true)
-    }
+    AsyncFunction("stop") { promise: Promise -> stopInternal(); promise.resolve(true) }
   }
 
   private fun context(): Context = requireNotNull(appContext.reactContext)
 
   private fun validateSource(uriString: String, name: String, mime: String): Map<String, String> {
-    val safe = setOf(
-      "pdf","jpg","jpeg","png","gif","webp","txt","md","csv","json",
-      "mp3","wav","m4a","aac","ogg","flac","mp4","m4v","mov","webm",
-      "docx","xlsx","pptx","epub"
-    )
     val cleanName = name.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._ -]"), "_")
     val ext = cleanName.substringAfterLast('.', "").lowercase()
-    require(ext in safe) { "Blocked file type. Nexus Plus only sends trusted document, image, audio and video formats." }
+    require(ext in safeExtensions) {
+      "Blocked file type. Nexus Plus only sends trusted document, image, audio and video formats."
+    }
     val uri = Uri.parse(uriString)
     val resolver = context().contentResolver
     val size = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
@@ -215,18 +224,26 @@ class NexusFileTransferModule : Module() {
       Nearby.getConnectionsClient(context()).sendPayload(endpoint, Payload.fromBytes(message))
       Nearby.getConnectionsClient(context()).sendPayload(endpoint, filePayload)
     } catch (e: Exception) {
-      status = "error"; error = e.message ?: "Unable to send file."
+      status = "error"
+      error = e.message ?: "Unable to send file."
     }
   }
 
-  private fun processReceivedFile(id: Long, payload: Payload) {
-    val meta = incomingMeta.remove(id) ?: run { payload.close(); return }
+  private fun processWhenReady(id: Long) {
+    val payload = completedFiles[id] ?: return
+    val meta = incomingMeta[id] ?: return
+    completedFiles.remove(id)
+    incomingMeta.remove(id)
+    processReceivedFile(meta, payload)
+  }
+
+  private fun processReceivedFile(meta: Map<String, String>, payload: Payload) {
     try {
       val name = meta["name"] ?: "received-file"
       val ext = name.substringAfterLast('.', "").lowercase()
-      val allowed = ext in setOf("pdf","jpg","jpeg","png","gif","webp","txt","md","csv","json","mp3","wav","m4a","aac","ogg","flac","mp4","m4v","mov","webm","docx","xlsx","pptx","epub")
-      require(allowed) { "Received file type is blocked." }
+      require(ext in safeExtensions) { "Received file type is blocked." }
       val expectedSize = meta["size"]?.toLongOrNull() ?: -1L
+      require(expectedSize in 1..(2L * 1024 * 1024 * 1024)) { "Received file size is invalid." }
       require(expectedSize == payload.asFile().size) { "Received file size does not match." }
       val source = payload.asFile().asUri()
       val out = File(context().filesDir, "received")
@@ -238,7 +255,9 @@ class NexusFileTransferModule : Module() {
       }
       val actualSha = sha256(Uri.fromFile(destination))
       require(actualSha.equals(meta["sha256"], true)) { "File integrity check failed. The file was not accepted." }
-      received.add(mapOf("name" to name, "path" to destination.absolutePath, "mime" to meta["mime"], "size" to expectedSize))
+      synchronized(received) {
+        received.add(mapOf("name" to name, "path" to destination.absolutePath, "mime" to meta["mime"], "size" to expectedSize))
+      }
       status = "received"
       progress = expectedSize
       progressTotal = expectedSize
@@ -247,7 +266,9 @@ class NexusFileTransferModule : Module() {
       status = "blocked"
       error = e.message ?: "The received file failed safety checks and was discarded."
       try { context().contentResolver.delete(payload.asFile().asUri(), null, null) } catch (_: Exception) { }
-    } finally { payload.close() }
+    } finally {
+      payload.close()
+    }
   }
 
   private fun stateMap(): Map<String, Any?> = mapOf(
@@ -259,13 +280,16 @@ class NexusFileTransferModule : Module() {
     "connected" to (connectedEndpoint != null),
     "progress" to progress,
     "total" to progressTotal,
-    "received" to received.toList()
+    "received" to synchronized(received) { received.toList() }
   )
 
   private fun stopInternal() {
     try { Nearby.getConnectionsClient(context()).stopAdvertising() } catch (_: Exception) { }
     try { Nearby.getConnectionsClient(context()).stopDiscovery() } catch (_: Exception) { }
     try { Nearby.getConnectionsClient(context()).stopAllEndpoints() } catch (_: Exception) { }
+    incoming.values.forEach { try { it.close() } catch (_: Exception) { } }
+    completedFiles.values.forEach { try { it.close() } catch (_: Exception) { } }
+    incoming.clear(); completedFiles.clear(); incomingMeta.clear()
     devices.clear(); pending.clear(); connectedEndpoint = null; queuedFile = null
     progress = 0; progressTotal = 0; mode = "idle"; status = "idle"; error = null
   }
