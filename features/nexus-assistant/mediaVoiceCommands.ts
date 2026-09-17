@@ -3,11 +3,11 @@ import { NativeModules, Platform } from 'react-native';
 export type MediaVoiceAction = 'play' | 'pause' | 'seek-forward' | 'seek-backward' | 'stop';
 
 type NativeMedia = {
-  isAvailable?: () => Promise<boolean>;
   pause?: () => Promise<boolean>;
   resume?: () => Promise<boolean>;
   stop?: () => Promise<boolean>;
-  seekTo?: (positionMs: number) => Promise<boolean>;
+  seekRelative?: (deltaMs: number) => Promise<boolean>;
+  sendSystemMediaKey?: (key: string) => Promise<boolean>;
 };
 
 const nativeMedia = NativeModules.NexusMedia as NativeMedia | undefined;
@@ -29,12 +29,16 @@ export async function executeMediaVoiceCommand(action: MediaVoiceAction, seekSec
     if (action === 'pause') return Boolean(await nativeMedia.pause?.());
     if (action === 'play') return Boolean(await nativeMedia.resume?.());
     if (action === 'stop') return Boolean(await nativeMedia.stop?.());
-    const deltaMs = Math.max(1, Math.min(60, seekSeconds)) * 1000;
-    // Native seek is absolute, so this command only works when the media service
-    // already exposes a current position API. Keep the action parser ready without
-    // guessing a position or touching unrelated apps.
-    return false;
+    const deltaMs = Math.sign(action === 'seek-forward' ? 1 : -1) * Math.max(1, Math.min(60, seekSeconds)) * 1000;
+    return Boolean(await nativeMedia.seekRelative?.(deltaMs));
   } catch {
     return false;
   }
+}
+
+/** Sends a standard Android transport key to another app's MediaSession. */
+export async function executeSystemMediaVoiceCommand(action: MediaVoiceAction): Promise<boolean> {
+  if (Platform.OS !== 'android' || !nativeMedia?.sendSystemMediaKey) return false;
+  const key = action === 'pause' ? 'pause' : action === 'play' ? 'play-pause' : action === 'stop' ? 'stop' : action === 'seek-forward' ? 'next' : 'previous';
+  return Boolean(await nativeMedia.sendSystemMediaKey(key));
 }
