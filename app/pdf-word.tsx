@@ -90,7 +90,7 @@ export default function PdfWordScreen() {
             <View style={[styles.icon, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="file-swap-outline" size={29} color={colors.primary} /></View>
             <View style={styles.copy}>
               <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>{title}</Text>
-              <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>One tool for both PDF to Word and Word to PDF conversion.</Text>
+              <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Document conversion powered by the configured Gotenberg service.</Text>
             </View>
           </View>
 
