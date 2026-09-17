@@ -24,11 +24,13 @@ class NexusMediaPlaybackService : Service() {
         const val ACTION_RESUME = "com.nexuswavetech.nexusplus.media.RESUME"
         const val ACTION_STOP = "com.nexuswavetech.nexusplus.media.STOP"
         const val ACTION_SEEK = "com.nexuswavetech.nexusplus.media.SEEK"
+        const val ACTION_SEEK_RELATIVE = "com.nexuswavetech.nexusplus.media.SEEK_RELATIVE"
         const val EXTRA_URI = "uri"
         const val EXTRA_TITLE = "title"
         const val EXTRA_ARTIST = "artist"
         const val EXTRA_AUTOPLAY = "autoplay"
         const val EXTRA_POSITION_MS = "position_ms"
+        const val EXTRA_DELTA_MS = "delta_ms"
         private const val CHANNEL_ID = "nexus-media-playback"
         private const val NOTIFICATION_ID = 4102
     }
@@ -46,13 +48,14 @@ class NexusMediaPlaybackService : Service() {
                     ACTION_RESUME -> player?.takeIf { !it.isPlaying }?.start()
                     ACTION_STOP -> stopPlayback()
                     ACTION_SEEK -> {
-                        val requested = intent.getLongExtra(EXTRA_POSITION_MS, 0L)
                         val current = player ?: return@runCatching
-                        if (requested >= 0L && current.isPlaying || requested >= 0L) {
-                            val duration = current.duration
-                            val target = requested.coerceIn(0L, duration.toLong().coerceAtLeast(0L))
-                            current.seekTo(target.toInt())
-                        }
+                        val requested = intent.getLongExtra(EXTRA_POSITION_MS, current.currentPosition.toLong())
+                        seekAbsolute(current, requested)
+                    }
+                    ACTION_SEEK_RELATIVE -> {
+                        val current = player ?: return@runCatching
+                        val delta = intent.getLongExtra(EXTRA_DELTA_MS, 0L)
+                        seekAbsolute(current, current.currentPosition.toLong() + delta)
                     }
                 }
                 updateNotification()
@@ -70,6 +73,7 @@ class NexusMediaPlaybackService : Service() {
             addAction(ACTION_RESUME)
             addAction(ACTION_STOP)
             addAction(ACTION_SEEK)
+            addAction(ACTION_SEEK_RELATIVE)
         })
     }
 
@@ -78,9 +82,7 @@ class NexusMediaPlaybackService : Service() {
             title = intent.getStringExtra(EXTRA_TITLE)?.trim()?.take(200).orEmpty().ifBlank { "Nexus Plus" }
             artist = intent.getStringExtra(EXTRA_ARTIST)?.trim()?.take(200).orEmpty().ifBlank { "Media Player" }
             val uri = intent.getStringExtra(EXTRA_URI)
-            if (!uri.isNullOrBlank()) {
-                playUri(uri, intent.getBooleanExtra(EXTRA_AUTOPLAY, true))
-            }
+            if (!uri.isNullOrBlank()) playUri(uri, intent.getBooleanExtra(EXTRA_AUTOPLAY, true))
         }
         return START_NOT_STICKY
     }
@@ -91,7 +93,6 @@ class NexusMediaPlaybackService : Service() {
             stopPlayback()
             return
         }
-
         try {
             player = MediaPlayer().apply {
                 setAudioAttributes(
@@ -110,6 +111,13 @@ class NexusMediaPlaybackService : Service() {
         } catch (_: Throwable) {
             stopPlayback()
         }
+    }
+
+    private fun seekAbsolute(player: MediaPlayer, requested: Long) {
+        if (!player.isInitialized) return
+        val duration = player.duration
+        if (duration <= 0) return
+        player.seekTo(requested.coerceIn(0L, duration.toLong()).toInt())
     }
 
     private fun requestAudioFocus(): Boolean {
@@ -137,9 +145,8 @@ class NexusMediaPlaybackService : Service() {
             audioFocusRequest = null
             return
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            audioFocusRequest?.let { manager.abandonAudioFocusRequest(it) }
-        } else {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) audioFocusRequest?.let { manager.abandonAudioFocusRequest(it) }
+        else {
             @Suppress("DEPRECATION")
             manager.abandonAudioFocus(null)
         }
@@ -161,12 +168,7 @@ class NexusMediaPlaybackService : Service() {
 
     private fun buildNotification(): Notification {
         val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
-        val contentIntent = PendingIntent.getActivity(
-            this,
-            0,
-            launchIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
+        val contentIntent = PendingIntent.getActivity(this, 0, launchIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle(title)
@@ -179,9 +181,7 @@ class NexusMediaPlaybackService : Service() {
     }
 
     private fun updateNotification() {
-        runCatching {
-            getSystemService(NotificationManager::class.java)?.notify(NOTIFICATION_ID, buildNotification())
-        }
+        runCatching { getSystemService(NotificationManager::class.java)?.notify(NOTIFICATION_ID, buildNotification()) }
     }
 
     private fun createChannel() {
@@ -192,9 +192,8 @@ class NexusMediaPlaybackService : Service() {
     }
 
     private fun registerReceiverCompat(receiver: BroadcastReceiver, filter: IntentFilter) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(receiver, filter, RECEIVER_NOT_EXPORTED)
-        } else {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) registerReceiver(receiver, filter, RECEIVER_NOT_EXPORTED)
+        else {
             @Suppress("DEPRECATION")
             registerReceiver(receiver, filter)
         }
