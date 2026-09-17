@@ -3,24 +3,16 @@ package com.nexuswavetech.nexusplus
 import java.io.File
 
 /**
- * Android-side adapter boundary for the bundled LibreOfficeKit engine.
+ * Android-side adapter for the bundled LibreOfficeKit engine.
  *
- * The real LibreOffice mobile engine is native code (liblo-native-code.so)
- * and is intentionally loaded only when its ABI-specific payload is present.
- * This class does not fabricate conversion output when that payload is absent.
+ * The native payload is liblo-native-code.so. Conversion calls are exposed
+ * through a small JNI bridge so the React Native layer never fabricates files.
  */
 object LibreOfficeEngine {
     private const val NATIVE_LIBRARY = "lo-native-code"
     @Volatile private var loaded = false
 
-    fun isBundled(): Boolean {
-        return try {
-            ensureLoaded()
-            true
-        } catch (_: Throwable) {
-            false
-        }
-    }
+    fun isBundled(): Boolean = runCatching { ensureLoaded(); true }.getOrDefault(false)
 
     @Synchronized
     private fun ensureLoaded() {
@@ -29,7 +21,7 @@ object LibreOfficeEngine {
         loaded = true
     }
 
-    fun requireBundled(): Unit {
+    fun requireBundled() {
         try {
             ensureLoaded()
         } catch (error: Throwable) {
@@ -41,14 +33,16 @@ object LibreOfficeEngine {
     }
 
     fun requireReadableFile(path: String): File {
-        require(path.isNotBlank()) { "Document path is required." }
+        require(path.isNotBlank() && path.length <= 4096) { "Document input path is invalid." }
+        require(!path.contains('\u0000') && !path.contains('\r') && !path.contains('\n')) { "Document input path is invalid." }
         val file = File(path)
         require(file.isFile && file.canRead()) { "Document input is not readable." }
         return file
     }
 
     fun requireWritableTarget(path: String): File {
-        require(path.isNotBlank()) { "Document output path is required." }
+        require(path.isNotBlank() && path.length <= 4096) { "Document output path is invalid." }
+        require(!path.contains('\u0000') && !path.contains('\r') && !path.contains('\n')) { "Document output path is invalid." }
         val file = File(path)
         file.parentFile?.mkdirs()
         require(file.parentFile?.isDirectory == true && file.parentFile?.canWrite() == true) {
@@ -56,4 +50,17 @@ object LibreOfficeEngine {
         }
         return file
     }
+
+    fun convert(input: File, output: File, inputExtension: String, outputExtension: String) {
+        requireBundled()
+        nativeConvert(input.absolutePath, output.absolutePath, inputExtension, outputExtension)
+    }
+
+    @JvmStatic
+    private external fun nativeConvert(
+        inputPath: String,
+        outputPath: String,
+        inputExtension: String,
+        outputExtension: String,
+    )
 }
