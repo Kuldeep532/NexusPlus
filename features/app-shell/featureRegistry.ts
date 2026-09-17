@@ -11,6 +11,7 @@ const registry: HomeFeatureDefinition[] = [
   { id: 'nexus-assistant', title: 'Nexus Assistant', description: 'Private on-device chat with safe device and app actions.', route: '/nexus-assistant', icon: 'cpu', category: 'productivity', featured: true, order: 79 },
   { id: 'audio-editor', title: 'Audio Editor', description: 'Edit audio with dedicated sound, timeline and mixing tools.', route: '/audio-editor', icon: 'edit-3', category: 'media', featured: true, order: 81 },
   { id: 'send-file', title: 'Send File', description: 'Send or receive trusted files directly between nearby phones.', route: '/send-file', icon: 'send', category: 'utility', featured: true, order: 82 },
+  { id: 'nexus-vision-assist', title: 'Nexus Vision Assist', description: 'Accessibility-first agent for screen, image and video understanding.', route: '/nexus-vision-assist', icon: 'eye', category: 'productivity', featured: true, order: 83 },
   { id: 'link-shortcuts', title: 'Link Shortcuts', description: 'Save frequently used web links for one-tap access.', route: '/link-shortcuts', icon: 'link', category: 'utility' },
   { id: 'talking-calculator', title: 'AI Calculator', description: 'AI-assisted math, finance, investment, salary, currency and market analysis.', route: '/calculator', icon: 'cpu', category: 'utility' },
   { id: 'qr-code-tools', title: 'QR Code Tools', description: 'Generate customizable Text, URL, WhatsApp, Wi‑Fi and UPI QR codes or scan QR codes.', route: '/utilities/qr-tools', icon: 'qrcode', category: 'utility' },
