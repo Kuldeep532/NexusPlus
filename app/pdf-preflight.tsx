@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { buildCombinedPdfWithGotenberg } from '@/features/pdf-gotenberg/pdfToolkit';
+import { flattenPdfWithGotenberg } from '@/features/pdf-gotenberg/gotenbergPdfEngine';
 import { PdfToolResultPanel } from '@/features/pdf-native/PdfToolResultPanel';
 
 type PickedFile = { uri: string; name: string };
@@ -36,12 +36,12 @@ export default function PdfPreflightScreen() {
     if (!file) { setStatus('Choose a PDF first.'); return; }
     setBusy(true);
     setResult(null);
-    setStatus('Running PDF preflight and normalization…');
+    setStatus('Running PDF preflight normalization…');
     try {
       const outputName = `${safeBaseName(file.name)}-preflight.pdf`;
-      const uri = await buildCombinedPdfWithGotenberg([file.uri, file.uri], outputName);
+      const uri = await flattenPdfWithGotenberg(file.uri, outputName);
       setResult(uri);
-      setStatus('PDF workflow completed.');
+      setStatus('PDF normalization completed.');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'PDF preflight could not be completed.');
     } finally { setBusy(false); }
@@ -53,11 +53,11 @@ export default function PdfPreflightScreen() {
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <Stack.Screen options={{ title: 'PDF Preflight & Optimize' }} />
       {busy ? <View style={styles.loading}><ActivityIndicator size="large" color={colors.primary} /><Text accessibilityRole="header" style={[styles.loadingTitle, { color: colors.foreground }]}>Processing PDF</Text><Text accessibilityLiveRegion="polite" style={[styles.loadingText, { color: colors.mutedForeground }]}>{status}</Text></View> : <ScrollView contentContainerStyle={{ paddingTop: insets.top + 18, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}><View style={[styles.icon, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="tune-variant" size={29} color={colors.primary} /></View><View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>PDF Preflight & Optimize</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Run a Gotenberg PDF-engine workflow to normalize PDF output before sharing or archiving.</Text></View></View>
+        <View style={styles.header}><View style={[styles.icon, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="tune-variant" size={29} color={colors.primary} /></View><View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>PDF Preflight & Optimize</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Normalize a PDF through the existing Gotenberg PDF Engine before sharing or archiving.</Text></View></View>
         <Pressable accessibilityRole="button" accessibilityLabel="Choose PDF" accessibilityHint="Select the PDF to process." onPress={() => void pickFile()} style={({ pressed }) => [styles.pick, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]}><Feather name="file-plus" size={20} color={colors.primary} /><View style={styles.pickCopy}><Text style={[styles.pickTitle, { color: colors.foreground }]}>Choose PDF</Text><Text numberOfLines={1} style={[styles.pickDetail, { color: colors.mutedForeground }]}>{file?.name || 'Select a PDF document'}</Text></View><Feather name="chevron-right" size={18} color={colors.mutedForeground} /></Pressable>
-        {!!file && !result && <View style={[styles.info, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>WORKFLOW</Text><Text style={[styles.infoValue, { color: colors.foreground }]}>Gotenberg PDF Engine normalization</Text></View>}
+        {!!file && !result && <View style={[styles.info, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>WORKFLOW</Text><Text style={[styles.infoValue, { color: colors.foreground }]}>Gotenberg PDF Engine flatten/normalization</Text></View>}
         {!result && <Pressable accessibilityRole="button" accessibilityLabel="Run PDF preflight and optimize" onPress={() => void processPdf()} disabled={!file} style={({ pressed }) => [styles.primary, { backgroundColor: colors.primary }, (!file || pressed) && styles.disabled]}><MaterialCommunityIcons name="tune-variant" size={19} color={colors.primaryForeground} /><Text style={[styles.primaryText, { color: colors.primaryForeground }]}>Process PDF</Text></Pressable>}
-        <Text accessibilityLiveRegion="polite" style={[styles.note, { color: colors.mutedForeground }]}>The current Gotenberg workflow is used as an engine boundary; no native PDF tools are modified by this feature.</Text>
+        <Text accessibilityLiveRegion="polite" style={[styles.note, { color: colors.mutedForeground }]}>This tool performs supported PDF normalization. It does not claim to diagnose every PDF/A, print-production, font, image, or accessibility issue.</Text>
         {!!status && <Text accessibilityLiveRegion="polite" style={[styles.status, { color: status.includes('completed') ? colors.primary : colors.mutedForeground }]}>{status}</Text>}
         <PdfToolResultPanel resultUri={result} filename={result ? `${safeBaseName(file?.name || 'document')}-preflight.pdf` : undefined} mimeType="application/pdf" onClose={reset} onReset={reset} title="PDF processing completed" />
       </ScrollView>}
