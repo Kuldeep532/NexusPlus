@@ -11,7 +11,7 @@ export type VoiceRuntimeStatus = { state: 'idle' | 'listening' | 'processing' | 
 
 type NativeVoiceModule = {
   isAvailable(): Promise<boolean>;
-  startListening(): Promise<void>;
+  startListening(options?: { locales?: string[] }): Promise<void>;
   stopListening(): Promise<void>;
   stopOutput(): Promise<void>;
   speak(text: string, options?: { modelPath?: string; configPath?: string }): Promise<void>;
@@ -24,8 +24,8 @@ async function ensureMicrophonePermission(): Promise<boolean> {
   const permission = PermissionsAndroid.PERMISSIONS.RECORD_AUDIO;
   if (await PermissionsAndroid.check(permission)) return true;
   const result = await PermissionsAndroid.request(permission, {
-    title: 'Nexus Assistant microphone',
-    message: 'Nexus Assistant uses the microphone only while a voice command is being captured.',
+    title: 'Nexus Focus Assist microphone',
+    message: 'Nexus Focus Assist uses the microphone only while a voice command is being captured.',
     buttonPositive: 'Allow',
     buttonNegative: 'Cancel',
   });
@@ -47,7 +47,11 @@ export function createStage7VoiceBridge(onStatus?: (status: VoiceRuntimeStatus) 
   return {
     bridge: {
       async isAvailable() { return (await getVoiceCommandsEnabled()) && (await ensureMicrophonePermission()) && nativeVoice.isAvailable(); },
-      async startListening() { if (!(await getVoiceCommandsEnabled())) throw new Error('VOICE_COMMANDS_DISABLED'); if (!(await ensureMicrophonePermission())) throw new Error('MIC_PERMISSION_REQUIRED'); await nativeVoice.startListening(); },
+      async startListening() {
+        if (!(await getVoiceCommandsEnabled())) throw new Error('VOICE_COMMANDS_DISABLED');
+        if (!(await ensureMicrophonePermission())) throw new Error('MIC_PERMISSION_REQUIRED');
+        await nativeVoice.startListening({ locales: ['hi-IN', 'en-IN', 'en-US'] });
+      },
       async stopListening() { await nativeVoice.stopListening(); onStatus?.({ state: 'idle' }); },
       async stopOutput() { await nativeVoice.stopOutput().catch(() => undefined); await Speech.stop().catch(() => undefined); },
       async speak(text: string) { await nativeVoice.speak(text); },
