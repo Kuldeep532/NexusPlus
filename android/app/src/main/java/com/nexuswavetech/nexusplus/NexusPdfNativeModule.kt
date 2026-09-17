@@ -36,6 +36,12 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
     }
 
     @ReactMethod
+    fun pdfToWord(inputPath: String, outputPath: String, promise: Promise) = convertDocs(inputPath, outputPath, "pdf", "docx", promise)
+
+    @ReactMethod
+    fun wordToPdf(inputPath: String, outputPath: String, promise: Promise) = convertDocs(inputPath, outputPath, "docx", "pdf", promise)
+
+    @ReactMethod
     fun merge(inputPaths: ReadableArray, outputPath: String, promise: Promise) {
         runCatching {
             ensurePdfBoxInitialized(); require(inputPaths.size() > 0) { "At least one PDF input is required." }
@@ -181,6 +187,16 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
         runCatching { ensurePdfBoxInitialized(); require(password.isNotEmpty()) { "PDF password is required." }; val output = File(outputPath); output.parentFile?.mkdirs(); PDDocument.load(File(requireReadablePath(inputPath), password)).use { document -> document.setAllSecurityToBeRemoved(true); FileOutputStream(output).use { document.save(it) } }; output.absolutePath }.onSuccess { promise.resolve(it) }.onFailure { promise.reject("PDF_UNLOCK", it.message, it) }
     }
 
+    private fun convertDocs(inputPath: String, outputPath: String, inputExtension: String, outputExtension: String, promise: Promise) {
+        try {
+            val future = DocsEngineRunner.submit(inputPath, outputPath, inputExtension, outputExtension)
+            val result = DocsEngineRunner.await(future)
+            promise.resolve(result)
+        } catch (error: Throwable) {
+            promise.reject("DOCS_CONVERSION", error.message ?: "Document conversion failed.", error)
+        }
+    }
+
     private fun renderSafely(renderer: PDFRenderer, document: PDDocument, pageIndex: Int, dpi: Int): Bitmap {
         val scale = dpi / 72f
         val pageSize = document.getPage(pageIndex).mediaBox
@@ -199,15 +215,15 @@ class NexusPdfNativeModule(private val reactContext: ReactApplicationContext) : 
     private fun maxSafeBitmapBytes(): Long = (Runtime.getRuntime().maxMemory() * 0.18).toLong().coerceAtMost(64L * 1024L * 1024L)
     private fun uniqueImageFile(directory: File, desired: String): File { if (!File(directory, desired).exists()) return File(directory, desired); val dot = desired.lastIndexOf('.'); val base = if (dot > 0) desired.substring(0, dot) else desired; val ext = if (dot > 0) desired.substring(dot) else ""; var n = 2; var candidate = File(directory, "$base-$n$ext"); while (candidate.exists()) { n++; candidate = File(directory, "$base-$n$ext") }; return candidate }
     private fun uniqueFilename(directory: File, desired: String): String { if (!File(directory, desired).exists()) return desired; val dot = desired.lastIndexOf('.'); val base = if (dot > 0) desired.substring(0, dot) else desired; val ext = if (dot > 0) desired.substring(dot) else ""; var n = 2; var candidate = "$base-$n$ext"; while (File(directory, candidate).exists()) { n++; candidate = "$base-$n$ext" }; return candidate }
-    private fun sanitizePathSegment(value: String, fallback: String): String { val sanitized = value.replace(Regex("[^a-zA-Z0-9 _-]"), "").trim().take(80); return if (sanitized.isEmpty()) fallback else sanitized }
-    private fun sanitizeFilename(value: String, fallback: String): String { val sanitized = value.replace(Regex("[^a-zA-Z0-9._ -]"), "").trim().take(180); return if (sanitized.isEmpty()) fallback else sanitized }
-    private fun requireReadablePath(path: String): String { val file = File(path); require(file.isFile && file.canRead()) { "Input document is unavailable." }; return file.absolutePath }
-    private fun requireArrayString(values: ReadableArray, index: Int): String { val value = values.getString(index); require(value.isNotBlank()) { "Input path is empty." }; return value }
-    private fun ReadableArray.toListOfPaths(): List<String> = (0 until size()).map { requireReadablePath(requireArrayString(this, it)) }
-    private fun ensurePdfBoxInitialized() { PDFBoxResourceLoader.init(reactContext.applicationContext) }
+    private fun requireReadablePath(path: String): String { require(path.isNotBlank() && path.length <= 4096) { "Invalid PDF input path." }; require(!path.contains('\u0000') && !path.contains('\r') && !path.contains('\n')) { "Invalid PDF input path." }; val file = File(path); require(file.isFile && file.canRead()) { "PDF input is not readable." }; return file.absolutePath }
+    private fun sanitizePathSegment(value: String, fallback: String): String { val normalized = value.trim().replace(Regex("[^a-zA-Z0-9._-]"), "_").take(80); return normalized.ifEmpty { fallback } }
+    private fun sanitizeFilename(value: String, fallback: String): String { val normalized = value.trim().replace(Regex("[/\\\\]"), "_").replace(Regex("[^a-zA-Z0-9._ -]"), "_").trim().take(160); return normalized.ifEmpty { fallback } }
+    private fun requireArrayString(array: ReadableArray, index: Int): String = array.getString(index) ?: throw IllegalArgumentException("Invalid path value.")
+    private fun ReadableArray.toListOfPaths(): List<String> = (0 until size()).map { requireArrayString(this, it) }
+    private fun ensurePdfBoxInitialized() { PDFBoxResourceLoader.init(reactContext) }
 
     companion object {
-        private const val MAX_PDF_PAGE_POINTS = 14400f
-        private const val MAX_BITMAP_DIMENSION = 12000
+        private const val MAX_PDF_PAGE_POINTS = 14_000f
+        private const val MAX_BITMAP_DIMENSION = 8_000
     }
 }
