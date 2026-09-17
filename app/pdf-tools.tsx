@@ -11,7 +11,6 @@ const tools: Tool[] = [
   { key: 'split-pdf', title: 'Split PDF', description: 'Cut a PDF into separate files using page ranges.', icon: 'content-cut', route: '/split-pdf' },
   { key: 'rotate-pdf', title: 'Rotate PDF', description: 'Rotate selected PDF pages by 90°, 180°, or 270°.', icon: 'rotate-right', route: '/rotate-pdf' },
   { key: 'pdf-image', title: 'PDF ⇄ Image', description: 'Convert PDF pages to images or images to PDF.', icon: 'file-swap-outline', route: '/pdf-image' },
-  { key: 'pdf-word', title: 'PDF ⇄ Word', description: 'Convert PDF to Word or Word to PDF in one tool.', icon: 'file-swap-outline', route: '/categories/pdf-word' },
   { key: 'compress-pdf', title: 'Compress PDF', description: 'Reduce PDF file size for easier sharing.', icon: 'file-minus-outline', route: '/compress-pdf' },
   { key: 'lock-unlock-pdf', title: 'Lock & Unlock PDF', description: 'Password-protect a PDF or remove its existing protection.', icon: 'shield-lock-outline', route: '/lock-unlock-pdf' },
   { key: 'reorder-pdf', title: 'Reorder PDF', description: 'Change the order of pages and save a new PDF.', icon: 'swap-vertical', route: '/reorder-pdf' },
@@ -30,7 +29,7 @@ export default function PdfToolsScreen() {
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 18, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={[styles.headerIcon, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="file-pdf-box" size={30} color={colors.primary} /></View>
-          <View style={styles.headerCopy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>PDF Tools</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>All PDF utilities, including two-way PDF ⇄ Word conversion.</Text></View>
+          <View style={styles.headerCopy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>PDF Tools</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Available PDF utilities. PDF ⇄ Word conversion is currently source-only until the LibreOfficeKit Android engine is bundled.</Text></View>
         </View>
         <View style={styles.list}>
           {tools.map((tool) => <Pressable key={tool.key} accessibilityRole="button" accessibilityLabel={`Open ${tool.title}`} accessibilityHint={tool.description} onPress={() => router.push(tool.route as never)} style={({ pressed }) => [styles.row, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]}>
