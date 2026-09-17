@@ -7,9 +7,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Vision Assist transport. It captures only the currently exposed
- * accessibility semantics; it does not capture screenshots, passwords,
- * clipboard contents, or raw key events.
+ * Vision Assist transport. It captures only currently exposed accessibility
+ * semantics. Password fields are always redacted and raw key/clipboard data
+ * is never collected.
  */
 class NexusVisionAccessibilityService : AccessibilityService() {
     companion object {
@@ -58,17 +58,18 @@ class NexusVisionAccessibilityService : AccessibilityService() {
 
     private fun appendNode(node: AccessibilityNodeInfo, out: JSONArray, depth: Int) {
         if (out.length() >= MAX_NODES || depth > 30) return
+        val passwordField = node.isPassword
         val item = JSONObject()
             .put("className", node.className?.toString().orEmpty())
-            .put("text", node.text?.toString()?.take(MAX_TEXT).orEmpty())
-            .put("contentDescription", node.contentDescription?.toString()?.take(MAX_TEXT).orEmpty())
+            .put("text", if (passwordField) "" else node.text?.toString()?.take(MAX_TEXT).orEmpty())
+            .put("contentDescription", if (passwordField) "" else node.contentDescription?.toString()?.take(MAX_TEXT).orEmpty())
             .put("viewId", node.viewIdResourceName?.take(MAX_TEXT).orEmpty())
             .put("clickable", node.isClickable)
             .put("focusable", node.isFocusable)
             .put("focused", node.isFocused)
             .put("enabled", node.isEnabled)
             .put("editable", node.isEditable)
-            .put("password", node.isPassword)
+            .put("password", passwordField)
             .put("scrollable", node.isScrollable)
         out.put(item)
         for (index in 0 until node.childCount) {
