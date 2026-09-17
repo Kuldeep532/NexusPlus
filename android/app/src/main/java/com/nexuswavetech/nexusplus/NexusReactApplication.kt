@@ -30,6 +30,7 @@ class NexusReactApplication : Application(), ReactApplication {
             add(NexusCctvOnvifPackage())
             add(NexusPdfNativePackage())
             add(NexusVideoEditorPackage())
+            add(NexusVisionAssistPackage())
         }
         override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"
         override fun getUseDeveloperSupport(): Boolean = BuildConfig.DEBUG
