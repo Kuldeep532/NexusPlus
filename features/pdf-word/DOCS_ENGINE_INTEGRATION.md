@@ -1,33 +1,37 @@
-# Docs Engine Integration — Stage Plan
+# Docs Engine Integration — Production Status
 
-Issue #79 tracks the Android document engine work. All changes stay on `main`; no new branch is created.
+Issue #79 covers Android PDF ⇄ DOCX conversion. All changes stay on `main`; no new branch is required.
 
-## Stage 1 — Engine selection
+## Engine
 
-Current native PDF work uses PDFBox for PDF operations, but PDFBox is not a DOCX conversion engine. A production PDF ⇄ Word implementation therefore requires a separate document engine.
+Nexus Plus uses LibreOfficeKit (LOK) as the document conversion engine. LibreOffice's Android implementation bundles the LibreOffice core as `liblo-native-code.so`; this is the native engine used by the Android application.
 
-Candidate assessment:
+## Adapter boundary
 
-- **Apryse Mobile SDK**: provides direct MS Office conversion on Android, including DOCX to PDF, without Microsoft Office and without an external conversion server. Production use requires a commercial license.
-- **Collabora/LibreOfficeKit**: has a real LibreOffice-derived document engine on Android and supports DOCX, but embedding the native engine requires a substantially heavier native build/integration surface and NDK/toolchain work.
-- **Apache POI**: handles OOXML/DOCX parsing and generation, but it is not a complete DOCX-to-PDF rendering engine. It cannot by itself satisfy both conversion directions with Word-compatible layout fidelity.
+The React Native layer calls `NexusPdfNative.isDocsEngineAvailable`, `pdfToWord`, and `wordToPdf`. The Kotlin `DocsEngineAdapter` owns validation and delegates conversion to `LibreOfficeEngine`; partial outputs are removed on failure.
 
-## Stage 2 — Native boundary
+## Required Android native payload
 
-The JS layer exposes `isDocumentEngineAvailable`, `pdfToWord`, and `wordToPdf` through `NexusPdfNative`. Missing engine methods must fail explicitly; no placeholder output is permitted.
+The APK must contain the LibreOfficeKit native payload for every supported ABI, including `liblo-native-code.so`, its required native dependencies, and the LibreOffice runtime assets/data required by that engine build.
 
-## Stage 3 — Engine adapter
+The JNI loader deliberately fails closed when the payload is missing. It must never create renamed files, empty documents, or other placeholder output.
 
-Add exactly one concrete adapter behind `NexusPdfNative` once the engine artifact and license/build requirements are available. Keep file validation, app-scoped output paths, cleanup and React Native Promise handling outside the vendor-specific adapter where practical.
+## Engine build
 
-## Stage 4 — Conversion implementation
+The normal Android Gradle/CMake build does not compile LibreOffice itself. A production build therefore needs a reproducible engine-artifact step that pins the LibreOffice source revision, builds the Android engine with the supported NDK/toolchain, places the ABI-specific native libraries and runtime assets into Android packaging inputs, and verifies the required payload before Gradle assembles the APK/AAB.
 
-Implement real PDF-to-DOCX and DOCX-to-PDF conversion. Conversion must run off the UI thread, validate input/output paths, bound document/resource sizes, close all streams/handles, and remove partial outputs on failure.
+LibreOffice's upstream Android documentation documents the Android LOK architecture and the bundled `liblo-native-code.so` engine.
 
-## Stage 5 — Validation
+## Conversion requirements
 
-Run the repository Android workflow and verify a fresh APK/AAB. Exercise valid PDF, malformed PDF, valid DOCX, malformed DOCX, large-file/error paths, and both conversion directions. Only after those checks should Issue #79 be considered production-ready.
+- PDF → DOCX creates a valid Office Open XML `.docx` package using the real document engine.
+- DOCX → PDF renders the document using the real document engine.
+- Conversion runs off the Android UI thread.
+- Inputs are limited to 50 MB by the app adapter.
+- Input/output paths are validated and outputs stay in app-scoped storage.
+- Partial output is removed on conversion failure.
+- Malformed and unsupported inputs fail visibly.
 
-## Current decision gate
+## Validation
 
-Do not add a commercial document engine dependency with a fake/public license key. A real production engine requires either the user's approved commercial license/configuration or an open-source engine that can be pinned and built within the repository's Android toolchain. Until that gate is satisfied, the app must continue reporting the feature as unavailable rather than generating fake files.
+The feature is production-complete only after the engine artifact is actually present, a fresh Android build passes, and both directions plus malformed/large-input error paths are exercised successfully.
