@@ -1,8 +1,13 @@
 package com.nexuswavetech.nexusplus
 
-import android.media.AudioFormat
-import android.media.AudioRecord
-import android.media.MediaRecorder
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import androidx.core.content.ContextCompat
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -11,17 +16,16 @@ import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.concurrent.thread
 
 class NexusAssistantVoiceModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
     private val listening = AtomicBoolean(false)
-    private var recordThread: Thread? = null
+    private var recognizer: SpeechRecognizer? = null
 
     override fun getName(): String = "NexusAssistantVoice"
 
     @ReactMethod
     fun isAvailable(promise: Promise) {
-        promise.resolve(hasRecordPermission())
+        promise.resolve(hasRecordPermission() && SpeechRecognizer.isRecognitionAvailable(context))
     }
 
     @ReactMethod
@@ -30,54 +34,63 @@ class NexusAssistantVoiceModule(private val context: ReactApplicationContext) : 
             promise.reject("MIC_PERMISSION", "Microphone permission is required.")
             return
         }
+        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+            promise.reject("ASR_UNAVAILABLE", "Android speech recognition is unavailable on this device.")
+            return
+        }
         if (!listening.compareAndSet(false, true)) {
             promise.resolve(null)
             return
         }
 
-        recordThread = thread(start = true, name = "NexusAssistantAudioCapture") {
-            val sampleRate = 16_000
-            val minBuffer = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-            if (minBuffer <= 0) {
-                emitState("error", "AUDIO_RECORD_UNAVAILABLE")
+        emitState("listening", null)
+        val speech = SpeechRecognizer.createSpeechRecognizer(context).also { recognizer = it }
+        speech.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) = Unit
+            override fun onBeginningOfSpeech() = Unit
+            override fun onRmsChanged(rmsdB: Float) = Unit
+            override fun onBufferReceived(buffer: ByteArray?) = Unit
+            override fun onEndOfSpeech() = emitState("processing", null)
+            override fun onError(error: Int) {
                 listening.set(false)
-                return@thread
-            }
-            val recorder = AudioRecord(
-                MediaRecorder.AudioSource.VOICE_RECOGNITION,
-                sampleRate,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                maxOf(minBuffer, sampleRate / 2),
-            )
-            try {
-                recorder.startRecording()
-                emitState("listening", null)
-                val buffer = ShortArray(maxOf(320, minBuffer / 2))
-                while (listening.get()) {
-                    val count = recorder.read(buffer, 0, buffer.size)
-                    if (count < 0) {
-                        emitState("error", "AUDIO_READ_$count")
-                        break
-                    }
-                    // PCM is kept in-process. ASR integration consumes it here when the
-                    // downloaded local ASR backend is loaded; it is never uploaded.
-                }
-            } catch (error: Throwable) {
-                emitState("error", error.message ?: "AUDIO_CAPTURE_FAILED")
-            } finally {
-                try { recorder.stop() } catch (_: Throwable) {}
-                recorder.release()
-                listening.set(false)
+                destroyRecognizer()
+                emitState("error", "ASR_ERROR_$error")
                 emitState("idle", null)
             }
+            override fun onResults(results: Bundle?) {
+                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                val transcript = matches?.firstOrNull()?.trim().orEmpty()
+                listening.set(false)
+                if (transcript.isNotBlank()) emitTranscript(transcript)
+                destroyRecognizer()
+                emitState("idle", null)
+            }
+            override fun onPartialResults(partialResults: Bundle?) = Unit
+            override fun onEvent(eventType: Int, params: Bundle?) = Unit
+        })
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
         }
-        promise.resolve(null)
+        try {
+            speech.startListening(intent)
+            promise.resolve(null)
+        } catch (error: Throwable) {
+            listening.set(false)
+            destroyRecognizer()
+            promise.reject("ASR_START_FAILED", error.message, error)
+        }
     }
 
     @ReactMethod
     fun stopListening(promise: Promise) {
         listening.set(false)
+        recognizer?.runCatching { stopListening() }
+        destroyRecognizer()
+        emitState("idle", null)
         promise.resolve(null)
     }
 
@@ -97,7 +110,22 @@ class NexusAssistantVoiceModule(private val context: ReactApplicationContext) : 
     }
 
     private fun hasRecordPermission(): Boolean =
-        context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+    private fun destroyRecognizer() {
+        recognizer?.runCatching { cancel() }
+        recognizer?.destroy()
+        recognizer = null
+    }
+
+    private fun emitTranscript(text: String) {
+        val payload: WritableMap = Arguments.createMap().apply {
+            putString("state", "processing")
+            putString("transcript", text.take(2000))
+        }
+        context.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+            .emit("NexusAssistantVoiceState", payload)
+    }
 
     private fun emitState(state: String, error: String?) {
         val payload: WritableMap = Arguments.createMap().apply {
