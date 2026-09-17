@@ -24,16 +24,6 @@ class NexusVisionAssistModule(private val context: ReactApplicationContext) : Re
         }.onSuccess(promise::resolve).onFailure { promise.reject("VISION_STATE", it.message, it) }
     }
 
-    @ReactMethod
-    fun refresh(promise: Promise) {
-        runCatching {
-            val service = NexusVisionAccessibilityService.instance
-            if (service == null) throw IllegalStateException("VISION_ACCESSIBILITY_SERVICE_NOT_CONNECTED")
-            service.refreshSnapshot()
-            true
-        }.onSuccess(promise::resolve).onFailure { promise.reject("VISION_REFRESH", it.message, it) }
-    }
-
     private fun isAccessibilityEnabled(): Boolean {
         val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false
         val packageName = context.packageName
