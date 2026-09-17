@@ -17,21 +17,91 @@ internal object AudioEffectProcessor {
   private data class Decoded(val sampleRate: Int, val channels: Int, val samples: FloatArray)
 
   fun process(context: Context, inputPath: String, outputPath: String, effect: String, amount: Double): Result {
-    require(effect in setOf("bass-boost", "treble", "vibrato", "echo", "telephone", "robot", "reverb", "megaphone")) { "Unknown audio effect." }
+    val supported = setOf("bass-boost", "treble", "vibrato", "echo", "telephone", "robot", "reverb", "megaphone", "channel-mono", "channel-stereo", "channel-swap", "channel-left", "channel-right")
+    require(effect in supported) { "Unknown audio effect." }
     require(amount.isFinite() && amount in 0.0..1.0) { "Effect amount must be between 0 and 1." }
     val decoded = decodePcm(context, inputPath)
-    val processed = when (effect) {
-      "bass-boost" -> bassBoost(decoded.samples, decoded.sampleRate, decoded.channels, amount)
-      "treble" -> treble(decoded.samples, decoded.sampleRate, decoded.channels, amount)
-      "vibrato" -> vibrato(decoded.samples, decoded.sampleRate, decoded.channels, amount)
-      "echo" -> echo(decoded.samples, decoded.sampleRate, decoded.channels, amount)
-      "telephone" -> telephone(decoded.samples, decoded.sampleRate, decoded.channels, amount)
-      "robot" -> robot(decoded.samples, decoded.sampleRate, decoded.channels, amount)
-      "reverb" -> reverb(decoded.samples, decoded.sampleRate, decoded.channels, amount)
-      else -> megaphone(decoded.samples, decoded.sampleRate, decoded.channels, amount)
+    val channelResult = when (effect) {
+      "channel-mono" -> mono(decoded.samples, decoded.channels)
+      "channel-stereo" -> stereo(decoded.samples, decoded.channels)
+      "channel-swap" -> swap(decoded.samples, decoded.channels)
+      "channel-left" -> leftOnly(decoded.samples, decoded.channels)
+      "channel-right" -> rightOnly(decoded.samples, decoded.channels)
+      else -> null
     }
-    val out = encodeAac(processed, decoded.sampleRate, decoded.channels, outputPath)
-    return Result(out, processed.size.toDouble() / decoded.channels / decoded.sampleRate * 1000.0, decoded.sampleRate, decoded.channels, "audio/mp4")
+    val processed: FloatArray
+    val outputChannels: Int
+    if (channelResult != null) {
+      processed = channelResult.first
+      outputChannels = channelResult.second
+    } else {
+      processed = when (effect) {
+        "bass-boost" -> bassBoost(decoded.samples, decoded.sampleRate, decoded.channels, amount)
+        "treble" -> treble(decoded.samples, decoded.sampleRate, decoded.channels, amount)
+        "vibrato" -> vibrato(decoded.samples, decoded.sampleRate, decoded.channels, amount)
+        "echo" -> echo(decoded.samples, decoded.sampleRate, decoded.channels, amount)
+        "telephone" -> telephone(decoded.samples, decoded.sampleRate, decoded.channels, amount)
+        "robot" -> robot(decoded.samples, decoded.sampleRate, decoded.channels, amount)
+        "reverb" -> reverb(decoded.samples, decoded.sampleRate, decoded.channels, amount)
+        else -> megaphone(decoded.samples, decoded.sampleRate, decoded.channels, amount)
+      }
+      outputChannels = decoded.channels
+    }
+    val out = encodeAac(processed, decoded.sampleRate, outputChannels, outputPath)
+    return Result(out, processed.size.toDouble() / outputChannels / decoded.sampleRate * 1000.0, decoded.sampleRate, outputChannels, "audio/mp4")
+  }
+
+  private fun mono(input: FloatArray, channels: Int): Pair<FloatArray, Int> {
+    require(channels >= 2) { "Mono conversion requires at least two input channels." }
+    val frames = input.size / channels
+    val out = FloatArray(frames)
+    for (f in 0 until frames) {
+      var sum = 0f
+      for (c in 0 until channels) sum += input[f * channels + c]
+      out[f] = (sum / channels).coerceIn(-1f, 1f)
+    }
+    return out to 1
+  }
+
+  private fun stereo(input: FloatArray, channels: Int): Pair<FloatArray, Int> {
+    val frames = input.size / channels
+    val out = FloatArray(frames * 2)
+    for (f in 0 until frames) {
+      val left = input[f * channels]
+      val right = if (channels >= 2) input[f * channels + 1] else left
+      out[f * 2] = left
+      out[f * 2 + 1] = right
+    }
+    return out to 2
+  }
+
+  private fun swap(input: FloatArray, channels: Int): Pair<FloatArray, Int> {
+    require(channels == 2) { "Left/right swap requires stereo input." }
+    val out = input.copyOf()
+    var f = 0
+    while (f < out.size) {
+      val left = out[f]
+      out[f] = out[f + 1]
+      out[f + 1] = left
+      f += 2
+    }
+    return out to 2
+  }
+
+  private fun leftOnly(input: FloatArray, channels: Int): Pair<FloatArray, Int> {
+    require(channels >= 2) { "Left channel extraction requires stereo or multichannel input." }
+    val frames = input.size / channels
+    val out = FloatArray(frames)
+    for (f in 0 until frames) out[f] = input[f * channels]
+    return out to 1
+  }
+
+  private fun rightOnly(input: FloatArray, channels: Int): Pair<FloatArray, Int> {
+    require(channels >= 2) { "Right channel extraction requires stereo or multichannel input." }
+    val frames = input.size / channels
+    val out = FloatArray(frames)
+    for (f in 0 until frames) out[f] = input[f * channels + 1]
+    return out to 1
   }
 
   private fun decodePcm(context: Context, inputPath: String): Decoded {
