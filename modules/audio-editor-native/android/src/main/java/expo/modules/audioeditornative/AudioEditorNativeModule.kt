@@ -70,6 +70,10 @@ class AudioEditorNativeModule : Module() {
       try { val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }; promise.resolve(RemoveVideoAudioProcessor.process(context, inputPath, outputPath)) }
       catch (error: Exception) { promise.reject("VIDEO_REMOVE_AUDIO_FAILED", error.message ?: "Unable to remove audio from video", error) }
     }
+    AsyncFunction("convertFormat") { inputPath: String, outputPath: String, format: String, bitrate: Int, sampleRate: Int, quality: Int, promise: Promise ->
+      try { promise.resolve(AudioFormatConverterProcessor.convert(appContext.reactContext, inputPath, outputPath, format, bitrate, sampleRate, quality)) }
+      catch (error: Exception) { promise.reject("AUDIO_FORMAT_CONVERSION_FAILED", error.message ?: "Unable to convert audio format", error) }
+    }
   }
 
   private fun probeAudio(inputPath: String): Map<String, Any?> {
