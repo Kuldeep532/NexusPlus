@@ -106,4 +106,5 @@ dependencies {
     implementation 'com.google.android.play:integrity:1.6.0'
     implementation 'com.tom-roush:pdfbox-android:2.0.27.0'
     implementation 'com.facebook.react:react-android'
+    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.22.0'
 }
