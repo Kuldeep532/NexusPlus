@@ -8,9 +8,9 @@ import { useAuth } from '@/features/auth/useAuth';
 import { getDailySpiritualMessage } from '@/features/spiritual/spiritualMessageLibrary';
 import { FEATURE_CATEGORY_META, getCategoryTools, getFeaturedHomeFeatures, getUtilityTools, type FeatureCategory } from '@/features/app-shell/featureRegistry';
 import { NexusBrandMark } from '@/features/branding/NexusBrandMark';
+import { PDF_TOOL_COUNT } from '@/app/pdf-tools';
 
 const CATEGORY_ORDER: FeatureCategory[] = ['utility', 'pdf', 'media', 'security', 'productivity'];
-const PDF_TOOL_COUNT = 3;
 
 export default function HomeScreen() {
   const colors = useColors(); const router = useRouter(); const insets = useSafeAreaInsets(); const auth = useAuth();
