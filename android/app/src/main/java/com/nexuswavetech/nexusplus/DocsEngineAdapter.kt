@@ -24,7 +24,7 @@ object DocsEngineAdapter {
         require(DocsEngineStatus.isAvailable()) { DocsEngineStatus.unavailableMessage() }
 
         return try {
-            LibreOfficeEngine.convert(input.absolutePath, output.absolutePath, inputExt, outputExt)
+            LibreOfficeEngine.convert(input, output, inputExt, outputExt)
             require(output.isFile && output.length() > 0L) { "Document engine did not produce a valid output file." }
             output.absolutePath
         } catch (error: Throwable) {
