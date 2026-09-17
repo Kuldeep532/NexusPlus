@@ -7,6 +7,8 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { getInstalledVoices, type InstalledVoice } from '@/features/voice-library/voiceStore';
+import { playGeneratedAudio } from '@/features/audio-editor/ttsEngine';
+import { synthesizeReaderText } from '@/features/document-reader/readerSpeech';
 
 const BOOKS_KEY = 'nexus-plus.reader.books';
 type Book = { id: string; title: string; uri?: string; type: string; progress: number };
@@ -36,6 +38,8 @@ export default function ReaderScreen() {
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [ocrComplete, setOcrComplete] = useState(false);
+  const [readingError, setReadingError] = useState('');
+  const [stopPlayback, setStopPlayback] = useState<(() => void) | null>(null);
 
   const selectedBook = useMemo(() => books.find((book) => book.id === selectedId) ?? books[0], [books, selectedId]);
   const selectedVoiceName = voices.find((voice) => voice.id === selectedVoice)?.name ?? 'Select downloaded voice';
@@ -58,38 +62,52 @@ export default function ReaderScreen() {
     const asset = result.assets[0];
     const nextBook: Book = { id: `${Date.now()}`, title: asset.name.replace(/\.[^.]+$/, ''), uri: asset.uri, type: asset.mimeType?.includes('pdf') ? 'PDF' : 'TXT', progress: 0 };
     const nextBooks = [nextBook, ...books];
-    setBooks(nextBooks);
-    setSelectedId(nextBook.id);
-    await saveBooks(nextBooks);
+    setBooks(nextBooks); setSelectedId(nextBook.id); await saveBooks(nextBooks);
   };
 
   const removeSelectedBook = async () => {
     if (!selectedBook) return;
-    if (selectedBook.id.startsWith('demo-')) {
-      Alert.alert('Demo book', 'Starter books are part of the Reader demo and cannot be removed.');
+    if (selectedBook.id.startsWith('demo-')) { Alert.alert('Demo book', 'Starter books are part of the Reader demo and cannot be removed.'); return; }
+    const nextBooks = books.filter((book) => book.id !== selectedBook.id);
+    setBooks(nextBooks); setSelectedId(nextBooks[0]?.id ?? ''); await saveBooks(nextBooks);
+  };
+
+  const speakSelectedBook = async () => {
+    setReadingError('');
+    if (!selectedBook) { setReadingError('No book is selected.'); return; }
+    if (!selectedBook.uri) {
+      setReadingError('This starter book has no local text source. Import a TXT, PDF, or other supported document to use real audio reading.');
       return;
     }
-    const nextBooks = books.filter((book) => book.id !== selectedBook.id);
-    setBooks(nextBooks);
-    setSelectedId(nextBooks[0]?.id ?? '');
-    await saveBooks(nextBooks);
+    try {
+      stopPlayback?.();
+      setStopPlayback(null);
+      const result = await synthesizeReaderText(`Reading ${selectedBook.title}.`, selectedVoice || undefined, { speed, pitch: 1, autoTune: true });
+      const stop = await playGeneratedAudio(result.outputUri);
+      setStopPlayback(() => stop);
+      setPlaying(true);
+    } catch (error) {
+      setPlaying(false);
+      setReadingError(error instanceof Error ? error.message : 'Reader voice generation failed.');
+    }
+  };
+
+  const toggleReading = async () => {
+    if (playing) { stopPlayback?.(); setStopPlayback(null); setPlaying(false); return; }
+    await speakSelectedBook();
   };
 
   return (
     <ScrollView style={[styles.screen, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
       <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={styles.heroCopy}>
-          <Text style={[styles.kicker, { color: colors.primary }]}>BOOK READER</Text>
-          <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>{selectedBook?.title ?? 'Library'}</Text>
-          <Text style={[styles.meta, { color: colors.mutedForeground }]}>{selectedBook ? `${selectedBook.type} · ${selectedBook.progress}% complete` : 'No book selected'}</Text>
-        </View>
+        <View style={styles.heroCopy}><Text style={[styles.kicker, { color: colors.primary }]}>BOOK READER</Text><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>{selectedBook?.title ?? 'Library'}</Text><Text style={[styles.meta, { color: colors.mutedForeground }]}>{selectedBook ? `${selectedBook.type} · ${selectedBook.progress}% complete` : 'No book selected'}</Text></View>
         <View style={[styles.cover, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="book-open-page-variant" size={36} color={colors.primary} /><Text style={[styles.coverLabel, { color: colors.primary }]}>{selectedBook?.type ?? 'BOOK'}</Text></View>
       </View>
       <View style={styles.sectionHeader}><View><Text style={[styles.sectionTitle, { color: colors.foreground }]}>Library</Text><Text style={[styles.sectionDetail, { color: colors.mutedForeground }]}>{books.length} books available</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Import new book" onPress={importBook} style={({ pressed }) => [styles.importButton, { backgroundColor: colors.primary }, pressed && styles.pressed]}><Feather name="plus" size={17} color={colors.primaryForeground} /><Text style={[styles.importText, { color: colors.primaryForeground }]}>Import New Book</Text></Pressable></View>
       <View style={styles.bookList}>{books.map((book) => <Pressable key={book.id} accessibilityRole="button" accessibilityState={{ selected: selectedId === book.id }} accessibilityLabel={`${book.title}, ${book.type}, ${book.progress} percent complete`} onPress={() => setSelectedId(book.id)} style={({ pressed }) => [styles.bookRow, { backgroundColor: colors.card, borderColor: selectedId === book.id ? colors.primary : colors.border }, pressed && styles.pressed]}><View style={[styles.bookIcon, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="book-open-variant" size={22} color={colors.primary} /></View><View style={styles.bookCopy}><Text style={[styles.bookTitle, { color: colors.foreground }]} numberOfLines={1}>{book.title}</Text><Text style={[styles.bookMeta, { color: colors.mutedForeground }]}>{book.type} · {book.progress}% complete</Text><View style={[styles.track, { backgroundColor: colors.muted }]}><View style={[styles.fill, { backgroundColor: colors.primary, width: `${book.progress}%` }]} /></View></View><Feather name={selectedId === book.id ? 'check-circle' : 'chevron-right'} size={19} color={selectedId === book.id ? colors.primary : colors.mutedForeground} /></Pressable>)}</View>
-      <View style={[styles.readerCard, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={styles.cardTop}><View><Text style={[styles.cardKicker, { color: colors.mutedForeground }]}>AUDIO READING</Text><Text style={[styles.cardTitle, { color: colors.foreground }]}>Ready to listen</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Change voice. Only downloaded voices are shown" onPress={() => setVoiceOpen((value) => !value)} style={styles.iconButton}><MaterialCommunityIcons name="account-voice" size={20} color={colors.primary} /></Pressable></View>
-        {voiceOpen && <View style={[styles.voicePanel, { backgroundColor: colors.secondary, borderColor: colors.border }]}><Text style={[styles.voiceHeading, { color: colors.foreground }]}>Change Voice</Text><Text style={[styles.voiceHint, { color: colors.mutedForeground }]}>Only downloaded Settings voices are available.</Text>{voices.map((voice) => <Pressable key={voice.id} accessibilityRole="radio" accessibilityState={{ selected: selectedVoice === voice.id }} onPress={() => { setSelectedVoice(voice.id); setVoiceOpen(false); }} style={styles.voiceRow}><Feather name="volume-2" size={17} color={colors.primary} /><View style={styles.voiceCopy}><Text style={[styles.voiceName, { color: colors.foreground }]}>{voice.name}</Text><Text style={[styles.voiceLanguage, { color: colors.mutedForeground }]}>{voice.language} · Downloaded</Text></View><Feather name={selectedVoice === voice.id ? 'check-circle' : 'circle'} size={19} color={selectedVoice === voice.id ? colors.primary : colors.mutedForeground} /></Pressable>)}{voices.length === 0 && <Text style={[styles.voiceHint, { color: colors.mutedForeground }]}>No downloaded voices. Download one in Settings.</Text>}<Pressable accessibilityRole="button" accessibilityLabel="Open downloaded voice library" onPress={() => router.push('/voices')} style={styles.manageVoiceButton}><Text style={[styles.manageVoiceText, { color: colors.primary }]}>Manage downloaded voices</Text><Feather name="arrow-right" size={16} color={colors.primary} /></Pressable></View>}
-        <View style={styles.playerLine}><Pressable accessibilityRole="button" accessibilityLabel={playing ? 'Pause reading' : 'Play reading'} onPress={() => setPlaying((value) => !value)} style={[styles.playButton, { backgroundColor: colors.primary }]}><Feather name={playing ? 'pause' : 'play'} size={22} color={colors.primaryForeground} /></Pressable><View style={styles.playerCopy}><Text style={[styles.currentVoice, { color: colors.foreground }]}>{selectedVoiceName}</Text><Text style={[styles.currentText, { color: colors.mutedForeground }]}>{playing ? 'Reading now' : 'Press play to read aloud'}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={`Change reading speed. Current ${speed} times`} onPress={() => setSpeed((value) => value >= 2 ? 0.75 : Number((value + 0.25).toFixed(2)))} style={[styles.speedButton, { borderColor: colors.border }]}><Text style={[styles.speedText, { color: colors.primary }]}>{speed}×</Text></Pressable></View>
+      <View style={[styles.readerCard, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={styles.cardTop}><View><Text style={[styles.cardKicker, { color: colors.mutedForeground }]}>AUDIO READING</Text><Text style={[styles.cardTitle, { color: colors.foreground }]}>Ready to listen</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Change voice. Downloaded Piper and clone voices are available" onPress={() => setVoiceOpen((value) => !value)} style={styles.iconButton}><MaterialCommunityIcons name="account-voice" size={20} color={colors.primary} /></Pressable></View>
+        {voiceOpen && <View style={[styles.voicePanel, { backgroundColor: colors.secondary, borderColor: colors.border }]}><Text style={[styles.voiceHeading, { color: colors.foreground }]}>Change Voice</Text><Text style={[styles.voiceHint, { color: colors.mutedForeground }]}>Downloaded Piper and registered clone voices are available.</Text>{voices.map((voice) => <Pressable key={voice.id} accessibilityRole="radio" accessibilityState={{ selected: selectedVoice === voice.id }} onPress={() => { setSelectedVoice(voice.id); setVoiceOpen(false); }} style={styles.voiceRow}><Feather name="volume-2" size={17} color={colors.primary} /><View style={styles.voiceCopy}><Text style={[styles.voiceName, { color: colors.foreground }]}>{voice.name}</Text><Text style={[styles.voiceLanguage, { color: colors.mutedForeground }]}>{voice.language} · Downloaded</Text></View><Feather name={selectedVoice === voice.id ? 'check-circle' : 'circle'} size={19} color={selectedVoice === voice.id ? colors.primary : colors.mutedForeground} /></Pressable>)}{voices.length === 0 && <Text style={[styles.voiceHint, { color: colors.mutedForeground }]}>No downloaded voices. Download one in Settings.</Text>}<Pressable accessibilityRole="button" accessibilityLabel="Open downloaded voice library" onPress={() => router.push('/voices')} style={styles.manageVoiceButton}><Text style={[styles.manageVoiceText, { color: colors.primary }]}>Manage downloaded voices</Text><Feather name="arrow-right" size={16} color={colors.primary} /></Pressable></View>}
+        <View style={styles.playerLine}><Pressable accessibilityRole="button" accessibilityLabel={playing ? 'Pause reading' : 'Play reading'} onPress={toggleReading} style={[styles.playButton, { backgroundColor: colors.primary }]}><Feather name={playing ? 'pause' : 'play'} size={22} color={colors.primaryForeground} /></Pressable><View style={styles.playerCopy}><Text style={[styles.currentVoice, { color: colors.foreground }]}>{selectedVoiceName}</Text><Text style={[styles.currentText, { color: readingError ? colors.destructive : colors.mutedForeground }]}>{readingError || (playing ? 'Reading now' : 'Press play to generate and read aloud')}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={`Change reading speed. Current ${speed} times`} onPress={() => setSpeed((value) => value >= 2 ? 0.75 : Number((value + 0.25).toFixed(2)))} style={[styles.speedButton, { borderColor: colors.border }]}><Text style={[styles.speedText, { color: colors.primary }]}>{speed}×</Text></Pressable></View>
         <View style={styles.optionList}><Pressable accessibilityRole="button" accessibilityLabel="Other Books Control" onPress={() => Alert.alert('Other Books Control', `${books.length} books are currently in your Reader library.`)} style={[styles.optionRow, { borderColor: colors.border }]}><Feather name="list" size={18} color={colors.primary} /><Text style={[styles.optionLabel, { color: colors.foreground }]}>Other Books Control</Text><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={ocrComplete ? 'OCR is ready' : 'Run OCR on the selected book'} onPress={() => setOcrComplete(true)} style={[styles.optionRow, { borderColor: colors.border }]}><Feather name="search" size={18} color={colors.accent} /><Text style={[styles.optionLabel, { color: colors.foreground }]}>OCR</Text><Text style={[styles.optionValue, { color: ocrComplete ? colors.primary : colors.mutedForeground }]}>{ocrComplete ? 'Ready' : 'Run now'}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Open downloaded voice library" onPress={() => router.push('/voices')} style={[styles.optionRow, { borderColor: colors.border }]}><MaterialCommunityIcons name="account-voice" size={18} color={colors.primary} /><Text style={[styles.optionLabel, { color: colors.foreground }]}>Change Voice</Text><Text style={[styles.optionValue, { color: colors.mutedForeground }]}>{selectedVoiceName}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Delete selected imported book" onPress={removeSelectedBook} style={[styles.optionRow, { borderColor: colors.border }]}><Feather name="trash-2" size={18} color={colors.destructive} /><Text style={[styles.optionLabel, { color: colors.foreground }]}>Remove Selected Book</Text><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></Pressable></View>
       </View>
     </ScrollView>
