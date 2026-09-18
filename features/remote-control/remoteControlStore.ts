@@ -25,6 +25,7 @@ export type RemoteConnection = {
   capabilities: RemoteCapabilities;
   paired: boolean;
   lastSeenAt?: number;
+  online?: boolean;
 };
 
 const STORAGE_KEY = 'nexus-plus.remote-control.connections.v1';
@@ -42,6 +43,11 @@ export async function getRemoteConnections(): Promise<RemoteConnection[]> {
   } catch {
     return [];
   }
+}
+
+export async function markRemoteDeviceOnline(id: string, online: boolean): Promise<void> {
+  const current = await getRemoteConnections();
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(current.map((item) => item.id === id ? { ...item, online, lastSeenAt: online ? Date.now() : item.lastSeenAt } : item)));
 }
 
 export async function saveRemoteConnection(connection: RemoteConnection): Promise<void> {
