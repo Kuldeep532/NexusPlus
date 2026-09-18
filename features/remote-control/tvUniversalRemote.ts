@@ -12,7 +12,7 @@ export type UniversalTvKey =
   | 'NUMBER_5' | 'NUMBER_6' | 'NUMBER_7' | 'NUMBER_8' | 'NUMBER_9'
   | 'CHANNEL_RETURN';
 
-type UniversalTvNative = {
+type UniversalTvNative = {\n  getReceiverStatus?: () => Promise<{ available: boolean; reason?: string }>;
   sendIrKey?: (key: UniversalTvKey) => Promise<boolean>;
   isIrAvailable?: () => Promise<boolean>;
   discoverWifiTvs?: () => Promise<Array<{ id: string; name: string; address?: string; brand?: string }>>;
@@ -20,7 +20,7 @@ type UniversalTvNative = {
 
 const native = NativeModules.NexusTvRemote as UniversalTvNative | undefined;
 
-export async function sendUniversalTvKey(key: UniversalTvKey): Promise<boolean> {
+export async function getUniversalTvReceiverStatus() {\n  if (!native?.getReceiverStatus) return { available: false, reason: 'TV receiver is not installed.' };\n  try { return await native.getReceiverStatus(); } catch { return { available: false, reason: 'TV receiver is not available.' }; }\n}\n\nexport async function sendUniversalTvKey(key: UniversalTvKey): Promise<boolean> {
   if (!native?.sendIrKey) {
     throw new Error('Universal TV key transport is not available on this device.');
   }
