@@ -6,7 +6,7 @@ import { createRemoteConnection, getDefaultCapabilities, saveRemoteConnection, t
 
 export default function ConnectComputerScreen(){
  const colors=useColors(); const router=useRouter(); const [name,setName]=useState(''); const [code,setCode]=useState(''); const [transport,setTransport]=useState<RemoteTransport>('wifi');
- const pair=async()=>{ if(!name.trim()||code.length!==6){Alert.alert('Computer pairing','Enter computer name and the 6-digit pairing code shown by Desktop Remote.');return;} await saveRemoteConnection(createRemoteConnection({name:name.trim(),type:'computer',transport,capabilities:getDefaultCapabilities('computer',transport),online:true})); router.replace('/remote-control/computer'); };
+ const pair=async()=>{ if(!name.trim()||code.length!==6){Alert.alert('Computer pairing','Enter computer name and the 6-digit pairing code shown by Desktop Remote.');return;} await saveRemoteConnection(createRemoteConnection({name:name.trim(),type:'computer',transport,capabilities:getDefaultCapabilities('computer',transport),online:true,pairingSecret:code,pairingState:'paired',paired:true})); router.replace('/remote-control/computer'); };
  return <View style={[styles.root,{backgroundColor:colors.background}]}>
    <Stack.Screen options={{title:'Connect to Computer'}}/>
    <Text style={[styles.title,{color:colors.foreground}]}>Connect to Computer</Text>
