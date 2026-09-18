@@ -2,6 +2,7 @@ import { Stack, useRouter } from 'expo-router';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { launchTvApp } from '@/features/remote-control/tvAppLaunch';
+import { remoteHaptic } from '@/features/remote-control/remoteFeedback';
 
 type TvApp = { id: string; name: string; category: string; packageHints: string[] };
 
@@ -40,7 +41,9 @@ export default function TvAllAppsScreen() {
   const colors = useColors(); const router = useRouter();
 
   const openGenericApp = async (app: TvApp) => {
+    void remoteHaptic('press');
     if (!app.packageHints.length) {
+      void remoteHaptic('error');
       Alert.alert(app.name, 'The app is not installed');
       return;
     }
@@ -48,8 +51,10 @@ export default function TvAllAppsScreen() {
       await launchTvApp(app.packageHints);
     } catch (error) {
       if (error instanceof Error && error.message === 'APP_NOT_INSTALLED') {
+        void remoteHaptic('error');
         Alert.alert(app.name, 'The app is not installed');
       } else {
+        void remoteHaptic('error');
         Alert.alert(app.name, 'The app could not be opened on this device.');
       }
     }
