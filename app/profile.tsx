@@ -55,7 +55,7 @@ export default function ProfileScreen() {
           {user?.photoUrl ? <Image source={{ uri: user.photoUrl }} contentFit="cover" style={styles.avatar} accessibilityLabel="Account profile photo" /> : <View style={[styles.avatar, { backgroundColor: colors.secondary }]} accessible accessibilityLabel={`Account avatar ${initials}`}><Text style={[styles.initials, { color: colors.primary }]}>{initials}</Text></View>}
           <Text style={[styles.name, { color: colors.foreground }]}>{user?.displayName || 'Nexus Plus user'}</Text>
           <Text style={[styles.email, { color: colors.mutedForeground }]}>{user?.email || 'Signed-in account'}</Text>
-          <Text style={[styles.provider, { color: colors.primary }]}>{user?.provider === 'google' ? 'Signed in with Google' : 'Signed in with email'}</Text>
+          <Text style={[styles.provider, { color: colors.primary }]}>Signed in as {user?.email || 'Nexus Plus account'}</Text>
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -66,6 +66,9 @@ export default function ProfileScreen() {
         </View>
 
         <Pressable accessibilityRole="button" accessibilityLabel="Open Settings" onPress={() => router.push('/settings')} style={[styles.action, { backgroundColor: colors.secondary, borderColor: colors.border }]}><Feather name="settings" size={18} color={colors.foreground} /><Text style={[styles.actionText, { color: colors.foreground }]}>Settings</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Manage account" onPress={() => router.push('/settings')} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="user-check" size={18} color={colors.foreground} /><Text style={[styles.actionText, { color: colors.foreground }]}>Manage Account</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open Privacy Policy" onPress={() => router.push('/privacy-policy')} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="lock" size={18} color={colors.foreground} /><Text style={[styles.actionText, { color: colors.foreground }]}>Privacy Policy</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open Terms and Conditions" onPress={() => router.push('/terms-and-conditions')} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="file-text" size={18} color={colors.foreground} /><Text style={[styles.actionText, { color: colors.foreground }]}>Terms & Conditions</Text></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Sign out" accessibilityState={{ disabled: auth.busy }} disabled={auth.busy} onPress={() => void signOut()} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="log-out" size={18} color={colors.foreground} /><Text style={[styles.actionText, { color: colors.foreground }]}>{auth.busy ? 'Signing out…' : 'Sign out'}</Text></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Delete account permanently" accessibilityHint="Permanently deletes your Nexus Plus account and cannot be undone" disabled={auth.busy} onPress={deleteAccount} style={[styles.deleteAction, { borderColor: colors.destructive }]}><Feather name="trash-2" size={18} color={colors.destructive} /><Text style={[styles.actionText, { color: colors.destructive }]}>Delete account permanently</Text></Pressable>
       </ScrollView>
