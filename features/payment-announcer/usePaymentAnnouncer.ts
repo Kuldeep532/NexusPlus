@@ -1,4 +1,5 @@
-import { AppState, type AppStateStatus, AccessibilityInfo } from 'react-native';
+import { AppState, type AppStateStatus,  } from 'react-native';
+import { announceClean } from '@/features/accessibility/spokenAnnouncement';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { authenticatePaymentAnnouncer, disablePaymentScreenProtection, enablePaymentScreenProtection, isPaymentBiometricAvailable } from './paymentAnnouncerSecurity';
 import { isPaymentAnnouncerSetupComplete, loadPaymentAnnouncerSettings, markPaymentAnnouncerSetupComplete, savePaymentAnnouncerSettings } from './paymentAnnouncerRepository';
