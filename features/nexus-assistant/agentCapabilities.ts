@@ -12,7 +12,9 @@ export type AssistantCapabilityId =
   | 'pdf-lock'
   | 'pdf-unlock'
   | 'pdf-compress'
-  | 'pdf-rotate';
+  | 'pdf-rotate'
+  | 'qr-generate'
+  | 'tool-open';
 
 export type AssistantCapability = {
   id: AssistantCapabilityId;
@@ -36,6 +38,8 @@ export const ASSISTANT_CAPABILITIES: readonly AssistantCapability[] = [
   { id: 'pdf-unlock', title: 'Unlock PDF', description: 'Remove protection from a selected local PDF using its password and the existing native engine.', risk: 'confirm', requiresConfirmation: true, offline: true },
   { id: 'pdf-compress', title: 'Compress PDF', description: 'Compress a selected local PDF with the existing native PDF engine.', risk: 'confirm', requiresConfirmation: true, offline: true },
   { id: 'pdf-rotate', title: 'Rotate PDF', description: 'Rotate a selected local PDF with the existing native PDF engine.', risk: 'confirm', requiresConfirmation: true, offline: true },
+  { id: 'qr-generate', title: 'Generate QR Code', description: 'Generate a QR code using the existing QR generator and its supported payload types.', risk: 'safe', requiresConfirmation: false, offline: true },
+  { id: 'tool-open', title: 'Open Nexus Tool', description: 'Open a registered Nexus Plus tool from the shared feature registry.', risk: 'safe', requiresConfirmation: false, offline: true },
 ];
 
 const capabilityMap = new Map(ASSISTANT_CAPABILITIES.map((capability) => [capability.id, capability]));
