@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { openURL } from 'expo-linking';
 import * as Battery from 'expo-battery';
 import { getAssistantCapability, type AssistantCapabilityId } from './agentCapabilities';
+import { openAssistantTool, searchAssistantTools } from './assistantToolAdapter';
 import type { CapabilityProposal } from './agentPlanner';
 
 export type ExecutionContext = {
@@ -51,6 +52,19 @@ export async function executeCapability(
       if (!/^https?:\/\//i.test(url)) throw new Error('Only HTTP(S) URLs are allowed.');
       await openURL(url);
       return { capabilityId: proposal.capability.id, success: true, message: 'The link was opened.' };
+    }
+    case 'qr-generate': {
+      const qr = searchAssistantTools('Generate QR Code').find((item) => item.id === 'qr-code');
+      if (!qr?.route) throw new Error('The existing QR generator is not registered.');
+      openAssistantTool(qr);
+      return { capabilityId: proposal.capability.id, success: true, message: 'Opened the existing QR generator. You can enter the data manually or let Nexus Assistant prepare the payload.' };
+    }
+    case 'tool-open': {
+      const toolId = proposal.args.toolId ?? '';
+      const tool = searchAssistantTools(toolId).find((item) => item.id === toolId) ?? searchAssistantTools(proposal.args.route ?? '').find((item) => item.route === proposal.args.route);
+      if (!tool?.route) throw new Error('Registered Nexus tool could not be resolved.');
+      openAssistantTool(tool);
+      return { capabilityId: proposal.capability.id, success: true, message: tool.title + ' opened.' };
     }
     default:
       return {
