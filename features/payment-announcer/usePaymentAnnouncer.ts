@@ -68,7 +68,7 @@ export function usePaymentAnnouncer() {
     await enablePaymentScreenProtection();
     setIsUnlocked(true);
     scheduleLock();
-    AccessibilityInfo.announceForAccessibility?.('Payment Announcer unlocked');
+    announceClean?.('Payment Announcer unlocked');
     return true;
   }, [biometricAvailable, scheduleLock]);
 
@@ -88,7 +88,7 @@ export function usePaymentAnnouncer() {
     await enablePaymentScreenProtection();
     setIsUnlocked(true);
     scheduleLock();
-    AccessibilityInfo.announceForAccessibility?.('Payment Announcer setup complete');
+    announceClean?.('Payment Announcer setup complete');
     return true;
   }, [biometricAvailable, scheduleLock]);
 
