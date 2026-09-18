@@ -6,7 +6,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { documentHaptic } from '@/features/document-studio/documentFeedback';
-import { convertWordToPdf } from '@/features/pdf-word/pdfWordConversion';
+import { convertOfficeDocumentWithExistingGotenberg } from '@/features/pdf-word/pdfWordConversion';
 
 function safeBaseName(name: string): string {
   return name.replace(/\.(pdf|docx|txt)$/i, '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 128) || 'document';
@@ -62,7 +62,7 @@ export default function DocumentCreatorScreen() {
       const source = `${dir}${safeBaseName(title)}.html`;
       await FileSystem.writeAsStringAsync(source, html);
       const output = `${dir}${safeBaseName(title)}.pdf`;
-      const uri = await convertWordToPdf(source, output);
+      const uri = await convertOfficeDocumentWithExistingGotenberg(source, `${safeBaseName(title)}.pdf`, 'text/html');
       setResultUri(uri);
       setStatus('PDF created successfully.');
       await documentHaptic('success');
