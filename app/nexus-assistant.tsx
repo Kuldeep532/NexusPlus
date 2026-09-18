@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -10,43 +11,438 @@ import { downloadAssistantModel, downloadAssistantVoice } from '@/features/nexus
 import { getLocalInferenceEngine } from '@/features/nexus-assistant/localInference';
 import { streamAssistantReply } from '@/features/nexus-assistant/stage2Agent';
 import { planCapability, formatCapabilityConfirmation, type CapabilityProposal } from '@/features/nexus-assistant/agentPlanner';
+import { answerNexusIdentityQuestion } from '@/features/nexus-assistant/nexusKnowledge';
+import { parseAssistantPdfCommand, type AssistantPdfAttachment } from '@/features/nexus-assistant/pdfAssistantCommands';
 import { runStage3Agent } from '@/features/nexus-assistant/stage3Agent';
 import { getWeatherLocalFirst } from '@/features/nexus-assistant/stage6Weather';
 import { createStage7VoiceBridge, speakAssistant, type VoiceRuntimeStatus } from '@/features/nexus-assistant/stage7VoiceBridge';
 import type { Stage6VoiceBridge, VoiceInputState } from '@/features/nexus-assistant/stage6Voice';
 import { routeAssistantRequest } from '@/features/nexus-assistant/stage9AssistantRouter';
 import { getResolvedAssistantContext } from '@/features/nexus-assistant/assistantContextService';
-import { isBookQuestion } from '@/features/nexus-assistant/bookContext';
 import { getAssetStatus } from '@/features/nexus-assistant/stage8AssetManager';
 
 const SESSION_ID = 'default';
 const CALCULATOR_SYSTEM_CONTRACT = 'For calculator requests, identify the module first; give an exact deterministic answer when calculator context contains one; then provide smart analysis as a compact table-like set of rows covering inflation, available live market context and what-if scenarios; finish with exactly two practical suggestions. Never invent live rates, salaries, prices or market trends. State when data is cached or unavailable.';
+type PdfCommandMode = 'lock' | 'unlock' | 'compress' | 'rotate' | null;
+
+function redactedAssistantUserText(text: string): string {
+  const command = parseAssistantPdfCommand(text);
+  if (!command) return text;
+  if (command.kind === 'lock' || command.kind === 'unlock') return '/' + command.kind + ' [password redacted]';
+  return text;
+}
 
 export default function NexusAssistantScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ calculatorContext?: string }>();
   const calculatorContext = typeof params.calculatorContext === 'string' ? params.calculatorContext : '';
-  const [messages, setMessages] = useState<ChatMessage[]>([]); const [input, setInput] = useState(''); const [busy, setBusy] = useState(false); const [status, setStatus] = useState('Checking Nexus Assistant…'); const [assetBusy, setAssetBusy] = useState<string | null>(null); const [streaming, setStreaming] = useState(''); const [engineReady, setEngineReady] = useState(false); const [pendingProposal, setPendingProposal] = useState<CapabilityProposal | null>(null); const [voiceInput, setVoiceInput] = useState(false); const [liveMode, setLiveMode] = useState(false); const [voiceState, setVoiceState] = useState<VoiceInputState>('idle'); const [voiceBridge, setVoiceBridge] = useState<Stage6VoiceBridge | null>(null); const [webResults, setWebResults] = useState<Array<{ title: string; url: string; snippet?: string }>>([]); const [activeContextLabel, setActiveContextLabel] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState('Checking Nexus Assistant…');
+  const [assetBusy, setAssetBusy] = useState<string | null>(null);
+  const [streaming, setStreaming] = useState('');
+  const [engineReady, setEngineReady] = useState(false);
+  const [pendingProposal, setPendingProposal] = useState<CapabilityProposal | null>(null);
+  const [voiceInput, setVoiceInput] = useState(false);
+  const [liveMode, setLiveMode] = useState(false);
+  const [voiceState, setVoiceState] = useState<VoiceInputState>('idle');
+  const [voiceBridge, setVoiceBridge] = useState<Stage6VoiceBridge | null>(null);
+  const [webResults, setWebResults] = useState<Array<{ title: string; url: string; snippet?: string }>>([]);
+  const [activeContextLabel, setActiveContextLabel] = useState<string | null>(null);
+  const [pdfAttachment, setPdfAttachment] = useState<AssistantPdfAttachment | null>(null);
+  const [pdfMode, setPdfMode] = useState<PdfCommandMode>(null);
+  const [pdfPassword, setPdfPassword] = useState('');
   const hasText = input.trim().length > 0;
 
-  useEffect(() => { const created = createStage7VoiceBridge((next: VoiceRuntimeStatus) => { if (next.state === 'listening') setVoiceState('listening'); else if (next.state === 'processing') setVoiceState('processing'); else setVoiceState('idle'); if (next.error) setStatus(`Voice error: ${next.error}`); }, (text: string) => { setInput(text); setVoiceState('idle'); setVoiceInput(true); setStatus('Voice transcription ready. Press Send to submit.'); if (liveMode) void send(text, true); }); setVoiceBridge(created.bridge); return created.dispose; }, [liveMode]);
-  useEffect(() => { void (async () => { await initAssistantStore(); await ensureSession(SESSION_ID, 'Nexus Assistant'); setMessages(await listMessages(SESSION_ID)); const context = await getResolvedAssistantContext(); setActiveContextLabel(context.book?.title ?? context.file?.name ?? null); const engine = await getLocalInferenceEngine(); const available = await engine.isAvailable(); setEngineReady(available); setStatus(available ? 'Local assistant ready. Cloud providers and web search are optional through the Gateway.' : 'Assistant ready. Local inference engine is not available in this build.'); if (calculatorContext) setInput('Explain and analyze the calculator context I just opened.'); })().catch(() => setStatus('Local chat storage could not be opened.')); }, []);
-  const history = useMemo(() => messages.slice(-12).map((message) => ({ role: message.role === 'assistant' ? 'assistant' as const : 'user' as const, text: message.content })), [messages]);
+  useEffect(() => {
+    const created = createStage7VoiceBridge(
+      (next: VoiceRuntimeStatus) => {
+        if (next.state === 'listening') setVoiceState('listening');
+        else if (next.state === 'processing') setVoiceState('processing');
+        else setVoiceState('idle');
+        if (next.error) setStatus('Voice error: ' + next.error);
+      },
+      (text: string) => {
+        setInput(text);
+        setVoiceState('idle');
+        setVoiceInput(true);
+        setStatus('Voice transcription ready. Press Send to submit.');
+        if (liveMode) void send(text, true);
+      },
+    );
+    setVoiceBridge(created.bridge);
+    return created.dispose;
+  }, [liveMode]);
+
+  useEffect(() => {
+    void (async () => {
+      await initAssistantStore();
+      await ensureSession(SESSION_ID, 'Nexus Assistant');
+      setMessages(await listMessages(SESSION_ID));
+      const context = await getResolvedAssistantContext();
+      setActiveContextLabel(context.book?.title ?? context.file?.name ?? null);
+      const engine = await getLocalInferenceEngine();
+      const available = await engine.isAvailable();
+      setEngineReady(available);
+      setStatus(available ? 'Local assistant ready. Cloud providers and web search are optional through the Gateway.' : 'Assistant ready. Local inference engine is not available in this build.');
+      if (calculatorContext) setInput('Explain and analyze the calculator context I just opened.');
+    })().catch(() => setStatus('Local chat storage could not be opened.'));
+  }, []);
+
+  const history = useMemo(
+    () => messages.slice(-12).map((message) => ({
+      role: message.role === 'assistant' ? 'assistant' as const : 'user' as const,
+      text: message.content,
+    })),
+    [messages],
+  );
+
   const refreshMessages = async () => setMessages(await listMessages(SESSION_ID));
-  const speakResponseForMode = async (text: string, live: boolean) => { if (!live || !text.trim()) return; const result = await speakAssistant(text, 'en-US', 'live-call'); if (result === 'piper') setStatus('Speaking with the Live Voice Call voice.'); else { const Speech = await import('expo-speech'); Speech.stop(); Speech.speak(text, { language: 'en-US' }); setStatus('Speaking with the device voice fallback.'); } };
-  const send = async (providedText?: string, fromLiveMode = liveMode) => { const text = (providedText ?? input).trim(); if (!text || busy) return; setBusy(true); setInput(''); setStreaming(''); setPendingProposal(null); setWebResults([]); try { await addMessage(SESSION_ID, 'user', text); await refreshMessages(); const proposal = planCapability(text); if (proposal) { setPendingProposal(proposal); const confirmation = formatCapabilityConfirmation(proposal); await addMessage(SESSION_ID, 'assistant', confirmation); await refreshMessages(); setStatus('Action prepared. Confirm it explicitly before Nexus Assistant executes it.'); return; } const context = await getResolvedAssistantContext(); if (/\b(weather|forecast|temperature|rain|raining|humidity|wind)\b|मौसम|तापमान|बारिश|हवा/i.test(text) && !context.book && !context.file) { setStatus('Checking local weather cache first…'); const weather = await getWeatherLocalFirst({ location: text }); if (weather) { await addMessage(SESSION_ID, 'assistant', weather.text); await refreshMessages(); setStatus(weather.source === 'cache' ? 'Weather served from the on-device cache.' : 'Weather refreshed through the Gateway and cached locally.'); await speakResponseForMode(weather.text, fromLiveMode); return; } }
-      try { setStatus(calculatorContext ? 'Processing calculator context through Nexus AI routing…' : 'Checking web search and optional cloud providers through Nexus Gateway…'); const routed = await routeAssistantRequest({ message: text, history, bookContext: context.book, fileContext: context.file }); setWebResults(routed.web); if (routed.provider) { const responseText = calculatorContext ? `${CALCULATOR_SYSTEM_CONTRACT}\n\nCALCULATOR CONTEXT:\n${calculatorContext}\n\nUSER REQUEST:\n${text}\n\nPROVIDER RESPONSE:\n${routed.provider.text}` : routed.provider.text; await addMessage(SESSION_ID, 'assistant', responseText); await refreshMessages(); setStatus(`${routed.provider.provider === 'openai' ? 'OpenAI' : 'Gemini'} response received through Nexus Gateway.`); await speakResponseForMode(responseText, fromLiveMode); return; } } catch { }
-      if (!engineReady) { const fallback = context.prompt ? 'Nexus Assistant could not reach an inference provider. Your selected context stays on this device.' : 'Nexus Assistant could not reach the available cloud provider and local inference is not available in this build. Your message is stored locally on this device.'; await addMessage(SESSION_ID, 'assistant', fallback); await refreshMessages(); setStatus('No inference provider available; message remains local.'); await speakResponseForMode(fallback, fromLiveMode); return; }
-      const model = ASSISTANT_MODELS.find((item) => item.id === NEXUS_CORE_MODEL_ID) ?? ASSISTANT_MODELS.find((item) => item.kind === 'chat'); if (!model) throw new Error('NEXUS_CORE_MODEL_UNAVAILABLE'); if (getAssetStatus(model.id) !== 'ready') setStatus('Nexus Core AI is still downloading in the background.');
-      const base = calculatorContext ? `${CALCULATOR_SYSTEM_CONTRACT}\n\nCALCULATOR CONTEXT:\n${calculatorContext}\n\nUSER REQUEST:\n${text}` : context.prompt ? `${context.prompt}\n\nUSER QUESTION:\n${text}` : text;
-      const localReply = await streamAssistantReply({ sessionId: SESSION_ID, modelId: model.id, modelPath: model.url, userText: base, onStatus: setStatus, onToken: (chunk) => setStreaming((value) => value + chunk) }); await refreshMessages(); setStreaming(''); setStatus('Local response complete.'); await speakResponseForMode(localReply.text, fromLiveMode);
-    } catch (error) { setStatus(error instanceof Error ? error.message : 'Assistant request failed.'); await refreshMessages(); setStreaming(''); } finally { setBusy(false); } };
-  const toggleVoiceInput = async () => { if (!voiceBridge) { setStatus('Voice bridge is still initializing.'); return; } if (voiceState === 'listening') { await voiceBridge.stopListening().catch(() => undefined); setVoiceState('idle'); setVoiceInput(false); setStatus('Voice input stopped.'); return; } const available = await voiceBridge.isAvailable(); if (!available) { setVoiceInput(true); setStatus('Microphone access is unavailable on this device or build.'); return; } setVoiceInput(true); setVoiceState('listening'); setStatus('Listening…'); await voiceBridge.startListening().catch((error) => { setVoiceState('idle'); setStatus(error instanceof Error ? error.message : 'Voice input failed.'); }); };
-  const toggleLiveMode = async () => { if (!voiceBridge) { setStatus('Voice bridge is still initializing.'); return; } const next = !liveMode; setLiveMode(next); if (!next) { await voiceBridge.stopListening().catch(() => undefined); await voiceBridge.stopOutput().catch(() => undefined); const Speech = await import('expo-speech'); Speech.stop(); setVoiceState('idle'); setStatus('Live Mode closed.'); return; } const available = await voiceBridge.isAvailable(); if (!available) { setLiveMode(false); setStatus('Live Mode needs microphone access on this device.'); return; } setStatus('Live Mode opened. Hold the Talk button to capture voice; release to process.'); await voiceBridge.startListening().catch((error) => { setLiveMode(false); setVoiceState('idle'); setStatus(error instanceof Error ? error.message : 'Live Mode could not start.'); }); };
-  const holdToTalk = async () => { if (!liveMode || !voiceBridge || voiceState === 'listening') return; setVoiceState('listening'); await voiceBridge.startListening().catch((error) => setStatus(error instanceof Error ? error.message : 'Voice capture failed.')); }; const releaseTalk = async () => { if (!liveMode || !voiceBridge || voiceState !== 'listening') return; await voiceBridge.stopListening().catch(() => undefined); setVoiceState('processing'); setStatus('Voice captured. Waiting for local ASR transcript…'); }; const endLiveMode = async () => { setLiveMode(false); await voiceBridge?.stopListening().catch(() => undefined); await voiceBridge?.stopOutput().catch(() => undefined); const Speech = await import('expo-speech'); Speech.stop(); setVoiceState('idle'); setStatus('Live Mode ended.'); };
-  const confirmPendingAction = async () => { if (!pendingProposal || busy) return; setBusy(true); try { await runStage3Agent({ sessionId: SESSION_ID, userText: pendingProposal.capability.id === 'open-url' ? `open ${pendingProposal.args.url ?? ''}` : pendingProposal.capability.title, confirmed: true, onStatus: setStatus }); setPendingProposal(null); await refreshMessages(); } catch (error) { setStatus(error instanceof Error ? error.message : 'Action failed.'); } finally { setBusy(false); } }; const cancelPendingAction = async () => { if (!pendingProposal) return; setPendingProposal(null); setStatus('Action cancelled. No capability was executed.'); await addMessage(SESSION_ID, 'assistant', 'Action cancelled. No device or app action was executed.'); await refreshMessages(); };
-  const downloadModel = async () => { const model = ASSISTANT_MODELS.find((item) => item.id === NEXUS_CORE_MODEL_ID); if (!model) return; setAssetBusy(model.id); setStatus('Preparing the local chat model download…'); try { await downloadAssistantModel(model.id); setStatus('Local Nexus Core AI downloaded. It remains outside the APK.'); } catch { setStatus('Model download failed. Background retry will continue automatically.'); } finally { setAssetBusy(null); } }; const downloadVoice = async () => { const voice = ASSISTANT_VOICES[0]; setAssetBusy(voice.id); setStatus('Preparing the local Piper voice download…'); try { await downloadAssistantVoice(voice.id); setStatus('Piper voice downloaded.'); } catch { setStatus('Voice download failed. Check your connection and try again.'); } finally { setAssetBusy(null); } };
-  return <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 18, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 28 }}><View style={styles.header}><View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="cpu" size={23} color={colors.primary} /></View><View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Nexus Assistant</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>Local agent + Gemini + optional OpenAI + Gateway web search.</Text></View></View><View accessibilityLiveRegion="polite" style={[styles.status, { borderColor: colors.border, backgroundColor: colors.card }]}><Text style={[styles.statusTitle, { color: colors.foreground }]}>Runtime</Text><Text style={[styles.note, { color: colors.mutedForeground }]}>{status}</Text>{calculatorContext ? <Text style={[styles.note, { color: colors.primary }]}>Calculator context attached.</Text> : null}{activeContextLabel ? <Text style={[styles.note, { color: colors.primary }]}>Active context: {activeContextLabel}</Text> : null}<Text style={[styles.note, { color: colors.mutedForeground }]}>Cloud providers and web search are optional. OpenAI failure never blocks Gemini or local fallback.</Text></View><View style={styles.chat} accessibilityLiveRegion="polite">{messages.map((message) => <View key={message.id} style={[styles.message, { backgroundColor: message.role === 'user' ? colors.secondary : colors.card, borderColor: colors.border }]}><Text style={[styles.role, { color: colors.foreground }]}>{message.role === 'user' ? 'You' : message.role === 'system' ? 'System' : 'Nexus Assistant'}</Text><Text selectable style={[styles.body, { color: colors.foreground }]}>{message.content}</Text></View>)}{streaming ? <View style={[styles.message, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.role, { color: colors.foreground }]}>Nexus Assistant</Text><Text selectable style={[styles.body, { color: colors.foreground }]}>{streaming}</Text></View> : null}</View>{pendingProposal ? <View style={[styles.confirm, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.statusTitle, { color: colors.foreground }]}>Confirmation required</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>{formatCapabilityConfirmation(pendingProposal)}</Text><View style={styles.actionRow}><Pressable accessibilityRole="button" onPress={cancelPendingAction} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>Cancel</Text></Pressable><Pressable accessibilityRole="button" onPress={confirmPendingAction} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Confirm</Text></Pressable></View></View> : null}<View style={[styles.inputCard, { backgroundColor: colors.card, borderColor: colors.border }]}><TextInput accessibilityLabel="Assistant message" value={input} onChangeText={setInput} multiline placeholder="Ask Nexus Assistant…" placeholderTextColor={colors.mutedForeground} style={[styles.input, { color: colors.foreground }]} /><View style={styles.actionRow}><Pressable accessibilityRole="button" onPress={toggleVoiceInput} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>{voiceState === 'listening' ? 'Stop voice' : 'Voice'}</Text></Pressable><Pressable accessibilityRole="button" onPress={() => void toggleLiveMode()} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>{liveMode ? 'End Live' : 'Live Mode'}</Text></Pressable><Pressable accessibilityRole="button" disabled={!hasText || busy} onPress={() => void send()} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: !hasText || busy ? 0.5 : 1 }]}><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{busy ? 'Working…' : 'Send'}</Text></Pressable></View></View></ScrollView>;
+  const speakResponseForMode = async (text: string, live: boolean) => {
+    if (!live || !text.trim()) return;
+    const result = await speakAssistant(text, 'en-US', 'live-call');
+    if (result === 'piper') setStatus('Speaking with the Live Voice Call voice.');
+    else {
+      const Speech = await import('expo-speech');
+      Speech.stop();
+      Speech.speak(text, { language: 'en-US' });
+      setStatus('Speaking with the device voice fallback.');
+    }
+  };
+
+  const choosePdf = async () => {
+    const picked = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', multiple: false, copyToCacheDirectory: true });
+    if (picked.canceled || !picked.assets?.[0]) return;
+    const asset = picked.assets[0];
+    setPdfAttachment({ uri: asset.uri, name: asset.name || 'document.pdf' });
+    setStatus('Local PDF attached to Nexus Assistant.');
+  };
+
+  const choosePdfMode = (mode: PdfCommandMode) => {
+    setPdfMode(mode);
+    if (mode) setInput('/' + mode);
+    if (mode === 'lock' || mode === 'unlock') setStatus('Enter the PDF password in the local password field. It is not sent to Gemini.');
+  };
+
+  const send = async (providedText?: string, fromLiveMode = liveMode) => {
+    let text = (providedText ?? input).trim();
+    if (pdfMode === 'lock' || pdfMode === 'unlock') {
+      if (!pdfAttachment) {
+        setStatus('Attach a local PDF first.');
+        return;
+      }
+      if (!pdfPassword.trim()) {
+        setStatus('Enter a PDF password first.');
+        return;
+      }
+      text = '/' + pdfMode + ' ' + pdfPassword.trim();
+    }
+    if (!text || busy) return;
+
+    const pdfCommand = parseAssistantPdfCommand(text);
+    const identity = answerNexusIdentityQuestion(text);
+
+    setBusy(true);
+    setInput('');
+    setStreaming('');
+    setPendingProposal(null);
+    setWebResults([]);
+
+    try {
+      await addMessage(SESSION_ID, 'user', redactedAssistantUserText(text));
+      await refreshMessages();
+
+      if (identity) {
+        await addMessage(SESSION_ID, 'assistant', identity);
+        await refreshMessages();
+        setStatus('Answered from Nexus local product knowledge.');
+        await speakResponseForMode(identity, fromLiveMode);
+        return;
+      }
+
+      if (pdfCommand) {
+        const result = await runStage3Agent({
+          sessionId: SESSION_ID,
+          userText: text,
+          confirmed: true,
+          pdfAttachment,
+          onStatus: setStatus,
+        });
+        if (result) {
+          await refreshMessages();
+          setPdfPassword('');
+          setPdfMode(null);
+          if (result.success) setPdfAttachment(null);
+          await speakResponseForMode(result.message, fromLiveMode);
+          return;
+        }
+      }
+
+      const proposal = planCapability(text);
+      if (proposal) {
+        setPendingProposal(proposal);
+        const confirmation = formatCapabilityConfirmation(proposal);
+        await addMessage(SESSION_ID, 'assistant', confirmation);
+        await refreshMessages();
+        setStatus('Action prepared. Confirm it explicitly before Nexus Assistant executes it.');
+        return;
+      }
+
+      const context = await getResolvedAssistantContext();
+
+      if (/\b(weather|forecast|temperature|rain|raining|humidity|wind)\b|मौसम|तापमान|बारिश|हवा/i.test(text) && !context.book && !context.file) {
+        setStatus('Checking local weather cache first…');
+        const weather = await getWeatherLocalFirst({ location: text });
+        if (weather) {
+          await addMessage(SESSION_ID, 'assistant', weather.text);
+          await refreshMessages();
+          setStatus(weather.source === 'cache' ? 'Weather served from the on-device cache.' : 'Weather refreshed through the Gateway and cached locally.');
+          await speakResponseForMode(weather.text, fromLiveMode);
+          return;
+        }
+      }
+
+      try {
+        setStatus(calculatorContext ? 'Processing calculator context through Nexus AI routing…' : 'Checking web search and optional cloud providers through Nexus Gateway…');
+        const routed = await routeAssistantRequest({ message: text, history, bookContext: context.book, fileContext: context.file });
+        setWebResults(routed.web);
+        if (routed.provider) {
+          const responseText = calculatorContext
+            ? CALCULATOR_SYSTEM_CONTRACT + '\n\nCALCULATOR CONTEXT:\n' + calculatorContext + '\n\nUSER REQUEST:\n' + text + '\n\nPROVIDER RESPONSE:\n' + routed.provider.text
+            : routed.provider.text;
+          await addMessage(SESSION_ID, 'assistant', responseText);
+          await refreshMessages();
+          setStatus((routed.provider.provider === 'openai' ? 'OpenAI' : 'Gemini') + ' response received through Nexus Gateway.');
+          await speakResponseForMode(responseText, fromLiveMode);
+          return;
+        }
+      } catch {}
+
+      if (!engineReady) {
+        const fallback = context.prompt
+          ? 'Nexus Assistant could not reach an inference provider. Your selected context stays on this device.'
+          : 'Nexus Assistant could not reach the available cloud provider and local inference is not available in this build. Your message is stored locally on this device.';
+        await addMessage(SESSION_ID, 'assistant', fallback);
+        await refreshMessages();
+        setStatus('No inference provider available; message remains local.');
+        await speakResponseForMode(fallback, fromLiveMode);
+        return;
+      }
+
+      const model = ASSISTANT_MODELS.find((item) => item.id === NEXUS_CORE_MODEL_ID) ?? ASSISTANT_MODELS.find((item) => item.kind === 'chat');
+      if (!model) throw new Error('NEXUS_CORE_MODEL_UNAVAILABLE');
+      if (getAssetStatus(model.id) !== 'ready') setStatus('Nexus Core AI is still downloading in the background.');
+
+      const base = calculatorContext
+        ? CALCULATOR_SYSTEM_CONTRACT + '\n\nCALCULATOR CONTEXT:\n' + calculatorContext + '\n\nUSER REQUEST:\n' + text
+        : context.prompt
+          ? context.prompt + '\n\nUSER QUESTION:\n' + text
+          : text;
+
+      const localReply = await streamAssistantReply({
+        sessionId: SESSION_ID,
+        modelId: model.id,
+        modelPath: model.url,
+        userText: base,
+        onStatus: setStatus,
+        onToken: (chunk) => setStreaming((value) => value + chunk),
+      });
+      await refreshMessages();
+      setStreaming('');
+      setStatus('Local response complete.');
+      await speakResponseForMode(localReply.text, fromLiveMode);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Assistant request failed.');
+      await refreshMessages();
+      setStreaming('');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleVoiceInput = async () => {
+    if (!voiceBridge) { setStatus('Voice bridge is still initializing.'); return; }
+    if (voiceState === 'listening') {
+      await voiceBridge.stopListening().catch(() => undefined);
+      setVoiceState('idle');
+      setVoiceInput(false);
+      setStatus('Voice input stopped.');
+      return;
+    }
+    const available = await voiceBridge.isAvailable();
+    if (!available) {
+      setVoiceInput(true);
+      setStatus('Microphone access is unavailable on this device or build.');
+      return;
+    }
+    setVoiceInput(true);
+    setVoiceState('listening');
+    setStatus('Listening…');
+    await voiceBridge.startListening().catch((error) => {
+      setVoiceState('idle');
+      setStatus(error instanceof Error ? error.message : 'Voice input failed.');
+    });
+  };
+
+  const toggleLiveMode = async () => {
+    if (!voiceBridge) { setStatus('Voice bridge is still initializing.'); return; }
+    const next = !liveMode;
+    setLiveMode(next);
+    if (!next) {
+      await voiceBridge.stopListening().catch(() => undefined);
+      await voiceBridge.stopOutput().catch(() => undefined);
+      const Speech = await import('expo-speech');
+      Speech.stop();
+      setVoiceState('idle');
+      setStatus('Live Mode closed.');
+      return;
+    }
+    const available = await voiceBridge.isAvailable();
+    if (!available) {
+      setLiveMode(false);
+      setStatus('Live Mode needs microphone access on this device.');
+      return;
+    }
+    setStatus('Live Mode opened. Hold the Talk button to capture voice; release to process.');
+    await voiceBridge.startListening().catch((error) => {
+      setLiveMode(false);
+      setVoiceState('idle');
+      setStatus(error instanceof Error ? error.message : 'Live Mode could not start.');
+    });
+  };
+
+  const confirmPendingAction = async () => {
+    if (!pendingProposal || busy) return;
+    setBusy(true);
+    try {
+      await runStage3Agent({
+        sessionId: SESSION_ID,
+        userText: pendingProposal.capability.id === 'open-url' ? 'open ' + (pendingProposal.args.url ?? '') : pendingProposal.capability.title,
+        confirmed: true,
+        onStatus: setStatus,
+      });
+      setPendingProposal(null);
+      await refreshMessages();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Action failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cancelPendingAction = async () => {
+    if (!pendingProposal) return;
+    setPendingProposal(null);
+    setStatus('Action cancelled. No capability was executed.');
+    await addMessage(SESSION_ID, 'assistant', 'Action cancelled. No device or app action was executed.');
+    await refreshMessages();
+  };
+
+  const downloadModel = async () => {
+    const model = ASSISTANT_MODELS.find((item) => item.id === NEXUS_CORE_MODEL_ID);
+    if (!model) return;
+    setAssetBusy(model.id);
+    setStatus('Preparing the local chat model download…');
+    try { await downloadAssistantModel(model.id); setStatus('Local Nexus Core AI downloaded. It remains outside the APK.'); }
+    catch { setStatus('Model download failed. Background retry will continue automatically.'); }
+    finally { setAssetBusy(null); }
+  };
+
+  const downloadVoice = async () => {
+    const voice = ASSISTANT_VOICES[0];
+    setAssetBusy(voice.id);
+    setStatus('Preparing the local Piper voice download…');
+    try { await downloadAssistantVoice(voice.id); setStatus('Piper voice downloaded.'); }
+    catch { setStatus('Voice download failed. Check your connection and try again.'); }
+    finally { setAssetBusy(null); }
+  };
+
+  return <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 18, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 28 }}>
+    <View style={styles.header}>
+      <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="cpu" size={23} color={colors.primary} /></View>
+      <View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Nexus Assistant</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>Local agent + Gemini + optional OpenAI + Gateway web search.</Text></View>
+    </View>
+    <View accessibilityLiveRegion="polite" style={[styles.status, { borderColor: colors.border, backgroundColor: colors.card }]}>
+      <Text style={[styles.statusTitle, { color: colors.foreground }]}>Runtime</Text>
+      <Text style={[styles.note, { color: colors.mutedForeground }]}>{status}</Text>
+      {calculatorContext ? <Text style={[styles.note, { color: colors.primary }]}>Calculator context attached.</Text> : null}
+      {activeContextLabel ? <Text style={[styles.note, { color: colors.primary }]}>Active context: {activeContextLabel}</Text> : null}
+      {pdfAttachment ? <Text style={[styles.note, { color: colors.primary }]}>Local PDF attached: {pdfAttachment.name}</Text> : null}
+    </View>
+
+    {pdfAttachment ? (
+      <View style={[styles.pdfCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.statusTitle, { color: colors.foreground }]}>PDF Command</Text>
+        <View style={styles.actionRow}>
+          {(['lock', 'unlock', 'compress', 'rotate'] as const).map((mode) => (
+            <Pressable key={mode} accessibilityRole="button" onPress={() => choosePdfMode(mode)} style={[styles.secondaryButton, { borderColor: pdfMode === mode ? colors.primary : colors.border }]}>
+              <Text style={[styles.buttonText, { color: colors.foreground }]}>/{mode}</Text>
+            </Pressable>
+          ))}
+        </View>
+        {(pdfMode === 'lock' || pdfMode === 'unlock') && <TextInput
+          accessibilityLabel="Local PDF password"
+          placeholder="PDF password"
+          placeholderTextColor={colors.mutedForeground}
+          secureTextEntry
+          value={pdfPassword}
+          onChangeText={setPdfPassword}
+          style={[styles.input, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border }]}
+        />}
+        <Text style={[styles.note, { color: colors.mutedForeground }]}>Password stays on the device and is not sent to Gemini.</Text>
+      </View>
+    ) : null}
+
+    <View style={styles.chat} accessibilityLiveRegion="polite">
+      {messages.map((message) => <View key={message.id} style={[styles.message, { backgroundColor: message.role === 'user' ? colors.secondary : colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.role, { color: colors.foreground }]}>{message.role === 'user' ? 'You' : message.role === 'system' ? 'System' : 'Nexus Assistant'}</Text>
+        <Text selectable style={[styles.body, { color: colors.foreground }]}>{message.content}</Text>
+      </View>)}
+      {streaming ? <View style={[styles.message, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.role, { color: colors.foreground }]}>Nexus Assistant</Text><Text selectable style={[styles.body, { color: colors.foreground }]}>{streaming}</Text></View> : null}
+    </View>
+
+    {pendingProposal ? <View style={[styles.confirm, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Text style={[styles.statusTitle, { color: colors.foreground }]}>Confirmation required</Text>
+      <Text style={[styles.body, { color: colors.mutedForeground }]}>{formatCapabilityConfirmation(pendingProposal)}</Text>
+      <View style={styles.actionRow}>
+        <Pressable accessibilityRole="button" onPress={cancelPendingAction} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>Cancel</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={confirmPendingAction} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Confirm</Text></Pressable>
+      </View>
+    </View> : null}
+
+    <View style={[styles.inputCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <TextInput accessibilityLabel="Assistant message" value={input} onChangeText={setInput} multiline placeholder="Ask Nexus Assistant…" placeholderTextColor={colors.mutedForeground} style={[styles.input, { color: colors.foreground }]} />
+      <View style={styles.actionRow}>
+        <Pressable accessibilityRole="button" onPress={() => void choosePdf()} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>{pdfAttachment ? 'Replace PDF' : 'Attach PDF'}</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={toggleVoiceInput} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>{voiceState === 'listening' ? 'Stop voice' : 'Voice'}</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => void toggleLiveMode()} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>{liveMode ? 'End Live' : 'Live Mode'}</Text></Pressable>
+        <Pressable accessibilityRole="button" disabled={!hasText || busy} onPress={() => void send()} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: !hasText || busy ? 0.5 : 1 }]}><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{busy ? 'Working…' : 'Send'}</Text></Pressable>
+      </View>
+    </View>
+  </ScrollView>;
 }
-const styles = StyleSheet.create({ root: { flex: 1 }, header: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 }, icon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' }, copy: { flex: 1, marginLeft: 12 }, title: { fontSize: 24, fontFamily: 'Inter_700Bold' }, body: { fontSize: 11, lineHeight: 17 }, status: { borderWidth: 1, borderRadius: 18, padding: 14, gap: 4, marginBottom: 14 }, statusTitle: { fontSize: 13, fontFamily: 'Inter_700Bold' }, note: { fontSize: 10.5, lineHeight: 16 }, chat: { gap: 9 }, message: { borderWidth: 1, borderRadius: 16, padding: 13 }, role: { fontSize: 10, fontFamily: 'Inter_700Bold', marginBottom: 5 }, confirm: { borderWidth: 1, borderRadius: 18, padding: 14, marginTop: 12, gap: 7 }, inputCard: { borderWidth: 1, borderRadius: 18, padding: 12, marginTop: 12 }, input: { minHeight: 70, maxHeight: 150, fontSize: 12, lineHeight: 18 }, actionRow: { flexDirection: 'row', gap: 8, marginTop: 9 }, secondaryButton: { minHeight: 44, borderWidth: 1, borderRadius: 13, paddingHorizontal: 13, alignItems: 'center', justifyContent: 'center', flex: 1 }, primaryButton: { minHeight: 44, borderRadius: 13, paddingHorizontal: 13, alignItems: 'center', justifyContent: 'center', flex: 1 }, buttonText: { fontSize: 11, fontFamily: 'Inter_700Bold' } });
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  icon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  copy: { flex: 1, marginLeft: 12 },
+  title: { fontSize: 24, fontFamily: 'Inter_700Bold' },
+  body: { fontSize: 11, lineHeight: 17 },
+  status: { borderWidth: 1, borderRadius: 18, padding: 14, gap: 4, marginBottom: 14 },
+  statusTitle: { fontSize: 13, fontFamily: 'Inter_700Bold' },
+  note: { fontSize: 10.5, lineHeight: 16 },
+  chat: { gap: 9 },
+  message: { borderWidth: 1, borderRadius: 16, padding: 13 },
+  role: { fontSize: 10, fontFamily: 'Inter_700Bold', marginBottom: 5 },
+  pdfCard: { borderWidth: 1, borderRadius: 16, padding: 12, marginBottom: 12, gap: 8 },
+  confirm: { borderWidth: 1, borderRadius: 18, padding: 14, marginTop: 12, gap: 7 },
+  inputCard: { borderWidth: 1, borderRadius: 18, padding: 12, marginTop: 12 },
+  input: { minHeight: 48, maxHeight: 150, fontSize: 12, lineHeight: 18, borderWidth: 1, borderRadius: 13, paddingHorizontal: 12, marginTop: 8 },
+  actionRow: { flexDirection: 'row', gap: 8, marginTop: 9 },
+  secondaryButton: { minHeight: 44, borderWidth: 1, borderRadius: 13, paddingHorizontal: 11, alignItems: 'center', justifyContent: 'center', flex: 1 },
+  primaryButton: { minHeight: 44, borderRadius: 13, paddingHorizontal: 13, alignItems: 'center', justifyContent: 'center', flex: 1 },
+  buttonText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
+});
