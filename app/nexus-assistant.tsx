@@ -6,7 +6,8 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { ASSISTANT_LIMITS, ASSISTANT_MODELS, ASSISTANT_VOICES, NEXUS_CORE_MODEL_ID } from '@/features/nexus-assistant/assistantConfig';
-import { addMessage, ensureSession, initAssistantStore, listMessages, type ChatMessage } from '@/features/nexus-assistant/assistantStore';
+import { addMessage, clearAllAssistantData, ensureSession, getHistoryEnabled, initAssistantStore, listMessages, listSessions, setHistoryEnabled, type ChatMessage } from '@/features/nexus-assistant/assistantStore';
+import { useAuth } from '@/features/auth/useAuth';
 import { downloadAssistantModel, downloadAssistantVoice } from '@/features/nexus-assistant/modelManager';
 import { getLocalInferenceEngine } from '@/features/nexus-assistant/localInference';
 import { streamAssistantReply } from '@/features/nexus-assistant/stage2Agent';
@@ -35,6 +36,7 @@ function redactedAssistantUserText(text: string): string {
 
 export default function NexusAssistantScreen() {
   const colors = useColors();
+  const auth = useAuth();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ calculatorContext?: string }>();
   const calculatorContext = typeof params.calculatorContext === 'string' ? params.calculatorContext : '';
@@ -57,6 +59,10 @@ export default function NexusAssistantScreen() {
   const [pdfPassword, setPdfPassword] = useState('');
   const [showTools, setShowTools] = useState(false);
   const [generatedResult, setGeneratedResult] = useState<{ title: string; message: string } | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyEnabled, setHistoryEnabledState] = useState(true);
+  const [sessionList, setSessionList] = useState<Array<{ id: string; title: string; createdAt: number; messageCount: number }>>([]);
   const toolCatalog = useMemo(() => getAssistantToolCatalog(), []);
   const pinnedTools = useMemo(() => toolCatalog.filter((tool) => ['file','qr-code','pdf-lock','pdf-unlock','pdf-compress'].includes(tool.id) || /PDF|File|QR/i.test(tool.title)).slice(0, 10), [toolCatalog]);
   const hasText = input.trim().length > 0;
@@ -84,8 +90,10 @@ export default function NexusAssistantScreen() {
   useEffect(() => {
     void (async () => {
       await initAssistantStore();
+      const retention = await getHistoryEnabled();
+      setHistoryEnabledState(retention);
       await ensureSession(SESSION_ID, 'Nexus Assistant');
-      setMessages(await listMessages(SESSION_ID));
+      setMessages(retention ? await listMessages(SESSION_ID) : []);
       const context = await getResolvedAssistantContext();
       setActiveContextLabel(context.book?.title ?? context.file?.name ?? null);
       const engine = await getLocalInferenceEngine();
@@ -104,7 +112,21 @@ export default function NexusAssistantScreen() {
     [messages],
   );
 
-  const refreshMessages = async () => setMessages(await listMessages(SESSION_ID));
+  const refreshMessages = async () => setMessages(historyEnabled ? await listMessages(SESSION_ID) : []);
+  const toggleHistory = async () => {
+    const next = !historyEnabled;
+    await setHistoryEnabled(next);
+    setHistoryEnabledState(next);
+    setMessages(next ? await listMessages(SESSION_ID) : []);
+    setStatus(next ? 'Chat history is enabled and linked to your signed-in account.' : 'Chat history is off. New chats will not be saved.');
+  };
+  const clearChats = async () => {
+    await clearAllAssistantData();
+    await ensureSession(SESSION_ID, 'Nexus Assistant');
+    setMessages([]);
+    setSessionList([]);
+    setStatus('All Nexus Assistant chats cleared from this device.');
+  };
   const speakResponseForMode = async (text: string, live: boolean) => {
     if (!live || !text.trim()) return;
     const result = await speakAssistant(text, 'en-US', 'live-call');
@@ -373,9 +395,40 @@ export default function NexusAssistantScreen() {
 
   return <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 18, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 28 }}>
     <View style={styles.header}>
-      <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="cpu" size={23} color={colors.primary} /></View>
-      <View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Nexus Assistant</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>Local agent + Gemini + optional OpenAI + Gateway web search.</Text></View>
+      <View style={styles.headerLeft}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open Nexus Assistant menu" onPress={() => setMenuOpen((v) => !v)} style={[styles.menuButton, { backgroundColor: colors.secondary, borderColor: colors.border }]}><Feather name="menu" size={22} color={colors.foreground} /></Pressable>
+        <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="cpu" size={23} color={colors.primary} /></View>
+      </View>
+      <View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Nexus Assistant</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>Chat + manual tools • {historyEnabled ? 'History ON' : 'History OFF'}</Text></View>
     </View>
+    {menuOpen ? (
+      <View accessibilityLabel="Nexus Assistant menu" style={[styles.sideMenu, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Pressable accessibilityRole="button" onPress={async () => { setHistoryOpen(true); setMenuOpen(false); setSessionList(await listSessions()); }} style={styles.menuRow}><Feather name="clock" size={18} color={colors.primary} /><Text style={[styles.menuText, { color: colors.foreground }]}>Chat History</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => { setMenuOpen(false); setStatus('Assistant settings are available below.'); }} style={styles.menuRow}><Feather name="settings" size={18} color={colors.primary} /><Text style={[styles.menuText, { color: colors.foreground }]}>Settings</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => void toggleHistory()} style={styles.menuRow}><Feather name={historyEnabled ? 'eye-off' : 'eye'} size={18} color={colors.primary} /><Text style={[styles.menuText, { color: colors.foreground }]}>{historyEnabled ? 'Turn history off' : 'Turn history on'}</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => void clearChats()} style={styles.menuRow}><Feather name="trash-2" size={18} color={colors.destructive} /><Text style={[styles.menuText, { color: colors.destructive }]}>Clear Chats</Text></Pressable>
+      </View>
+    ) : null}
+
+    <View style={[styles.settingsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Text style={[styles.statusTitle, { color: colors.foreground }]}>Assistant Settings</Text>
+      <Text style={[styles.note, { color: colors.mutedForeground }]}>Signed in: {auth.session?.user.email ?? 'Not signed in'}</Text>
+      <Pressable accessibilityRole="switch" accessibilityState={{ checked: historyEnabled }} onPress={() => void toggleHistory()} style={[styles.settingRow, { borderColor: colors.border }]}>
+        <View style={{ flex: 1 }}><Text style={[styles.menuText, { color: colors.foreground }]}>Save chat history</Text><Text style={[styles.note, { color: colors.mutedForeground }]}>When off, new conversations are not persisted.</Text></View>
+        <Text style={[styles.buttonText, { color: colors.primary }]}>{historyEnabled ? 'On' : 'Off'}</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void clearChats()} style={[styles.settingRow, { borderColor: colors.border }]}>
+        <Text style={[styles.menuText, { color: colors.destructive }]}>Clear all chats</Text>
+      </Pressable>
+    </View>
+
+    {historyOpen ? (
+      <View style={[styles.historyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.toolsHeader}><Text style={[styles.statusTitle, { color: colors.foreground }]}>Chat History</Text><Pressable accessibilityRole="button" onPress={() => setHistoryOpen(false)} style={[styles.iconButton, { borderColor: colors.border, backgroundColor: colors.background }]}><Feather name="x" size={18} color={colors.foreground} /></Pressable></View>
+        {sessionList.length ? sessionList.map((session) => <View key={session.id} style={[styles.historyRow, { borderColor: colors.border }]}><Text style={[styles.menuText, { color: colors.foreground }]}>{session.title}</Text><Text style={[styles.note, { color: colors.mutedForeground }]}>{session.messageCount} messages</Text></View>) : <Text style={[styles.note, { color: colors.mutedForeground }]}>No saved chats.</Text>}
+      </View>
+    ) : null}
+
     <View accessibilityLiveRegion="polite" style={[styles.status, { borderColor: colors.border, backgroundColor: colors.card }]}>
       <Text style={[styles.statusTitle, { color: colors.foreground }]}>Runtime</Text>
       <Text style={[styles.note, { color: colors.mutedForeground }]}>{status}</Text>
@@ -471,6 +524,15 @@ export default function NexusAssistantScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  menuButton: { width: 44, height: 44, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  sideMenu: { borderWidth: 1, borderRadius: 18, padding: 10, marginBottom: 12, gap: 2 },
+  menuRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8 },
+  menuText: { fontSize: 12, fontFamily: 'Inter_700Bold' },
+  settingsCard: { borderWidth: 1, borderRadius: 18, padding: 13, marginBottom: 12, gap: 8 },
+  settingRow: { minHeight: 48, borderTopWidth: 1, flexDirection: 'row', alignItems: 'center', paddingVertical: 9 },
+  historyCard: { borderWidth: 1, borderRadius: 18, padding: 13, marginBottom: 12 },
+  historyRow: { borderTopWidth: 1, paddingVertical: 9 },
   icon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   copy: { flex: 1, marginLeft: 12 },
   title: { fontSize: 24, fontFamily: 'Inter_700Bold' },
