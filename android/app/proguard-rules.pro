@@ -39,3 +39,6 @@
 
 -keep class com.nexuswavetech.nexusplus.NexusRemoteModule { *; }
 -keep class com.nexuswavetech.nexusplus.NexusRemotePackage { *; }
+
+-keep class com.nexuswavetech.nexusplus.NexusTvCastModule { *; }
+-keep class com.nexuswavetech.nexusplus.NexusTvCastPackage { *; }
