@@ -1,6 +1,7 @@
 import { Stack, useRouter } from 'expo-router';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
+import { launchTvApp } from '@/features/remote-control/tvAppLaunch';
 
 type TvApp = { id: string; name: string; category: string; packageHints: string[] };
 
@@ -38,8 +39,20 @@ export const GENERIC_TV_APPS: TvApp[] = [
 export default function TvAllAppsScreen() {
   const colors = useColors(); const router = useRouter();
 
-  const openGenericApp = (app: TvApp) => {
-    Alert.alert(app.name, 'TV app launch from a universal remote requires a compatible TV receiver. ' + app.name + ' is marked Coming Soon until that receiver is installed and paired.');
+  const openGenericApp = async (app: TvApp) => {
+    if (!app.packageHints.length) {
+      Alert.alert(app.name, 'The app is not installed');
+      return;
+    }
+    try {
+      await launchTvApp(app.packageHints);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'APP_NOT_INSTALLED') {
+        Alert.alert(app.name, 'The app is not installed');
+      } else {
+        Alert.alert(app.name, 'The app could not be opened on this device.');
+      }
+    }
   };
 
   return <View style={[styles.root,{backgroundColor:colors.background}]}>
@@ -47,7 +60,7 @@ export default function TvAllAppsScreen() {
     <ScrollView contentContainerStyle={styles.content}>
       <Text accessibilityRole="header" style={[styles.title,{color:colors.foreground}]}>All Apps</Text>
       <Text style={[styles.sub,{color:colors.mutedForeground}]}>
-        Generic universal app catalog. Receiver-dependent launch and automatic installed-app discovery are marked Coming Soon.
+        Installed-app launch uses the local Android app registry where supported. Dynamic TV installed-app discovery remains receiver-ready.
       </Text>
       {['Video','India','Music','Media','Social','Education','Utility','System','TV'].map((category) => {
         const apps = GENERIC_TV_APPS.filter((app) => app.category === category);
