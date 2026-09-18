@@ -36,3 +36,6 @@
     public static *** d(...);
     public static *** v(...);
 }
+
+-keep class com.nexuswavetech.nexusplus.NexusRemoteModule { *; }
+-keep class com.nexuswavetech.nexusplus.NexusRemotePackage { *; }
