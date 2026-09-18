@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AccessibilityInfo, Alert, FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { , Alert, FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { announceClean } from '@/features/accessibility/spokenAnnouncement';
 import { VideoView } from 'expo-video';
 import { scanLocalMedia, buildCollections } from './library';
 import { createPlaylist, loadDevicePlaylists } from './playlists';
@@ -45,7 +46,7 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
   }, [player]);
 
   useEffect(() => { void refresh(); void isYouTubeMusicInstalled().then(setYoutubeInstalled); }, [refresh]);
-  useEffect(() => { if (player.state.current) void AccessibilityInfo.announceForAccessibility(`Playing ${player.state.current.title}`); }, [player.state.current?.id]);
+  useEffect(() => { if (player.state.current) void announceClean(`Playing ${player.state.current.title}`); }, [player.state.current?.id]);
 
   const audio = useMemo(() => library.filter((item) => item.kind === 'audio'), [library]);
   const video = useMemo(() => library.filter((item) => item.kind === 'video'), [library]);
@@ -69,7 +70,7 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
       const result = await vocalRemoverService.removeVocals(current, { outputStem: vocalMode, quality: 'studio' }, (job) => setVocalProgress(job.progress));
       const derived: MediaItemModel = { ...current, id: `${current.id}:${result.stem}:${Date.now()}`, uri: result.outputUri, title: `${current.title} — ${result.stem === 'instrumental' ? 'Instrumental' : 'Vocals'}`, source: 'local' };
       loadItem(derived, [derived]);
-      void AccessibilityInfo.announceForAccessibility('Vocal separation completed');
+      void announceClean('Vocal separation completed');
     } catch (error) { Alert.alert('Vocal Remover', error instanceof Error ? error.message : 'Vocal separation failed.'); }
     finally { setVocalBusy(false); setVocalProgress(0); }
   }, [canVocalRemove, current, loadItem, vocalMode]);
@@ -80,7 +81,7 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
       setPlaylists((items) => [...items, playlist]);
       setNewPlaylistName('');
       setShowCreatePlaylist(false);
-      void AccessibilityInfo.announceForAccessibility(`Playlist ${playlist.name} created`);
+      void announceClean(`Playlist ${playlist.name} created`);
     } catch (error) { Alert.alert('Playlist', error instanceof Error ? error.message : 'Could not create playlist.'); }
   }, [newPlaylistName]);
 
