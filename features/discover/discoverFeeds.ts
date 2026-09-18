@@ -1,4 +1,4 @@
-export type DiscoverCategory = 'top' | 'world' | 'technology' | 'science';
+export type DiscoverCategory = 'top' | 'world' | 'technology' | 'science' | 'business' | 'health' | 'entertainment';
 
 export type DiscoverFeed = {
   id: string;
@@ -20,6 +20,49 @@ export type DiscoverItem = {
 };
 
 export const DISCOVER_FEEDS: DiscoverFeed[] = [
+  {
+    id: 'bbc-world',
+    category: 'world',
+    name: 'BBC — World',
+    url: 'https://feeds.bbci.co.uk/news/world/rss.xml',
+    attributionUrl: 'https://www.bbc.com/news/10628494',
+  },
+  {
+    id: 'bbc-technology',
+    category: 'technology',
+    name: 'BBC — Technology',
+    url: 'https://feeds.bbci.co.uk/news/technology/rss.xml',
+    attributionUrl: 'https://www.bbc.com/news/10628494',
+  },
+  {
+    id: 'bbc-science-environment',
+    category: 'science',
+    name: 'BBC — Science & Environment',
+    url: 'https://feeds.bbci.co.uk/news/science_and_environment/rss.xml',
+    attributionUrl: 'https://www.bbc.com/news/10628494',
+  },
+  {
+    id: 'bbc-business',
+    category: 'business',
+    name: 'BBC — Business',
+    url: 'https://feeds.bbci.co.uk/news/business/rss.xml',
+    attributionUrl: 'https://www.bbc.com/news/10628494',
+  },
+  {
+    id: 'bbc-health',
+    category: 'health',
+    name: 'BBC — Health',
+    url: 'https://feeds.bbci.co.uk/news/health/rss.xml',
+    attributionUrl: 'https://www.bbc.com/news/10628494',
+  },
+  {
+    id: 'bbc-entertainment',
+    category: 'entertainment',
+    name: 'BBC — Entertainment & Arts',
+    url: 'https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml',
+    attributionUrl: 'https://www.bbc.com/news/10628494',
+  },
+
   {
     id: 'guardian-world',
     category: 'world',
@@ -69,6 +112,9 @@ export const CATEGORY_LABELS: Record<DiscoverCategory, string> = {
   world: 'World',
   technology: 'Technology',
   science: 'Science',
+  business: 'Business',
+  health: 'Health',
+  entertainment: 'Entertainment',
 };
 
 export const CATEGORY_ICONS: Record<DiscoverCategory, string> = {
@@ -76,6 +122,9 @@ export const CATEGORY_ICONS: Record<DiscoverCategory, string> = {
   world: 'globe',
   technology: 'cpu',
   science: 'activity',
+  business: 'briefcase',
+  health: 'heart',
+  entertainment: 'film',
 };
 
 function firstTagValue(xml: string, tag: string): string {
