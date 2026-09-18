@@ -19,7 +19,7 @@ export default function RemoteControlScreen() {
   const [transport, setTransport] = useState<RemoteTransport>('wifi');
   const [name, setName] = useState(''); const [address, setAddress] = useState(''); const [port, setPort] = useState('8765'); const [code, setCode] = useState('');
 
-  const load = async () => setConnections(await getRemoteConnections());
+  const load = async () => setConnections((await getRemoteConnections()).filter((item) => item.online !== false));
   useEffect(() => { void load(); }, []);
   useEffect(() => { setScreenOnMobile(Object.fromEntries(connections.map((item) => [item.id, false]))); }, [connections]);
 
