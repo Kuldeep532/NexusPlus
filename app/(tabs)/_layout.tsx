@@ -1,6 +1,6 @@
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
-function MaterialCommunityIconShim({ color, size }: { color: string; size: number }) { return <MaterialCommunityIcons name="sparkles" color={color} size={size} />; }
+function MaterialCommunityIconShim({ color, size }: { color: string; size: number }) { return <MaterialCommunityIcons name="compass-outline" color={color} size={size} />; }
 import { Tabs } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 
