@@ -32,6 +32,7 @@ class NexusReactApplication : Application(), ReactApplication {
             add(NexusVideoEditorPackage())
             add(NexusVisionAssistPackage())
             add(NexusRemotePackage())
+            add(NexusRemoteDiscoveryPackage())
         }
         override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"
         override fun getUseDeveloperSupport(): Boolean = BuildConfig.DEBUG
