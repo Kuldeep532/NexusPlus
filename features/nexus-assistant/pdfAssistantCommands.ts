@@ -88,11 +88,5 @@ export async function executeAssistantPdfCommand(
     };
   }
 
-  const output = await PdfNativeBridge.preparePdfToolOutput('PDF Tools - Rotate', safeBaseName(pdf.name) + '-rotated-' + command.degrees + '.pdf');
-  await PdfNativeBridge.rotate(pdf.uri, output, ['1-999999'], command.degrees);
-  return {
-    uri: output,
-    name: safeBaseName(pdf.name) + '-rotated-' + command.degrees + '.pdf',
-    message: 'PDF rotated successfully and saved to Nexus Plus PDF Tools.',
-  };
+  throw new Error('Assistant PDF rotate requires the dedicated PDF tool because a verified page-count path is not exposed here.');
 }
