@@ -26,7 +26,12 @@ export default function MoreScreen() {
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={{ padding: 18, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 32 }}>
         <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>More</Text>
-        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Nexus Plus settings, information and support.</Text>
+        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Nexus Plus settings, profile, information and support.</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open Profile" onPress={() => router.push('/profile')} style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="user" size={20} color={colors.primary} /></View>
+          <View style={styles.copy}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Profile</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>Settings, Manage Account, Privacy Policy and Terms & Conditions.</Text></View>
+          <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+        </Pressable>
         <View style={styles.list}>
           {ITEMS.map((item) => <Pressable key={item.route} accessibilityRole="button" accessibilityLabel={item.title + '. ' + item.description} onPress={() => router.push(item.route as never)} style={[styles.item, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name={item.icon} size={20} color={colors.primary} /></View>
@@ -54,6 +59,7 @@ export default function MoreScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 }, title: { fontSize: 28, fontFamily: 'Inter_700Bold' }, subtitle: { fontSize: 12, lineHeight: 18, marginTop: 4, marginBottom: 18 },
   list: { gap: 10 }, sectionTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', marginTop: 22, marginBottom: 10 },
+  profileCard: { minHeight: 76, borderWidth: 1, borderRadius: 17, padding: 13, marginBottom: 12, flexDirection: 'row', alignItems: 'center' },
   item: { minHeight: 70, borderWidth: 1, borderRadius: 17, padding: 13, flexDirection: 'row', alignItems: 'center' }, icon: { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   copy: { flex: 1, marginHorizontal: 12 }, itemTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', marginBottom: 3 }, body: { fontSize: 11, lineHeight: 16 },
 });
