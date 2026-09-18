@@ -31,6 +31,7 @@ export type RemoteConnection = {
   online?: boolean;
   pairingState?: 'unpaired' | 'paired';
   pairingSecret?: string;
+  targetKind?: 'local' | 'tv' | 'computer';
 };
 
 const STORAGE_KEY = 'nexus-plus.remote-control.connections.v1';
@@ -68,7 +69,7 @@ export async function removeRemoteConnection(id: string): Promise<void> {
 
 export function createRemoteConnection(input: Omit<RemoteConnection, 'id' | 'paired' | 'pairingState' | 'pairingSecret'> & { paired?: boolean; pairingState?: 'unpaired' | 'paired'; pairingSecret?: string }): RemoteConnection {
   const paired = input.paired ?? true;
-  return { ...input, id: createId(input.type), paired, pairingState: input.pairingState ?? (paired ? 'paired' : 'unpaired'), pairingSecret: input.pairingSecret };
+  return { ...input, id: createId(input.type), paired, pairingState: input.pairingState ?? (paired ? 'paired' : 'unpaired'), pairingSecret: input.pairingSecret, targetKind: input.targetKind ?? input.type };
 }
 
 export function getDefaultCapabilities(type: RemoteDeviceType, transport: RemoteTransport): RemoteCapabilities {
