@@ -3,7 +3,8 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { , Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { announceClean } from '@/features/accessibility/spokenAnnouncement';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { speakAnnouncement } from '@/features/time-announcer/announcementSpeaker';
@@ -39,7 +40,7 @@ export default function SelfieScreen() {
     } catch {
       // Voice guidance is optional; visual/accessibility status remains authoritative.
     }
-    AccessibilityInfo.announceForAccessibility(message);
+    announceClean(message);
   }, []);
 
   useEffect(() => {
