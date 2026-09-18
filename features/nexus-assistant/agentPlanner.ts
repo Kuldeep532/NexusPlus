@@ -20,7 +20,7 @@ const COMMAND_PATTERNS: Array<{
 }> = [
   { id: 'battery-status', pattern: /(?:battery|बैटरी)/i, reason: 'The user appears to be asking for battery state.', args: () => ({}) },
   { id: 'device-info', pattern: /(?:device information|phone info|डिवाइस|फोन की जानकारी)/i, reason: 'The request appears to ask for basic device information.', args: () => ({}) },
-  { id: 'open-url', pattern: /(?:open|खोलो|खोलना)s+(https?://S+)/i, reason: 'The user requested opening a specific URL.', args: (match) => ({ url: match[1] }) },
+  { id: 'open-url', pattern: /(?:open|खोलो|खोलना)\s+(https?:\/\/\S+)/i, reason: 'The user requested opening a specific URL.', args: (match) => ({ url: match[1] }) },
   { id: 'create-reminder', pattern: /(?:remind me|reminder|याद दिलाना|रिमाइंडर)/i, reason: 'The request appears to create a reminder.', args: () => ({}) },
 ];
 
@@ -50,7 +50,6 @@ export function planCapability(request: string): CapabilityProposal | null {
 
   const text = request.trim();
   if (!text) return null;
-
   for (const candidate of COMMAND_PATTERNS) {
     const match = candidate.pattern.exec(text);
     if (!match) continue;
