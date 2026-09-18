@@ -39,10 +39,7 @@ export default function TvAllAppsScreen() {
   const colors = useColors(); const router = useRouter();
 
   const openGenericApp = (app: TvApp) => {
-    Alert.alert(
-      app.name,
-      'This is a generic TV-app shortcut. It will send the app-launch request when the Nexus TV receiver is installed and paired.',
-    );
+    Alert.alert(app.name, 'TV app launch from a universal remote requires a compatible TV receiver. ' + app.name + ' is marked Coming Soon until that receiver is installed and paired.');
   };
 
   return <View style={[styles.root,{backgroundColor:colors.background}]}>
@@ -50,7 +47,7 @@ export default function TvAllAppsScreen() {
     <ScrollView contentContainerStyle={styles.content}>
       <Text accessibilityRole="header" style={[styles.title,{color:colors.foreground}]}>All Apps</Text>
       <Text style={[styles.sub,{color:colors.mutedForeground}]}>
-        Generic catalog prepared for Android TV and Google TV. Receiver support can later replace these generic launch requests with the actual installed-app list from the TV.
+        Generic universal app catalog. Receiver-dependent launch and automatic installed-app discovery are marked Coming Soon.
       </Text>
       {['Video','India','Music','Media','Social','Education','Utility','System','TV'].map((category) => {
         const apps = GENERIC_TV_APPS.filter((app) => app.category === category);
