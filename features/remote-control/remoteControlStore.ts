@@ -13,6 +13,9 @@ export type RemoteCapabilities = {
   voice?: boolean;
   ir?: boolean;
   media?: boolean;
+  apps?: boolean;
+  appList?: string[];
+  screen?: boolean;
 };
 
 export type RemoteConnection = {
