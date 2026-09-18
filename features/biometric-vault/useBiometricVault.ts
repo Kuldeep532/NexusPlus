@@ -108,7 +108,7 @@ export function useBiometricVault(
       setBiometricEnrolled(refreshed.enrolled && refreshed.securityLevel === 'strong');
       await saveVaultCredentialMode('biometric-only');
       setCredentialMode('biometric-only');
-      AccessibilityInfo.announceForAccessibility?.('Vault biometric registered successfully');
+      announceClean?.('Vault biometric registered successfully');
       return true;
     } catch {
       setAuthError('Biometric registration failed.');
@@ -126,7 +126,7 @@ export function useBiometricVault(
       }
       await saveVaultCredentialMode('device-auth');
       setCredentialMode('device-auth');
-      AccessibilityInfo.announceForAccessibility?.('Vault device authentication mode selected');
+      announceClean?.('Vault device authentication mode selected');
       return true;
     } catch {
       setAuthError('Could not change Vault credential mode.');
@@ -174,7 +174,7 @@ export function useBiometricVault(
       setItems(snapshot.items);
       setIsUnlocked(true);
       scheduleLock();
-      AccessibilityInfo.announceForAccessibility?.('Vault unlocked successfully');
+      announceClean?.('Vault unlocked successfully');
       return true;
     } catch {
       lock();
