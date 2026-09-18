@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
-import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { , Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { announceClean } from '@/features/accessibility/spokenAnnouncement';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { DEFAULT_ANNOUNCEMENT_SETTINGS } from '@/features/time-assisted/timeAssistedTypes';
@@ -19,7 +20,7 @@ export default function TimeAnnouncementScreen() {
     setBusy(true);
     try {
       await speakTimeAssisted(settings, new Date());
-      AccessibilityInfo.announceForAccessibility('Current time announced with beep.');
+      announceClean('Current time announced with beep.');
     } finally {
       setBusy(false);
     }
