@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { , Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { announceClean } from '@/features/accessibility/spokenAnnouncement';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { DEFAULT_ANNOUNCEMENT_SETTINGS } from '@/features/time-assisted/timeAssistedTypes';
@@ -23,7 +24,7 @@ export default function IntervalAnnouncementScreen() {
 
   const announceNow = async () => {
     await speakTimeAssisted({ ...DEFAULT_ANNOUNCEMENT_SETTINGS, enabled: true, intervalMinutes: minutes });
-    AccessibilityInfo.announceForAccessibility('Time announced.');
+    announceClean('Time announced.');
   };
 
   return <ScrollView style={[styles.screen, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 40 }}>
