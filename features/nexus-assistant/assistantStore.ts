@@ -50,6 +50,7 @@ export async function addMessage(
   role: ChatMessage['role'],
   content: string,
 ): Promise<void> {
+  if (!(await getHistoryEnabled())) return;
   const db = await dbPromise;
   await db.runAsync(
     'INSERT INTO chat_messages (session_id, role, content, created_at) VALUES (?, ?, ?, ?)',
