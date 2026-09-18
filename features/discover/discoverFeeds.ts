@@ -21,6 +21,27 @@ export type DiscoverItem = {
 
 export const DISCOVER_FEEDS: DiscoverFeed[] = [
   {
+    id: 'guardian-world',
+    category: 'world',
+    name: 'The Guardian — World',
+    url: 'https://www.theguardian.com/world/rss',
+    attributionUrl: 'https://www.theguardian.com/help/feeds',
+  },
+  {
+    id: 'guardian-technology',
+    category: 'technology',
+    name: 'The Guardian — Technology',
+    url: 'https://www.theguardian.com/technology/rss',
+    attributionUrl: 'https://www.theguardian.com/help/feeds',
+  },
+  {
+    id: 'guardian-science',
+    category: 'science',
+    name: 'The Guardian — Science',
+    url: 'https://www.theguardian.com/science/rss',
+    attributionUrl: 'https://www.theguardian.com/help/feeds',
+  },
+  {
     id: 'sciencedaily-top-science',
     category: 'science',
     name: 'ScienceDaily — Top Science',
@@ -35,11 +56,11 @@ export const DISCOVER_FEEDS: DiscoverFeed[] = [
     attributionUrl: 'https://www.sciencedaily.com/newsfeeds.htm',
   },
   {
-    id: 'nasa-news',
+    id: 'jpl-news',
     category: 'science',
-    name: 'NASA — News Releases',
-    url: 'https://www.nasa.gov/rss-feeds/',
-    attributionUrl: 'https://www.nasa.gov/rss-feeds/',
+    name: 'NASA JPL — News & Features',
+    url: 'https://www.jpl.nasa.gov/feeds/news/',
+    attributionUrl: 'https://www.jpl.nasa.gov/rss/',
   },
 ];
 
@@ -71,7 +92,7 @@ function decodeXml(value: string): string {
     .replace(/&gt;/gi, '>')
     .replace(/&quot;/gi, '"')
     .replace(/&#39;|&apos;/gi, "'")
-    .replace(/\\s+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
