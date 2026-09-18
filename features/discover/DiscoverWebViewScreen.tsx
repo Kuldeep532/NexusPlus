@@ -14,7 +14,6 @@ export default function DiscoverWebViewScreen() {
   const url = typeof params.url === 'string' ? params.url : '';
   const title = typeof params.title === 'string' ? params.title : 'Article';
   const summary = typeof params.summary === 'string' ? params.summary : '';
-  const [canGoBack, setCanGoBack] = useState(false);
   const [speaking, setSpeaking] = useState(false);
 
   const listen = async () => {
@@ -51,7 +50,6 @@ export default function DiscoverWebViewScreen() {
         source={{ uri: url }}
         style={styles.web}
         startInLoadingState
-        onNavigationStateChange={(state) => setCanGoBack(state.canGoBack)}
         accessibilityLabel="News article web view"
         allowsBackForwardNavigationGestures
         javaScriptEnabled
