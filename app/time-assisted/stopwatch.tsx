@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { , Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { announceClean } from '@/features/accessibility/spokenAnnouncement';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 
@@ -32,13 +33,13 @@ export default function StopwatchScreen() {
       baseElapsed.current = next;
       setElapsed(next);
       setRunning(false);
-      AccessibilityInfo.announceForAccessibility('Stopwatch paused.');
+      announceClean('Stopwatch paused.');
       return;
     }
     startedAt.current = Date.now();
     baseElapsed.current = elapsed;
     setRunning(true);
-    AccessibilityInfo.announceForAccessibility('Stopwatch started.');
+    announceClean('Stopwatch started.');
   };
 
   const reset = () => {
@@ -46,14 +47,14 @@ export default function StopwatchScreen() {
     setElapsed(0);
     baseElapsed.current = 0;
     setLaps([]);
-    AccessibilityInfo.announceForAccessibility('Stopwatch reset.');
+    announceClean('Stopwatch reset.');
   };
 
   const lap = () => {
     if (!running) return;
     const value = baseElapsed.current + Date.now() - startedAt.current;
     setLaps((items) => [value, ...items].slice(0, 50));
-    AccessibilityInfo.announceForAccessibility(`Lap ${laps.length + 1}: ${formatStopwatch(value)}.`);
+    announceClean(`Lap ${laps.length + 1}: ${formatStopwatch(value)}.`);
   };
 
   return <ScrollView style={[styles.screen, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 40 }}>
