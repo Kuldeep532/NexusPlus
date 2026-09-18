@@ -7,9 +7,14 @@ import android.media.projection.MediaProjectionManager
 import android.os.Build
 import com.facebook.react.bridge.*
 
-class NexusScreenMirrorModule(private val reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
+class NexusScreenMirrorModule(private val reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext), ActivityEventListener {
     companion object { const val REQUEST_CODE = 48271 }
+
     private var pending: Promise? = null
+
+    init {
+        reactContext.addActivityEventListener(this)
+    }
 
     override fun getName(): String = "NexusScreenMirror"
 
@@ -19,6 +24,7 @@ class NexusScreenMirrorModule(private val reactContext: ReactApplicationContext)
             putBoolean("available", Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
             putBoolean("projectionActive", NexusScreenMirrorService.isProjectionActive)
             putBoolean("mediaActive", NexusScreenMirrorService.isMediaActive)
+            putString("receiverUrl", NexusScreenMirrorService.receiverUrl(reactContext))
         })
     }
 
@@ -33,10 +39,8 @@ class NexusScreenMirrorModule(private val reactContext: ReactApplicationContext)
             promise.reject("MIRROR_UNSUPPORTED", "Screen projection is unavailable on this Android version.")
             return
         }
-
         pending?.reject("MIRROR_REQUEST_REPLACED", "A newer capture request replaced this request.")
         pending = promise
-
         try {
             val manager = activity.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             activity.startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_CODE)
@@ -47,16 +51,17 @@ class NexusScreenMirrorModule(private val reactContext: ReactApplicationContext)
     }
 
     @ReactMethod
-    fun stopProjection(promise: Promise) {
-        NexusScreenMirrorService.stopProjection(reactContext)
-        promise.resolve(true)
-    }
-
-    @ReactMethod
     fun castMedia(target: String, uri: String, mimeType: String?, kind: String, name: String?, durationMs: Double?, promise: Promise) {
         try {
-            NexusScreenMirrorService.castMedia(reactContext, target, uri, mimeType, kind, name, durationMs)
-            promise.resolve(true)
+            promise.resolve(NexusScreenMirrorService.castMedia(
+                reactContext,
+                target,
+                uri,
+                mimeType,
+                kind,
+                name,
+                durationMs
+            ))
         } catch (error: Exception) {
             promise.reject("MEDIA_CAST_FAILED", error.message, error)
         }
@@ -65,11 +70,23 @@ class NexusScreenMirrorModule(private val reactContext: ReactApplicationContext)
     @ReactMethod
     fun replaceCastMedia(uri: String, mimeType: String?, kind: String, name: String?, durationMs: Double?, promise: Promise) {
         try {
-            NexusScreenMirrorService.replaceCastMedia(reactContext, uri, mimeType, kind, name, durationMs)
-            promise.resolve(true)
+            promise.resolve(NexusScreenMirrorService.replaceCastMedia(
+                reactContext,
+                uri,
+                mimeType,
+                kind,
+                name,
+                durationMs
+            ))
         } catch (error: Exception) {
             promise.reject("MEDIA_REPLACE_FAILED", error.message, error)
         }
+    }
+
+    @ReactMethod
+    fun stopProjection(promise: Promise) {
+        NexusScreenMirrorService.stopProjection(reactContext)
+        promise.resolve(true)
     }
 
     @ReactMethod
@@ -78,7 +95,8 @@ class NexusScreenMirrorModule(private val reactContext: ReactApplicationContext)
         promise.resolve(true)
     }
 
-    fun onScreenCaptureResult(resultCode: Int, data: Intent?) {
+    override fun onActivityResult(activity: Activity?, requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode != REQUEST_CODE) return
         val p = pending ?: return
         pending = null
         if (resultCode != Activity.RESULT_OK || data == null) {
@@ -92,4 +110,6 @@ class NexusScreenMirrorModule(private val reactContext: ReactApplicationContext)
             p.reject("MIRROR_START_FAILED", error.message, error)
         }
     }
+
+    override fun onNewIntent(intent: Intent?) = Unit
 }
