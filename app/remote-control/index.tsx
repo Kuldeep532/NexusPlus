@@ -2,15 +2,11 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useEffect, useState } from 'react';
-import { getRemoteConnections, markRemoteDeviceOnline, type RemoteConnection } from '@/features/remote-control/remoteControlStore';
+import { getRemoteConnections, type RemoteConnection } from '@/features/remote-control/remoteControlStore';
 
 export default function RemoteHomeScreen() {
   const colors = useColors(); const router = useRouter(); const [devices, setDevices] = useState<RemoteConnection[]>([]);
-  const refresh = async () => {
-    const saved = await getRemoteConnections();
-    await Promise.all(saved.map((item) => markRemoteDeviceOnline(item.id, item.online !== false)));
-    setDevices(saved.filter((item) => item.online !== false));
-  };
+  const refresh = async () => { const saved = await getRemoteConnections(); setDevices(saved.filter((item) => item.paired && Boolean(item.pairingSecret))); };
   useEffect(() => { void refresh(); }, []);
   return <View style={[styles.root,{backgroundColor:colors.background}]}>
     <Text accessibilityRole="header" style={[styles.title,{color:colors.foreground}]}>Nexus Remote</Text>
