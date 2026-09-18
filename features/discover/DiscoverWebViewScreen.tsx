@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useColors } from '@/hooks/useColors';
@@ -15,6 +15,11 @@ export default function DiscoverWebViewScreen() {
   const title = typeof params.title === 'string' ? params.title : 'Article';
   const summary = typeof params.summary === 'string' ? params.summary : '';
   const [speaking, setSpeaking] = useState(false);
+  const [canGoBack, setCanGoBack] = useState(false);
+  const [pageTitle, setPageTitle] = useState(title);
+  const webRef = useRef<WebView>(null);
+
+  useEffect(() => () => { Speech.stop(); }, []);
 
   const listen = async () => {
     if (speaking) {
@@ -22,7 +27,7 @@ export default function DiscoverWebViewScreen() {
       setSpeaking(false);
       return;
     }
-    const text = [title, summary].filter(Boolean).join('. ').trim();
+    const text = [pageTitle, summary].filter(Boolean).join('. ').trim();
     if (!text) return;
     setSpeaking(true);
     try {
@@ -37,18 +42,20 @@ export default function DiscoverWebViewScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <View style={[styles.toolbar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Back to Discover" onPress={() => router.back()} style={styles.button}>
+        <Pressable accessibilityRole="button" accessibilityLabel={canGoBack ? 'Go back in article' : 'Back to Discover'} onPress={() => { if (canGoBack) webRef.current?.goBack(); else router.back(); }} style={styles.button}>
           <Feather name="arrow-left" size={21} color={colors.foreground} />
         </Pressable>
-        <View style={styles.titleWrap}><Text numberOfLines={2} style={[styles.title, { color: colors.foreground }]}>{title}</Text></View>
+        <View style={styles.titleWrap}><Text numberOfLines={2} style={[styles.title, { color: colors.foreground }]}>{pageTitle}</Text></View>
         <Pressable accessibilityRole="button" accessibilityLabel={speaking ? 'Stop listening' : 'Listen to article summary'} onPress={() => void listen()} style={[styles.listen, { backgroundColor: colors.secondary }]}>
           <Feather name={speaking ? 'square' : 'volume-2'} size={18} color={colors.primary} />
           <Text style={[styles.listenText, { color: colors.foreground }]}>{speaking ? 'Stop' : 'Listen'}</Text>
         </Pressable>
       </View>
       <WebView
+        ref={webRef}
         source={{ uri: url }}
         style={styles.web}
+        onNavigationStateChange={(state) => { setCanGoBack(state.canGoBack); if (state.title) setPageTitle(state.title); }}
         startInLoadingState
         accessibilityLabel="News article web view"
         allowsBackForwardNavigationGestures
