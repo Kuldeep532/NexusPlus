@@ -1,5 +1,4 @@
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { Stack } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -59,12 +58,9 @@ export default function DocumentCreatorScreen() {
     try {
       const dir = `${FileSystem.documentDirectory}Document Studio/`;
       await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
-      const source = `${dir}${safeBaseName(title)}.docx`;
-      const docxBytes = [
-        'PK\\x03\\x04',
-        `Nexus Plus Document Studio\\n\\n${title.trim()}\\n\\n${body.trim()}`,
-      ].join('');
-      await FileSystem.writeAsStringAsync(source, docxBytes);
+      const html = `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;padding:48px;line-height:1.6}h1{margin-bottom:24px}</style></head><body><h1>${title.trim().replace(/[&<>]/g, '')}</h1><p>${body.trim().replace(/[&<>]/g, '').replace(/\\n/g, '<br/>')}</p></body></html>`;
+      const source = `${dir}${safeBaseName(title)}.html`;
+      await FileSystem.writeAsStringAsync(source, html);
       const output = `${dir}${safeBaseName(title)}.pdf`;
       const uri = await convertWordToPdf(source, output);
       setResultUri(uri);
