@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, AppStateStatus, AccessibilityInfo } from 'react-native';
+import { AppState, AppStateStatus,  } from 'react-native';
+import { announceClean } from '@/features/accessibility/spokenAnnouncement';
 import * as Haptics from 'expo-haptics';
 import {
   DEFAULT_VAULT_SECURITY,
