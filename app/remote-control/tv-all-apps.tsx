@@ -44,7 +44,7 @@ export default function TvAllAppsScreen() {
     void remoteHaptic('press');
     if (!app.packageHints.length) {
       void remoteHaptic('error');
-      Alert.alert(app.name, 'The app is not installed');
+      Alert.alert(app.name, 'This TV app cannot be checked without a TV connection. The app is not installed or not available through the current remote transport.');
       return;
     }
     try {
@@ -52,7 +52,7 @@ export default function TvAllAppsScreen() {
     } catch (error) {
       if (error instanceof Error && error.message === 'APP_NOT_INSTALLED') {
         void remoteHaptic('error');
-        Alert.alert(app.name, 'The app is not installed');
+        Alert.alert(app.name, 'The app is not installed or this TV does not expose that app through the current remote transport.');
       } else {
         void remoteHaptic('error');
         Alert.alert(app.name, 'The app could not be opened on this device.');
