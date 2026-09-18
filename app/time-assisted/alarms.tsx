@@ -1,7 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import { NativeModules } from 'react-native';
 import { useCallback, useEffect, useState } from 'react';
-import { AccessibilityInfo, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { , Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { announceClean } from '@/features/accessibility/spokenAnnouncement';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { ALARM_SOUNDS, type AlarmSound } from '@/features/time-announcer/timeAnnouncerTypes';
@@ -40,7 +41,7 @@ export default function AlarmsScreen() {
       }
       setAlarms(next);
     } catch {
-      AccessibilityInfo.announceForAccessibility('Alarm settings could not be saved.');
+      announceClean('Alarm settings could not be saved.');
     }
   }, []);
 
@@ -91,7 +92,7 @@ export default function AlarmsScreen() {
     if (!(await schedule(alarm))) return;
     const enabledAlarm = { ...alarm, enabled: true };
     await persist([enabledAlarm, ...alarms]);
-    AccessibilityInfo.announceForAccessibility(`Alarm set for ${formatAlarm(alarm.hour, alarm.minute)}. Sound ${findSound(alarm.soundId).displayName}.`);
+    announceClean(`Alarm set for ${formatAlarm(alarm.hour, alarm.minute)}. Sound ${findSound(alarm.soundId).displayName}.`);
   };
 
   const toggle = async (id: string) => {
@@ -122,7 +123,7 @@ export default function AlarmsScreen() {
       if (!(await schedule({ ...current, soundId: nextSound.id }))) return;
     }
     await persist(next);
-    void AccessibilityInfo.announceForAccessibility(`Alarm sound changed to ${nextSound.displayName}.`);
+    void announceClean(`Alarm sound changed to ${nextSound.displayName}.`);
   };
 
   return <ScrollView style={[styles.screen, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 40 }}>
