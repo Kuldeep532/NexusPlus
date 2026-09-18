@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type ChatMessage = {
   id: number;
@@ -9,6 +10,8 @@ export type ChatMessage = {
 };
 
 const dbPromise = SQLite.openDatabaseAsync('nexus-assistant.db');
+const HISTORY_ENABLED_KEY = '@nexus-plus/nexus-assistant-history-enabled';
+const DEFAULT_HISTORY_ENABLED = true;
 
 export async function initAssistantStore(): Promise<void> {
   const db = await dbPromise;
@@ -74,4 +77,22 @@ export async function deleteSession(sessionId: string): Promise<void> {
 export async function clearAllAssistantData(): Promise<void> {
   const db = await dbPromise;
   await db.execAsync('DELETE FROM chat_messages; DELETE FROM chat_sessions;');
+}
+
+export async function getHistoryEnabled(): Promise<boolean> {
+  const value = await AsyncStorage.getItem(HISTORY_ENABLED_KEY);
+  if (value === null) return DEFAULT_HISTORY_ENABLED;
+  return value === 'true';
+}
+
+export async function setHistoryEnabled(enabled: boolean): Promise<void> {
+  await AsyncStorage.setItem(HISTORY_ENABLED_KEY, String(enabled));
+  if (!enabled) await clearAllAssistantData();
+}
+
+export async function listSessions(): Promise<Array<{ id: string; title: string; createdAt: number; messageCount: number }>> {
+  const db = await dbPromise;
+  return db.getAllAsync(
+    'SELECT s.id, s.title, s.created_at as createdAt, COUNT(m.id) as messageCount FROM chat_sessions s LEFT JOIN chat_messages m ON m.session_id = s.id GROUP BY s.id ORDER BY s.created_at DESC',
+  );
 }
