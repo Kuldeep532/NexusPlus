@@ -19,7 +19,7 @@ export async function isTvAppInstalled(packageHints: string[]): Promise<string |
   return null;
 }
 
-export async function launchTvApp(packageHints: string[]): Promise<{ launched: boolean; installedPackage?: string }> {
+export async function launchTvApp(packageHints: string[], requireRemoteTarget = true): Promise<{ launched: boolean; installedPackage?: string; localOnly?: boolean }> {
   const installedPackage = await isTvAppInstalled(packageHints);
   if (!installedPackage) throw new Error('APP_NOT_INSTALLED');
   if (!native?.launchLocalApp) throw new Error('APP_LAUNCH_UNAVAILABLE');
