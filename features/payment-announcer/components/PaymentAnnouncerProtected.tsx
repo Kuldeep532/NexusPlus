@@ -15,7 +15,7 @@ export function PaymentAnnouncerProtected({ children }: { children: React.ReactN
     const ok = await requirePaymentAnnouncerUiAuthentication();
     setAuthorized(ok);
     setBusy(false);
-    if (ok) AccessibilityInfo.announceForAccessibility?.('Payment Announcer protected area unlocked');
+    if (ok) announceClean?.('Payment Announcer protected area unlocked');
   };
 
   useEffect(() => {
