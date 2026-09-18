@@ -27,6 +27,7 @@ export type RemoteConnection = {
   lastSeenAt?: number;
   online?: boolean;
   pairingState?: 'unpaired' | 'paired';
+  pairingSecret?: string;
 };
 
 const STORAGE_KEY = 'nexus-plus.remote-control.connections.v1';
@@ -62,9 +63,9 @@ export async function removeRemoteConnection(id: string): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
 }
 
-export function createRemoteConnection(input: Omit<RemoteConnection, 'id' | 'paired' | 'pairingState'> & { paired?: boolean; pairingState?: 'unpaired' | 'paired' }): RemoteConnection {
+export function createRemoteConnection(input: Omit<RemoteConnection, 'id' | 'paired' | 'pairingState' | 'pairingSecret'> & { paired?: boolean; pairingState?: 'unpaired' | 'paired'; pairingSecret?: string }): RemoteConnection {
   const paired = input.paired ?? true;
-  return { ...input, id: createId(input.type), paired, pairingState: input.pairingState ?? (paired ? 'paired' : 'unpaired') };
+  return { ...input, id: createId(input.type), paired, pairingState: input.pairingState ?? (paired ? 'paired' : 'unpaired'), pairingSecret: input.pairingSecret };
 }
 
 export function getDefaultCapabilities(type: RemoteDeviceType, transport: RemoteTransport): RemoteCapabilities {
@@ -87,4 +88,16 @@ export function getDefaultCapabilities(type: RemoteDeviceType, transport: Remote
     ir: transport === 'ir',
     media: true,
   };
+}
+
+
+export async function getRemoteConnection(id: string): Promise<RemoteConnection | undefined> {
+  return (await getRemoteConnections()).find((item) => item.id === id);
+}
+
+export async function setRemotePairingSecret(id: string, pairingSecret: string): Promise<void> {
+  const current = await getRemoteConnections();
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(current.map((item) =>
+    item.id === id ? { ...item, pairingSecret, pairingState: 'paired' as const, paired: true } : item
+  )));
 }
