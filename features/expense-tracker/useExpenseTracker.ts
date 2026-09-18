@@ -66,7 +66,7 @@ export function useExpenseTracker(userId: string | null) {
     await enableExpenseScreenProtection();
     setIsUnlocked(true);
     scheduleLock();
-    AccessibilityInfo.announceForAccessibility?.('Expense Tracker unlocked');
+    announceClean?.('Expense Tracker unlocked');
     return true;
   }, [biometricAvailable, scheduleLock]);
 
