@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { CATEGORY_ICONS, CATEGORY_LABELS, fetchDiscoverItems, type DiscoverCategory, type DiscoverItem } from '@/features/discover/discoverFeeds';
 
-const CATEGORIES: DiscoverCategory[] = ['top', 'world', 'technology', 'science'];
+const CATEGORIES: DiscoverCategory[] = ['top', 'world', 'technology', 'science', 'business', 'health', 'entertainment'];
 
 export default function DiscoverScreen() {
   const colors = useColors();
@@ -26,7 +26,7 @@ export default function DiscoverScreen() {
       setItems(next);
       if (next.length === 0) setError('No feed items are available right now. Check your connection and refresh.');
     } catch {
-      setError('Discover could not load the feeds right now.');
+      setError('Discover could not load the RSS feeds right now.');
       setItems([]);
     } finally {
       setLoading(false);
@@ -51,7 +51,7 @@ export default function DiscoverScreen() {
         <View style={styles.header}>
           <View style={styles.headingCopy}>
             <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Nexus Discover</Text>
-            <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Live RSS headlines across world news, technology and science. Full articles open on the publisher site.</Text>
+            <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Live RSS headlines across news, world, technology, science, business, health and entertainment. Full articles stay on the publisher site.</Text>
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel="Refresh Discover feeds" onPress={() => void load(true)} style={[styles.refresh, { backgroundColor: colors.secondary }]}>
             <Feather name="refresh-cw" size={18} color={colors.primary} />
