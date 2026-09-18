@@ -6,7 +6,7 @@ import { createRemoteConnection, getDefaultCapabilities, saveRemoteConnection } 
 
 export default function ConnectTvScreen(){
  const colors=useColors(); const router=useRouter(); const [name,setName]=useState(''); const [code,setCode]=useState('');
- const pair=async()=>{ if(!name.trim()||code.length!==6){Alert.alert('TV pairing','Enter TV name and the 6-digit code shown by the TV.');return;} await saveRemoteConnection(createRemoteConnection({name:name.trim(),type:'tv',transport:'wifi',capabilities:getDefaultCapabilities('tv','wifi'),online:true})); router.replace('/remote-control/tv'); };
+ const pair=async()=>{ if(!name.trim()||code.length!==6){Alert.alert('TV pairing','Enter TV name and the 6-digit code shown by the TV.');return;} await saveRemoteConnection(createRemoteConnection({name:name.trim(),type:'tv',transport:'wifi',capabilities:getDefaultCapabilities('tv','wifi'),online:true,pairingSecret:code,pairingState:'paired',paired:true})); router.replace('/remote-control/tv'); };
  return <View style={[styles.root,{backgroundColor:colors.background}]}>
    <Stack.Screen options={{title:'Connect to TV'}}/>
    <Text style={[styles.title,{color:colors.foreground}]}>Connect to TV</Text>
