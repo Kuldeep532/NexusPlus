@@ -1,7 +1,8 @@
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Battery from 'expo-battery';
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { , Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { announceClean } from '@/features/accessibility/spokenAnnouncement';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { loadLanguagePreferences, type LanguagePreferences } from '@/features/language-preferences/languagePreferences';
@@ -28,7 +29,7 @@ export default function BatteryAnnouncerScreen() {
     try {
       await saveBatteryAnnouncementSettings(next);
     } catch {
-      AccessibilityInfo.announceForAccessibility('Battery setting could not be saved.');
+      announceClean('Battery setting could not be saved.');
     }
   };
 
@@ -70,7 +71,7 @@ export default function BatteryAnnouncerScreen() {
           current,
         );
         await speakFeatureText(phrase, prefs.featureTtsLanguage);
-        AccessibilityInfo.announceForAccessibility(phrase);
+        announceClean(phrase);
       } catch {
         // Battery announcements are optional and must not interrupt the listener.
       }
@@ -88,9 +89,9 @@ export default function BatteryAnnouncerScreen() {
       const prefs = await loadLanguagePreferences();
       setLanguage(prefs.featureTtsLanguage);
       await readCurrentBattery(prefs.featureTtsLanguage, speakFeatureText, settingsRef.current);
-      AccessibilityInfo.announceForAccessibility('Current battery status announced.');
+      announceClean('Current battery status announced.');
     } catch {
-      AccessibilityInfo.announceForAccessibility('Unable to announce current battery status.');
+      announceClean('Unable to announce current battery status.');
     }
   };
 
