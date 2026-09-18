@@ -47,7 +47,7 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 28 }]}>
         <View style={styles.topBar}>
           <Pressable accessibilityRole="button" accessibilityLabel="Back to Home" onPress={() => router.replace('/(tabs)')} style={styles.iconButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></Pressable>
-          <Text accessibilityRole="header" style={[styles.headerTitle, { color: colors.foreground }]}>Google Account</Text>
+          <Text accessibilityRole="header" style={[styles.headerTitle, { color: colors.foreground }]}>Nexus Plus Profile</Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Open Settings" onPress={() => router.push('/settings')} style={styles.iconButton}><Feather name="settings" size={20} color={colors.foreground} /></Pressable>
         </View>
 
