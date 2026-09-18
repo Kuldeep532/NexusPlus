@@ -11,6 +11,7 @@ import { downloadAssistantModel, downloadAssistantVoice } from '@/features/nexus
 import { getLocalInferenceEngine } from '@/features/nexus-assistant/localInference';
 import { streamAssistantReply } from '@/features/nexus-assistant/stage2Agent';
 import { planCapability, formatCapabilityConfirmation, type CapabilityProposal } from '@/features/nexus-assistant/agentPlanner';
+import { getAssistantToolCatalog, openAssistantTool, type AssistantToolDefinition } from '@/features/nexus-assistant/assistantToolAdapter';
 import { answerNexusIdentityQuestion } from '@/features/nexus-assistant/nexusKnowledge';
 import { parseAssistantPdfCommand, type AssistantPdfAttachment } from '@/features/nexus-assistant/pdfAssistantCommands';
 import { runStage3Agent } from '@/features/nexus-assistant/stage3Agent';
@@ -54,6 +55,10 @@ export default function NexusAssistantScreen() {
   const [pdfAttachment, setPdfAttachment] = useState<AssistantPdfAttachment | null>(null);
   const [pdfMode, setPdfMode] = useState<PdfCommandMode>(null);
   const [pdfPassword, setPdfPassword] = useState('');
+  const [showTools, setShowTools] = useState(false);
+  const [generatedResult, setGeneratedResult] = useState<{ title: string; message: string } | null>(null);
+  const toolCatalog = useMemo(() => getAssistantToolCatalog(), []);
+  const pinnedTools = useMemo(() => toolCatalog.filter((tool) => ['file','qr-code','pdf-lock','pdf-unlock','pdf-compress'].includes(tool.id) || /PDF|File|QR/i.test(tool.title)).slice(0, 10), [toolCatalog]);
   const hasText = input.trim().length > 0;
 
   useEffect(() => {
@@ -171,6 +176,7 @@ export default function NexusAssistantScreen() {
           onStatus: setStatus,
         });
         if (result) {
+          setGeneratedResult(result.success ? { title: 'Nexus Assistant result', message: result.message } : null);
           await refreshMessages();
           setPdfPassword('');
           setPdfMode(null);
@@ -182,6 +188,12 @@ export default function NexusAssistantScreen() {
 
       const proposal = planCapability(text);
       if (proposal) {
+        if (proposal.capability.id === 'qr-generate' || proposal.capability.id === 'tool-open') {
+          const result = await runStage3Agent({ sessionId: SESSION_ID, userText: text, confirmed: true, proposal, onStatus: setStatus });
+          if (result?.success) setGeneratedResult({ title: 'Tool action ready', message: result.message });
+          await refreshMessages();
+          return;
+        }
         setPendingProposal(proposal);
         const confirmation = formatCapabilityConfirmation(proposal);
         await addMessage(SESSION_ID, 'assistant', confirmation);
@@ -412,10 +424,42 @@ export default function NexusAssistantScreen() {
       </View>
     </View> : null}
 
+    {showTools ? (
+      <View accessibilityLabel="Nexus Assistant tool attachments" style={[styles.toolsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.toolsHeader}>
+          <Text style={[styles.statusTitle, { color: colors.foreground }]}>Attach a tool</Text>
+          <Pressable accessibilityRole="button" onPress={() => setShowTools(false)} style={[styles.iconButton, { borderColor: colors.border, backgroundColor: colors.background }]}><Feather name="x" size={18} color={colors.foreground} /></Pressable>
+        </View>
+        <View style={styles.toolGrid}>
+          {pinnedTools.map((tool) => (
+            <Pressable key={tool.id} accessibilityRole="button" accessibilityLabel={tool.title} onPress={() => {
+              if (tool.id === 'file') { void choosePdf(); return; }
+              openAssistantTool(tool);
+              setStatus(tool.title + ' opened through the existing Nexus Plus tool.');
+            }} style={[styles.toolChip, { borderColor: colors.border, backgroundColor: colors.background }]}>
+              <Feather name={tool.id === 'file' ? 'file' : tool.id === 'qr-code' ? 'grid' : 'tool'} size={16} color={colors.primary} />
+              <Text style={[styles.toolChipText, { color: colors.foreground }]}>{tool.title}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    ) : null}
+
+    {generatedResult ? (
+      <View accessibilityLiveRegion="polite" style={[styles.resultCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text accessibilityRole="header" style={[styles.statusTitle, { color: colors.foreground }]}>{generatedResult.title}</Text>
+        <Text selectable style={[styles.body, { color: colors.mutedForeground }]}>{generatedResult.message}</Text>
+        <View style={styles.actionRow}>
+          <Pressable accessibilityRole="button" onPress={() => setGeneratedResult(null)} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>Close</Text></Pressable>
+          <Pressable accessibilityRole="button" onPress={() => void send('regenerate')} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Regenerate</Text></Pressable>
+        </View>
+      </View>
+    ) : null}
+
     <View style={[styles.inputCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <TextInput accessibilityLabel="Assistant message" value={input} onChangeText={setInput} multiline placeholder="Ask Nexus Assistant…" placeholderTextColor={colors.mutedForeground} style={[styles.input, { color: colors.foreground }]} />
       <View style={styles.actionRow}>
-        <Pressable accessibilityRole="button" onPress={() => void choosePdf()} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>{pdfAttachment ? 'Replace PDF' : 'Attach PDF'}</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Attach a Nexus tool" onPress={() => setShowTools((v) => !v)} style={[styles.secondaryButton, { borderColor: showTools ? colors.primary : colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>Attach</Text></Pressable>
         <Pressable accessibilityRole="button" onPress={toggleVoiceInput} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>{voiceState === 'listening' ? 'Stop voice' : 'Voice'}</Text></Pressable>
         <Pressable accessibilityRole="button" onPress={() => void toggleLiveMode()} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>{liveMode ? 'End Live' : 'Live Mode'}</Text></Pressable>
         <Pressable accessibilityRole="button" disabled={!hasText || busy} onPress={() => void send()} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: !hasText || busy ? 0.5 : 1 }]}><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{busy ? 'Working…' : 'Send'}</Text></Pressable>
@@ -440,6 +484,13 @@ const styles = StyleSheet.create({
   pdfCard: { borderWidth: 1, borderRadius: 16, padding: 12, marginBottom: 12, gap: 8 },
   confirm: { borderWidth: 1, borderRadius: 18, padding: 14, marginTop: 12, gap: 7 },
   inputCard: { borderWidth: 1, borderRadius: 18, padding: 12, marginTop: 12 },
+  toolsCard: { borderWidth: 1, borderRadius: 18, padding: 12, marginTop: 12 },
+  toolsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  iconButton: { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  toolGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  toolChip: { minHeight: 48, borderRadius: 13, borderWidth: 1, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 7, width: '48%' },
+  toolChipText: { flex: 1, fontSize: 10.5, fontFamily: 'Inter_700Bold' },
+  resultCard: { borderWidth: 1, borderRadius: 18, padding: 14, marginTop: 12 },
   input: { minHeight: 48, maxHeight: 150, fontSize: 12, lineHeight: 18, borderWidth: 1, borderRadius: 13, paddingHorizontal: 12, marginTop: 8 },
   actionRow: { flexDirection: 'row', gap: 8, marginTop: 9 },
   secondaryButton: { minHeight: 44, borderWidth: 1, borderRadius: 13, paddingHorizontal: 11, alignItems: 'center', justifyContent: 'center', flex: 1 },
