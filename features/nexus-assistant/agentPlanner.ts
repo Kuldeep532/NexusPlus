@@ -4,6 +4,7 @@ import {
   type AssistantCapability,
 } from './agentCapabilities';
 import { parseAssistantPdfCommand } from './pdfAssistantCommands';
+import { searchAssistantTools } from './assistantToolAdapter';
 
 export type CapabilityProposal = {
   capability: AssistantCapability;
@@ -50,6 +51,18 @@ export function planCapability(request: string): CapabilityProposal | null {
 
   const text = request.trim();
   if (!text) return null;
+
+  const qrRequest = /(?:qr|qrcode|qr code|क्यूआर|क्यूआर कोड|upi qr|wifi qr|whatsapp qr)/i.test(text);
+  if (qrRequest) {
+    const capability = getAssistantCapability('qr-generate');
+    if (capability) return { capability, args: { query: text }, requiresConfirmation: false, reason: 'The request appears to ask the existing QR generator to create a QR code.' };
+  }
+
+  const tool = searchAssistantTools(text).find((item) => item.id !== 'qr-code' && item.kind === 'route');
+  if (tool) {
+    const capability = getAssistantCapability('tool-open');
+    if (capability) return { capability, args: { toolId: tool.id, route: tool.route ?? '' }, requiresConfirmation: false, reason: 'The request matches a registered Nexus Plus tool.' };
+  }
   for (const candidate of COMMAND_PATTERNS) {
     const match = candidate.pattern.exec(text);
     if (!match) continue;
