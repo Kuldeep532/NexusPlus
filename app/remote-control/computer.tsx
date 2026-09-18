@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { activePcRemoteController, connectComputer, leftClick, pressComputerKey, rightClick, scrollComputer } from '@/features/remote-control/remoteControlComputer';
 import { getRemoteConnections, type RemoteConnection } from '@/features/remote-control/remoteControlStore';
 import { getComingSoonLabel } from '@/features/remote-control/remoteReceiverStatus';
+import { remoteHaptic } from '@/features/remote-control/remoteFeedback';
 
 const keys=['CTRL','ALT','SHIFT','TAB','ENTER','ESC','BACKSPACE','SPACE','ARROW_UP','ARROW_DOWN','ARROW_LEFT','ARROW_RIGHT'];
 
@@ -12,7 +13,7 @@ export default function ComputerRemoteScreen(){
  const colors=useColors(); const router=useRouter(); const [connection,setConnection]=useState<RemoteConnection>(); const [status,setStatus]=useState('Ready');
  useEffect(()=>{ void getRemoteConnections().then((items)=>setConnection(items.find((item)=>item.type==='computer'&&item.paired))); activePcRemoteController.onConnectionChange((connected)=>setStatus(connected?'Connected':'Disconnected')); return ()=>activePcRemoteController.disconnect(); },[]);
  const ensure=()=>{ if(!connection){Alert.alert('Computer Remote','Pair a computer first.');return false;} try{connectComputer(connection);return true;}catch(e){Alert.alert('Computer Remote',String(e instanceof Error?e.message:e));return false;} };
- const tap=(fn:()=>void)=>{try{fn();setStatus('Command sent')}catch{Alert.alert('Computer Remote','The desktop receiver is not connected. '+getComingSoonLabel('Nexus PC receiver'));}};
+ const tap=(fn:()=>void)=>{void remoteHaptic('press');try{fn();void remoteHaptic('success');setStatus('Command sent')}catch{void remoteHaptic('error');Alert.alert('Computer Remote','The desktop receiver is not connected. '+getComingSoonLabel('Nexus PC receiver'));}};
  const panResponder=useMemo(()=>PanResponder.create({onMoveShouldSetPanResponder:(_,g)=>Math.abs(g.dx)>20||Math.abs(g.dy)>20,onPanResponderRelease:(_,g)=>{if(!ensure())return;scrollComputer(g.dx,g.dy);}}),[connection]);
  return <View style={[styles.root,{backgroundColor:colors.background}]}>
   <Stack.Screen options={{title:'Computer Remote'}}/>
