@@ -1,4 +1,6 @@
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+
+function MaterialCommunityIconShim({ color, size }: { color: string; size: number }) { return <MaterialCommunityIcons name="sparkles" color={color} size={size} />; }
 import { Tabs } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 
@@ -16,7 +18,8 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarAccessibilityLabel: 'Home tab', tabBarIcon: ({ color, size }) => <Feather name="home" color={color} size={size} /> }} />
-      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarAccessibilityLabel: 'Settings tab', tabBarIcon: ({ color, size }) => <Feather name="settings" color={color} size={size} /> }} />
+      <Tabs.Screen name="discover" options={{ title: 'Discover', tabBarAccessibilityLabel: 'Nexus Discover tab', tabBarIcon: ({ color, size }) => <MaterialCommunityIconShim color={color} size={size} /> }} />
+      <Tabs.Screen name="more" options={{ title: 'More', tabBarAccessibilityLabel: 'More tab', tabBarIcon: ({ color, size }) => <Feather name="more-horizontal" color={color} size={size} /> }} />
     </Tabs>
   );
 }
