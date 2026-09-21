@@ -75,7 +75,7 @@ export async function discoverCctvCameras(request: CctvDiscoveryRequest): Promis
       passwordRef: id,
       createdAt: now,
       updatedAt: now,
-      capabilities: { liveView: false, audio: false, recordings: false, playback: false, eraseData: false, passwordChange: false, discovery: false, multiCamera: false, switchCamera: false, flip: false, panTiltZoom: false, nightVision: false, talk: false },
+      capabilities: { liveView: false, recordings: false, playback: false, panTiltZoom: false },
       authenticationProfile: { id: 'username_password', fields: [{ id: 'username', label: 'Username', required: true }, { id: 'password', label: 'Password', required: true, secret: true }], source: 'protocol', confidence: 'detected' },
       securityProfile: { secureTransport: true, authenticated: false, protocolFamily: 'onvif', securityLevel: 'detected', reason: 'LAN discovery found an HTTPS ONVIF endpoint; authentication must be verified separately.' },
       connectionState: 'idle',
