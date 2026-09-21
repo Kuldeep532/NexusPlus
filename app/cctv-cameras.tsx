@@ -30,7 +30,7 @@ export default function CctvCamerasScreen() {
         <View style={styles.headerRow}>
           <View style={styles.copy}>
             <Text style={[styles.title, { color: colors.foreground }]}>CCTV Cameras</Text>
-            <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Cameras are opened only after authorized QR-based setup. Network address and credentials stay hidden.</Text>
+            <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Cameras are opened only after authenticated ONVIF verification. Discovery is local-network only; credentials and network details stay protected.</Text>
           </View>
           {cameras.length > 0 && <AddButton colors={colors} onPress={() => router.push('/cctv-add')} />}
         </View>
@@ -39,10 +39,10 @@ export default function CctvCamerasScreen() {
           <View style={[styles.empty, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="shield" size={42} color={colors.primary} />
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No authorized CCTV camera</Text>
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Add a camera using its authorized Nexus Plus CCTV QR code. Network discovery remains internal and is never shown as a manual scan option.</Text>
+            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Discover a compatible ONVIF camera on the local network or enter its verified secure endpoint. The camera is saved only after native authentication and device-identity verification.</Text>
             <Pressable accessibilityRole="button" accessibilityLabel="Add CCTV camera using secure setup" onPress={() => router.push('/cctv-add')} style={[styles.primaryButton, { backgroundColor: colors.primary }]}>
               <Feather name="plus" size={18} color={colors.primaryForeground} />
-              <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Securely Add CCTV</Text>
+              <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Discover / Add CCTV</Text>
             </Pressable>
           </View>
         ) : (
