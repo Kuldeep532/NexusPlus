@@ -57,6 +57,30 @@ class AudioEditorNativeModule : Module() {
       } catch (error: Exception) { promise.reject("AUDIO_MIX_PROJECT_FAILED", error.message ?: "Unable to mix audio project", error) }
     }
 
+    AsyncFunction("applyEffect") { input: Map<String, Any?>, promise: Promise ->
+      try {
+        val inputPath = input["inputPath"] as? String ?: error("Input audio path is required.")
+        val outputPath = input["outputPath"] as? String ?: error("Output audio path is required.")
+        val effect = input["effect"] as? String ?: error("Audio effect is required.")
+        val startMs = (input["startMs"] as? Number)?.toDouble() ?: 0.0
+        val endMs = (input["endMs"] as? Number)?.toDouble() ?: Double.MAX_VALUE
+        val amount = (input["amount"] as? Number)?.toDouble() ?: 0.95
+        promise.resolve(
+          AudioEffectProcessor.apply(
+            appContext.reactContext,
+            inputPath,
+            outputPath,
+            effect,
+            startMs,
+            endMs,
+            amount,
+          )
+        )
+      } catch (error: Exception) {
+        promise.reject("AUDIO_EFFECT_FAILED", error.message ?: "Unable to apply audio effect", error)
+      }
+    }
+
     AsyncFunction("synthesizePiper") { input: Map<String, Any?>, promise: Promise ->
       try {
         val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
