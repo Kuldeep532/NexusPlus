@@ -81,10 +81,7 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
                 "search_recordings" -> { cap(s, "recordings"); cap(s, "playback"); promise.resolve(searchRecordings(s, payload)) }
                 "recording_start" -> { cap(s, "recordings"); val ref = startRecording(s); s.recordingRef = ref; promise.resolve(Arguments.createMap().apply { putString("recordingToken", ref.recordingToken); if (ref.jobToken != null) putString("jobToken", ref.jobToken) }) }
                 "recording_stop" -> { cap(s, "recordings"); stopRecording(s); promise.resolve(null) }
-                "erase_data" -> { cap(s, "eraseData"); eraseRecordings(s, payload); promise.resolve(null) }
-                "change_password" -> { cap(s, "passwordChange"); changePassword(s, payload); promise.resolve(null) }
                 "ptz" -> { cap(s, "panTiltZoom"); ptz(s, payload); promise.resolve(null) }
-                "sound", "switch_camera", "flip", "night_vision", "talk" -> throw UnsupportedOperationException("This control is not proven by the authenticated ONVIF capability probe.")
                 else -> throw IllegalArgumentException("Unknown CCTV control.")
             }
         } catch (e: Throwable) {
@@ -178,14 +175,6 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
         val jobToken = ref.jobToken ?: throw IllegalStateException("No recording job is active.")
         soap(ep, ACTION_SET_RECORDING_JOB, "<SetRecordingJob xmlns=\"http://www.onvif.org/ver10/recording/wsdl\"><JobConfiguration><JobToken>${xml(jobToken)}</JobToken><Mode>Idle</Mode></JobConfiguration></SetRecordingJob>", s.username, s.password)
         s.recordingRef = null
-    }
-
-    private fun eraseRecordings(s: Session, payload: ReadableMap?) {
-        val ep = s.recordingXaddr ?: throw IllegalStateException("Camera does not expose Recording Control service.")
-        val token = payload?.getString("recordingToken") ?: throw IllegalArgumentException("A selected recording token is required for erase.")
-        if (!getRecordings(s).contains(token)) throw IllegalArgumentException("Recording authorization token is invalid.")
-        soap(ep, ACTION_DELETE_RECORDING, "<DeleteRecording xmlns=\"http://www.onvif.org/ver10/recording/wsdl\"><RecordingToken>${xml(token)}</RecordingToken></DeleteRecording>", s.username, s.password)
-        if (s.recordingRef?.recordingToken == token) s.recordingRef = null
     }
 
     private fun searchRecordings(s: Session, payload: ReadableMap?): com.facebook.react.bridge.WritableMap {
@@ -292,6 +281,6 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
         private const val ACTION_DELETE_RECORDING = "http://www.onvif.org/ver10/recording/wsdl/DeleteRecording"
         private const val ACTION_FIND_RECORDINGS = "http://www.onvif.org/ver10/search/wsdl/FindRecordings"
         private const val ACTION_GET_RECORDING_SEARCH_RESULTS = "http://www.onvif.org/ver10/search/wsdl/GetRecordingSearchResults"
-        private val CAPABILITY_KEYS = listOf("liveView", "audio", "recordings", "playback", "eraseData", "passwordChange", "discovery", "multiCamera", "switchCamera", "flip", "panTiltZoom", "nightVision", "talk")
+        private val CAPABILITY_KEYS = listOf("liveView", "recordings", "playback", "panTiltZoom")
     }
 }
