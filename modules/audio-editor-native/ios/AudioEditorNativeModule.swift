@@ -79,6 +79,111 @@ public final class AudioEditorNativeModule: Module {
   }
 
 
+    AsyncFunction("compress") { (input: [String: Any?]) async throws -> [String: Any?] in
+      guard let inputPath = input["inputPath"] as? String, !inputPath.isEmpty else {
+        throw NSError(domain: "AudioEditorNative", code: 70, userInfo: [NSLocalizedDescriptionKey: "Input audio path is required."])
+      }
+      guard let outputPath = input["outputPath"] as? String, !outputPath.isEmpty else {
+        throw NSError(domain: "AudioEditorNative", code: 71, userInfo: [NSLocalizedDescriptionKey: "Output audio path is required."])
+      }
+      guard let bitrateKbps = (input["bitrateKbps"] as? NSNumber)?.intValue, (16...320).contains(bitrateKbps) else {
+        throw NSError(domain: "AudioEditorNative", code: 72, userInfo: [NSLocalizedDescriptionKey: "Target bitrate must be between 16 and 320 kbps."])
+      }
+      guard let sampleRateHz = (input["sampleRateHz"] as? NSNumber)?.intValue,
+            [8000, 12000, 16000, 22050, 24000, 32000, 44100, 48000].contains(sampleRateHz) else {
+        throw NSError(domain: "AudioEditorNative", code: 73, userInfo: [NSLocalizedDescriptionKey: "Target sample rate is not supported."])
+      }
+
+      let inputURL = URL(fileURLWithPath: inputPath)
+      let outputURL = URL(fileURLWithPath: outputPath)
+      let asset = AVURLAsset(url: inputURL)
+      let tracks = try await asset.load(.tracks)
+      guard let audioTrack = tracks.first(where: { $0.mediaType == .audio }) else {
+        throw NSError(domain: "AudioEditorNative", code: 74, userInfo: [NSLocalizedDescriptionKey: "No supported audio track was found."])
+      }
+      let descriptions = try await audioTrack.load(.formatDescriptions)
+      guard let description = descriptions.first,
+            let stream = CMAudioFormatDescriptionGetStreamBasicDescription(description) else {
+        throw NSError(domain: "AudioEditorNative", code: 75, userInfo: [NSLocalizedDescriptionKey: "Unable to read source audio format."])
+      }
+      let channels = max(1, Int(stream.pointee.mChannelsPerFrame))
+      guard channels <= 2 else {
+        throw NSError(domain: "AudioEditorNative", code: 76, userInfo: [NSLocalizedDescriptionKey: "The compressor supports mono and stereo audio."])
+      }
+
+      if FileManager.default.fileExists(atPath: outputURL.path) {
+        try FileManager.default.removeItem(at: outputURL)
+      }
+      try FileManager.default.createDirectory(at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+
+      guard let reader = try? AVAssetReader(asset: asset) else {
+        throw NSError(domain: "AudioEditorNative", code: 77, userInfo: [NSLocalizedDescriptionKey: "Audio reader is unavailable on this device."])
+      }
+      let readerOutput = AVAssetReaderTrackOutput(track: audioTrack, outputSettings: [
+        AVFormatIDKey: kAudioFormatLinearPCM,
+        AVSampleRateKey: sampleRateHz,
+        AVNumberOfChannelsKey: channels,
+        AVLinearPCMBitDepthKey: 16,
+        AVLinearPCMIsFloatKey: false,
+        AVLinearPCMIsBigEndianKey: false,
+        AVLinearPCMIsNonInterleaved: false,
+      ])
+      reader.add(readerOutput)
+
+      guard let writer = try? AVAssetWriter(outputURL: outputURL, fileType: .m4a) else {
+        throw NSError(domain: "AudioEditorNative", code: 78, userInfo: [NSLocalizedDescriptionKey: "Audio writer is unavailable on this device."])
+      }
+      let writerInput = AVAssetWriterInput(mediaType: .audio, outputSettings: [
+        AVFormatIDKey: kAudioFormatMPEG4AAC,
+        AVSampleRateKey: sampleRateHz,
+        AVNumberOfChannelsKey: channels,
+        AVEncoderBitRateKey: bitrateKbps * 1000,
+      ])
+      writerInput.expectsMediaDataInRealTime = false
+      writer.add(writerInput)
+
+      reader.startReading()
+      writer.startWriting()
+      writer.startSession(atSourceTime: .zero)
+
+      while writerInput.isReadyForMoreMediaData {
+        guard let sample = readerOutput.copyNextSampleBuffer() else {
+          writerInput.markAsFinished()
+          break
+        }
+        if !writerInput.append(sample) {
+          sample.withUnsafeMutablePointerToMemory { pointer, size, _ in
+            _ = pointer
+            _ = size
+          }
+          throw NSError(domain: "AudioEditorNative", code: 79, userInfo: [NSLocalizedDescriptionKey: "Audio compression failed while encoding."])
+        }
+      }
+
+      await withCheckedContinuation { continuation in
+        writer.finishWriting { continuation.resume() }
+      }
+
+      guard writer.status == .completed else {
+        throw writer.error ?? NSError(domain: "AudioEditorNative", code: 80, userInfo: [NSLocalizedDescriptionKey: "Audio compression export failed."])
+      }
+
+      let inputBytes = (try? FileManager.default.attributesOfItem(atPath: inputURL.path)[.size] as? NSNumber)?.int64Value ?? -1
+      let outputBytes = (try? FileManager.default.attributesOfItem(atPath: outputURL.path)[.size] as? NSNumber)?.int64Value ?? -1
+      let duration = try await asset.load(.duration)
+
+      return [
+        "outputPath": outputURL.path,
+        "durationMs": duration.seconds * 1000,
+        "sampleRate": sampleRateHz,
+        "channels": channels,
+        "mimeType": "audio/mp4",
+        "bitrateKbps": bitrateKbps,
+        "inputSizeBytes": inputBytes,
+        "outputSizeBytes": outputBytes,
+      ]
+    }
+
     AsyncFunction("applyEffect") { (input: [String: Any?]) async throws -> [String: Any?] in
       guard let inputPath = input["inputPath"] as? String, !inputPath.isEmpty else { throw NSError(domain: "AudioEditorNative", code: 50, userInfo: [NSLocalizedDescriptionKey: "Input audio path is required."]) }
       guard let outputPath = input["outputPath"] as? String, !outputPath.isEmpty else { throw NSError(domain: "AudioEditorNative", code: 51, userInfo: [NSLocalizedDescriptionKey: "Output audio path is required."]) }
