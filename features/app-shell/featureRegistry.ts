@@ -14,6 +14,8 @@ const registry: HomeFeatureDefinition[] = [
   { id: 'nexus-focus-assist', title: 'Nexus Focus Assist', description: 'Use accessible voice commands and on-screen context to control supported actions.', route: '/nexus-vision-assist', icon: 'eye', category: 'productivity', featured: true, order: 83 },
   { id: 'remote-control', title: 'Nexus Remote', description: 'Control authorized TVs and computers over supported Wi-Fi, Bluetooth and IR transports.', route: '/remote-control', icon: 'radio', category: 'utility', featured: true, order: 84 },
   { id: 'screen-mirroring', title: 'Screen Mirroring', description: 'Mirror the complete screen, selected apps, photos or videos to an authorized TV or computer.', route: '/screen-mirroring', icon: 'cast', category: 'utility', featured: true, order: 85 },
+  { id: 'document-studio', title: 'Document Studio', description: 'Create, import, scan, read, summarize, translate and manage documents through dedicated screens.', route: '/document-studio', icon: 'file-text', category: 'productivity', featured: true, order: 86 },
+  { id: 'notepad', title: 'Notepad', description: 'Create, organize, search and protect local notes with modular screens.', route: '/notepad', icon: 'file-text', category: 'productivity', featured: true, order: 87 },
   { id: 'link-shortcuts', title: 'Link Shortcuts', description: 'Save frequently used web links for one-tap access.', route: '/link-shortcuts', icon: 'link', category: 'utility' },
   { id: 'talking-calculator', title: 'AI Calculator', description: 'AI-assisted math, finance, investment, salary, currency and market analysis.', route: '/calculator', icon: 'cpu', category: 'utility' },
   { id: 'qr-code-tools', title: 'QR Code Tools', description: 'Generate customizable Text, URL, WhatsApp, Wi‑Fi and UPI QR codes or scan QR codes.', route: '/utilities/qr-tools', icon: 'qrcode', category: 'utility' },
@@ -26,7 +28,6 @@ const registry: HomeFeatureDefinition[] = [
   { id: 'pdf-tools', title: 'PDF Tools', description: 'Convert, protect, lock, unlock and manage PDFs.', route: '/categories/pdf-tools', icon: 'file-text', category: 'pdf' },
   { id: 'online-radio', title: 'Online Radio', description: 'Listen to online radio.', route: '/online-radio', icon: 'radio', category: 'media' },
   { id: 'nexus-ai-workflow', title: 'Nexus AI Workflow', description: 'Draft bilingual messages and plan email, meeting and calendar workflows.', route: '/productivity-ai', icon: 'zap', category: 'productivity' },
-  { id: 'document-studio', title: 'Document Studio', description: 'Create, import, scan, read, summarize, translate and manage documents through dedicated screens.', route: '/document-studio', icon: 'file-text', category: 'productivity', featured: true, order: 86 },
 ];
 export function registerFeature(feature: HomeFeatureDefinition): void { const existingIndex = registry.findIndex((item) => item.id === feature.id); if (existingIndex >= 0) registry[existingIndex] = feature; else registry.push(feature); }
 export function getHomeFeatures(): HomeFeatureDefinition[] { return [...registry].sort((a, b) => (a.order ?? 1000) - (b.order ?? 1000)); }
