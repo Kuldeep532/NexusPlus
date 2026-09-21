@@ -1,5 +1,5 @@
 import { assertCapability, CctvBackendError, getCctvAdapter, type CctvCameraRecord } from './cctvBackend';
-import { getActiveCctvSession, openCctvSession } from './cctvSession';
+import { getActiveCctvSession, startCctvLiveView, stopCctvLiveView } from './cctvSession';
 
 export type CctvLiveControl = 'start' | 'stop' | 'playback' | 'ptz';
 
@@ -10,23 +10,16 @@ export async function executeCctvLiveControl(
 ): Promise<void> {
   if (control === 'start') {
     assertCapability(camera, 'liveView');
-    const session = await openCctvSession(camera);
-    await getCctvAdapter(camera.protocol).startLiveView(session.context);
+    await startCctvLiveView(camera);
     return;
   }
 
   const active = getActiveCctvSession(camera.id);
-  if (!active) {
-    throw new CctvBackendError({
-      code: 'NOT_FOUND',
-      message: 'Start the live session before using camera controls.',
-      retryable: true,
-    });
-  }
+  if (!active) throw new CctvBackendError({ code: 'NOT_FOUND', message: 'Start the live session before using camera controls.', retryable: true });
 
   const adapter = getCctvAdapter(camera.protocol);
   if (control === 'stop') {
-    await adapter.stopLiveView(active.context);
+    await stopCctvLiveView(camera.id);
     return;
   }
   if (control === 'playback') {
