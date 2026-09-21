@@ -45,6 +45,8 @@ jobs:
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_GOOGLE_DRIVE_ENABLED: ${{ secrets.GOOGLE_DRIVE_ENABLED }}
+      EXPO_PUBLIC_GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
       EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
     steps:
       - name: Checkout
