@@ -3,7 +3,7 @@ import type { HomeFeatureDefinition } from '@/features/app-shell/featureRegistry
 export const CCTV_FEATURE: HomeFeatureDefinition = {
   id: 'cctv-cameras',
   title: 'CCTV Cameras',
-  description: 'Manage local CCTV cameras over the local network.',
+  description: 'Manage authorized CCTV cameras over a secure local connection.',
   route: '/cctv-cameras',
   icon: 'video',
   category: 'security',
@@ -17,6 +17,4 @@ export const CCTV_ROUTES = {
   live: '/cctv-cameras/live',
   recordings: '/cctv-cameras/recordings',
   playback: '/cctv-cameras/playback',
-  erase: '/cctv-cameras/erase',
-  security: '/cctv-cameras/security',
 } as const;
