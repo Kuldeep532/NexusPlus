@@ -17,7 +17,7 @@ export default function GeetaNexusChapters() {
 
   const openChapter = async (chapter: number) => {
     await saveReadingProgress({ textId: 'bhagavad-gita', chapter, verse: 1 });
-    router.push(`/geeta-nexus/chapters?chapter=${chapter}&verse=1` as never);
+    router.push(`/geeta-nexus/read?chapter=${chapter}&verse=1` as never);
   };
 
   return (
