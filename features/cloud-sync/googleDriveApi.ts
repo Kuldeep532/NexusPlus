@@ -6,6 +6,7 @@ const TOKEN_KEY = 'nexusplus.google-drive.oauth.v1';
 const CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_DRIVE_CLIENT_ID?.trim() ?? '';
 const ENABLED = process.env.EXPO_PUBLIC_GOOGLE_DRIVE_ENABLED === 'true' && CLIENT_ID.length > 0;
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+const OAUTH_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 
 export type GoogleDriveAuthState = { accessToken: string; refreshToken?: string; expiresAt: number; email: string; userId: string };
 
@@ -89,4 +90,41 @@ export async function downloadEncryptedAppDataFile(fileId: string): Promise<stri
   const response = await driveRequest(`/files/${encodeURIComponent(fileId)}?alt=media`);
   if (!response.ok) throw new Error(`GOOGLE_DRIVE_DOWNLOAD_${response.status}`);
   return response.text();
+}
+
+export async function exchangeGoogleDriveAuthorizationCode(input: {
+  code: string;
+  codeVerifier: string;
+  redirectUri: string;
+  email: string;
+  userId: string;
+}): Promise<GoogleDriveAuthState> {
+  if (!ENABLED) throw new Error('GOOGLE_DRIVE_NOT_CONFIGURED');
+  const response = await fetch(OAUTH_TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: CLIENT_ID,
+      code: input.code,
+      code_verifier: input.codeVerifier,
+      grant_type: 'authorization_code',
+      redirect_uri: input.redirectUri,
+    }).toString(),
+  });
+  if (!response.ok) throw new Error(`GOOGLE_DRIVE_TOKEN_${response.status}`);
+  const token = await response.json() as {
+    access_token?: string;
+    refresh_token?: string;
+    expires_in?: number;
+  };
+  if (!token.access_token) throw new Error('GOOGLE_DRIVE_ACCESS_TOKEN_MISSING');
+  const state: GoogleDriveAuthState = {
+    accessToken: token.access_token,
+    refreshToken: token.refresh_token,
+    expiresAt: Date.now() + Math.max(60, token.expires_in ?? 3600) * 1000,
+    email: input.email,
+    userId: input.userId,
+  };
+  await persistGoogleDriveAuth(state);
+  return state;
 }
