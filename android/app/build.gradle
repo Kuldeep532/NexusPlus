@@ -28,6 +28,7 @@ if (keystorePropertiesFile.exists()) {
 def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBuilds') ?: true).toBoolean()
 def enableShrinkResourcesInReleaseBuilds = (findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: true).toBoolean()
 def enablePngCrunchInReleaseBuilds = (findProperty('android.enablePngCrunchInReleaseBuilds') ?: true).toBoolean()
+def requiredReleaseCertSha256 = (findProperty('NEXUS_RELEASE_CERT_SHA256') ?: '').toString().trim().replace(':', '').toLowerCase()
 
 android {
     namespace 'com.nexuswavetech.nexusplus'
@@ -66,6 +67,9 @@ android {
             crunchPngs enablePngCrunchInReleaseBuilds
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
+            // The backend remains the authoritative trust boundary. This value is a build-time
+            // declaration used by release diagnostics and should match the Play/App signing cert.
+            buildConfigField 'String', 'EXPECTED_RELEASE_CERT_SHA256', "\"${requiredReleaseCertSha256}\""
         }
     }
 }
