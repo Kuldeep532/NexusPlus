@@ -62,6 +62,24 @@ export type AudioEffectInput = {
 
 export type AudioEffectResult = AudioMixResult;
 
+export type AudioCompressionPreset = {
+  id: string;
+  title: string;
+  bitrateKbps: number;
+  sampleRateHz: number;
+};
+
+export type AudioCompressionInput = {
+  inputPath: string;
+  outputPath: string;
+  bitrateKbps: number;
+  sampleRateHz: number;
+};
+
+export type AudioCompressionResult = AudioMixResult & {
+  bitrateKbps: number;
+};
+
 export type PiperSynthesizeInput = {
   text: string;
   modelPath: string;
@@ -83,6 +101,7 @@ type AudioEditorNativeModuleType = {
   mix(input: AudioMixInput): Promise<AudioMixResult>;
   mixProject(input: AudioMixProjectInput): Promise<AudioMixResult>;
   applyEffect(input: AudioEffectInput): Promise<AudioEffectResult>;
+  compress(input: AudioCompressionInput): Promise<AudioCompressionResult>;
   synthesizePiper(input: PiperSynthesizeInput): Promise<PiperSynthesizeResult>;
 };
 
