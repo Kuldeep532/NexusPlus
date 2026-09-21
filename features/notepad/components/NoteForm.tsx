@@ -24,11 +24,12 @@ const NOTE_TYPES: Array<{ kind: NoteKind; label: string; icon: string }> = [
   { kind:'DRAWING',label:'Drawing Note',icon:'edit-3' },
 ];
 
-export function NoteForm({ categories, initial, saving, onSave, onOpenDrawing }: {
+export function NoteForm({ categories, initial, saving, onSave, onDraftChange, onOpenDrawing }: {
   categories: NoteCategory[];
   initial?: Note;
   saving: boolean;
   onSave: (draft: NoteDraft) => void;
+  onDraftChange?: () => void;
   onOpenDrawing?: () => void;
 }) {
   const colors=useColors();
@@ -42,6 +43,7 @@ export function NoteForm({ categories, initial, saving, onSave, onOpenDrawing }:
   const recorder=useRef<Audio.Recording|null>(null);
   const [recording,setRecording]=useState(false);
 
+  const touchDraft=()=>onDraftChange?.();
   const canSave=useMemo(()=>Boolean(title.trim()&&categoryId&&!saving&&!persisting&&(content.trim()||attachments.length)),[title,categoryId,saving,persisting,content,attachments.length]);
 
   const pickImage=async()=>{
@@ -50,8 +52,8 @@ export function NoteForm({ categories, initial, saving, onSave, onOpenDrawing }:
     const asset=result.assets[0];
     const name=asset.fileName ?? 'image';
     const storedUri=await persistAttachment(asset.uri,name);
-    setKind(kind==='TEXT'?'IMAGE':'MIXED');
-    setAttachments(current=>[{id:Date.now().toString(36),kind:'IMAGE',uri:storedUri,mimeType:asset.mimeType,name,width:asset.width,height:asset.height},...current]);
+    setKind(kind==='TEXT'?'IMAGE':'MIXED'); touchDraft();
+    setAttachments(current=>[{id:Date.now().toString(36),kind:'IMAGE',uri:storedUri,mimeType:asset.mimeType,name,width:asset.width,height:asset.height},...current]); touchDraft();
   };
 
   const toggleRecording=async()=>{
@@ -62,7 +64,7 @@ export function NoteForm({ categories, initial, saving, onSave, onOpenDrawing }:
       setRecording(false);
       if(uri){
         const storedUri=await persistAttachment(uri,'audio-note.m4a');
-        setAttachments(current=>[{id:Date.now().toString(36),kind:'AUDIO',uri:storedUri,mimeType:'audio/m4a',name:'audio-note.m4a'},...current]);
+        setAttachments(current=>[{id:Date.now().toString(36),kind:'AUDIO',uri:storedUri,mimeType:'audio/m4a',name:'audio-note.m4a'},...current]); touchDraft();
       }
       return;
     }
@@ -98,20 +100,20 @@ export function NoteForm({ categories, initial, saving, onSave, onOpenDrawing }:
   return (
     <View style={styles.root}>
       <Text style={[styles.label,{color:colors.foreground}]}>Note type</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.typeRow}>{NOTE_TYPES.map(item=>{const selected=kind===item.kind;return <Pressable key={item.kind} accessibilityRole="button" accessibilityState={{selected}} accessibilityLabel={item.label} onPress={()=>setKind(item.kind)} style={[styles.typeButton,{backgroundColor:selected?colors.primary:colors.card,borderColor:selected?colors.primary:colors.border}]}><Feather name={item.icon as never} size={18} color={selected?colors.primaryForeground:colors.foreground}/><Text style={{color:selected?colors.primaryForeground:colors.foreground,fontFamily:'Inter_700Bold',fontSize:10}}>{item.label}</Text></Pressable>;})}</ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.typeRow}>{NOTE_TYPES.map(item=>{const selected=kind===item.kind;return <Pressable key={item.kind} accessibilityRole="button" accessibilityState={{selected}} accessibilityLabel={item.label} onPress={()=>{setKind(item.kind);touchDraft();}} style={[styles.typeButton,{backgroundColor:selected?colors.primary:colors.card,borderColor:selected?colors.primary:colors.border}]}><Feather name={item.icon as never} size={18} color={selected?colors.primaryForeground:colors.foreground}/><Text style={{color:selected?colors.primaryForeground:colors.foreground,fontFamily:'Inter_700Bold',fontSize:10}}>{item.label}</Text></Pressable>;})}</ScrollView>
       <Text style={[styles.label,{color:colors.foreground}]}>Category</Text>
-      <NoteCategoryPicker categories={categories} value={categoryId} onChange={setCategoryId}/>
+      <NoteCategoryPicker categories={categories} value={categoryId} onChange={value=>{setCategoryId(value);touchDraft();}}/>
       <Text style={[styles.label,{color:colors.foreground}]}>Title</Text>
-      <TextInput accessibilityLabel="Note title" value={title} onChangeText={setTitle} placeholder="Note title" placeholderTextColor={colors.mutedForeground} style={[styles.input,{color:colors.foreground,backgroundColor:colors.card,borderColor:colors.border}]}/>
+      <TextInput accessibilityLabel="Note title" value={title} onChangeText={value=>{setTitle(value);touchDraft();}} placeholder="Note title" placeholderTextColor={colors.mutedForeground} style={[styles.input,{color:colors.foreground,backgroundColor:colors.card,borderColor:colors.border}]}/>
       {(kind==='TEXT'||kind==='AUDIO'||kind==='MIXED')&&<>
         <Text style={[styles.label,{color:colors.foreground}]}>Note text</Text>
-        <TextInput accessibilityLabel="Note text" value={content} onChangeText={setContent} placeholder={kind==='AUDIO'?'Add text to this audio note...':'Write your note...'} placeholderTextColor={colors.mutedForeground} multiline textAlignVertical="top" style={[styles.editor,{color:colors.foreground,backgroundColor:colors.card,borderColor:colors.border}]}/>
+        <TextInput accessibilityLabel="Note text" value={content} onChangeText={value=>{setContent(value);touchDraft();}} placeholder={kind==='AUDIO'?'Add text to this audio note...':'Write your note...'} placeholderTextColor={colors.mutedForeground} multiline textAlignVertical="top" style={[styles.editor,{color:colors.foreground,backgroundColor:colors.card,borderColor:colors.border}]}/>
       </>}
       {kind==='IMAGE'||kind==='MIXED'?<Pressable accessibilityRole="button" accessibilityLabel="Add image" onPress={()=>void pickImage()} style={[styles.tool,{backgroundColor:colors.card,borderColor:colors.border}]}><Feather name="image" size={19} color={colors.primary}/><Text style={[styles.toolText,{color:colors.foreground}]}>Add Image</Text></Pressable>:null}
       {kind==='AUDIO'||kind==='MIXED'?<Pressable accessibilityRole="button" accessibilityState={{selected:recording}} accessibilityLabel={recording?'Stop audio recording':'Start audio recording'} onPress={()=>void toggleRecording()} style={[styles.tool,{backgroundColor:recording?colors.destructive:colors.card,borderColor:colors.border}]}><Feather name={recording?'square':'mic'} size={19} color={recording?colors.primaryForeground:colors.primary}/><Text style={[styles.toolText,{color:recording?colors.primaryForeground:colors.foreground}]}>{recording?'Stop Recording':'Record Audio'}</Text></Pressable>:null}
       {kind==='DRAWING'?<Pressable accessibilityRole="button" accessibilityLabel="Open drawing canvas" onPress={onOpenDrawing} style={[styles.tool,{backgroundColor:colors.card,borderColor:colors.border}]}><Feather name="edit-3" size={19} color={colors.primary}/><Text style={[styles.toolText,{color:colors.foreground}]}>Open Drawing Canvas</Text></Pressable>:null}
       {attachments.length?<View style={[styles.attachmentBox,{backgroundColor:colors.secondary}]}><Text style={[styles.attachmentTitle,{color:colors.foreground}]}>{attachments.length} attachment{attachments.length===1?'':'s'} attached</Text>{attachments.map(item=><Text key={item.id} style={[styles.attachmentText,{color:colors.mutedForeground}]}>{item.kind}: {item.name||item.uri.split('/').pop()||'attachment'}</Text>)}</View>:null}
-      <Pressable accessibilityRole="checkbox" accessibilityState={{checked:saveToSecureVault}} accessibilityLabel="Save to Secure Vault" onPress={()=>setSaveToSecureVault(v=>!v)} style={[styles.vaultRow,{borderColor:colors.border,backgroundColor:colors.card}]}><MaterialCommunityIcons name={saveToSecureVault?'checkbox-marked':'checkbox-blank-outline'} size={23} color={saveToSecureVault?colors.primary:colors.mutedForeground}/><View style={styles.vaultCopy}><Text style={[styles.vaultTitle,{color:colors.foreground}]}>Save to Secure Vault</Text><Text style={[styles.vaultHint,{color:colors.mutedForeground}]}>Create the same note inside Secure Notes without opening Vault manually.</Text></View></Pressable>
+      <Pressable accessibilityRole="checkbox" accessibilityState={{checked:saveToSecureVault}} accessibilityLabel="Save to Secure Vault" onPress={()=>{setSaveToSecureVault(v=>!v);touchDraft();}} style={[styles.vaultRow,{borderColor:colors.border,backgroundColor:colors.card}]}><MaterialCommunityIcons name={saveToSecureVault?'checkbox-marked':'checkbox-blank-outline'} size={23} color={saveToSecureVault?colors.primary:colors.mutedForeground}/><View style={styles.vaultCopy}><Text style={[styles.vaultTitle,{color:colors.foreground}]}>Save to Secure Vault</Text><Text style={[styles.vaultHint,{color:colors.mutedForeground}]}>Create the same note inside Secure Notes without opening Vault manually.</Text></View></Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel={initial?'Update note':'Save note'} disabled={!canSave} onPress={()=>void submit()} style={[styles.save,{backgroundColor:canSave?colors.primary:colors.secondary}]}><Text style={{color:canSave?colors.primaryForeground:colors.mutedForeground,fontFamily:'Inter_700Bold'}}>{persisting?'Preparing…':saving?'Saving…':initial?'Update Note':'Save Note'}</Text></Pressable>
     </View>
   );
