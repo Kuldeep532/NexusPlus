@@ -29,7 +29,7 @@ export function LegalDocumentScreen({ title, subtitle, sections }: Props) {
           </View>
           <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>{subtitle}</Text>
-            <Text style={[styles.updated, { color: colors.primary }]}>Last updated: 30 August 2026</Text>
+            <Text style={[styles.updated, { color: colors.primary }]}>Last updated: 21 September 2026</Text>
           </View>
           {sections.map((section) => (
             <View key={section.title} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -37,7 +37,7 @@ export function LegalDocumentScreen({ title, subtitle, sections }: Props) {
               <Text selectable style={[styles.body, { color: colors.mutedForeground }]}>{section.body}</Text>
             </View>
           ))}
-          <Text style={[styles.footer, { color: colors.mutedForeground }]}>Nexus Plus • Nexus Wave Technologies</Text>
+          <Text style={[styles.footer, { color: colors.mutedForeground }]}>Nexus Plus • Nexus Wave Technologies • Founder: Kuldeep</Text>
         </View>
       </ScrollView>
     </View>
