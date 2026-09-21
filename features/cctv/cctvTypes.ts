@@ -12,28 +12,16 @@ export interface CctvSecurityProfile {
   reason?: string;
 }
 
-/**
- * Capabilities are runtime facts established by the authenticated native
- * protocol handshake. Persisted values are treated as hints until refreshed.
- */
+/** Runtime capabilities proven by the authenticated native handshake. */
 export interface CctvCapabilities {
   liveView: boolean;
-  audio: boolean;
   recordings: boolean;
   playback: boolean;
-  eraseData: boolean;
-  passwordChange: boolean;
-  discovery: boolean;
-  multiCamera: boolean;
-  switchCamera: boolean;
-  flip: boolean;
   panTiltZoom: boolean;
-  nightVision: boolean;
-  talk: boolean;
 }
 
 export type CctvCapabilityKey = keyof CctvCapabilities;
-export type CctvCameraControl = 'sound' | 'switch_camera' | 'flip' | 'ptz' | 'night_vision' | 'talk' | 'playback';
+export type CctvCameraControl = 'ptz' | 'playback';
 
 export interface CctvCamera {
   id: string;
@@ -58,16 +46,7 @@ export type CctvDiscoveryMode = 'qr' | 'serial' | 'lan' | 'manual';
 
 export const CCTV_CAPABILITY_LABELS: Record<CctvCapabilityKey, string> = {
   liveView: 'Live View',
-  audio: 'Sound',
   recordings: 'Recording',
   playback: 'Playback',
-  eraseData: 'Erase Data',
-  passwordChange: 'Password Change',
-  discovery: 'Discovery',
-  multiCamera: 'Multi-camera',
-  switchCamera: 'Switch Camera',
-  flip: 'Flip',
   panTiltZoom: 'PTZ',
-  nightVision: 'Night Vision',
-  talk: 'Talk',
 };
