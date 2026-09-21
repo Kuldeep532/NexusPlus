@@ -1,31 +1,31 @@
-import { AudioEditorNative, assertAudioEditorNative, type AudioMixInput, type AudioMixResult } from '@/modules/audio-editor-native';
+import { AudioEditorNative, assertAudioEditorNative } from '@/modules/audio-editor-native';
 
-export type AudioEffectMix = {
+export type AudioEffectType = 'volume' | 'fade-in' | 'fade-out' | 'normalize';
+
+export type AudioEffectInput = {
   inputPath: string;
-  effectPath: string;
   outputPath: string;
-  effectStartMs: number;
-  effectEndMs: number;
-  volume: number;
+  effect: AudioEffectType;
+  startMs?: number;
+  endMs?: number;
+  amount?: number;
 };
 
-export type AudioEffectMixResult = AudioMixResult;
+export type AudioEffectResult = {
+  outputPath: string;
+  durationMs: number;
+  sampleRate: number;
+  channels: number;
+  mimeType: string | null;
+};
 
 export function assertAudioEffectsNative() {
   return {
-    mix: (input: AudioEffectMix) => {
-      const request: AudioMixInput = {
-        inputPath: input.inputPath,
-        overlayPath: input.effectPath,
-        outputPath: input.outputPath,
-        overlayStartMs: input.effectStartMs,
-        overlayVolume: input.volume,
-      };
-      return assertAudioEditorNative().mix(request);
-    },
+    apply: (input: AudioEffectInput): Promise<AudioEffectResult> =>
+      assertAudioEditorNative().applyEffect(input),
   };
 }
 
 export function isAudioEffectsNativeAvailable(): boolean {
-  return Boolean(AudioEditorNative);
+  return Boolean(AudioEditorNative?.applyEffect);
 }
