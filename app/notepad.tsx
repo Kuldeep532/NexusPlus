@@ -8,6 +8,7 @@ import { localNotesRepository, NOTES_STORAGE_LOCATION } from '@/features/notepad
 import { DEFAULT_NOTE_CATEGORIES, Note, NoteCategory } from '@/features/notepad/notepadTypes';
 import { NoteList } from '@/features/notepad/components/NoteList';
 import { NoteForm, NoteDraft } from '@/features/notepad/components/NoteForm';
+import { readVault, writeVault } from '@/features/biometric-vault/biometricVaultRepository';
 
 type Screen = 'home' | 'all' | 'categories' | 'add' | 'edit';
 
@@ -19,7 +20,7 @@ export default function NotepadRoute() {
   const [categories, setCategories] = useState<NoteCategory[]>([]);
   const [editing, setEditing] = useState<Note | undefined>();
   const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [saving, setSaving] = useState(false);
   const [newCategory, setNewCategory] = useState('');
 
@@ -38,10 +39,7 @@ export default function NotepadRoute() {
 
   const visibleNotes = notes.filter((note) => {
     const q = search.trim().toLowerCase();
-    const matchesSearch = !q || `${note.title} ${note.description} ${note.content}`.toLowerCase().includes(q);
-    const matchesCategory = !selectedCategory || note.categoryId === selectedCategory;
-    const active = !note.archived;
-    return matchesSearch && matchesCategory && active;
+    return !note.archived && (!q || `${note.title} ${note.description} ${note.content}`.toLowerCase().includes(q)) && (!selectedCategory || note.categoryId === selectedCategory);
   });
 
   const saveDraft = async (draft: NoteDraft) => {
@@ -54,12 +52,15 @@ export default function NotepadRoute() {
       await localNotesRepository.saveNote(note);
       setNotes((current) => [note, ...current.filter((item) => item.id !== note.id)]);
       if (draft.saveToSecureVault) {
-        Alert.alert('Secure Vault', 'The note is saved locally. To preserve the Vault’s existing biometric/encryption boundary, Secure Vault insertion should be completed through its unlocked vault session.', [{ text: 'OK' }]);
+        const snapshot = await readVault();
+        const vaultNote = { id: `secure-note-${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`, category: 'SECURE_NOTE' as const, title: draft.title, content: draft.content, tags: draft.description ? [draft.description] : [], createdAt: now, updatedAt: now };
+        await writeVault([vaultNote, ...snapshot.items], snapshot.keyVersion);
       }
       setEditing(undefined);
       setScreen('all');
-    } catch {
-      Alert.alert('Could not save note', 'The local Notes store could not be updated.');
+      Alert.alert('Note saved', draft.saveToSecureVault ? 'Note saved to Nexus Plus / Notes and Secure Vault.' : 'Note saved to Nexus Plus / Notes.');
+    } catch (error) {
+      Alert.alert('Could not save note', draft.saveToSecureVault ? 'The note could not be saved to the Secure Vault. Unlock the Vault first, then try again.' : 'The local Notes store could not be updated.');
     } finally { setSaving(false); }
   };
 
@@ -73,13 +74,8 @@ export default function NotepadRoute() {
     setNewCategory('');
   };
 
-  const title = screen === 'home' ? 'Notepad' : screen === 'all' ? 'All Notes' : screen === 'categories' ? 'Categories' : editing ? 'Edit Note' : 'Add New Note';
-  const menu = [
-    ['All Notes', 'all'], ['Categories', 'categories'], ['Add New Note', 'add']
-  ] as const;
-
   if (screen === 'add' || screen === 'edit') {
-    return <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}><Stack.Screen options={{ headerShown: false }} /><Header title={title} onBack={() => setScreen('all')} colors={colors} /><ScrollView contentContainerStyle={styles.form}><NoteForm categories={categories} initial={editing} saving={saving} onSave={saveDraft} /></ScrollView></View>;
+    return <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}><Stack.Screen options={{ headerShown: false }} /><Header title={editing ? 'Edit Note' : 'Add New Note'} onBack={() => setScreen('all')} colors={colors} /><ScrollView contentContainerStyle={styles.form}><NoteForm categories={categories} initial={editing} saving={saving} onSave={saveDraft} /></ScrollView></View>;
   }
 
   if (screen === 'categories') {
@@ -90,11 +86,8 @@ export default function NotepadRoute() {
     return <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}><Stack.Screen options={{ headerShown: false }} /><Header title="All Notes" onBack={() => setScreen('home')} colors={colors} /><View style={[styles.search, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="search" size={17} color={colors.mutedForeground} /><TextInput accessibilityLabel="Search notes" value={search} onChangeText={setSearch} placeholder="Search notes" placeholderTextColor={colors.mutedForeground} style={[styles.searchInput, { color: colors.foreground }]} /></View><NoteList notes={visibleNotes} categories={categories} onOpen={(note) => { setEditing(note); setScreen('edit'); }} /></View>;
   }
 
-  return <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}><Stack.Screen options={{ headerShown: false }} /><Header title="Notepad" onBack={() => router.back()} colors={colors} /><ScrollView contentContainerStyle={styles.home}><Text style={[styles.storage, { color: colors.mutedForeground }]}>Local storage: {NOTES_STORAGE_LOCATION}</Text>{menu.map(([label, target]) => <Pressable key={target} accessibilityRole="button" accessibilityLabel={label} onPress={() => { if (target === 'add') { setEditing(undefined); setScreen('add'); } else setScreen(target); }} style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.menuText, { color: colors.foreground }]}>{label}</Text><Feather name="chevron-right" size={18} color={colors.mutedForeground} /></Pressable>)}<Pressable accessibilityRole="button" accessibilityLabel="View a category" onPress={() => setScreen('categories')} style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.menuText, { color: colors.foreground }]}>Browse by Category</Text><Feather name="grid" size={18} color={colors.mutedForeground} /></Pressable></ScrollView></View>;
+  return <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}><Stack.Screen options={{ headerShown: false }} /><Header title="Notepad" onBack={() => router.back()} colors={colors} /><ScrollView contentContainerStyle={styles.home}><Text style={[styles.storage, { color: colors.mutedForeground }]}>Local storage: {NOTES_STORAGE_LOCATION}</Text><Pressable accessibilityRole="button" accessibilityLabel="All Notes" onPress={() => setScreen('all')} style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.menuText, { color: colors.foreground }]}>All Notes</Text><Feather name="chevron-right" size={18} color={colors.mutedForeground} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Categories" onPress={() => setScreen('categories')} style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.menuText, { color: colors.foreground }]}>Categories</Text><Feather name="grid" size={18} color={colors.mutedForeground} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Add New Note" onPress={() => { setEditing(undefined); setScreen('add'); }} style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.menuText, { color: colors.foreground }]}>Add New Note</Text><Feather name="plus" size={18} color={colors.mutedForeground} /></Pressable><Text style={[styles.syncHint, { color: colors.mutedForeground }]}>Storage is repository-based, so an S3 or Firebase sync adapter can be added later without replacing these screens.</Text></ScrollView></View>;
 }
 
-function Header({ title, onBack, colors }: { title: string; onBack: () => void; colors: any }) {
-  return <View style={styles.header}><Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack} style={styles.back}><Feather name="arrow-left" size={21} color={colors.foreground} /></Pressable><Text accessibilityRole="header" style={[styles.heading, { color: colors.foreground }]}>{title}</Text></View>;
-}
-
-const styles = StyleSheet.create({ root: { flex: 1 }, header: { minHeight: 58, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 12 }, back: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' }, heading: { fontSize: 23, fontFamily: 'Inter_700Bold' }, home: { padding: 20, gap: 11 }, storage: { fontSize: 11, marginBottom: 6 }, menuCard: { minHeight: 62, borderWidth: 1, borderRadius: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, menuText: { fontSize: 14, fontFamily: 'Inter_700Bold' }, search: { marginHorizontal: 20, minHeight: 48, borderRadius: 14, borderWidth: 1, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center' }, searchInput: { flex: 1, marginLeft: 9 }, form: { paddingBottom: 30 }, categoryCreate: { padding: 20, flexDirection: 'row', gap: 9 }, input: { minHeight: 48, borderWidth: 1, borderRadius: 13, paddingHorizontal: 13, flex: 1 }, primaryButton: { minWidth: 72, minHeight: 48, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, categoryList: { padding: 20, gap: 10 }, categoryCard: { minHeight: 70, borderWidth: 1, borderRadius: 15, padding: 14 }, categoryName: { fontSize: 14, fontFamily: 'Inter_700Bold' }, categoryCount: { fontSize: 11, marginTop: 4 } });
+function Header({ title, onBack, colors }: { title: string; onBack: () => void; colors: any }) { return <View style={styles.header}><Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack} style={styles.back}><Feather name="arrow-left" size={21} color={colors.foreground} /></Pressable><Text accessibilityRole="header" style={[styles.heading, { color: colors.foreground }]}>{title}</Text></View>; }
+const styles = StyleSheet.create({ root: { flex: 1 }, header: { minHeight: 58, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 12 }, back: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' }, heading: { fontSize: 23, fontFamily: 'Inter_700Bold' }, home: { padding: 20, gap: 11 }, storage: { fontSize: 11, marginBottom: 6 }, syncHint: { fontSize: 11, lineHeight: 17, marginTop: 6 }, menuCard: { minHeight: 62, borderWidth: 1, borderRadius: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, menuText: { fontSize: 14, fontFamily: 'Inter_700Bold' }, search: { marginHorizontal: 20, minHeight: 48, borderRadius: 14, borderWidth: 1, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center' }, searchInput: { flex: 1, marginLeft: 9 }, form: { paddingBottom: 30 }, categoryCreate: { padding: 20, flexDirection: 'row', gap: 9 }, input: { minHeight: 48, borderWidth: 1, borderRadius: 13, paddingHorizontal: 13, flex: 1 }, primaryButton: { minWidth: 72, minHeight: 48, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, categoryList: { padding: 20, gap: 10 }, categoryCard: { minHeight: 70, borderWidth: 1, borderRadius: 15, padding: 14 }, categoryName: { fontSize: 14, fontFamily: 'Inter_700Bold' }, categoryCount: { fontSize: 11, marginTop: 4 } });
