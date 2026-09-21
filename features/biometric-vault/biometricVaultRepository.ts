@@ -102,7 +102,8 @@ export async function readVault(): Promise<VaultRepositorySnapshot> {
   const items = JSON.parse(plaintext) as unknown;
   if (!Array.isArray(items)) throw new Error('Vault payload is invalid.');
 
-  return { items: items as VaultItem[], keyVersion: envelope.keyVersion };
+  const normalizedItems = (items as VaultItem[]).map((item) => item.category === 'SECURE_NOTE' ? { ...item, kind: (item as any).kind ?? 'TEXT', attachments: (item as any).attachments ?? [] } : item);
+  return { items: normalizedItems, keyVersion: envelope.keyVersion };
 }
 
 export async function writeVault(items: VaultItem[], keyVersion = DEFAULT_KEY_VERSION): Promise<void> {
@@ -135,6 +136,8 @@ export async function addSecureNoteToVault(input: { title: string; content: stri
   const item: VaultItem = {
     id: `secure-note-${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     category: 'SECURE_NOTE',
+    kind: 'TEXT',
+    attachments: [],
     title: input.title,
     content: input.content,
     tags: input.tags,
