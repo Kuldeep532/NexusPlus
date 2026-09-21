@@ -51,21 +51,12 @@ export async function initializeVault(): Promise<void> {
   const existingMeta = await loadVaultMeta();
 
   if (existingKey && existingMeta) return;
-  if (!existingKey && existingMeta) {
-    throw new Error('Vault key is missing while encrypted Vault data still exists.');
-  }
-  if (existingKey && !existingMeta) {
-    throw new Error('Vault metadata is missing while the Vault key still exists.');
-  }
+  if (!existingKey && existingMeta) throw new Error('Vault key is missing while encrypted Vault data still exists.');
+  if (existingKey && !existingMeta) throw new Error('Vault metadata is missing while the Vault key still exists.');
 
   await generateVaultKey();
   const aad = buildVaultAad(DEFAULT_KEY_VERSION);
-  const encrypted = await encryptVaultPayload(
-    JSON.stringify(EMPTY_ITEMS),
-    undefined,
-    aad,
-  );
-
+  const encrypted = await encryptVaultPayload(JSON.stringify(EMPTY_ITEMS), undefined, aad);
   const now = Date.now();
   const envelope: VaultEnvelope = {
     version: VAULT_FORMAT_VERSION,
@@ -96,14 +87,10 @@ export async function readVault(): Promise<VaultRepositorySnapshot> {
     await initializeVault();
     return readVault();
   }
-  if (!keyAvailable || !rawEnvelope) {
-    throw new Error('Vault integrity state is invalid. Vault remains locked.');
-  }
+  if (!keyAvailable || !rawEnvelope) throw new Error('Vault integrity state is invalid. Vault remains locked.');
 
   const envelope = parseEnvelope(rawEnvelope);
-  if (envelope.aad !== buildVaultAad(envelope.keyVersion)) {
-    throw new Error('Vault integrity check failed.');
-  }
+  if (envelope.aad !== buildVaultAad(envelope.keyVersion)) throw new Error('Vault integrity check failed.');
 
   const plaintext = await decryptVaultPayload(
     envelope.ciphertext,
@@ -112,34 +99,20 @@ export async function readVault(): Promise<VaultRepositorySnapshot> {
     undefined,
     envelope.aad,
   );
-
   const items = JSON.parse(plaintext) as unknown;
-  if (!Array.isArray(items)) {
-    throw new Error('Vault payload is invalid.');
-  }
+  if (!Array.isArray(items)) throw new Error('Vault payload is invalid.');
 
-  return {
-    items: items as VaultItem[],
-    keyVersion: envelope.keyVersion,
-  };
+  return { items: items as VaultItem[], keyVersion: envelope.keyVersion };
 }
 
-export async function writeVault(
-  items: VaultItem[],
-  keyVersion = DEFAULT_KEY_VERSION,
-): Promise<void> {
+export async function writeVault(items: VaultItem[], keyVersion = DEFAULT_KEY_VERSION): Promise<void> {
   const keyAvailable = await loadVaultMasterKey();
   if (!keyAvailable) throw new Error('Vault master key is unavailable.');
 
   const previousRaw = await loadVaultMeta();
   const previous = previousRaw ? parseEnvelope(previousRaw) : null;
   const aad = buildVaultAad(keyVersion);
-  const encrypted = await encryptVaultPayload(
-    JSON.stringify(items),
-    undefined,
-    aad,
-  );
-
+  const encrypted = await encryptVaultPayload(JSON.stringify(items), undefined, aad);
   const now = Date.now();
   const envelope: VaultEnvelope = {
     version: VAULT_FORMAT_VERSION,
@@ -154,6 +127,21 @@ export async function writeVault(
   };
 
   await saveVaultMeta(serializeEnvelope(envelope));
+}
+
+export async function addSecureNoteToVault(input: { title: string; content: string; tags?: string[] }): Promise<void> {
+  const snapshot = await readVault();
+  const now = Date.now();
+  const item: VaultItem = {
+    id: `secure-note-${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    category: 'SECURE_NOTE',
+    title: input.title,
+    content: input.content,
+    tags: input.tags,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await writeVault([item, ...snapshot.items], snapshot.keyVersion);
 }
 
 export async function destroyVault(): Promise<void> {
