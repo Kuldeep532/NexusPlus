@@ -78,6 +78,59 @@ public final class AudioEditorNativeModule: Module {
     }
   }
 
+
+    AsyncFunction("applyEffect") { (input: [String: Any?]) async throws -> [String: Any?] in
+      guard let inputPath = input["inputPath"] as? String, !inputPath.isEmpty else { throw NSError(domain: "AudioEditorNative", code: 50, userInfo: [NSLocalizedDescriptionKey: "Input audio path is required."]) }
+      guard let outputPath = input["outputPath"] as? String, !outputPath.isEmpty else { throw NSError(domain: "AudioEditorNative", code: 51, userInfo: [NSLocalizedDescriptionKey: "Output audio path is required."]) }
+      guard let effect = input["effect"] as? String, !effect.isEmpty else { throw NSError(domain: "AudioEditorNative", code: 52, userInfo: [NSLocalizedDescriptionKey: "Audio effect is required."]) }
+      let startMs = (input["startMs"] as? NSNumber)?.doubleValue ?? 0
+      let endMs = (input["endMs"] as? NSNumber)?.doubleValue
+      let amount = (input["amount"] as? NSNumber)?.doubleValue ?? 0.95
+      guard startMs.isFinite, startMs >= 0, (endMs == nil || endMs!.isFinite) else { throw NSError(domain: "AudioEditorNative", code: 53, userInfo: [NSLocalizedDescriptionKey: "Effect range is invalid."]) }
+      guard ["volume", "fade-in", "fade-out", "normalize"].contains(effect.lowercased()) else { throw NSError(domain: "AudioEditorNative", code: 54, userInfo: [NSLocalizedDescriptionKey: "Unsupported audio effect."]) }
+      if effect.lowercased() == "volume" { guard amount.isFinite, amount >= 0, amount <= 2 else { throw NSError(domain: "AudioEditorNative", code: 55, userInfo: [NSLocalizedDescriptionKey: "Volume amount must be between 0 and 2."]) } }
+      if effect.lowercased() == "normalize" { guard amount.isFinite, amount > 0 else { throw NSError(domain: "AudioEditorNative", code: 56, userInfo: [NSLocalizedDescriptionKey: "Normalize target must be positive."]) } }
+      let inputURL = URL(fileURLWithPath: inputPath)
+      let outputURL = URL(fileURLWithPath: outputPath)
+      let asset = AVURLAsset(url: inputURL)
+      let tracks = try await asset.load(.tracks)
+      guard let track = tracks.first(where: { $0.mediaType == .audio }) else { throw NSError(domain: "AudioEditorNative", code: 57, userInfo: [NSLocalizedDescriptionKey: "No supported audio track was found."]) }
+      let duration = try await asset.load(.duration)
+      let durationMs = duration.seconds * 1000
+      let safeStart = min(max(startMs, 0), durationMs)
+      let safeEnd = min(max(endMs ?? durationMs, safeStart), durationMs)
+      guard safeEnd > safeStart else { throw NSError(domain: "AudioEditorNative", code: 58, userInfo: [NSLocalizedDescriptionKey: "Effect range is invalid."]) }
+      if FileManager.default.fileExists(atPath: outputURL.path) { try FileManager.default.removeItem(at: outputURL) }
+      try FileManager.default.createDirectory(at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+      guard let compositionTrack = AVMutableComposition().addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { throw NSError(domain: "AudioEditorNative", code: 59, userInfo: [NSLocalizedDescriptionKey: "Unable to create audio effect composition."]) }
+      let composition = compositionTrack.asset as? AVMutableComposition
+      _ = composition
+      guard let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else { throw NSError(domain: "AudioEditorNative", code: 60, userInfo: [NSLocalizedDescriptionKey: "Audio export is unavailable on this device."]) }
+      let parent = AVMutableComposition()
+      guard let outputTrack = parent.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { throw NSError(domain: "AudioEditorNative", code: 61, userInfo: [NSLocalizedDescriptionKey: "Unable to create audio composition track."]) }
+      try outputTrack.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: track, at: .zero)
+      let mix = AVMutableAudioMix()
+      let params = AVMutableAudioMixInputParameters(track: outputTrack)
+      if effect.lowercased() == "volume" {
+        params.setVolume(Float(amount), at: CMTime(seconds: safeStart / 1000, preferredTimescale: 600))
+        params.setVolumeRamp(fromStartVolume: 1, toEndVolume: Float(amount), timeRange: CMTimeRange(start: CMTime(seconds: safeStart / 1000, preferredTimescale: 600), duration: CMTime(seconds: (safeEnd - safeStart) / 1000, preferredTimescale: 600)))
+      } else if effect.lowercased() == "fade-in" {
+        params.setVolumeRamp(fromStartVolume: 0, toEndVolume: 1, timeRange: CMTimeRange(start: CMTime(seconds: safeStart / 1000, preferredTimescale: 600), duration: CMTime(seconds: (safeEnd - safeStart) / 1000, preferredTimescale: 600)))
+      } else if effect.lowercased() == "fade-out" {
+        params.setVolumeRamp(fromStartVolume: 1, toEndVolume: 0, timeRange: CMTimeRange(start: CMTime(seconds: safeStart / 1000, preferredTimescale: 600), duration: CMTime(seconds: (safeEnd - safeStart) / 1000, preferredTimescale: 600)))
+      } else {
+        params.setVolume(1, at: .zero)
+      }
+      mix.inputParameters = [params]
+      exporter.audioMix = mix
+      exporter.outputURL = outputURL
+      exporter.outputFileType = .m4a
+      exporter.shouldOptimizeForNetworkUse = false
+      await exporter.export()
+      guard exporter.status == .completed else { throw exporter.error ?? NSError(domain: "AudioEditorNative", code: 62, userInfo: [NSLocalizedDescriptionKey: "Audio effect export failed."]) }
+      return ["outputPath": outputURL.path, "durationMs": durationMs, "sampleRate": 0, "channels": 0, "mimeType": "audio/mp4"]
+    }
+
   private func mixProjectInternal(basePath: String, overlays: [[String: Any?]], outputPath: String) async throws -> [String: Any?] {
     let base = AVURLAsset(url: URL(fileURLWithPath: basePath))
     let baseTracks = try await base.load(.tracks)
