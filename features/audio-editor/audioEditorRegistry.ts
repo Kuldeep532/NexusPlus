@@ -13,6 +13,14 @@ export interface AudioEditorToolDefinition {
  */
 const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
   {
+    id: 'audio-compressor',
+    title: 'Audio Compressor',
+    description: 'Reduce audio file size with real native AAC bitrate and sample-rate presets.',
+    route: '/audio-editor/audio-compressor',
+    icon: 'minimize-2',
+    order: 10,
+  },
+  {
     id: 'audio-trimmer',
     title: 'Audio Trimmer',
     description: 'Trim audio with exact start/end values and export the selected range.',
