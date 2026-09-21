@@ -62,8 +62,12 @@ export default function AudioTrimmerScreen() {
   }, []);
 
   const selectFromFileManager = useCallback(async () => {
-    const picked = await pickAudioFromFileManager();
-    if (picked) await loadSource(picked);
+    try {
+      const picked = await pickAudioFromFileManager();
+      if (picked) await loadSource(picked);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to choose an audio file.');
+    }
   }, [loadSource]);
 
   const discover = useCallback(async () => {
@@ -117,7 +121,15 @@ export default function AudioTrimmerScreen() {
 
   const stepMs = Math.max(100, Math.min(1000, durationMs / 100));
   const cutDuration = Math.max(0, endMs - startMs);
-  const validRange = Boolean(source && durationMs > 0 && startMs >= 0 && endMs > startMs && endMs <= durationMs);
+  const validRange = Boolean(
+    source &&
+    durationMs > 0 &&
+    Number.isFinite(startMs) &&
+    Number.isFinite(endMs) &&
+    startMs >= 0 &&
+    endMs > startMs &&
+    endMs <= durationMs,
+  );
 
   const smartSuggestion = useMemo(() => {
     if (!durationMs) return null;
@@ -140,9 +152,10 @@ export default function AudioTrimmerScreen() {
     setMessage('Exporting trimmed audio…');
     try {
       const native = assertAudioEditorNative();
-      const outputPath = await createAudioEditorOutputPath('Audio Trims', source.name);
-      await native.trim(source.uri, outputPath, startMs, endMs);
-      setMessage(`Export complete: ${outputPath}`);
+      const outputPath = await createAudioEditorOutputPath('Audio Trims', source.name, 'trimmed', 'm4a');
+      const result = await native.trim(source.uri, outputPath, startMs, endMs);
+      const outputUri = result.outputPath || outputPath;
+      setMessage(`Audio trimmed and saved successfully to ${outputUri}`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to export the trimmed audio.');
     } finally {
