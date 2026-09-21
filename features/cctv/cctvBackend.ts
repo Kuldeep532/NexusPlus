@@ -23,6 +23,7 @@ export interface CctvCameraRecord extends CctvCamera { schemaVersion: number; co
 export interface CctvSession { id: string; cameraId: string; state: Exclude<CctvConnectionState, 'idle' | 'error'>; startedAt: number; expiresAt: number; }
 export interface CctvTransportContext { camera: CctvCameraRecord; session: CctvSession; capabilities: CctvCapabilities; nativeSessionId?: string; streamUri?: string; }
 export interface CctvProtocolAdapter { readonly protocol: CctvCamera['protocol']; discover(): Promise<CctvCameraRecord[]>; connect(camera: CctvCameraRecord): Promise<CctvTransportContext>; disconnect(context: CctvTransportContext): Promise<void>; startLiveView(context: CctvTransportContext): Promise<void>; stopLiveView(context: CctvTransportContext): Promise<void>; startRecording(context: CctvTransportContext): Promise<void>; stopRecording(context: CctvTransportContext): Promise<void>; searchRecordings(context: CctvTransportContext, query: CctvRecordingSearch): Promise<CctvRecordingItem[]>; setControl(context: CctvTransportContext, control: CctvCameraControl, payload?: Record<string, unknown>): Promise<void>; }
+
 export type CctvCameraControl = 'ptz' | 'playback';
 export interface CctvRecordingSearch { from: number; to: number; query?: string; limit?: number; }
 export interface CctvRecordingItem { id: string; cameraId: string; startedAt: number; endedAt: number; label?: string; recordingToken?: string; }
