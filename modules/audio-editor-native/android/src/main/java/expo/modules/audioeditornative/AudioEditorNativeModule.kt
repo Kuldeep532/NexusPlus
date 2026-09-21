@@ -81,6 +81,19 @@ class AudioEditorNativeModule : Module() {
       }
     }
 
+    AsyncFunction("compress") { input: Map<String, Any?>, promise: Promise ->
+      try {
+        val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
+        val inputPath = input["inputPath"] as? String ?: error("Input audio path is required.")
+        val outputPath = input["outputPath"] as? String ?: error("Output audio path is required.")
+        val bitrateKbps = (input["bitrateKbps"] as? Number)?.toInt() ?: error("Target bitrate is required.")
+        val sampleRateHz = (input["sampleRateHz"] as? Number)?.toInt() ?: error("Target sample rate is required.")
+        promise.resolve(AudioCompressionProcessor.compress(context, inputPath, outputPath, bitrateKbps, sampleRateHz))
+      } catch (error: Exception) {
+        promise.reject("AUDIO_COMPRESS_FAILED", error.message ?: "Unable to compress audio", error)
+      }
+    }
+
     AsyncFunction("synthesizePiper") { input: Map<String, Any?>, promise: Promise ->
       try {
         val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
