@@ -5,6 +5,7 @@ module.exports = ({ config }) => ({
     googleServicesFile: process.env.GOOGLE_SERVICES_JSON || config.android?.googleServicesFile,
   },
   plugins: [
+    ...(process.env.GOOGLE_DRIVE_ENABLED === 'true' ? [['expo-linking']] : []),
     ...(config.plugins || []).filter((plugin) => plugin !== 'expo-splash-screen'),
     [
       'expo-splash-screen',
