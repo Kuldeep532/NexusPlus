@@ -104,8 +104,6 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
         if ((s.media2Xaddr != null || s.mediaXaddr != null) && runCatching { getStreamUri(s) }.isSuccess) out += "liveView"
         if (requested.contains("recordings") && s.recordingXaddr != null && runCatching { getRecordings(s) }.isSuccess) out += "recordings"
         if (requested.contains("playback") && s.replayXaddr != null && s.recordingXaddr != null && s.searchXaddr != null && out.contains("recordings")) out += "playback"
-        if (requested.contains("eraseData") && s.recordingXaddr != null && out.contains("recordings")) out += "eraseData"
-        if (requested.contains("passwordChange")) out += "passwordChange"
         if (requested.contains("panTiltZoom") && s.ptzXaddr != null && runCatching { probePtz(s) }.isSuccess) out += "panTiltZoom"
         if (requested.contains("discovery")) out += "discovery"
         return out
@@ -229,17 +227,6 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
         soap(ep, "http://www.onvif.org/ver20/ptz/wsdl/ContinuousMove", body, s.username, s.password)
     }
 
-    private fun changePassword(s: Session, p: ReadableMap?) {
-        val current = p?.getString("currentPassword") ?: throw IllegalArgumentException("Current password is required.")
-        val np = p?.getString("newPassword") ?: throw IllegalArgumentException("New password is required.")
-        require(current == s.password) { "Current password verification failed." }
-        require(np.length >= 8) { "New password is too short." }
-        require(np != current) { "New password must differ from the current password." }
-        val body = "<SetUser xmlns=\"http://www.onvif.org/ver10/device/wsdl\"><User><Username>${xml(s.username)}</Username><Password>${xml(np)}</Password><UserLevel>Administrator</UserLevel></User></SetUser>"
-        soap(s.deviceXaddr, ACTION_SET_USER, body, s.username, s.password)
-        s.password = np
-    }
-
     private fun soap(ep: String, action: String, body: String, u: String, p: String): String {
         require(ep.startsWith("https://", ignoreCase = true)) { "ONVIF endpoint is not secure." }
         val c = URL(ep).openConnection() as HttpURLConnection
@@ -274,11 +261,9 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
 
     companion object {
         private const val ACTION_GET_SERVICES = "http://www.onvif.org/ver10/device/wsdl/GetServices"
-        private const val ACTION_SET_USER = "http://www.onvif.org/ver10/device/wsdl/SetUser"
         private const val ACTION_GET_RECORDINGS = "http://www.onvif.org/ver10/recording/wsdl/GetRecordings"
         private const val ACTION_CREATE_RECORDING_JOB = "http://www.onvif.org/ver10/recording/wsdl/CreateRecordingJob"
         private const val ACTION_SET_RECORDING_JOB = "http://www.onvif.org/ver10/recording/wsdl/SetRecordingJob"
-        private const val ACTION_DELETE_RECORDING = "http://www.onvif.org/ver10/recording/wsdl/DeleteRecording"
         private const val ACTION_FIND_RECORDINGS = "http://www.onvif.org/ver10/search/wsdl/FindRecordings"
         private const val ACTION_GET_RECORDING_SEARCH_RESULTS = "http://www.onvif.org/ver10/search/wsdl/GetRecordingSearchResults"
         private val CAPABILITY_KEYS = listOf("liveView", "recordings", "playback", "panTiltZoom")
