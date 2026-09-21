@@ -6,116 +6,86 @@ export const VAULT_META_KEY = 'nexusplus.biometric-vault.meta.v1';
 export const VAULT_CREDENTIAL_MODE_KEY = 'nexusplus.biometric-vault.credential-mode.v1';
 
 export type VaultCredentialMode = 'biometric-only' | 'device-auth';
-export type VaultAuthError =
-  | 'user_cancel'
-  | 'lockout'
-  | 'biometric_unavailable'
-  | 'credential_unavailable'
-  | 'activity_unavailable'
-  | 'unknown';
+export type VaultAuthError = 'user_cancel'|'lockout'|'biometric_unavailable'|'credential_unavailable'|'activity_unavailable'|'unknown';
 
 type NativeVaultSecurity = {
-  getBiometricCapability: () => Promise<{
-    hardware: boolean;
-    enrolled: boolean;
-    deviceCredentialAvailable: boolean;
-    securityLevel: 'strong' | 'weak' | 'none';
-  }>;
-  authenticate: (
-    promptMessage: string,
-    mode: VaultCredentialMode,
-  ) => Promise<{ success: boolean; error?: VaultAuthError | string }>;
-  ensureKey: () => Promise<void>;
-  deleteKey: () => Promise<void>;
-  isKeyAvailable: () => Promise<boolean>;
-  saveMetadata: (value: string) => Promise<void>;
-  loadMetadata: () => Promise<string | null>;
-  deleteMetadata: () => Promise<void>;
-  saveCredentialMode: (mode: VaultCredentialMode) => Promise<void>;
-  loadCredentialMode: () => Promise<VaultCredentialMode>;
+  getBiometricCapability:()=>Promise<{hardware:boolean;enrolled:boolean;deviceCredentialAvailable:boolean;securityLevel:'strong'|'weak'|'none'}>;
+  authenticate:(promptMessage:string,mode:VaultCredentialMode)=>Promise<{success:boolean;error?:VaultAuthError|string}>;
+  ensureKey:()=>Promise<void>;
+  deleteKey:()=>Promise<void>;
+  isKeyAvailable:()=>Promise<boolean>;
+  saveMetadata:(value:string)=>Promise<void>;
+  loadMetadata:()=>Promise<string|null>;
+  deleteMetadata:()=>Promise<void>;
+  saveCredentialMode:(mode:VaultCredentialMode)=>Promise<void>;
+  loadCredentialMode:()=>Promise<VaultCredentialMode>;
 };
 
 const { NexusVault } = NativeModules;
 
-function nativeSecurity(): NativeVaultSecurity {
+function nativeSecurity():NativeVaultSecurity {
   if (Platform.OS === 'android' && NexusVault) return NexusVault as NativeVaultSecurity;
   throw new Error('Native Nexus Vault security module is unavailable.');
 }
 
-export async function getBiometricCapability(): Promise<{
-  hardware: boolean;
-  enrolled: boolean;
-  deviceCredentialAvailable: boolean;
-  securityLevel: 'strong' | 'weak' | 'none';
-}> {
-  if (Platform.OS === 'android') return nativeSecurity().getBiometricCapability();
-  return {
-    hardware: false,
-    enrolled: false,
-    deviceCredentialAvailable: false,
-    securityLevel: 'none',
-  };
+export async function getBiometricCapability(){
+  if(Platform.OS==='android') return nativeSecurity().getBiometricCapability();
+  return {hardware:false,enrolled:false,deviceCredentialAvailable:false,securityLevel:'none' as const};
 }
 
-export async function authenticateVault(
-  promptMessage = 'Unlock Nexus Biometric Vault',
-  mode: VaultCredentialMode = 'biometric-only',
-): Promise<{ success: boolean; error?: VaultAuthError | string }> {
-  if (Platform.OS === 'android') return nativeSecurity().authenticate(promptMessage, mode);
+export async function authenticateVault(promptMessage='Unlock Nexus Biometric Vault',mode:VaultCredentialMode='biometric-only'){
+  if(Platform.OS==='android') return nativeSecurity().authenticate(promptMessage,mode);
   throw new Error('A platform-native Vault authentication provider is required.');
 }
 
-export async function enrollStrongBiometric(): Promise<boolean> {
-  const capability = await getBiometricCapability();
-  if (!capability.hardware || capability.securityLevel !== 'strong') return false;
-  return (await authenticateVault('Register this biometric for Nexus Biometric Vault', 'biometric-only')).success;
+export async function requireVaultReauthentication(promptMessage='Re-authenticate for this protected Vault action.'){
+  const mode=await loadVaultCredentialMode();
+  return (await authenticateVault(promptMessage,mode)).success;
 }
 
-export async function enableVaultScreenProtection(): Promise<void> {
+export async function enrollStrongBiometric():Promise<boolean>{
+  const capability=await getBiometricCapability();
+  if(!capability.hardware||capability.securityLevel!=='strong'||!capability.enrolled)return false;
+  return (await authenticateVault('Register this biometric for Nexus Biometric Vault','biometric-only')).success;
+}
+
+export async function enableVaultScreenProtection():Promise<void>{
   await ScreenCapture.preventScreenCaptureAsync('nexusplus-biometric-vault');
   await ScreenCapture.enableAppSwitcherProtectionAsync(1);
 }
-
-export async function disableVaultScreenProtection(): Promise<void> {
+export async function disableVaultScreenProtection():Promise<void>{
   await ScreenCapture.allowScreenCaptureAsync('nexusplus-biometric-vault');
   await ScreenCapture.disableAppSwitcherProtectionAsync();
 }
 
-export async function saveVaultMasterKey(_keyBase64?: string): Promise<void> {
-  if (Platform.OS === 'android') return nativeSecurity().ensureKey();
+export async function saveVaultMasterKey(_keyBase64?:string):Promise<void>{
+  if(Platform.OS==='android')return nativeSecurity().ensureKey();
   throw new Error('A platform-native Vault key provider is required.');
 }
-
-export async function loadVaultMasterKey(): Promise<string | null> {
-  if (Platform.OS === 'android') return (await nativeSecurity().isKeyAvailable()) ? '__native_keystore_key__' : null;
+export async function loadVaultMasterKey():Promise<string|null>{
+  if(Platform.OS==='android')return (await nativeSecurity().isKeyAvailable())?'__native_keystore_key__':null;
   return null;
 }
-
-export async function deleteVaultMasterKey(): Promise<void> {
-  if (Platform.OS === 'android') return nativeSecurity().deleteKey();
+export async function deleteVaultMasterKey():Promise<void>{
+  if(Platform.OS==='android')return nativeSecurity().deleteKey();
   throw new Error('A platform-native Vault key provider is required.');
 }
-
-export async function saveVaultMeta(meta: string): Promise<void> {
-  if (Platform.OS === 'android') return nativeSecurity().saveMetadata(meta);
+export async function saveVaultMeta(meta:string):Promise<void>{
+  if(Platform.OS==='android')return nativeSecurity().saveMetadata(meta);
   throw new Error('A platform-native Vault storage provider is required.');
 }
-
-export async function loadVaultMeta(): Promise<string | null> {
-  if (Platform.OS === 'android') return nativeSecurity().loadMetadata();
+export async function loadVaultMeta():Promise<string|null>{
+  if(Platform.OS==='android')return nativeSecurity().loadMetadata();
   return null;
 }
-
-export async function deleteVaultMeta(): Promise<void> {
-  if (Platform.OS === 'android') return nativeSecurity().deleteMetadata();
+export async function deleteVaultMeta():Promise<void>{
+  if(Platform.OS==='android')await nativeSecurity().deleteMetadata();
 }
-
-export async function saveVaultCredentialMode(mode: VaultCredentialMode): Promise<void> {
-  if (Platform.OS === 'android') return nativeSecurity().saveCredentialMode(mode);
+export async function saveVaultCredentialMode(mode:VaultCredentialMode):Promise<void>{
+  if(Platform.OS==='android')return nativeSecurity().saveCredentialMode(mode);
   throw new Error('A platform-native Vault storage provider is required.');
 }
-
-export async function loadVaultCredentialMode(): Promise<VaultCredentialMode> {
-  if (Platform.OS === 'android') return nativeSecurity().loadCredentialMode();
+export async function loadVaultCredentialMode():Promise<VaultCredentialMode>{
+  if(Platform.OS==='android')return nativeSecurity().loadCredentialMode();
   return 'biometric-only';
 }
