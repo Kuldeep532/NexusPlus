@@ -25,14 +25,6 @@ const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
     icon: 'layers',
     order: 30,
   },
-  {
-    id: 'audio-to-video',
-    title: 'Audio to Video',
-    description: 'Create an image-based video timeline whose image durations are constrained by the selected audio.',
-    route: '/audio-editor/audio-to-video',
-    icon: 'film',
-    order: 40,
-  },
 ];
 
 export function getAudioEditorTools(): AudioEditorToolDefinition[] {
