@@ -20,7 +20,9 @@ Android third-party apps cannot reliably read the global ADB/developer-option fl
 
 ## Install source and tampering
 
-Play-recognized app integrity is required. An unknown or modified binary is rejected by the backend. Play Integrity remediation may be used for recoverable cases such as licensing or access-risk conditions.
+Play-recognized app integrity is required for protected backend operations. The production backend is the security authority: it verifies the Play Integrity token and rejects protected operations when the installed binary, licensing state, or device integrity does not satisfy policy. A modified/re-signed build may still display limited local UI, but it must not receive protected backend data or privileged API access.
+
+The app never intentionally corrupts, deletes, or degrades user data because a binary was modified. Tamper handling is fail-closed: protected reads/writes and privileged operations are denied, while ordinary local UI remains usable where possible. This prevents an attacker from turning the integrity control itself into a data-destruction mechanism.
 
 ## One account per device
 
