@@ -8,9 +8,8 @@ export interface AudioEditorToolDefinition {
 }
 
 /**
- * Registry contains only tools that have a real routed implementation.
- * Feature code can exist in the repository without being advertised here
- * until its complete user flow is wired and verified.
+ * Registry contains only audio-editor tools with a routed, implemented flow.
+ * Feature code is not advertised here until its user flow is wired and verified.
  */
 const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
   {
