@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AuthSession, EmailPasswordInput } from './authTypes';
+import { bindCloudSyncAccount } from '@/features/cloud-sync/cloudSyncBinding';
 import {
   getStoredAuthSession,
   supabaseAuthAdapter,
@@ -42,6 +43,12 @@ async function initializeSharedAuth(): Promise<void> {
 function subscribe(listener: AuthListener): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
+}
+
+async function bindSessionToCloudOwner(value: AuthSession): Promise<void> {
+  const email = value.user.email?.trim();
+  if (!email) throw new Error('CLOUD_SYNC_ACCOUNT_EMAIL_REQUIRED');
+  await bindCloudSyncAccount({ ownerEmail: email, ownerUserId: value.user.uid, provider: 'google-drive', boundAt: Date.now(), driveFolderId: null });
 }
 
 function setSharedSession(value: AuthSession | null): void {
@@ -88,6 +95,7 @@ export function useAuth() {
     setBusy(true);
     try {
       const next = await action();
+      await bindSessionToCloudOwner(next);
       setSharedSession(next);
       return next;
     } catch (err) {
