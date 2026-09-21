@@ -78,6 +78,10 @@ export type AudioCompressionInput = {
 
 export type AudioCompressionResult = AudioMixResult & {
   bitrateKbps: number;
+  inputSizeBytes?: number;
+  outputSizeBytes?: number;
+  encodedBytes?: number;
+  decodedPcmBytes?: number;
 };
 
 export type PiperSynthesizeInput = {
