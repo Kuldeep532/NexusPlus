@@ -81,7 +81,7 @@ export default function GeetaNexusHome() {
         </View>
 
         {gitaAvailable && (
-          <Pressable accessibilityRole="button" accessibilityLabel={continueLabel} onPress={() => router.push(currentProgress ? `/geeta-nexus/chapters?chapter=${currentProgress.chapter}&verse=${currentProgress.verse}` as never : '/geeta-nexus/chapters' as never)} style={[styles.continueCard, { backgroundColor: colors.primary }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={continueLabel} onPress={() => router.push(currentProgress ? `/geeta-nexus/read?chapter=${currentProgress.chapter}&verse=${currentProgress.verse}` as never : '/geeta-nexus/read?chapter=1&verse=1' as never)} style={[styles.continueCard, { backgroundColor: colors.primary }]}>
             <View style={styles.continueCopy}>
               <Text style={[styles.cardKicker, { color: colors.primaryForeground }]}>CONTINUE READING</Text>
               <Text style={[styles.continueTitle, { color: colors.primaryForeground }]}>{continueLabel}</Text>
@@ -97,7 +97,7 @@ export default function GeetaNexusHome() {
               <Feather name="clock" size={18} color={colors.primary} />
             </View>
             {progress.map((item) => (
-              <Pressable key={item.textId} accessibilityRole="button" accessibilityLabel={`Resume ${item.textId}. Chapter ${item.chapter}, verse ${item.verse}`} onPress={() => { setSelectedText(item.textId); if (item.textId === 'bhagavad-gita') router.push(`/geeta-nexus/chapters?chapter=${item.chapter}&verse=${item.verse}` as never); }} style={[styles.progressRow, { borderTopColor: colors.border }]}>
+              <Pressable key={item.textId} accessibilityRole="button" accessibilityLabel={`Resume ${item.textId}. Chapter ${item.chapter}, verse ${item.verse}`} onPress={() => { setSelectedText(item.textId); if (item.textId === 'bhagavad-gita') router.push(`/geeta-nexus/read?chapter=${item.chapter}&verse=${item.verse}` as never); }} style={[styles.progressRow, { borderTopColor: colors.border }]}>
                 <View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{item.textId === 'bhagavad-gita' ? 'Bhagavad Gita' : 'Ramcharitmanas'}</Text><Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>Chapter {item.chapter}, Verse {item.verse}</Text></View>
                 <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
               </Pressable>
@@ -139,7 +139,7 @@ export default function GeetaNexusHome() {
 
       <View style={[styles.bottomBar, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 8) }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Return to Nexus Plus Home" style={styles.tab} onPress={() => router.replace('/(tabs)' as never)}><Feather name="home" size={20} color={colors.primary} /><Text style={[styles.tabLabel, { color: colors.primary }]}>Nexus Plus</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Bhagavad Gita Chapters" style={styles.tab} onPress={() => router.push('/geeta-nexus/chapters' as never)}><Feather name="book" size={20} color={colors.foreground} /><Text style={[styles.tabLabel, { color: colors.foreground }]}>Chapters</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Bhagavad Gita Chapters" style={styles.tab} onPress={() => router.push('/geeta-nexus/read?chapter=1&verse=1' as never)}><Feather name="book" size={20} color={colors.foreground} /><Text style={[styles.tabLabel, { color: colors.foreground }]}>Chapters</Text></Pressable>
       </View>
     </View>
   );
