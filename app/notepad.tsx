@@ -8,7 +8,7 @@ import { localNotesRepository, NOTES_STORAGE_LOCATION } from '@/features/notepad
 import { DEFAULT_NOTE_CATEGORIES, Note, NoteCategory } from '@/features/notepad/notepadTypes';
 import { NoteList } from '@/features/notepad/components/NoteList';
 import { NoteForm, NoteDraft } from '@/features/notepad/components/NoteForm';
-import { readVault, writeVault } from '@/features/biometric-vault/biometricVaultRepository';
+import { saveNoteToSecureVault } from '@/features/notepad/notepadVaultBridge';
 
 type Screen = 'home' | 'all' | 'categories' | 'add' | 'edit';
 
@@ -39,7 +39,7 @@ export default function NotepadRoute() {
 
   const visibleNotes = notes.filter((note) => {
     const q = search.trim().toLowerCase();
-    return !note.archived && (!q || `${note.title} ${note.description} ${note.content}`.toLowerCase().includes(q)) && (!selectedCategory || note.categoryId === selectedCategory);
+    return !note.archived && (!q || (note.title + ' ' + note.content + ' ' + note.kind).toLowerCase().includes(q)) && (!selectedCategory || note.categoryId === selectedCategory);
   });
 
   const saveDraft = async (draft: NoteDraft) => {
@@ -47,20 +47,16 @@ export default function NotepadRoute() {
     try {
       const now = Date.now();
       const note: Note = editing
-        ? { ...editing, title: draft.title, description: draft.description, content: draft.content, categoryId: draft.categoryId, updatedAt: now }
-        : { id: `${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`, title: draft.title, description: draft.description, content: draft.content, categoryId: draft.categoryId, createdAt: now, updatedAt: now };
+        ? { ...editing, kind: draft.kind, title: draft.title, content: draft.content, categoryId: draft.categoryId, attachments: draft.attachments, updatedAt: now }
+        : { id: now.toString(36) + '-' + Math.random().toString(36).slice(2, 8), kind: draft.kind, title: draft.title, content: draft.content, categoryId: draft.categoryId, attachments: draft.attachments, createdAt: now, updatedAt: now, source: 'NOTEPAD' };
       await localNotesRepository.saveNote(note);
       setNotes((current) => [note, ...current.filter((item) => item.id !== note.id)]);
-      if (draft.saveToSecureVault) {
-        const snapshot = await readVault();
-        const vaultNote = { id: `secure-note-${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`, category: 'SECURE_NOTE' as const, title: draft.title, content: draft.content, tags: draft.description ? [draft.description] : [], createdAt: now, updatedAt: now };
-        await writeVault([vaultNote, ...snapshot.items], snapshot.keyVersion);
-      }
+      if (draft.saveToSecureVault) await saveNoteToSecureVault({ title: note.title, content: note.content, attachments: note.attachments });
       setEditing(undefined);
       setScreen('all');
-      Alert.alert('Note saved', draft.saveToSecureVault ? 'Note saved to Nexus Plus / Notes and Secure Vault.' : 'Note saved to Nexus Plus / Notes.');
-    } catch (error) {
-      Alert.alert('Could not save note', draft.saveToSecureVault ? 'The note could not be saved to the Secure Vault. Unlock the Vault first, then try again.' : 'The local Notes store could not be updated.');
+      Alert.alert('Note saved', draft.saveToSecureVault ? 'Saved to Nexus Plus / Notes and Secure Vault.' : 'Saved to Nexus Plus / Notes.');
+    } catch {
+      Alert.alert('Could not save note', draft.saveToSecureVault ? 'Save to Secure Vault failed. Unlock the Vault and try again.' : 'The local Notes store could not be updated.');
     } finally { setSaving(false); }
   };
 
@@ -68,7 +64,7 @@ export default function NotepadRoute() {
     const name = newCategory.trim();
     if (!name) return;
     const now = Date.now();
-    const category: NoteCategory = { id: `${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`, name, createdAt: now, updatedAt: now };
+    const category: NoteCategory = { id: now.toString(36) + '-' + Math.random().toString(36).slice(2, 8), name, createdAt: now, updatedAt: now };
     await localNotesRepository.saveCategory(category);
     setCategories((current) => [category, ...current]);
     setNewCategory('');
@@ -79,14 +75,14 @@ export default function NotepadRoute() {
   }
 
   if (screen === 'categories') {
-    return <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}><Stack.Screen options={{ headerShown: false }} /><Header title="Categories" onBack={() => setScreen('home')} colors={colors} /><View style={styles.categoryCreate}><TextInput accessibilityLabel="New category" value={newCategory} onChangeText={setNewCategory} placeholder="New category" placeholderTextColor={colors.mutedForeground} style={[styles.input, { color: colors.foreground, backgroundColor: colors.card, borderColor: colors.border }]} /><Pressable accessibilityRole="button" accessibilityLabel="Add category" onPress={() => void addCategory()} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_700Bold' }}>Add</Text></Pressable></View><ScrollView contentContainerStyle={styles.categoryList}>{categories.map((category) => <Pressable key={category.id} onPress={() => { setSelectedCategory(category.id); setScreen('all'); }} style={[styles.categoryCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.categoryName, { color: colors.foreground }]}>{category.name}</Text><Text style={[styles.categoryCount, { color: colors.mutedForeground }]}>{notes.filter((note) => note.categoryId === category.id).length} notes</Text></Pressable>)}</ScrollView></View>;
+    return <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}><Stack.Screen options={{ headerShown: false }} /><Header title="Categories" onBack={() => setScreen('home')} colors={colors} /><View style={styles.categoryCreate}><TextInput accessibilityLabel="New category" value={newCategory} onChangeText={setNewCategory} placeholder="New category" placeholderTextColor={colors.mutedForeground} style={[styles.input, { color: colors.foreground, backgroundColor: colors.card, borderColor: colors.border }]} /><Pressable accessibilityRole="button" accessibilityLabel="Add category" onPress={() => void addCategory()} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_700Bold' }}>Add</Text></Pressable></View><ScrollView contentContainerStyle={styles.categoryList}>{categories.map((category) => <Pressable key={category.id} accessibilityRole="button" accessibilityLabel={category.name} onPress={() => { setSelectedCategory(category.id); setScreen('all'); }} style={[styles.categoryCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.categoryName, { color: colors.foreground }]}>{category.name}</Text><Text style={[styles.categoryCount, { color: colors.mutedForeground }]}>{notes.filter((note) => note.categoryId === category.id).length} notes</Text></Pressable>)}</ScrollView></View>;
   }
 
   if (screen === 'all') {
     return <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}><Stack.Screen options={{ headerShown: false }} /><Header title="All Notes" onBack={() => setScreen('home')} colors={colors} /><View style={[styles.search, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="search" size={17} color={colors.mutedForeground} /><TextInput accessibilityLabel="Search notes" value={search} onChangeText={setSearch} placeholder="Search notes" placeholderTextColor={colors.mutedForeground} style={[styles.searchInput, { color: colors.foreground }]} /></View><NoteList notes={visibleNotes} categories={categories} onOpen={(note) => { setEditing(note); setScreen('edit'); }} /></View>;
   }
 
-  return <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}><Stack.Screen options={{ headerShown: false }} /><Header title="Notepad" onBack={() => router.back()} colors={colors} /><ScrollView contentContainerStyle={styles.home}><Text style={[styles.storage, { color: colors.mutedForeground }]}>Local storage: {NOTES_STORAGE_LOCATION}</Text><Pressable accessibilityRole="button" accessibilityLabel="All Notes" onPress={() => setScreen('all')} style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.menuText, { color: colors.foreground }]}>All Notes</Text><Feather name="chevron-right" size={18} color={colors.mutedForeground} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Categories" onPress={() => setScreen('categories')} style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.menuText, { color: colors.foreground }]}>Categories</Text><Feather name="grid" size={18} color={colors.mutedForeground} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Add New Note" onPress={() => { setEditing(undefined); setScreen('add'); }} style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.menuText, { color: colors.foreground }]}>Add New Note</Text><Feather name="plus" size={18} color={colors.mutedForeground} /></Pressable><Text style={[styles.syncHint, { color: colors.mutedForeground }]}>Storage is repository-based, so an S3 or Firebase sync adapter can be added later without replacing these screens.</Text></ScrollView></View>;
+  return <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}><Stack.Screen options={{ headerShown: false }} /><Header title="Notepad" onBack={() => router.back()} colors={colors} /><ScrollView contentContainerStyle={styles.home}><Text style={[styles.storage, { color: colors.mutedForeground }]}>Local storage: {NOTES_STORAGE_LOCATION}</Text><Pressable accessibilityRole="button" accessibilityLabel="All Notes" onPress={() => setScreen('all')} style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.menuText, { color: colors.foreground }]}>All Notes</Text><Feather name="chevron-right" size={18} color={colors.mutedForeground} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Categories" onPress={() => setScreen('categories')} style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.menuText, { color: colors.foreground }]}>Categories</Text><Feather name="grid" size={18} color={colors.mutedForeground} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Add New Note" onPress={() => { setEditing(undefined); setScreen('add'); }} style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.menuText, { color: colors.foreground }]}>Add New Note</Text><Feather name="plus" size={18} color={colors.mutedForeground} /></Pressable><Text style={[styles.syncHint, { color: colors.mutedForeground }]}>Notes are repository-based and ready for a future S3/Firebase sync adapter.</Text></ScrollView></View>;
 }
 
 function Header({ title, onBack, colors }: { title: string; onBack: () => void; colors: any }) { return <View style={styles.header}><Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack} style={styles.back}><Feather name="arrow-left" size={21} color={colors.foreground} /></Pressable><Text accessibilityRole="header" style={[styles.heading, { color: colors.foreground }]}>{title}</Text></View>; }
