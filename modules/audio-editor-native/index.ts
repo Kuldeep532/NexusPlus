@@ -51,6 +51,17 @@ export type AudioMixResult = {
   mimeType: string | null;
 };
 
+export type AudioEffectInput = {
+  inputPath: string;
+  outputPath: string;
+  effect: 'volume' | 'fade-in' | 'fade-out' | 'normalize';
+  startMs?: number;
+  endMs?: number;
+  amount?: number;
+};
+
+export type AudioEffectResult = AudioMixResult;
+
 export type PiperSynthesizeInput = {
   text: string;
   modelPath: string;
@@ -71,6 +82,7 @@ type AudioEditorNativeModuleType = {
   trim(inputPath: string, outputPath: string, startMs: number, endMs: number): Promise<AudioTrimResult>;
   mix(input: AudioMixInput): Promise<AudioMixResult>;
   mixProject(input: AudioMixProjectInput): Promise<AudioMixResult>;
+  applyEffect(input: AudioEffectInput): Promise<AudioEffectResult>;
   synthesizePiper(input: PiperSynthesizeInput): Promise<PiperSynthesizeResult>;
 };
 
