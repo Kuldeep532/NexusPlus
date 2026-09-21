@@ -175,6 +175,15 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
         s.recordingRef = null
     }
 
+    private data class RecordingSearchEntry(val recordingToken: String, val startedAt: Double, val endedAt: Double)
+
+    private fun textValue(xmlText: String, tag: String): String? =
+        Regex("(?is)<(?:[A-Za-z0-9_.-]+:)?$tag[^>]*>(.*?)</(?:[A-Za-z0-9_.-]+:)?$tag>").find(xmlText)?.groupValues?.getOrNull(1)?.trim()?.takeIf(String::isNotBlank)
+
+    private fun parseTimestamp(value: String?): Double? = value?.let {
+        runCatching { Instant.parse(it).toEpochMilli().toDouble() }.getOrNull()
+    }
+
     private fun searchRecordings(s: Session, payload: ReadableMap?): com.facebook.react.bridge.WritableMap {
         val ep = s.searchXaddr ?: throw IllegalStateException("Camera does not expose Recording Search service.")
         val from = payload?.getDouble("from") ?: throw IllegalArgumentException("Search start time is required.")
@@ -189,16 +198,24 @@ class NexusCctvOnvifModule(private val reactContext: ReactApplicationContext) : 
         val response = soap(ep, ACTION_FIND_RECORDINGS, body, s.username, s.password)
         val searchToken = Regex("(?is)<(?:[A-Za-z0-9_.-]+:)?SearchToken>(.*?)</(?:[A-Za-z0-9_.-]+:)?SearchToken>").find(response)?.groupValues?.getOrNull(1)?.trim() ?: throw IllegalStateException("Camera returned no recording search token.")
         val results = soap(ep, ACTION_GET_RECORDING_SEARCH_RESULTS, "<GetRecordingSearchResults xmlns=\"http://www.onvif.org/ver10/search/wsdl\"><SearchToken>${xml(searchToken)}</SearchToken><MinResults>0</MinResults><MaxResults>$limit</MaxResults><WaitTime>PT1S</WaitTime></GetRecordingSearchResults>", s.username, s.password)
-        val entries = Regex("(?is)<(?:[A-Za-z0-9_.-]+:)?RecordingInformation>(.*?)</(?:[A-Za-z0-9_.-]+:)?RecordingInformation>").findAll(results).mapIndexed { index, _ -> index to token }.toList()
+        val entries = Regex("(?is)<(?:[A-Za-z0-9_.-]+:)?RecordingInformation>(.*?)</(?:[A-Za-z0-9_.-]+:)?RecordingInformation>").findAll(results).mapNotNull { match ->
+            val info = match.groupValues.getOrNull(1).orEmpty()
+            val recordingToken = textValue(info, "RecordingToken") ?: token
+            val startText = textValue(info, "Time") ?: textValue(info, "StartTime")
+            val endText = textValue(info, "EndTime")
+            val start = parseTimestamp(startText) ?: from
+            val end = parseTimestamp(endText) ?: start
+            RecordingSearchEntry(recordingToken, start, end)
+        }.take(limit).toList()
         return Arguments.createMap().apply {
             putArray("recordings", Arguments.createArray().apply {
-                entries.forEach { (index, recordingToken) -> pushMap(Arguments.createMap().apply {
-                    putString("id", "${s.cameraId}:$recordingToken:$index")
+                entries.forEachIndexed { index, entry -> pushMap(Arguments.createMap().apply {
+                    putString("id", "${s.cameraId}:${entry.recordingToken}:$index")
                     putString("cameraId", s.cameraId)
-                    putDouble("startedAt", from)
-                    putDouble("endedAt", to)
+                    putDouble("startedAt", entry.startedAt)
+                    putDouble("endedAt", maxOf(entry.endedAt, entry.startedAt))
                     putString("label", "Recording")
-                    putString("recordingToken", recordingToken)
+                    putString("recordingToken", entry.recordingToken)
                 }) }
             })
         }
