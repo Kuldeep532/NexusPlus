@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { Link, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { Alert } from 'react-native';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -22,6 +23,11 @@ export default function WelcomeScreen() {
     if (!accepted || cctvPolicyAccepted !== true) return;
     await completeWelcome();
     router.replace('/login-plus-register');
+  };
+
+  const openGoogleLogin = async () => {
+    if (!accepted || cctvPolicyAccepted !== true) return;
+    await continueToLogin();
   };
 
   const acceptCctvUsePolicy = async () => {
@@ -107,8 +113,9 @@ export default function WelcomeScreen() {
             accessibilityRole="button"
             accessibilityLabel="Login with Google"
             accessibilityHint="Continue to Google login"
+            accessibilityState={{ disabled: !accepted || cctvPolicyAccepted !== true }}
             disabled={!accepted || cctvPolicyAccepted !== true}
-            onPress={() => void continueToLogin()}
+            onPress={() => void openGoogleLogin()}
             style={[styles.googleButton, { backgroundColor: colors.card, borderColor: colors.border, opacity: accepted && cctvPolicyAccepted === true ? 1 : 0.45 }]}
           >
             <Feather name="globe" size={17} color={colors.foreground} />
