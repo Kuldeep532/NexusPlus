@@ -1,6 +1,7 @@
 package com.nexuswavetech.nexusplus
 
 import android.app.Activity
+import android.os.Build
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
@@ -59,7 +60,6 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
             promise.resolve(mapOf("success" to false, "error" to "activity_unsupported"))
             return
         }
-
         val manager = BiometricManager.from(fragmentActivity)
         val hasStrong = manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
         val hasDeviceCredential = manager.canAuthenticate(BiometricManager.Authenticators.DEVICE_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS
@@ -69,7 +69,6 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
             promise.resolve(mapOf("success" to false, "error" to error))
             return
         }
-
         val authenticators = if (allowDevice) {
             BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
         } else {
@@ -78,7 +77,7 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
         val safeReason = reason.trim().take(120).ifBlank { "Unlock Nexus Biometric Vault" }
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle(safeReason)
-            .setSubtitle("Unlock Nexus Plus Vault")
+            .setSubtitle("Nexus Plus Vault")
             .setAllowedAuthenticators(authenticators)
             .build()
         val executor = ContextCompat.getMainExecutor(fragmentActivity)
@@ -105,33 +104,25 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
         prompt.authenticate(promptInfo)
     }
 
-    @ReactMethod
-    fun ensureKey(promise: Promise) {
-        try { getOrCreateKey(); promise.resolve(null) }
-        catch (_: Throwable) { promise.reject("VAULT_KEY", "Unable to initialize secure Vault key.") }
+    @ReactMethod fun ensureKey(promise: Promise) {
+        try { getOrCreateKey(); promise.resolve(null) } catch (_: Throwable) { promise.reject("VAULT_KEY", "Unable to initialize secure Vault key.") }
     }
 
-    @ReactMethod
-    fun isKeyAvailable(promise: Promise) {
-        try { promise.resolve(getKey() != null) }
-        catch (_: Throwable) { promise.reject("VAULT_KEY", "Unable to inspect secure Vault key.") }
+    @ReactMethod fun isKeyAvailable(promise: Promise) {
+        try { promise.resolve(getKey() != null) } catch (_: Throwable) { promise.reject("VAULT_KEY", "Unable to inspect secure Vault key.") }
     }
 
-    @ReactMethod
-    fun deleteKey(promise: Promise) {
+    @ReactMethod fun deleteKey(promise: Promise) {
         try {
             val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
             if (keyStore.containsAlias(KEY_ALIAS)) keyStore.deleteEntry(KEY_ALIAS)
             promise.resolve(null)
-        } catch (_: Throwable) {
-            promise.reject("VAULT_KEY", "Unable to remove secure Vault key.")
-        }
+        } catch (_: Throwable) { promise.reject("VAULT_KEY", "Unable to remove secure Vault key.") }
     }
 
-    @ReactMethod
-    fun encrypt(plaintext: String, aad: String, promise: Promise) {
+    @ReactMethod fun encrypt(plaintext: String, aad: String, promise: Promise) {
         try {
-            require(plaintext.toByteArray(Charsets.UTF_8).size <= MAX_METADATA_BYTES) { "Vault payload exceeds the supported size limit." }
+            require(plaintext.toByteArray(Charsets.UTF_8).size <= MAX_METADATA_BYTES)
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
             cipher.updateAAD(aad.toByteArray(Charsets.UTF_8))
@@ -142,25 +133,21 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
                 "iv" to Base64.getEncoder().encodeToString(cipher.iv),
                 "tag" to Base64.getEncoder().encodeToString(combined.copyOfRange(combined.size - tagBytes, combined.size)),
             ))
-        } catch (_: Throwable) {
-            promise.reject("VAULT_CRYPTO", "Vault encryption failed.")
-        }
+        } catch (_: Throwable) { promise.reject("VAULT_CRYPTO", "Vault encryption failed.") }
     }
 
-    @ReactMethod
-    fun decrypt(ciphertext: String, iv: String, tag: String, aad: String, promise: Promise) {
+    @ReactMethod fun decrypt(ciphertext: String, iv: String, tag: String, aad: String, promise: Promise) {
         try {
             val key = getKey() ?: throw IllegalStateException("Vault master key is unavailable.")
             val ivBytes = Base64.getDecoder().decode(iv)
-            val combined = Base64.getDecoder().decode(ciphertext) + Base64.getDecoder().decode(tag)
-            require(ivBytes.size == 12 && Base64.getDecoder().decode(tag).size == 16) { "Invalid Vault encryption parameters." }
+            val tagBytes = Base64.getDecoder().decode(tag)
+            require(ivBytes.size == 12 && tagBytes.size == 16)
+            val combined = Base64.getDecoder().decode(ciphertext) + tagBytes
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, ivBytes))
             cipher.updateAAD(aad.toByteArray(Charsets.UTF_8))
             promise.resolve(cipher.doFinal(combined).toString(Charsets.UTF_8))
-        } catch (_: Throwable) {
-            promise.reject("VAULT_CRYPTO", "Vault decryption failed.")
-        }
+        } catch (_: Throwable) { promise.reject("VAULT_CRYPTO", "Vault decryption failed.") }
     }
 
     private fun getKey(): javax.crypto.SecretKey? {
@@ -171,13 +158,19 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
     private fun getOrCreateKey(): javax.crypto.SecretKey {
         getKey()?.let { return it }
         val keyGenerator = javax.crypto.KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
-        keyGenerator.init(
-            KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
-                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                .setUserAuthenticationRequired(false)
-                .build(),
-        )
+        val builder = KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            builder.setUserAuthenticationRequired(true)
+            builder.setUserAuthenticationParameters(
+                30,
+                KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL,
+            )
+        } else {
+            builder.setUserAuthenticationRequired(false)
+        }
+        keyGenerator.init(builder)
         return keyGenerator.generateKey()
     }
 }
