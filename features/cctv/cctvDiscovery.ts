@@ -52,7 +52,7 @@ export async function discoverCctvCameras(request: CctvDiscoveryRequest): Promis
   const devices = await nativeDiscovery.discover(normalizeTimeout(request.timeoutMs));
   const cameras: CctvCameraRecord[] = [];
   for (const device of devices) {
-    const xaddr = device.xaddrs?.split(/\s+/).find(Boolean);
+    const xaddr = device.xaddrs?.split(/\s+/).map((value) => value.trim()).find((value) => parseEndpoint(value).secureTransport);
     const endpoint = parseEndpoint(xaddr);
     if (!endpoint.secureTransport || !endpoint.host || !endpoint.port) continue;
     const manufacturer = extractManufacturer(device.scopes);
