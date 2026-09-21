@@ -44,7 +44,7 @@ export default function CctvAddScreen() {
         passwordRef: `onboarding_${Date.now()}`,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        capabilities: { liveView: false, audio: false, recordings: false, playback: false, eraseData: false, passwordChange: false, discovery: false, multiCamera: false, switchCamera: false, flip: false, panTiltZoom: false, nightVision: false, talk: false },
+        capabilities: { liveView: false, recordings: false, playback: false, panTiltZoom: false },
         securityProfile: { secureTransport: true, authenticated: false, protocolFamily: 'onvif', securityLevel: 'detected', reason: 'Awaiting native authenticated verification.' },
         connectionState: 'idle',
         schemaVersion: 3,
