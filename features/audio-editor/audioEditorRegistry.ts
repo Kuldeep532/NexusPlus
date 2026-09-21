@@ -7,7 +7,11 @@ export interface AudioEditorToolDefinition {
   order?: number;
 }
 
-/** Only completed child tools are registered here. Home registers the parent Audio Editor. */
+/**
+ * Registry contains only tools that have a real routed implementation.
+ * Feature code can exist in the repository without being advertised here
+ * until its complete user flow is wired and verified.
+ */
 const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
   {
     id: 'audio-trimmer',
@@ -24,6 +28,14 @@ const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
     route: '/audio-editor/mix-audio',
     icon: 'layers',
     order: 30,
+  },
+  {
+    id: 'audio-to-video',
+    title: 'Audio to Video',
+    description: 'Turn an audio track and timed images into an exported video.',
+    route: '/audio-editor/audio-to-video',
+    icon: 'film',
+    order: 40,
   },
 ];
 
