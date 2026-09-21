@@ -50,11 +50,6 @@ function RootLayoutContent() {
     const inHome = firstSegment === 'home';
     const inLegal = firstSegment === 'privacy-policy' || firstSegment === 'terms-and-conditions' || firstSegment === 'about-us';
 
-    if (firstSegment === 'geeta-nexus') {
-      router.replace('/(tabs)');
-      return;
-    }
-
     if (!auth.session) {
       if (inWelcome || inLegal) return;
 
