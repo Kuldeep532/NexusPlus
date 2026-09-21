@@ -44,8 +44,4 @@ The app does not implement a permanent IP ban. Mobile carrier NAT, shared Wi-Fi,
 
 ## User-facing block
 
-When the backend denies access because the installation/device is not trusted, the client should render:
-
-> Please uninstall this app to use this app.
-
-No payment, profile, account, or business UI should be accessible while blocked.
+When the backend denies protected access because the installation/device is not trusted, the client should enter a safe limited state and clearly explain that the build is not trusted. Protected account data, backend writes, payments, profile operations, and privileged device controls remain unavailable until a trusted release is installed. Local UI that does not expose protected data may remain usable.
