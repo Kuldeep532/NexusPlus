@@ -22,6 +22,10 @@ const sections = [
     body: 'Nexus Plus brings that philosophy into practical technology. It is a compact, feature-rich multi-utility application built around accessibility, productivity, security, time assistance, media, document tools, connected-device workflows, and thoughtful digital utilities. We follow the principle that work itself can become worship when it is performed with sincerity, responsibility, and service in mind.',
   },
   {
+    title: 'Geeta Nexus Integration',
+    body: 'Geeta Nexus was previously maintained as a standalone Bhagavad Gita experience and is now integrated into Nexus Plus for unified accessibility, account, storage, media and feature management. The integrated module currently focuses on Bhagavad Gita reading and chapter progress; additional sacred-text libraries are added only when their verified content is available.',
+  },
+  {
     title: 'What is Nexus Plus?',
     body: 'Nexus Plus is a versatile digital companion designed to simplify everyday tasks. Its current feature set includes document and PDF utilities, file management and protection, audio and media tools, voice and text-to-speech workflows, accessibility assistance, reminders and time tools, financial-organization utilities, QR tools, connected-device features, news and content aggregation, AI-assisted workflows, screen mirroring, authorized remote control, CCTV management, nearby file transfer, and access to the Geeta Nexus spiritual experience where enabled. Feature availability can vary by device, Android version, account status, network and required third-party service.',
   },
