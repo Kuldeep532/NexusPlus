@@ -5,7 +5,6 @@ import { palettes, radius, type ColorTokens } from '@/constants/colors';
 
 let selectedTheme: ThemeColor = 'ocean-blue';
 const listeners = new Set<() => void>();
-
 type PaletteTokens = ColorTokens & { radius: number; ink: string };
 function subscribe(listener: () => void) { listeners.add(listener); return () => listeners.delete(listener); }
 function getSnapshot() { return selectedTheme; }
@@ -15,7 +14,7 @@ export function useColors(): PaletteTokens {
   const scheme = useColorScheme();
   const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   useEffect(() => { let active = true; void readThemeColor().then((stored) => { if (active && stored !== selectedTheme) refreshThemeColor(stored); }); return () => { active = false; }; }, []);
-  const paletteName = theme === 'ocean-blue' ? 'oceanBlue' : theme === 'classic' ? 'classic' : 'light';
+  const paletteName: keyof typeof palettes = theme === 'ocean-blue' ? 'oceanBlue' : theme === 'classic' ? 'classic' : theme === 'light' ? 'light' : theme === 'material' ? 'material' : theme === 'black' ? 'black' : theme === 'spiritual' ? 'spiritual' : 'oceanBlue';
   const palette = palettes[paletteName];
   const effectiveScheme = theme === 'dark' ? 'dark' : theme === 'light' ? 'light' : scheme === 'dark' ? 'dark' : 'light';
   const tokens = palette[effectiveScheme];
