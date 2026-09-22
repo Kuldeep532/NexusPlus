@@ -61,6 +61,14 @@ const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
     order: 57,
   },
   {
+    id: 'remove-silence',
+    title: 'Remove Silence',
+    description: 'Automatically detect sustained quiet gaps and remove them while preserving configurable padding.',
+    route: '/audio-editor/remove-silence',
+    icon: 'volume-x',
+    order: 58,
+  },
+  {
     id: 'text-to-speech',
     title: 'Text to Speech',
     description: 'Generate speech with installed Nexus voices, speed, pitch, and automatic emotion tuning.',
