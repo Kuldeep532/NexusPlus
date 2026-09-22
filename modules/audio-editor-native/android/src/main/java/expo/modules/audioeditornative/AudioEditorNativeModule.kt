@@ -20,10 +20,10 @@ class AudioEditorNativeModule : Module() {
       catch (error: Exception) { promise.reject("AUDIO_TRIM_FAILED", error.message ?: "Unable to trim audio", error) }
     }
 
-    AsyncFunction("vocalRemove") { inputPath: String, outputPath: String, quality: String, preserveBass: Boolean, preserveStereo: Boolean, promise: Promise ->
+    AsyncFunction("vocalRemove") { inputPath: String, outputPath: String, outputStem: String, quality: String, preserveBass: Boolean, preserveStereo: Boolean, promise: Promise ->
       try {
         val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
-        val result = VocalRemovalProcessor.process(context, inputPath, outputPath, quality, preserveBass, preserveStereo)
+        val result = VocalRemovalProcessor.process(context, inputPath, outputPath, outputStem, quality, preserveBass, preserveStereo)
         promise.resolve(mapOf(
           "outputPath" to result.outputPath,
           "durationMs" to result.durationMs,
