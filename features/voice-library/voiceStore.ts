@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { UNIQUE_VOICE_CATALOG, type VoiceCatalogItem } from './voiceCatalog';
 import { acquireVoiceDownloadSlot, releaseVoiceDownloadSlot } from './voiceDownloadGuard';
+import { requestModelDownload } from '@/features/model-manager/modelDownloadManager';
 import { finishSupabaseVoiceDownload, tryStartSupabaseVoiceDownload, type DownloadGateDeviceInfo } from './supabaseDownloadGate';
 
 const STORAGE_KEY = 'nexus-plus.voice-library.v4';
@@ -42,11 +43,12 @@ async function installVoice(voice: VoiceCatalogItem, onProgress?: (progress: Voi
   try {
     if (supabaseDownloadSessionProvider) { supabaseSession = await supabaseDownloadSessionProvider(); if (supabaseSession) await tryStartSupabaseVoiceDownload(supabaseSession.userId, supabaseSession.accessToken, deviceInfoProvider?.()); }
     await safeDelete(modelTemp); await safeDelete(configTemp);
-    const modelUriDownloaded = await downloadWithProgress(voice.modelUrl, modelTemp, (bytes, total) => onProgress?.({ voiceId: voice.id, stage: 'model', downloadedBytes: bytes, totalBytes: total || voice.modelSizeBytes || 0 }));
-    if (!(await validFile(modelUriDownloaded, voice.modelSizeBytes))) throw new Error(`Voice model ${voice.name} failed integrity verification.`);
-    const configUriDownloaded = await FileSystem.downloadAsync(voice.configUrl, configTemp);
-    if (!(await validFile(configUriDownloaded.uri, voice.configSizeBytes))) throw new Error(`Voice configuration for ${voice.name} failed integrity verification.`);
-    await safeDelete(model); await safeDelete(config); await FileSystem.moveAsync({ from: modelTemp, to: model }); await FileSystem.moveAsync({ from: configTemp, to: config });
+    const modelResult = await requestModelDownload({ id: `piper:${voice.id}`, url: voice.modelUrl, destination: model, expectedSizeBytes: voice.modelSizeBytes });
+    onProgress?.({ voiceId: voice.id, stage: 'model', downloadedBytes: modelResult.sizeBytes, totalBytes: voice.modelSizeBytes || modelResult.sizeBytes });
+    if (!(await validFile(modelResult.uri, voice.modelSizeBytes))) throw new Error(`Voice model ${voice.name} failed integrity verification.`);
+    const configResult = await requestModelDownload({ id: `piper-config:${voice.id}`, url: voice.configUrl, destination: config, expectedSizeBytes: voice.configSizeBytes });
+    if (!(await validFile(configResult.uri, voice.configSizeBytes))) throw new Error(`Voice configuration for ${voice.name} failed integrity verification.`);
+    await safeDelete(modelTemp); await safeDelete(configTemp);
     if (!(await validFile(model, voice.modelSizeBytes)) || !(await validFile(config, voice.configSizeBytes))) throw new Error(`Voice ${voice.name} could not be finalized safely.`);
     const installed = { ...voice, installedAt: Date.now(), modelPath: model, configPath: config } as InstalledVoice; const current = await getInstalledVoices(); await writeInstalled([...current.filter((item) => item.id !== voice.id), installed]); return installed;
   } catch (error) { await safeDelete(modelTemp); await safeDelete(configTemp); throw error instanceof Error ? error : new Error(`Voice ${voice.name} download failed.`); }
