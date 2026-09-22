@@ -15,6 +15,7 @@ import { detectVideoDescriptionLanguage, speakVideoDescription } from './videoDe
 import { getNativeVideoDescriptionModule } from './videoDescriptionNative';
 import { ensureOpenCvWasm } from './opencvWasm';
 import { AUDIO_EFFECT_PRESETS, type AudioEffectPreset } from './audioEffects';
+import { validateStreamUri } from './streamCapability';
 
 type Props = { initialItems?: MediaItemModel[]; onBack?: () => void };
 type LibraryTab = 'tracks' | 'albums' | 'playlists';
@@ -124,17 +125,20 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
       Alert.alert('Protected provider', 'Use the official provider flow for protected platforms. Direct stream extraction is not supported.');
       return;
     }
-    const kind: 'audio' | 'video' = /\.(mp4|m4v|webm|mov|mkv)(?:\?|#|$)/i.test(uri) ? 'video' : 'audio';
-    const item: MediaItemModel = {
+    const kind: 'audio' | 'video' = /\.(mp4|m4v|webm|mov|mkv|m3u8)(?:\?|#|$)/i.test(uri) ? 'video' : 'audio';
+    void validateStreamUri(uri, kind).then((capability) => {
+      if (!capability.supported) { Alert.alert('Unsupported media', capability.message || (kind === 'audio' ? 'This audio URL is not supported.' : 'This video URL is not supported.')); return; }
+      const item: MediaItemModel = {
       id: 'url:' + uri,
       uri,
       kind,
       source: 'local',
       title: uri,
     };
-    loadItem(item, [item]);
-    setUrlDialog(false);
-    setMediaUrl('');
+      loadItem(item, [item]);
+      setUrlDialog(false);
+      setMediaUrl('');
+    });
   }, [loadItem, mediaUrl]);
 
   const runVocalRemoval = useCallback(async () => {
