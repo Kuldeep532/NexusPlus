@@ -18,12 +18,7 @@ object VideoDescriptionProcessor {
       } else {
         retriever.setDataSource(videoUri.removePrefix("file://"))
       }
-
-      val bitmap = retriever.getFrameAtTime(
-        (timestampMs.coerceAtLeast(0.0) * 1000.0).toLong(),
-        MediaMetadataRetriever.OPTION_CLOSEST,
-      ) ?: return null
-
+      val bitmap = retriever.getFrameAtTime((timestampMs.coerceAtLeast(0.0) * 1000.0).toLong(), MediaMetadataRetriever.OPTION_CLOSEST) ?: return null
       val width = bitmap.width
       val height = bitmap.height
       val orientation = when {
@@ -31,15 +26,10 @@ object VideoDescriptionProcessor {
         height > width * 1.25 -> "portrait"
         else -> "landscape"
       }
-
       val isHindi = language.lowercase(Locale.ROOT).startsWith("hi")
-      val text = if (isHindi) "वीडियो का दृश्य $orientation फ्रेम है।"
-      else "The video is showing a $orientation frame."
-
+      val text = if (isHindi) "वीडियो का फ्रेम ${orientation} है।" else "The video frame is ${orientation}."
       bitmap.recycle()
-      return mapOf("text" to text, "confidence" to 0.1)
-    } finally {
-      retriever.release()
-    }
+      return mapOf("text" to text, "confidence" to 0.1, "semantic" to false)
+    } finally { retriever.release() }
   }
 }
