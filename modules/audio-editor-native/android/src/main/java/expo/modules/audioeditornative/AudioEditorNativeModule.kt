@@ -94,6 +94,22 @@ class AudioEditorNativeModule : Module() {
       }
     }
 
+    AsyncFunction("speedAndPitch") { inputPath: String, outputPath: String, speed: Double, pitchSemitones: Double, promise: Promise ->
+      try {
+        val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
+        val result = SpeedPitchProcessor.process(context, inputPath, outputPath, speed, pitchSemitones)
+        promise.resolve(mapOf(
+          "outputPath" to result.outputPath,
+          "durationMs" to result.durationMs,
+          "sampleRate" to result.sampleRate,
+          "channels" to result.channels,
+          "mimeType" to result.mimeType,
+        ))
+      } catch (error: Exception) {
+        promise.reject("AUDIO_SPEED_PITCH_FAILED", error.message ?: "Unable to change audio speed and pitch", error)
+      }
+    }
+
     AsyncFunction("synthesizePiper") { input: Map<String, Any?>, promise: Promise ->
       try {
         val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
