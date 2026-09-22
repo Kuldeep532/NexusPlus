@@ -126,8 +126,11 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
   }, [videoDescriptionEnabled, current?.id, current?.kind, current?.uri, player.state.isPlaying, Math.floor(player.state.positionMs / mediaPrefs.descriptionIntervalMs), mediaPrefs.descriptionIntervalMs]);
 
   const loadItem = useCallback((item: MediaItemModel, queue = library) => {
+    if (item.kind === 'audio' && item.source !== 'radio') {
+      void persistent.load(item, queue);
+      return setScreen('player');
+    }
     player.load(item, queue);
-    if (item.kind === 'audio' && item.source !== 'radio') void persistent.load(item, queue);
     setScreen('player');
   }, [library, persistent, player]);
 
