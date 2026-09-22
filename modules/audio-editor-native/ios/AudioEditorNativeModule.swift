@@ -217,7 +217,7 @@ public final class AudioEditorNativeModule: Module {
       try outputTrack.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: track, at: .zero)
 
       if normalizedEffect == "normalize" {
-        throw NSError(domain: "AudioEditorNative", code: 63, userInfo: [NSLocalizedDescriptionKey: "Normalize is not available on the iOS native backend yet."])
+        throw NSError(domain: "AudioEditorNative", code: 63, userInfo: [NSLocalizedDescriptionKey: "Normalize is not supported on this iOS audio backend yet."])
       }
 
       let mix = AVMutableAudioMix()
