@@ -9,7 +9,8 @@ const TOOLS = [
   { route:'/spiritual-meditation', title:'Meditation Timer', description:'Guided silent practice with configurable duration, interval bell, and session history.', icon:'clock' },
   { route:'/spiritual-breathing', title:'Pranayama Timer', description:'Practice timed breathing cycles with inhale, hold, exhale, and rest phases.', icon:'wind' },
   { route:'/spiritual-daily-sadhana', title:'Daily Sadhana', description:'Create a simple spiritual practice checklist and track completed practices each day.', icon:'check-circle' },
-  { route:'/spiritual-mantra', title:'Mantra Player', description:'Generate and play a steady mantra recitation rhythm using device speech, without bundled audio assets.', icon:'volume-2' },
+  { route:'/spiritual-mantra', title:'Mantra Player', description:'Play licensed remote mantra recordings or use the device speech engine.', icon:'volume-2' },
+  { route:'/spiritual-krishna-mantras', title:'Krishna Mantras', description:'Dedicated Krishna mantra library including the Hare Krishna Mahamantra.', icon:'heart' },
 ];
 
 export default function SpiritualScreen() {
