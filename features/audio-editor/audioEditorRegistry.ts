@@ -37,14 +37,6 @@ const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
     order: 30,
   },
   {
-    id: 'audio-to-video',
-    title: 'Audio to Video',
-    description: 'Turn an audio track and timed images into an exported video.',
-    route: '/audio-editor/audio-to-video',
-    icon: 'film',
-    order: 40,
-  },
-  {
     id: 'audio-effects',
     title: 'Audio Effects',
     description: 'Apply real volume, fade-in, fade-out, and normalization effects to selected audio ranges.',
@@ -59,6 +51,14 @@ const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
     route: '/audio-editor/audio-normalizer',
     icon: 'bar-chart-2',
     order: 55,
+  },
+  {
+    id: 'speed-pitch',
+    title: 'Speed & Pitch',
+    description: 'Change playback speed and pitch independently and export a real processed audio file.',
+    route: '/audio-editor/speed-pitch',
+    icon: 'sliders',
+    order: 57,
   },
   {
     id: 'text-to-speech',
