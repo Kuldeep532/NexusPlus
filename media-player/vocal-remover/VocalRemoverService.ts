@@ -1,5 +1,6 @@
 import type { MediaItemModel } from '../types';
 import { createVocalRemovalEngines } from './engines';
+import { Platform } from 'react-native';
 import type { VocalRemovalEngine, VocalRemovalJob, VocalRemovalOptions, VocalRemovalResult } from './types';
 
 const DEFAULT_OPTIONS: VocalRemovalOptions = {
@@ -44,6 +45,8 @@ export class VocalRemoverService {
       progress: 0,
     };
     onJobUpdate?.(job);
+
+    if (Platform.OS !== 'android') throw new Error('Vocal removal is supported only on Android.');
 
     const available = await this.getAvailableEngines();
     if (!available.length) throw new Error('No vocal-removal engine is available.');
