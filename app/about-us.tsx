@@ -6,6 +6,14 @@ const sections = [
     body: 'Nexus Plus is created by Nexus Wave Technologies with a simple belief: technology should reduce friction, increase accessibility, and help people use digital tools with greater independence and clarity.',
   },
   {
+    title: 'The Purpose Behind Nexus Wave Technologies',
+    body: 'Nexus Wave Technologies was founded with a central spiritual purpose: to use technology as a means of service and to help carry spiritual wisdom into everyday digital life. Accessibility, useful technology and responsible innovation are important parts of that work, but spirituality remains the guiding purpose behind the product vision.',
+  },
+  {
+    title: 'Nexus Plus & Geeta Nexus',
+    body: 'Nexus Plus is the main product of Nexus Wave Technologies, and Geeta Nexus is its primary spiritual experience. Geeta Nexus brings the Bhagavad Gita into an accessible digital reading experience with chapter navigation, reading progress and verified verse content. Other utilities exist to support everyday life, while the spiritual purpose remains central to the product direction.',
+  },
+  {
     title: 'Founder — Kuldeep',
     body: 'Kuldeep is the Founder of Nexus Wave Technologies and the creator behind the Nexus product family. The product vision combines accessibility, practical everyday utilities, technology, and a service-oriented approach to digital innovation.',
   },
