@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { OFFLINE_VOICE_MODELS, type OfflineVoiceModel } from './offlineVoiceModels';
+import { requestModelDownload } from '@/features/model-manager/modelDownloadManager';
 
 const MODEL_DIRECTORY = `${FileSystem.documentDirectory ?? FileSystem.cacheDirectory}tts-models/`;
 const activeDownloads = new Map<string, Promise<string>>();
@@ -32,18 +33,18 @@ async function install(model: OfflineVoiceModel, onProgress?: (progress: VoiceIn
   }
   safeDelete(modelTemp); safeDelete(configTemp);
   try {
-    const task = FileSystem.createDownloadResumable(model.source, modelTemp, {}, ({ totalBytesWritten, totalBytesExpectedToWrite }) => onProgress?.({ modelId: model.id, downloadedBytes: totalBytesWritten, totalBytes: totalBytesExpectedToWrite || model.sizeBytes, complete: false }));
-    const downloaded = await task.downloadAsync();
-    if (!downloaded?.uri) throw new Error(`Voice model ${model.id} failed to download.`);
+    const result = await requestModelDownload({ id: `offline-tts:${model.id}`, url: model.source, destination, expectedSizeBytes: model.sizeBytes });
+    onProgress?.({ modelId: model.id, downloadedBytes: result.sizeBytes, totalBytes: model.sizeBytes, complete: false });
+    const downloaded = { uri: result.uri };
+    if (!downloaded.uri) throw new Error(`Voice model ${model.id} failed to download.`);
     const info = await FileSystem.getInfoAsync(downloaded.uri);
     if (!info.exists || !('size' in info) || Number(info.size) !== model.sizeBytes) throw new Error(`Voice model ${model.id} failed size verification after download.`);
-    const config = await FileSystem.downloadAsync(model.configSource, configTemp);
+    const configResult = await requestModelDownload({ id: `offline-tts-config:${model.id}`, url: model.configSource, destination: configDestination });
+    const config = { uri: configResult.uri };
     const configInfo = await FileSystem.getInfoAsync(config.uri);
     if (!configInfo.exists || !('size' in configInfo) || Number(configInfo.size) <= 0) throw new Error(`Voice model ${model.id} configuration failed verification after download.`);
-    await FileSystem.deleteAsync(destination, { idempotent: true });
-    await FileSystem.deleteAsync(configDestination, { idempotent: true });
-    await FileSystem.moveAsync({ from: modelTemp, to: destination });
-    await FileSystem.moveAsync({ from: configTemp, to: configDestination });
+    await FileSystem.deleteAsync(modelTemp, { idempotent: true });
+    await FileSystem.deleteAsync(configTemp, { idempotent: true });
     if (!(await isInstalled(model))) throw new Error(`Voice model ${model.id} could not be finalized safely.`);
     onProgress?.({ modelId: model.id, downloadedBytes: model.sizeBytes, totalBytes: model.sizeBytes, complete: true });
     return destination;
