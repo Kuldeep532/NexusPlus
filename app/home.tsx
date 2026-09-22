@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -9,6 +9,7 @@ import { getDailySpiritualMessage } from '@/features/spiritual/spiritualMessageL
 import { FEATURE_CATEGORY_META, getCategoryTools, getFeaturedHomeFeatures, getUtilityTools, type FeatureCategory } from '@/features/app-shell/featureRegistry';
 import { NexusBrandMark } from '@/features/branding/NexusBrandMark';
 import { PDF_TOOL_COUNT } from '@/app/pdf-tools';
+import { getGreetingText, readGreetingPreferences } from '@/features/app-shell/greetingPreferences';
 
 const CATEGORY_ORDER: FeatureCategory[] = ['utility', 'pdf', 'media', 'security', 'productivity'];
 
@@ -17,13 +18,15 @@ export default function HomeScreen() {
   const featuredTools = useMemo(() => getFeaturedHomeFeatures(), []);
   const categorySections = useMemo(() => CATEGORY_ORDER.map((category) => ({ category, meta: FEATURE_CATEGORY_META[category], count: category === 'pdf' ? PDF_TOOL_COUNT : category === 'utility' ? getUtilityTools().length : getCategoryTools(category).length })).filter((section) => section.count > 0), []);
   const dailyMessage = getDailySpiritualMessage();
+  const [greeting, setGreeting] = useState('Radhe Radhe');
+  useEffect(() => { void readGreetingPreferences().then((prefs) => setGreeting(getGreetingText(prefs.mode))); }, []);
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView accessibilityLabel="Nexus Plus home screen" contentContainerStyle={[styles.content, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 30 }]}>
         <View style={styles.header}><View style={styles.headerCopy}><View style={styles.brandRow}><NexusBrandMark size={42} /><View><Text style={[styles.brand, { color: colors.foreground }]}>Nexus Plus</Text><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Home</Text></View></View><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Major features first. Smaller tools stay inside dedicated screens.</Text></View><Pressable accessibilityRole="button" accessibilityLabel={auth.session ? 'Open profile' : 'Login or register'} onPress={() => router.push(auth.session ? '/profile' : '/login-plus-register')} style={[styles.profileButton, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name={auth.session ? 'user' : 'log-in'} size={22} color={colors.foreground} /></Pressable></View>
         {!auth.session && <View accessible accessibilityRole="summary" style={[styles.accountCard, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={styles.accountCopy}><Text style={[styles.accountTitle, { color: colors.foreground }]}>Nexus Plus Account</Text><Text style={[styles.accountMessage, { color: colors.mutedForeground }]}>Login or create your account to sync your Nexus Plus experience and receive notifications.</Text></View><Pressable accessibilityRole="button" onPress={() => router.push('/login-plus-register')} accessibilityLabel="Login or create account" style={[styles.accountButton, { backgroundColor: colors.primary }]}><Text style={[styles.accountButtonText, { color: colors.primaryForeground }]}>Login / Register</Text></Pressable></View>}
-        <View style={[styles.messageCard, { backgroundColor: colors.card, borderColor: colors.border }]} accessible accessibilityRole="summary"><Feather name="sunrise" size={21} color={colors.primary} /><View style={styles.messageCopy}><Text style={[styles.messageLabel, { color: colors.primary }]}>SPIRITUAL SUNDAYS</Text><Text style={[styles.message, { color: colors.foreground }]}>{dailyMessage.text}</Text></View></View>
+        <View style={[styles.messageCard, { backgroundColor: colors.card, borderColor: colors.border }]} accessible accessibilityRole="summary"><Feather name="sunrise" size={21} color={colors.primary} /><View style={styles.messageCopy}><Text style={[styles.messageLabel, { color: colors.primary }]}>{greeting}</Text><Text style={[styles.message, { color: colors.foreground }]}>{dailyMessage.text}</Text></View></View>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Main features</Text>
         <View style={styles.list}>{featuredTools.map((tool) => <Pressable key={tool.id} accessibilityRole="button" accessibilityLabel={`${tool.title}. ${tool.description}`} onPress={() => router.push(tool.route as never)} style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.toolIcon, { backgroundColor: colors.secondary }]}><Feather name={tool.icon as never} size={20} color={colors.primary} /></View><View style={styles.toolCopy}><Text style={[styles.toolTitle, { color: colors.foreground }]}>{tool.title}</Text><Text style={[styles.toolDescription, { color: colors.mutedForeground }]}>{tool.description}</Text></View><Feather name="chevron-right" size={19} color={colors.mutedForeground} accessibilityElementsHidden /></Pressable>)}</View>
         <Text style={[styles.categorySectionTitle, { color: colors.foreground }]}>Discover categories</Text>
