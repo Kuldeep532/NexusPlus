@@ -12,6 +12,7 @@ const SETTINGS = [
   { title:'Language & preferences',description:'Language, accessibility and general preferences.',route:'/language-and-preference',icon:'globe' as const },
   { title:'Biometric Vault',description:'Manage secure biometric protection.',route:'/biometric-vault',icon:'shield' as const },
   { title:'Payment Announcer',description:'Configure secure payment announcements.',route:'/payment-announcer',icon:'volume-2' as const },
+  { title:'Media Player Settings',description:'Advanced video, audio, subtitles, playback and live video-description controls.',route:'/media-player-settings',icon:'play-circle' as const },
   { title:'Expense Tracker',description:'Manage expense detection and financial privacy.',route:'/expense-tracker',icon:'credit-card' as const },
 ];
 const LEGAL_SETTINGS = [
