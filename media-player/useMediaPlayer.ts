@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppState } from 'react-native';
-import { type AudioPlayer } from 'expo-audio';
 import { useVideoPlayer } from 'expo-video';
 import type { MediaItemModel, PlayerState, RepeatMode } from './types';
 
@@ -19,7 +18,6 @@ const EMPTY: PlayerState = {
 };
 
 export function useMediaPlayer(initialQueue: MediaItemModel[] = []) {
-  const audioRef = useRef<AudioPlayer | null>(null);
   const [state, setState] = useState<PlayerState>(() => ({ ...EMPTY, queue: initialQueue }));
   const current = state.current;
 
@@ -64,7 +62,8 @@ export function useMediaPlayer(initialQueue: MediaItemModel[] = []) {
 
   const pause = useCallback(() => {
     if (!current) return;
-    if (current.kind === 'audio') return; videoPlayer.pause();
+    if (current.kind === 'audio') return;
+    videoPlayer.pause();
     setState((s) => ({ ...s, isPlaying: false }));
   }, [current, videoPlayer]);
 
