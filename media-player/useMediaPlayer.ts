@@ -55,30 +55,7 @@ export function useMediaPlayer(initialQueue: MediaItemModel[] = []) {
     load(state.queue[nextIndex]);
   }, [current, state.index, state.queue, state.repeat, state.shuffle]);
 
-  useEffect(() => {
-    let cancelled = false;
-    void setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'mixWithOthers' });
-    if (!current || current.kind !== 'audio') return;
-
-    const player = createAudioPlayer({ uri: current.uri });
-    audioRef.current = player;
-    player.volume = state.volume;
-    player.setPlaybackRate(state.rate);
-    player.play();
-    setState((s) => ({ ...s, isPlaying: true, error: undefined }));
-
-    const subscription = player.addListener('playbackStatusUpdate', () => {
-      if (!cancelled) syncFromNative();
-    });
-
-    return () => {
-      cancelled = true;
-      subscription.remove();
-      player.remove();
-      audioRef.current = null;
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.id]);
+  // Audio playback is intentionally not created here. PersistentMediaController is the single audio owner.
 
   useEffect(() => {
     if (current?.kind !== 'video') return;
@@ -93,7 +70,7 @@ export function useMediaPlayer(initialQueue: MediaItemModel[] = []) {
 
   const pause = useCallback(() => {
     if (!current) return;
-    if (current.kind === 'audio') audioRef.current?.pause(); else videoPlayer.pause();
+    if (current.kind === 'audio') return; else videoPlayer.pause();
     setState((s) => ({ ...s, isPlaying: false }));
   }, [current, videoPlayer]);
 
@@ -101,13 +78,23 @@ export function useMediaPlayer(initialQueue: MediaItemModel[] = []) {
 
   const seekTo = useCallback((positionMs: number) => {
     const seconds = Math.max(0, positionMs) / 1000;
-    if (current?.kind === 'audio') audioRef.current?.seekTo(seconds);
     if (current?.kind === 'video') videoPlayer.currentTime = seconds;
     setState((s) => ({ ...s, positionMs: Math.max(0, positionMs) }));
   }, [current, videoPlayer]);
 
   const load = useCallback((item: MediaItemModel, queue = state.queue) => {
     const index = queue.findIndex((candidate) => candidate.id === item.id);
+    // This hook owns video playback only. Local audio is owned by PersistentMediaController.
+    if (item.kind === 'audio') {
+      audioRef.current?.pause();
+      audioRef.current?.remove();
+      audioRef.current = null;
+    }
+    if (item.kind === 'video') {
+      audioRef.current?.pause();
+      audioRef.current?.remove();
+      audioRef.current = null;
+    }
     setState((s) => ({ ...s, current: item, queue, index: index >= 0 ? index : s.index, positionMs: 0, durationMs: item.durationMs ?? 0, error: undefined }));
   }, [state.queue]);
 
@@ -120,14 +107,13 @@ export function useMediaPlayer(initialQueue: MediaItemModel[] = []) {
 
   const setRate = useCallback((rate: number) => {
     const safeRate = Math.max(0.25, Math.min(3, rate));
-    audioRef.current?.setPlaybackRate(safeRate);
+
     videoPlayer.playbackRate = safeRate;
     setState((s) => ({ ...s, rate: safeRate }));
   }, [videoPlayer]);
 
   const setVolume = useCallback((volume: number) => {
     const safeVolume = Math.max(0, Math.min(1, volume));
-    if (audioRef.current) audioRef.current.volume = safeVolume;
     videoPlayer.volume = safeVolume;
     setState((s) => ({ ...s, volume: safeVolume }));
   }, [videoPlayer]);
