@@ -10,6 +10,7 @@ import { GlobalMiniPlayer } from '@/features/media/GlobalMiniPlayer';
 import { RemoteConfigOverlay } from '@/features/supabase/RemoteConfigOverlay';
 import { attachFirebaseTokenRefreshListener, registerForFirebaseNotifications } from '@/features/notifications/pushNotifications';
 import { startAssistantBootstrap } from '@/features/nexus-assistant/assistantBootstrap';
+import { readSpiritualReminderPreferences, scheduleSpiritualReminders } from '@/features/spiritual/spiritualReminder';
 import DebugErrorBoundary from '../DebugErrorBoundary';
 
 void SplashScreen.preventAutoHideAsync();
@@ -38,6 +39,13 @@ function RootLayoutContent() {
   useEffect(() => {
     if (!auth.loading && auth.session) return startAssistantBootstrap();
     return undefined;
+  }, [auth.loading, auth.session]);
+
+  useEffect(() => {
+    if (auth.loading || !auth.session) return;
+    void readSpiritualReminderPreferences().then((prefs) => {
+      if (prefs.enabled) void scheduleSpiritualReminders();
+    }).catch(() => undefined);
   }, [auth.loading, auth.session]);
 
   useEffect(() => {
