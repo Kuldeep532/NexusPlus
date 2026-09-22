@@ -129,13 +129,6 @@ export function PersistentMediaProvider({ children }: { children: React.ReactNod
 
   const toggle = () => (state.isPlaying ? pause() : play());
 
-  const stopCompletely = () => {
-    clearBackgroundTimer();
-    clearPlayer();
-    void NexusMedia?.stop?.().catch?.(() => undefined);
-    setState({ current: null, isPlaying: false, positionMs: 0, durationMs: 0, queue: [] });
-  };
-
   const seekTo = (positionMs: number) => {
     playerRef.current?.seekTo(Math.max(0, positionMs) / 1000);
     setState((s) => ({ ...s, positionMs: Math.max(0, positionMs) }));
