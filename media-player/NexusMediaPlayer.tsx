@@ -13,6 +13,7 @@ import { DEFAULT_MEDIA_PLAYER_PREFERENCES, readMediaPlayerPreferences, type Medi
 import { videoDescriptionAnalyzer } from './videoDescription';
 import { detectVideoDescriptionLanguage, speakVideoDescription } from './videoDescriptionTts';
 import { getNativeVideoDescriptionModule } from './videoDescriptionNative';
+import { ensureOpenCvWasm } from './opencvWasm';
 
 type Props = { initialItems?: MediaItemModel[]; onBack?: () => void };
 type LibraryTab = 'tracks' | 'albums' | 'playlists';
@@ -85,8 +86,13 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
     const run = async () => {
       descriptionBusy.current = true;
       try {
-        const available = await videoDescriptionAnalyzer.isAvailable();
-        if (!available) { setVideoDescriptionStatus('Live video description is not available in this Android build yet.'); return; }
+        const nativeAvailable = await videoDescriptionAnalyzer.isAvailable();
+        if (!nativeAvailable) {
+          const wasm = await ensureOpenCvWasm();
+          if (wasm.status !== 'ready') { setVideoDescriptionStatus(wasm.error || 'OpenCV visual description engine is unavailable.'); return; }
+          setVideoDescriptionStatus(wasm.downloadedNow ? 'OpenCV visual engine downloaded and cached.' : 'OpenCV visual engine loaded from device cache.');
+          return;
+        }
         const language: 'hi' | 'en' = activeCue?.text ? detectVideoDescriptionLanguage(activeCue.text) : 'en';
         const description = await videoDescriptionAnalyzer.describeFrame(current.uri, player.state.positionMs, language);
         if (!description?.text) return;
