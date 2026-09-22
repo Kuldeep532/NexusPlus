@@ -4,9 +4,10 @@ import android.content.Context
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
-import android.media.MediaMuxer
 import android.net.Uri
 import java.io.File
+import java.io.RandomAccessFile
+import kotlin.math.PI
 import kotlin.math.max
 import kotlin.math.min
 
@@ -19,57 +20,26 @@ internal object VocalRemovalProcessor {
     val mimeType: String,
   )
 
+  private const val WAV_HEADER_BYTES = 44L
+
   fun process(
     context: Context,
     inputPath: String,
     outputPath: String,
+    outputStem: String,
     quality: String,
     preserveBass: Boolean,
     preserveStereo: Boolean,
   ): Result {
-    val decoded = decode(context, inputPath)
-    require(decoded.channels == 2) {
-      "Vocal removal needs a stereo audio source. Mono files cannot be separated reliably."
-    }
-
-    val processed = FloatArray(decoded.samples.size)
-    val bassMix = when (quality) {
-      "preview" -> if (preserveBass) 0.18f else 0f
-      "studio" -> if (preserveBass) 0.10f else 0f
-      else -> if (preserveBass) 0.14f else 0f
-    }
-
-    var frame = 0
-    val totalFrames = decoded.samples.size / 2
-    while (frame < totalFrames) {
-      val base = frame * 2
-      val left = decoded.samples[base]
-      val right = decoded.samples[base + 1]
-      val mid = 0.5f * (left + right)
-      val side = 0.5f * (left - right)
-
-      if (preserveStereo) {
-        processed[base] = side + bassMix * mid
-        processed[base + 1] = -side + bassMix * mid
-      } else {
-        val instrumental = side + bassMix * mid
-        processed[base] = instrumental
-        processed[base + 1] = instrumental
-      }
-      frame++
-    }
-
-    val output = encodeWav(context, processed, decoded.sampleRate, decoded.channels, outputPath)
-    val durationMs = totalFrames.toDouble() / decoded.sampleRate.toDouble() * 1000.0
-    return Result(output, durationMs, decoded.sampleRate, decoded.channels, "audio/wav")
-  }
-
-  private data class Decoded(val sampleRate: Int, val channels: Int, val samples: FloatArray)
-
-  private fun decode(context: Context, inputPath: String): Decoded {
     val extractor = MediaExtractor()
+    var decoder: MediaCodec? = null
+    val output = File(outputPath)
+    output.parentFile?.mkdirs()
+    if (output.exists()) require(output.delete()) { "Unable to replace existing vocal-removal output." }
+
     try {
       setDataSource(context, extractor, inputPath)
+
       var audioTrack = -1
       var format: MediaFormat? = null
       for (index in 0 until extractor.trackCount) {
@@ -83,67 +53,195 @@ internal object VocalRemovalProcessor {
       }
       require(audioTrack >= 0 && format != null) { "No supported audio track was found." }
 
-      val inputFormat = format!!
-      val mime = inputFormat.getString(MediaFormat.KEY_MIME) ?: error("Audio codec MIME type is missing.")
+      val inputFormat = requireNotNull(format)
+      val mime = inputFormat.getString(MediaFormat.KEY_MIME)
+        ?: error("Audio codec MIME type is missing.")
       val sampleRate = inputFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
       val channels = inputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
       require(sampleRate > 0 && channels > 0) { "Audio format has invalid sample rate or channel count." }
+      require(channels == 2) {
+        "Vocal removal needs a stereo audio source. Mono files cannot be separated reliably."
+      }
+
+      val durationUs = if (inputFormat.containsKey(MediaFormat.KEY_DURATION)) {
+        inputFormat.getLong(MediaFormat.KEY_DURATION)
+      } else 0L
 
       extractor.selectTrack(audioTrack)
-      val decoder = MediaCodec.createDecoderByType(mime)
+      decoder = MediaCodec.createDecoderByType(mime)
       decoder.configure(inputFormat, null, null, 0)
       decoder.start()
 
-      val samples = ArrayList<Float>()
-      val info = MediaCodec.BufferInfo()
-      var inputDone = false
-      var outputDone = false
-      try {
+      val bassCutoff = when (quality) {
+        "preview" -> 220.0
+        "studio" -> 140.0
+        else -> 180.0
+      }
+      val bassAlpha = min(1.0, (2.0 * PI * bassCutoff / sampleRate).coerceAtLeast(0.0001)).toFloat()
+      val bassGain = if (preserveBass) 0.28f else 0.0f
+      var bassState = 0f
+
+      RandomAccessFile(output, "rw").use { file ->
+        writeWavHeader(file, sampleRate, channels, 0L)
+
+        val info = MediaCodec.BufferInfo()
+        var inputDone = false
+        var outputDone = false
+        var pcmBytesWritten = 0L
+
         while (!outputDone) {
           if (!inputDone) {
             val inputIndex = decoder.dequeueInputBuffer(10_000)
             if (inputIndex >= 0) {
-              val inputBuffer = decoder.getInputBuffer(inputIndex) ?: error("Decoder input buffer unavailable.")
+              val inputBuffer = decoder.getInputBuffer(inputIndex)
+                ?: error("Decoder input buffer unavailable.")
               inputBuffer.clear()
               val size = extractor.readSampleData(inputBuffer, 0)
               if (size < 0) {
-                decoder.queueInputBuffer(inputIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                decoder.queueInputBuffer(
+                  inputIndex,
+                  0,
+                  0,
+                  0L,
+                  MediaCodec.BUFFER_FLAG_END_OF_STREAM,
+                )
                 inputDone = true
               } else {
-                decoder.queueInputBuffer(inputIndex, 0, size, extractor.sampleTime.coerceAtLeast(0L), extractor.sampleFlags)
+                decoder.queueInputBuffer(
+                  inputIndex,
+                  0,
+                  size,
+                  extractor.sampleTime.coerceAtLeast(0L),
+                  extractor.sampleFlags,
+                )
                 extractor.advance()
               }
             }
           }
 
           when (val outputIndex = decoder.dequeueOutputBuffer(info, 10_000)) {
-            MediaCodec.INFO_TRY_AGAIN_LATER, MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> Unit
+            MediaCodec.INFO_TRY_AGAIN_LATER,
+            MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> Unit
+
             else -> if (outputIndex >= 0) {
-              val outputBuffer = decoder.getOutputBuffer(outputIndex) ?: error("Decoder output buffer unavailable.")
+              val outputBuffer = decoder.getOutputBuffer(outputIndex)
+                ?: error("Decoder output buffer unavailable.")
+
               if (info.size > 0) {
                 outputBuffer.position(info.offset)
                 outputBuffer.limit(info.offset + info.size)
-                while (outputBuffer.remaining() >= 2) {
-                  samples.add(outputBuffer.short.toInt() / 32768.0f)
+
+                val frameBytes = channels * 2
+                val usableBytes = info.size - (info.size % frameBytes)
+                var byteOffset = 0
+                while (byteOffset < usableBytes) {
+                  val left = outputBuffer.getShort(byteOffset).toInt() / 32768.0f
+                  val right = outputBuffer.getShort(byteOffset + 2).toInt() / 32768.0f
+                  val mid = 0.5f * (left + right)
+                  val side = 0.5f * (left - right)
+
+                  val instrumentalLeft: Float
+                  val instrumentalRight: Float
+
+                  if (outputStem == "vocals") {
+                    instrumentalLeft = mid
+                    instrumentalRight = mid
+                  } else {
+                    bassState += bassAlpha * (mid - bassState)
+                    val centerBass = bassGain * bassState
+                    instrumentalLeft = side + centerBass
+                    instrumentalRight = if (preserveStereo) {
+                      -side + centerBass
+                    } else {
+                      instrumentalLeft
+                    }
+                  }
+
+                  file.writeShortLE(toPcm16(instrumentalLeft))
+                  file.writeShortLE(toPcm16(instrumentalRight))
+                  pcmBytesWritten += 4
+                  byteOffset += frameBytes
                 }
               }
+
               decoder.releaseOutputBuffer(outputIndex, false)
-              if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) outputDone = true
+              if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                outputDone = true
+              }
             }
           }
         }
-      } finally {
-        decoder.stop()
-        decoder.release()
-      }
 
-      return Decoded(sampleRate, channels, samples.toFloatArray())
+        require(pcmBytesWritten > 0L) { "The selected audio contains no decodable samples." }
+        require(pcmBytesWritten <= 0xFFFFFFFFL) { "Output is too large for WAV format." }
+
+        val finalDurationMs =
+          if (durationUs > 0L) durationUs / 1000.0
+          else (pcmBytesWritten / (channels * 2L)).toDouble() / sampleRate * 1000.0
+
+        writeWavHeader(file, sampleRate, channels, pcmBytesWritten)
+        return Result(
+          output.absolutePath,
+          finalDurationMs,
+          sampleRate,
+          channels,
+          "audio/wav",
+        )
+      }
     } finally {
+      runCatching { decoder?.stop() }
+      decoder?.release()
       extractor.release()
     }
   }
 
-  private fun setDataSource(context: Context, extractor: MediaExtractor, inputPath: String) {
+  private fun toPcm16(sample: Float): Int {
+    return (sample.coerceIn(-1f, 1f) * 32767f).toInt()
+  }
+
+  private fun writeWavHeader(
+    file: RandomAccessFile,
+    sampleRate: Int,
+    channels: Int,
+    dataBytes: Long,
+  ) {
+    file.seek(0L)
+    file.writeBytes("RIFF")
+    file.writeUInt32LE(36L + dataBytes)
+    file.writeBytes("WAVE")
+    file.writeBytes("fmt ")
+    file.writeUInt32LE(16L)
+    file.writeUInt16LE(1)
+    file.writeUInt16LE(channels)
+    file.writeUInt32LE(sampleRate.toLong())
+    file.writeUInt32LE((sampleRate * channels * 2).toLong())
+    file.writeUInt16LE(channels * 2)
+    file.writeUInt16LE(16)
+    file.writeBytes("data")
+    file.writeUInt32LE(dataBytes)
+  }
+
+  private fun RandomAccessFile.writeShortLE(value: Int) {
+    writeUInt16LE(value)
+  }
+
+  private fun RandomAccessFile.writeUInt16LE(value: Int) {
+    write(value and 0xFF)
+    write((value ushr 8) and 0xFF)
+  }
+
+  private fun RandomAccessFile.writeUInt32LE(value: Long) {
+    write((value and 0xFF).toInt())
+    write(((value ushr 8) and 0xFF).toInt())
+    write(((value ushr 16) and 0xFF).toInt())
+    write(((value ushr 24) and 0xFF).toInt())
+  }
+
+  private fun setDataSource(
+    context: Context,
+    extractor: MediaExtractor,
+    inputPath: String,
+  ) {
     when {
       inputPath.startsWith("content://") || inputPath.startsWith("file://") -> {
         context.contentResolver.openFileDescriptor(Uri.parse(inputPath), "r").use { descriptor ->
@@ -154,45 +252,5 @@ internal object VocalRemovalProcessor {
       File(inputPath).isFile -> extractor.setDataSource(inputPath)
       else -> error("Input audio file was not found.")
     }
-  }
-
-  private fun encodeWav(context: Context, samples: FloatArray, sampleRate: Int, channels: Int, outputPath: String): String {
-    val file = File(outputPath)
-    file.parentFile?.mkdirs()
-    val dataBytes = samples.size * 2L
-    require(dataBytes <= 0xFFFFFFFFL - 44L) { "Output is too large for WAV." }
-
-    file.outputStream().use { out ->
-      val fileOutput = java.io.DataOutputStream(out)
-      fun u16(value: Int) {
-        fileOutput.write(value and 0xFF)
-        fileOutput.write((value ushr 8) and 0xFF)
-      }
-      fun u32(value: Long) {
-        fileOutput.write((value and 0xFF).toInt())
-        fileOutput.write(((value ushr 8) and 0xFF).toInt())
-        fileOutput.write(((value ushr 16) and 0xFF).toInt())
-        fileOutput.write(((value ushr 24) and 0xFF).toInt())
-      }
-      fileOutput.writeBytes("RIFF")
-      u32(dataBytes + 36L)
-      fileOutput.writeBytes("WAVE")
-      fileOutput.writeBytes("fmt ")
-      u32(16)
-      u16(1)
-      u16(channels)
-      u32(sampleRate.toLong())
-      u32((sampleRate * channels * 2).toLong())
-      u16(channels * 2)
-      u16(16)
-      fileOutput.writeBytes("data")
-      u32(dataBytes)
-
-      for (sample in samples) {
-        val pcm = (sample.coerceIn(-1f, 1f) * 32767f).toInt().toShort().toInt()
-        u16(pcm)
-      }
-    }
-    return file.absolutePath
   }
 }
