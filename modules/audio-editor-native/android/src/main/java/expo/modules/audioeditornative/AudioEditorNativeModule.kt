@@ -2,6 +2,7 @@ package expo.modules.audioeditornative
 
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import android.content.Intent
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -143,6 +144,20 @@ class AudioEditorNativeModule : Module() {
         ))
       } catch (error: Exception) {
         promise.reject("AUDIO_SPEED_PITCH_FAILED", error.message ?: "Unable to change audio speed and pitch", error)
+      }
+    }
+
+    AsyncFunction("pickMediaFolder") { kind: String, promise: Promise ->
+      try {
+        val activity = appContext.currentActivity ?: error("An Android activity is required.")
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+          addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+          addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        }
+        activity.startActivityForResult(intent, 4907)
+        promise.resolve(true)
+      } catch (error: Exception) {
+        promise.reject("MEDIA_FOLDER_PICK_FAILED", error.message ?: "Unable to open media folder picker.", error)
       }
     }
 
