@@ -11,6 +11,7 @@ const TOOLS = [
   { route:'/spiritual-daily-sadhana', title:'Daily Sadhana', description:'Create a simple spiritual practice checklist and track completed practices each day.', icon:'check-circle' },
   { route:'/spiritual-mantra', title:'Mantra Player', description:'Play licensed remote mantra recordings or use the device speech engine.', icon:'volume-2' },
   { route:'/spiritual-krishna-mantras', title:'Krishna Mantras', description:'Dedicated Krishna mantra library including the Hare Krishna Mahamantra.', icon:'heart' },
+  { route:'/spiritual-sadhana-streak', title:'Sadhana Streak', description:'Track consecutive days of your self-chosen spiritual practice.', icon:'trending-up' },
 ];
 
 export default function SpiritualScreen() {
