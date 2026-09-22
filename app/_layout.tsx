@@ -57,6 +57,7 @@ function RootLayoutContent() {
     const inTabs = firstSegment === '(tabs)';
     const inHome = firstSegment === 'home';
     const inGeetaNexus = firstSegment === 'geeta-nexus';
+    const inSpiritual = firstSegment === 'spiritual' || firstSegment === '(tabs)' && segments[1] === 'spiritual';
     const inLegal = firstSegment === 'privacy-policy' || firstSegment === 'terms-and-conditions' || firstSegment === 'about-us';
 
     if (!auth.session) {
@@ -73,9 +74,9 @@ function RootLayoutContent() {
       return;
     }
 
-    if (inAuth || inWelcome || (!firstSegment && !inTabs && !inHome && !inGeetaNexus && !inLegal)) {
+    if (inAuth || inWelcome || (!firstSegment && !inTabs && !inHome && !inGeetaNexus && !inSpiritual && !inLegal)) {
       void import('@/features/app-shell/launchPreferences').then(({ readLaunchPreferences }) => readLaunchPreferences()).then((prefs) => {
-        router.replace((prefs.homeDestination === 'geeta-home' ? '/geeta-nexus' : '/home') as never);
+        router.replace((prefs.homeDestination === 'geeta-home' ? '/geeta-nexus' : prefs.homeDestination === 'spiritual-home' ? '/(tabs)/spiritual' : '/home') as never);
       });
     }
   }, [auth.loading, auth.session, router, segments]);
