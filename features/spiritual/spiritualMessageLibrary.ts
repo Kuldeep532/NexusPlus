@@ -27,7 +27,7 @@ export function getDailySpiritualMessage(date = new Date()): SpiritualMessage {
 
 export function chooseGitaVerse(verses: GitaVerse[], date = new Date(), offset = 0): SpiritualMessage | null {
   if (!verses.length) return null;
-  const index = (dayIndex(date, verses.length) + offset) % verses.length;
+  const index = ((dayIndex(date, verses.length) + offset) % verses.length + verses.length) % verses.length;
   const verse = verses[index];
   const text = verse.translationHindi || verse.meaningHindi || verse.sanskrit;
   return {
