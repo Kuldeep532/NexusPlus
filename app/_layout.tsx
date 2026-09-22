@@ -48,6 +48,7 @@ function RootLayoutContent() {
     const inWelcome = firstSegment === 'welcome';
     const inTabs = firstSegment === '(tabs)';
     const inHome = firstSegment === 'home';
+    const inGeetaNexus = firstSegment === 'geeta-nexus';
     const inLegal = firstSegment === 'privacy-policy' || firstSegment === 'terms-and-conditions' || firstSegment === 'about-us';
 
     if (!auth.session) {
@@ -64,8 +65,10 @@ function RootLayoutContent() {
       return;
     }
 
-    if (inAuth || inWelcome || (!firstSegment && !inTabs && !inHome && !inLegal)) {
-      router.replace('/home');
+    if (inAuth || inWelcome || (!firstSegment && !inTabs && !inHome && !inGeetaNexus && !inLegal)) {
+      void import('@/features/app-shell/launchPreferences').then(({ readLaunchPreferences }) => readLaunchPreferences()).then((prefs) => {
+        router.replace((prefs.homeDestination === 'geeta-home' ? '/geeta-nexus' : '/home') as never);
+      });
     }
   }, [auth.loading, auth.session, router, segments]);
 
