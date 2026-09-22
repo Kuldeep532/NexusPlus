@@ -16,6 +16,7 @@ import { getNativeVideoDescriptionModule } from './videoDescriptionNative';
 import { ensureOpenCvWasm } from './opencvWasm';
 import { AUDIO_EFFECT_PRESETS, type AudioEffectPreset } from './audioEffects';
 import { validateStreamUri } from './streamCapability';
+import { assertAudioEditorNative } from '@/modules/audio-editor-native';
 
 type Props = { initialItems?: MediaItemModel[]; onBack?: () => void };
 type LibraryTab = 'tracks' | 'albums' | 'playlists';
@@ -46,6 +47,7 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
   const [mediaPrefs, setMediaPrefs] = useState<MediaPlayerPreferences>(DEFAULT_MEDIA_PLAYER_PREFERENCES);
   const [videoDescriptionStatus, setVideoDescriptionStatus] = useState('');
   const [audioEffect, setAudioEffect] = useState<AudioEffectPreset>('normal');
+  const [audioEffectBusy, setAudioEffectBusy] = useState(false);
   const [urlDialog, setUrlDialog] = useState(false);
   const [mediaUrl, setMediaUrl] = useState('');
   const descriptionBusy = useRef(false);
@@ -112,6 +114,36 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
 
   const loadItem = useCallback((item: MediaItemModel, queue = library) => { player.load(item, queue); setScreen('player'); }, [library, player]);
 
+  const applyAudioEffect = useCallback(async (preset: AudioEffectPreset) => {
+    if (!current || current.kind !== 'audio' || preset === 'normal' || audioEffectBusy) return;
+    setAudioEffectBusy(true);
+    try {
+      const native = assertAudioEditorNative();
+      const safeStem = current.uri.replace(/\.[^.\\/]+$/, '');
+      const outputPath = safeStem + '.' + preset + '.' + Date.now() + '.wav';
+      const result = await native.applyEffect({
+        inputPath: current.uri,
+        outputPath,
+        effect: preset,
+        startMs: 0,
+        endMs: current.durationMs ?? 2147483647,
+        amount: 0.65,
+      });
+      const derived: MediaItemModel = {
+        ...current,
+        id: current.id + ':' + preset + ':' + Date.now(),
+        uri: result.outputPath,
+        title: current.title + ' — ' + preset,
+        source: 'local',
+      };
+      loadItem(derived, [derived]);
+    } catch (error) {
+      Alert.alert('Audio effect', error instanceof Error ? error.message : 'The selected audio effect could not be applied.');
+    } finally {
+      setAudioEffectBusy(false);
+    }
+  }, [audioEffectBusy, current, loadItem]);
+
   const loadRemoteUrl = useCallback(() => {
     const uri = mediaUrl.trim();
     if (!/^https:\/\//i.test(uri)) {
@@ -174,7 +206,7 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
       {!isRadio ? <View style={styles.progressRow}><Text style={styles.time}>{formatTime(player.state.positionMs)}</Text><Pressable accessibilityRole="adjustable" accessibilityLabel="Playback position" accessibilityValue={{ min: 0, max: Math.max(1, player.state.durationMs), now: player.state.positionMs }} onPress={() => player.seekTo(Math.min(player.state.durationMs, player.state.positionMs + 10000))} style={styles.progress}><View style={[styles.progressFill, { width: `${player.state.durationMs ? Math.min(100, player.state.positionMs / player.state.durationMs * 100) : 0}%` }]} /></Pressable><Text style={styles.time}>{formatTime(player.state.durationMs)}</Text></View> : <Text accessibilityRole="text" style={styles.live}>LIVE RADIO · SEEKING DISABLED</Text>}
       <View style={styles.controls}>{!isRadio ? <Button label="Previous" hint="Play previous track" onPress={player.previous} text="⏮" /> : null}<Button label={player.state.isPlaying ? 'Pause' : 'Play'} onPress={player.togglePlayPause} text={player.state.isPlaying ? '❚❚' : '▶'} selected />{!isRadio ? <Button label="Next" hint="Play next track" onPress={player.next} text="⏭" /> : null}</View>
       <View style={styles.controls}><Button label="Shuffle" onPress={player.toggleShuffle} text="🔀" selected={player.state.shuffle} /><Button label="Repeat" onPress={player.cycleRepeat} text="↻" /><Button label="Volume down" onPress={() => player.setVolume(player.state.volume - .1)} text="🔉" /><Button label="Volume up" onPress={() => player.setVolume(player.state.volume + .1)} text="🔊" /></View>
-      {current?.kind === 'audio' ? <View style={styles.audioEffectCard}><Text style={styles.sectionTitle}>Audio playback mode</Text><View style={styles.rowButtons}>{AUDIO_EFFECT_PRESETS.map((preset) => <Button key={preset.id} label={preset.title} hint={preset.description} onPress={() => setAudioEffect(preset.id)} text={preset.title} selected={audioEffect === preset.id} />)}</View><Text accessibilityLiveRegion="polite" style={styles.muted}>Selected: {audioEffect}</Text></View> : null}
+      {current?.kind === 'audio' ? <View style={styles.audioEffectCard}><Text style={styles.sectionTitle}>Audio playback mode</Text><View style={styles.rowButtons}>{AUDIO_EFFECT_PRESETS.map((preset) => <Button key={preset.id} label={preset.title} hint={preset.description} onPress={() => { setAudioEffect(preset.id); void applyAudioEffect(preset.id); }} text={preset.title} selected={audioEffect === preset.id} />)}</View><Text accessibilityLiveRegion="polite" style={styles.muted}>Selected: {audioEffectBusy ? 'Processing…' : audioEffect}</Text></View> : null}
       {current?.kind === 'video' ? <View style={styles.videoDescriptionCard} accessible><Text style={styles.sectionTitle}>Video Description</Text><Button label={videoDescriptionEnabled ? 'Disable live video description' : 'Enable live video description'} hint="Describe important visual changes while the video plays using on-device speech." onPress={() => { const next = !videoDescriptionEnabled; setVideoDescriptionEnabled(next); setVideoDescriptionStatus(next ? 'Live video description enabled' : 'Live video description disabled'); }} text={videoDescriptionEnabled ? 'On' : 'Off'} selected={videoDescriptionEnabled} />{videoDescriptionStatus ? <Text accessibilityLiveRegion="polite" style={styles.muted}>{videoDescriptionStatus}</Text> : null}</View> : null}
       {canVocalRemove ? <View style={styles.vocalCard} accessible accessibilityLabel="Vocal Remover"><Text style={styles.sectionTitle}>Vocal Remover</Text><Text style={styles.muted}>Vocal separation runs through the Android native audio engine.</Text><View style={styles.rowButtons}><Button label="Create instrumental" onPress={() => setVocalMode('instrumental')} text="Instrumental" selected={vocalMode === 'instrumental'} /><Button label="Extract vocals" onPress={() => setVocalMode('vocals')} text="Vocals" selected={vocalMode === 'vocals'} /><Button label={vocalBusy ? 'Processing' : 'Remove vocals'} onPress={() => { void runVocalRemoval(); }} text={vocalBusy ? `${Math.round(vocalProgress * 100)}%` : 'Process'} /></View></View> : null}
       {current?.subtitleTracks?.length ? <View style={styles.rowButtons}>{current.subtitleTracks.map((track) => <Button key={track.id} label={`Subtitle ${track.label}`} onPress={() => { if (track.uri) void onLoadSrt(track.uri); else setSubtitleCues(track.cues || []); }} text={track.label} />)}</View> : null}
