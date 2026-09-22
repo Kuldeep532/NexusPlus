@@ -1,3 +1,4 @@
+import { AudioEditorNative } from '@/modules/audio-editor-native';
 import type { VocalRemovalEngine, VocalRemovalOptions, VocalRemovalProgress } from './types';
 
 /**
@@ -34,17 +35,30 @@ export class NativeAiVocalRemovalEngine implements VocalRemovalEngine {
   readonly displayName = 'Nexus AI Vocal Separation';
 
   async isAvailable(): Promise<boolean> {
+    if (AudioEditorNative?.vocalRemove) return true;
     const bridge = getNativeBridge();
     return Boolean(bridge?.separate && (await bridge.isAvailable?.() ?? true));
   }
 
   async separate(inputUri: string, options: VocalRemovalOptions, onProgress?: (p: VocalRemovalProgress) => void) {
-    const bridge = getNativeBridge();
-    if (!bridge?.separate) {
-      throw new Error('Nexus AI vocal-removal engine is not installed in this build.');
+    if (AudioEditorNative?.vocalRemove) {
+      onProgress?.({ stage: 'preparing', progress: 0.03, message: 'Preparing Android audio decoder' });
+      const outputUri = inputUri + '.nexus-vocal-' + Date.now() + '.wav';
+      const result = await AudioEditorNative.vocalRemove(
+        inputUri,
+        outputUri,
+        options.quality,
+        options.preserveBass,
+        options.preserveStereo,
+      );
+      onProgress?.({ stage: 'separating', progress: 0.8, message: 'Applying native center-channel separation' });
+      onProgress?.({ stage: 'complete', progress: 1, message: 'Vocal separation complete' });
+      return { outputUri: result.outputPath, durationMs: result.durationMs };
     }
+    const bridge = getNativeBridge();
+    if (!bridge?.separate) throw new Error('Android vocal-removal engine is not installed in this build.');
     const outputUri = outputPath(inputUri, options.outputStem, options.quality);
-    onProgress?.({ stage: 'preparing', progress: 0.05, message: 'Preparing audio for AI separation' });
+    onProgress?.({ stage: 'preparing', progress: 0.05, message: 'Preparing legacy native vocal separation' });
     return bridge.separate(inputUri, outputUri, options, onProgress ?? (() => undefined));
   }
 
@@ -66,18 +80,11 @@ export class PhaseCancelVocalRemovalEngine implements VocalRemovalEngine {
   readonly displayName = 'Stereo Center-Channel Removal';
 
   async isAvailable(): Promise<boolean> {
-    return true;
+    return false;
   }
 
-  async separate(inputUri: string, options: VocalRemovalOptions, onProgress?: (p: VocalRemovalProgress) => void) {
-    onProgress?.({ stage: 'preparing', progress: 0.1, message: 'Preparing stereo channel separation' });
-    // The actual PCM operation belongs in the native audio processor. The URI
-    // is passed through a stable contract so the processor can be swapped in
-    // without changing the player or job manager.
-    const outputUri = outputPath(inputUri, options.outputStem, options.quality);
-    onProgress?.({ stage: 'separating', progress: 0.5, message: 'Removing center-channel content' });
-    onProgress?.({ stage: 'complete', progress: 1, message: 'Vocal removal complete' });
-    return { outputUri };
+  async separate(): Promise<{ outputUri: string }> {
+    throw new Error('The compatibility phase-cancel engine is disabled because it previously returned a URI without processing audio.');
   }
 
   async cancel(): Promise<void> {}
