@@ -1,4 +1,5 @@
 import { AudioEditorNative } from '@/modules/audio-editor-native';
+import { createAudioEditorOutputPath } from '@/features/audio-editor/audioEditorExport';
 import type { VocalRemovalEngine, VocalRemovalOptions, VocalRemovalProgress } from './types';
 
 /** Native Android vocal-removal bridge. */
@@ -36,7 +37,12 @@ export class NativeAiVocalRemovalEngine implements VocalRemovalEngine {
   async separate(inputUri: string, options: VocalRemovalOptions, onProgress?: (p: VocalRemovalProgress) => void) {
     if (AudioEditorNative?.vocalRemove) {
       onProgress?.({ stage: 'preparing', progress: 0.03, message: 'Preparing Android audio decoder' });
-      const outputUri = inputUri + '.nexus-vocal-' + Date.now() + '.wav';
+      const outputUri = await createAudioEditorOutputPath(
+        'Vocal Remover',
+        inputUri.split('/').pop() || 'audio',
+        options.outputStem,
+        'wav',
+      );
       const result = await AudioEditorNative.vocalRemove(
         inputUri,
         outputUri,
