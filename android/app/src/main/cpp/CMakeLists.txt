@@ -47,3 +47,24 @@ target_link_options(nexus_docs_engine_jni PRIVATE
 find_library(log-lib log)
 target_link_libraries(nexus_security ${log-lib})
 target_link_libraries(nexus_docs_engine_jni ${log-lib})
+
+add_library(nexus_vocal_remover SHARED
+  nexus_vocal_remover.cpp
+  nexus_vocal_remover_jni.cpp
+)
+
+target_compile_options(nexus_vocal_remover PRIVATE
+  -fvisibility=hidden
+  -fvisibility-inlines-hidden
+  -ffunction-sections
+  -fdata-sections
+  -fstack-protector-strong
+  -D_FORTIFY_SOURCE=2
+)
+target_link_options(nexus_vocal_remover PRIVATE
+  -Wl,--gc-sections
+  -Wl,--exclude-libs,ALL
+  -Wl,--build-id=sha1
+)
+
+target_link_libraries(nexus_vocal_remover ${log-lib} android)
