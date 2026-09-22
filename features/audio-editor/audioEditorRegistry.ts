@@ -52,6 +52,14 @@ const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
     icon: 'sliders',
     order: 50,
   },
+  {
+    id: 'text-to-speech',
+    title: 'Text to Speech',
+    description: 'Generate speech with installed Nexus voices, speed, pitch, and automatic emotion tuning.',
+    route: '/audio-editor/text-to-speech',
+    icon: 'volume-2',
+    order: 60,
+  },
 ];
 
 export function getAudioEditorTools(): AudioEditorToolDefinition[] {
