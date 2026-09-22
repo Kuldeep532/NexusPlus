@@ -14,6 +14,8 @@ export type ModelDownloadResult = { id: string; uri: string; downloadedNow: bool
 
 const INDEX_KEY='@nexus-plus/model-download-index-v1';
 const active=new Map<string,Promise<ModelDownloadResult>>();
+let lastNetworkStartAt=0;
+const MIN_GAP_MS=750;
 let queue: Array<{request:ModelDownloadRequest;resolve:(value:ModelDownloadResult)=>void;reject:(reason:unknown)=>void}>=[];
 let running=false;
 
@@ -47,6 +49,8 @@ async function download(request:ModelDownloadRequest):Promise<ModelDownloadResul
   return {id:request.id,uri:request.destination,downloadedNow:true,sizeBytes};
 }
 
+async function waitForNetworkGap(){const wait=Math.max(0,MIN_GAP_MS-(Date.now()-lastNetworkStartAt)); if(wait) await new Promise<void>((resolve)=>setTimeout(resolve,wait)); lastNetworkStartAt=Date.now();}
+
 async function drain():Promise<void>{
   if(running)return;
   running=true;
@@ -54,7 +58,7 @@ async function drain():Promise<void>{
     while(queue.length){
       queue.sort((a,b)=>(b.request.priority??0)-(a.request.priority??0));
       const item=queue.shift()!;
-      try{item.resolve(await download(item.request));}catch(error){item.reject(error);}
+      try{await waitForNetworkGap(); item.resolve(await download(item.request));}catch(error){item.reject(error);}
     }
   }finally{running=false;}
 }
