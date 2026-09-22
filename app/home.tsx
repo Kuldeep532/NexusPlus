@@ -20,8 +20,8 @@ export default function HomeScreen() {
   const categorySections = useMemo(() => CATEGORY_ORDER.map((category) => ({ category, meta: FEATURE_CATEGORY_META[category], count: category === 'pdf' ? PDF_TOOL_COUNT : category === 'utility' ? getUtilityTools().length : getCategoryTools(category).length })).filter((section) => section.count > 0), []);
   const dailyMessage = getDailySpiritualMessage();
   const [greeting, setGreeting] = useState('Radhe Radhe');
-  const [showDiscover, setShowDiscover] = useState(false);
-  useEffect(() => { void readGreetingPreferences().then((prefs) => setGreeting(getGreetingText(prefs.mode))); void readLaunchPreferences().then((prefs) => setShowDiscover(prefs.showDiscoverOnHome)); }, []);
+  const [showDiscover] = useState(false);
+  useEffect(() => { void readGreetingPreferences().then((prefs) => setGreeting(getGreetingText(prefs.mode))); void readLaunchPreferences(); }, []);
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <Stack.Screen options={{ headerShown: false }} />
