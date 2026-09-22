@@ -1,6 +1,5 @@
 import * as Speech from 'expo-speech';
 import { listTtsVoices, generateWithPiper, playGeneratedAudio, type TtsVoiceOption } from '@/features/audio-editor/ttsEngine';
-import { ensurePiperVoice, speakWithPiper } from '@/features/time-announcer/piperTts';
 
 export type VideoDescriptionTtsLanguage = 'hi' | 'en';
 
