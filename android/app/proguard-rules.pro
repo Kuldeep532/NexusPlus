@@ -42,7 +42,3 @@
 
 -keep class com.nexuswavetech.nexusplus.NexusTvCastModule { *; }
 -keep class com.nexuswavetech.nexusplus.NexusTvCastPackage { *; }
--keep class com.nexuswavetech.nexusplus.NexusScreenMirrorModule { *; }
--keep class com.nexuswavetech.nexusplus.NexusScreenMirrorPackage { *; }
--keep class com.nexuswavetech.nexusplus.NexusScreenMirrorService { *; }
--keep class com.nexuswavetech.nexusplus.NexusScreenMirrorStopReceiver { *; }
