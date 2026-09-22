@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createAudioPlayer, type AudioPlayer, setAudioModeAsync } from 'expo-audio';
 import type { MediaItemModel } from './types';
 
@@ -27,6 +27,10 @@ export function PersistentMediaProvider({ children }: { children: React.ReactNod
   const playerRef = useRef<AudioPlayer | null>(null);
   const [state, setState] = useState<PersistentMediaState>({ current: null, isPlaying: false, positionMs: 0, durationMs: 0, queue: [] });
 
+  useEffect(() => {
+    void setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'mixWithOthers' });
+  }, []);
+
   const clearPlayer = () => {
     playerRef.current?.remove();
     playerRef.current = null;
@@ -39,7 +43,12 @@ export function PersistentMediaProvider({ children }: { children: React.ReactNod
     playerRef.current = player;
     player.volume = 1;
     player.addListener('playbackStatusUpdate', () => {
-      setState((current) => ({ ...current, isPlaying: player.playing, positionMs: player.currentTime * 1000, durationMs: Number.isFinite(player.duration) ? player.duration * 1000 : current.durationMs }));
+      setState((current) => ({
+        ...current,
+        isPlaying: player.playing,
+        positionMs: player.currentTime * 1000,
+        durationMs: Number.isFinite(player.duration) ? player.duration * 1000 : current.durationMs,
+      }));
     });
     setState({ current: item, isPlaying: true, positionMs: 0, durationMs: item.durationMs ?? 0, queue });
     player.play();
@@ -48,10 +57,28 @@ export function PersistentMediaProvider({ children }: { children: React.ReactNod
   const play = () => { playerRef.current?.play(); setState((s) => ({ ...s, isPlaying: true })); };
   const pause = () => { playerRef.current?.pause(); setState((s) => ({ ...s, isPlaying: false })); };
   const toggle = () => (state.isPlaying ? pause() : play());
-  const stop = () => { clearPlayer(); setState({ current: null, isPlaying: false, positionMs: 0, durationMs: 0, queue: [] }); };
-  const seekTo = (positionMs: number) => { playerRef.current?.seekTo(Math.max(0, positionMs) / 1000); setState((s) => ({ ...s, positionMs: Math.max(0, positionMs) })); };
-  const next = () => { const index = state.queue.findIndex((item) => item.id === state.current?.id); const item = index >= 0 ? state.queue[index + 1] : undefined; if (item) void load(item, state.queue); };
-  const previous = () => { const index = state.queue.findIndex((item) => item.id === state.current?.id); const item = index > 0 ? state.queue[index - 1] : undefined; if (item) void load(item, state.queue); };
+
+  const stop = () => {
+    clearPlayer();
+    setState({ current: null, isPlaying: false, positionMs: 0, durationMs: 0, queue: [] });
+  };
+
+  const seekTo = (positionMs: number) => {
+    playerRef.current?.seekTo(Math.max(0, positionMs) / 1000);
+    setState((s) => ({ ...s, positionMs: Math.max(0, positionMs) }));
+  };
+
+  const next = () => {
+    const index = state.queue.findIndex((item) => item.id === state.current?.id);
+    const item = index >= 0 ? state.queue[index + 1] : undefined;
+    if (item) void load(item, state.queue);
+  };
+
+  const previous = () => {
+    const index = state.queue.findIndex((item) => item.id === state.current?.id);
+    const item = index > 0 ? state.queue[index - 1] : undefined;
+    if (item) void load(item, state.queue);
+  };
 
   const value = useMemo(() => ({ ...state, load, play, pause, toggle, stop, seekTo, next, previous }), [state]);
   return <MediaContext.Provider value={value}>{children}</MediaContext.Provider>;
