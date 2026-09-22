@@ -13,6 +13,7 @@ export type MediaPlayerPreferences = {
   rememberVolume: boolean;
   defaultVolume: number;
   subtitlesEnabled: boolean;
+  audioEffectPreset: 'normal' | 'lofi' | 'echo' | 'stereo-split';
 };
 
 const KEY = '@nexus-plus/media-player-preferences';
@@ -29,6 +30,7 @@ export const DEFAULT_MEDIA_PLAYER_PREFERENCES: MediaPlayerPreferences = {
   rememberVolume: true,
   defaultVolume: 1,
   subtitlesEnabled: true,
+  audioEffectPreset: 'normal',
 };
 
 export async function readMediaPlayerPreferences(): Promise<MediaPlayerPreferences> {
