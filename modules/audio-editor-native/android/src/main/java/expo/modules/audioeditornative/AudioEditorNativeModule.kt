@@ -146,6 +146,21 @@ class AudioEditorNativeModule : Module() {
       }
     }
 
+    AsyncFunction("isOpenCvAvailable") { promise: Promise ->
+      try {
+        val available = runCatching { Class.forName("org.opencv.android.OpenCVLoader") }.isSuccess
+        promise.resolve(available)
+      } catch (error: Exception) { promise.resolve(false) }
+    }
+
+    AsyncFunction("describeVideoFrame") { videoUri: String, timestampMs: Double, language: String, promise: Promise ->
+      try {
+        promise.resolve(VideoDescriptionProcessor.describeFrame(appContext.reactContext, videoUri, timestampMs, language))
+      } catch (error: Exception) {
+        promise.reject("VIDEO_DESCRIPTION_FAILED", error.message ?: "Unable to describe video frame", error)
+      }
+    }
+
     AsyncFunction("synthesizePiper") { input: Map<String, Any?>, promise: Promise ->
       try {
         val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
