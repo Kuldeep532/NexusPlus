@@ -8,7 +8,6 @@ import android.net.Uri
 import java.io.File
 import java.io.RandomAccessFile
 import kotlin.math.PI
-import kotlin.math.max
 import kotlin.math.min
 
 internal object VocalRemovalProcessor {
@@ -20,7 +19,6 @@ internal object VocalRemovalProcessor {
     val mimeType: String,
   )
 
-  private const val WAV_HEADER_BYTES = 44L
 
   fun process(
     context: Context,
