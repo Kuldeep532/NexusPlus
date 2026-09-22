@@ -47,6 +47,7 @@ export class NativeAiVocalRemovalEngine implements VocalRemovalEngine {
       const result = await AudioEditorNative.vocalRemove(
         inputUri,
         outputUri,
+        options.outputStem,
         options.quality,
         options.preserveBass,
         options.preserveStereo,
