@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { announceClean } from '@/features/accessibility/spokenAnnouncement';
 import { VideoView } from 'expo-video';
 import { scanLocalMedia, buildCollections } from './library';
@@ -14,6 +14,7 @@ import { videoDescriptionAnalyzer } from './videoDescription';
 import { detectVideoDescriptionLanguage, speakVideoDescription } from './videoDescriptionTts';
 import { getNativeVideoDescriptionModule } from './videoDescriptionNative';
 import { ensureOpenCvWasm } from './opencvWasm';
+import { AUDIO_EFFECT_PRESETS, type AudioEffectPreset } from './audioEffects';
 
 type Props = { initialItems?: MediaItemModel[]; onBack?: () => void };
 type LibraryTab = 'tracks' | 'albums' | 'playlists';
@@ -43,6 +44,9 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
   const [videoDescriptionEnabled, setVideoDescriptionEnabled] = useState(false);
   const [mediaPrefs, setMediaPrefs] = useState<MediaPlayerPreferences>(DEFAULT_MEDIA_PLAYER_PREFERENCES);
   const [videoDescriptionStatus, setVideoDescriptionStatus] = useState('');
+  const [audioEffect, setAudioEffect] = useState<AudioEffectPreset>('normal');
+  const [urlDialog, setUrlDialog] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState('');
   const descriptionBusy = useRef(false);
   const player = useMediaPlayer(library);
 
@@ -107,6 +111,32 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
 
   const loadItem = useCallback((item: MediaItemModel, queue = library) => { player.load(item, queue); setScreen('player'); }, [library, player]);
 
+  const loadRemoteUrl = useCallback(() => {
+    const uri = mediaUrl.trim();
+    if (!/^https:\/\//i.test(uri)) {
+      Alert.alert('Get Audio from URL', 'Only secure HTTPS URLs are supported.');
+      return;
+    }
+    const lower = uri.toLowerCase();
+    if (lower.includes('youtube.com') || lower.includes('youtu.be') || lower.includes('spotify.com')) {
+      setUrlDialog(false);
+      setMediaUrl('');
+      Alert.alert('Protected provider', 'Use the official provider flow for protected platforms. Direct stream extraction is not supported.');
+      return;
+    }
+    const kind: 'audio' | 'video' = /\.(mp4|m4v|webm|mov|mkv)(?:\?|#|$)/i.test(uri) ? 'video' : 'audio';
+    const item: MediaItemModel = {
+      id: 'url:' + uri,
+      uri,
+      kind,
+      source: 'local',
+      title: uri,
+    };
+    loadItem(item, [item]);
+    setUrlDialog(false);
+    setMediaUrl('');
+  }, [loadItem, mediaUrl]);
+
   const runVocalRemoval = useCallback(async () => {
     if (!current || !canVocalRemove) return;
     setVocalBusy(true);
@@ -134,16 +164,17 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
 
   if (screen === 'player') {
     return <View style={styles.root}>
-      <View style={styles.header}><Button label="Back to media library" onPress={() => setScreen('library')} text="‹" /><View style={styles.headerText}><Text accessibilityRole="header" style={styles.title}>Now Playing</Text><Text style={styles.muted}>{isRadio ? 'Radio' : current?.kind?.toUpperCase() || 'Media'}</Text></View></View>
+      <View style={styles.header}><Button label="Back to media library" onPress={() => setScreen('library')} text="‹" /><View style={styles.headerText}><Text accessibilityRole="header" style={styles.title}>Now Playing</Text><Text style={styles.muted}>{isRadio ? 'Radio' : current?.kind?.toUpperCase() || 'Media'}</Text></View><Button label="Get Audio from URL" onPress={() => setUrlDialog(true)} text="URL" /></View>
       {current?.kind === 'video' ? <View style={styles.video}><VideoView player={player.videoPlayer} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls={false} />{activeCue ? <View style={styles.subtitle}><Text style={styles.subtitleText}>{activeCue.text}</Text></View> : null}</View> : <View style={styles.artwork}>{current?.artworkUri ? <Image source={{ uri: current.artworkUri }} style={styles.artworkImage} /> : <Text style={styles.glyph}>♫</Text>}</View>}
       <View style={styles.nowPlaying}><Text accessibilityRole="header" numberOfLines={2} style={styles.trackTitle}>{current?.title || 'Nothing playing'}</Text><Text style={styles.muted}>{current?.artist || current?.album || ''}</Text></View>
       {!isRadio ? <View style={styles.progressRow}><Text style={styles.time}>{formatTime(player.state.positionMs)}</Text><Pressable accessibilityRole="adjustable" accessibilityLabel="Playback position" accessibilityValue={{ min: 0, max: Math.max(1, player.state.durationMs), now: player.state.positionMs }} onPress={() => player.seekTo(Math.min(player.state.durationMs, player.state.positionMs + 10000))} style={styles.progress}><View style={[styles.progressFill, { width: `${player.state.durationMs ? Math.min(100, player.state.positionMs / player.state.durationMs * 100) : 0}%` }]} /></Pressable><Text style={styles.time}>{formatTime(player.state.durationMs)}</Text></View> : <Text accessibilityRole="text" style={styles.live}>LIVE RADIO · SEEKING DISABLED</Text>}
       <View style={styles.controls}>{!isRadio ? <Button label="Previous" hint="Play previous track" onPress={player.previous} text="⏮" /> : null}<Button label={player.state.isPlaying ? 'Pause' : 'Play'} onPress={player.togglePlayPause} text={player.state.isPlaying ? '❚❚' : '▶'} selected />{!isRadio ? <Button label="Next" hint="Play next track" onPress={player.next} text="⏭" /> : null}</View>
       <View style={styles.controls}><Button label="Shuffle" onPress={player.toggleShuffle} text="🔀" selected={player.state.shuffle} /><Button label="Repeat" onPress={player.cycleRepeat} text="↻" /><Button label="Volume down" onPress={() => player.setVolume(player.state.volume - .1)} text="🔉" /><Button label="Volume up" onPress={() => player.setVolume(player.state.volume + .1)} text="🔊" /></View>
+      {current?.kind === 'audio' ? <View style={styles.audioEffectCard}><Text style={styles.sectionTitle}>Audio playback mode</Text><View style={styles.rowButtons}>{AUDIO_EFFECT_PRESETS.map((preset) => <Button key={preset.id} label={preset.title} hint={preset.description} onPress={() => setAudioEffect(preset.id)} text={preset.title} selected={audioEffect === preset.id} />)}</View><Text accessibilityLiveRegion="polite" style={styles.muted}>Selected: {audioEffect}</Text></View> : null}
       {current?.kind === 'video' ? <View style={styles.videoDescriptionCard} accessible><Text style={styles.sectionTitle}>Video Description</Text><Button label={videoDescriptionEnabled ? 'Disable live video description' : 'Enable live video description'} hint="Describe important visual changes while the video plays using on-device speech." onPress={() => { const next = !videoDescriptionEnabled; setVideoDescriptionEnabled(next); setVideoDescriptionStatus(next ? 'Live video description enabled' : 'Live video description disabled'); }} text={videoDescriptionEnabled ? 'On' : 'Off'} selected={videoDescriptionEnabled} />{videoDescriptionStatus ? <Text accessibilityLiveRegion="polite" style={styles.muted}>{videoDescriptionStatus}</Text> : null}</View> : null}
       {canVocalRemove ? <View style={styles.vocalCard} accessible accessibilityLabel="Vocal Remover"><Text style={styles.sectionTitle}>Vocal Remover</Text><Text style={styles.muted}>Vocal separation runs through the Android native audio engine.</Text><View style={styles.rowButtons}><Button label="Create instrumental" onPress={() => setVocalMode('instrumental')} text="Instrumental" selected={vocalMode === 'instrumental'} /><Button label="Extract vocals" onPress={() => setVocalMode('vocals')} text="Vocals" selected={vocalMode === 'vocals'} /><Button label={vocalBusy ? 'Processing' : 'Remove vocals'} onPress={() => { void runVocalRemoval(); }} text={vocalBusy ? `${Math.round(vocalProgress * 100)}%` : 'Process'} /></View></View> : null}
       {current?.subtitleTracks?.length ? <View style={styles.rowButtons}>{current.subtitleTracks.map((track) => <Button key={track.id} label={`Subtitle ${track.label}`} onPress={() => { if (track.uri) void onLoadSrt(track.uri); else setSubtitleCues(track.cues || []); }} text={track.label} />)}</View> : null}
-    </View>;
+    </View><Modal visible={urlDialog} transparent animationType="fade" onRequestClose={() => setUrlDialog(false)}><View style={styles.modalBackdrop}><View style={styles.modalCard}><Text accessibilityRole="header" style={styles.modalTitle}>Get Audio from URL</Text><Text style={styles.muted}>Enter a secure HTTPS direct media URL.</Text><TextInput accessibilityLabel="Media URL" autoCapitalize="none" autoCorrect={false} value={mediaUrl} onChangeText={setMediaUrl} placeholder="https://..." placeholderTextColor="#7f8794" style={styles.search} /><View style={styles.rowButtons}><Button label="Next" onPress={loadRemoteUrl} text="Next" /><Button label="Cancel" onPress={() => { setUrlDialog(false); setMediaUrl(''); }} text="Cancel" /></View><Text accessibilityLiveRegion="polite" style={styles.muted}>Protected provider stream extraction is not supported.</Text></View></View></Modal>;
   }
 
   return <View style={styles.root}>
@@ -159,5 +190,5 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0d0f12' }, header: { flexDirection: 'row', alignItems: 'center', padding: 12 }, headerText: { flex: 1, paddingHorizontal: 8 }, title: { color: '#fff', fontSize: 21, fontWeight: '800' }, muted: { color: '#aeb4be', fontSize: 13, marginTop: 3 }, button: { minWidth: 52, minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 }, selectedButton: { backgroundColor: '#26303d' }, buttonText: { color: '#fff', fontWeight: '700' }, pressed: { opacity: .65 }, tabs: { flexDirection: 'row', paddingHorizontal: 8, gap: 4 }, searchWrap: { padding: 12 }, search: { minHeight: 48, borderRadius: 14, backgroundColor: '#181c22', color: '#fff', paddingHorizontal: 16, fontSize: 16 }, searchSmall: { flex: 1, minHeight: 44, borderRadius: 12, backgroundColor: '#181c22', color: '#fff', paddingHorizontal: 12 }, list: { padding: 10, paddingBottom: 30 }, row: { minHeight: 72, borderRadius: 14, padding: 10, flexDirection: 'row', alignItems: 'center' }, rowText: { flex: 1, paddingHorizontal: 12 }, rowTitle: { color: '#fff', fontSize: 15, fontWeight: '700' }, thumbnail: { width: 52, height: 52, borderRadius: 10, backgroundColor: '#262d37', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, thumbImage: { width: '100%', height: '100%' }, glyph: { color: '#aeb4be', fontSize: 90 }, glyphSmall: { color: '#aeb4be', fontSize: 20 }, video: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000' }, subtitle: { position: 'absolute', bottom: 16, left: 16, right: 16, alignItems: 'center' }, subtitleText: { color: '#fff', backgroundColor: '#000c', padding: 8, borderRadius: 7, fontSize: 16 }, artwork: { margin: 24, aspectRatio: 1, maxHeight: 340, borderRadius: 24, overflow: 'hidden', backgroundColor: '#1b2028', alignItems: 'center', justifyContent: 'center' }, artworkImage: { width: '100%', height: '100%' }, nowPlaying: { paddingHorizontal: 24, paddingTop: 8 }, trackTitle: { color: '#fff', fontSize: 21, fontWeight: '800' }, progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 18 }, time: { color: '#aeb4be', width: 44, textAlign: 'center' }, progress: { flex: 1, height: 36, justifyContent: 'center' }, progressFill: { height: 5, backgroundColor: '#fff', borderRadius: 3 }, controls: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 4 }, live: { textAlign: 'center', color: '#e4e7ec', fontSize: 12, padding: 12 }, vocalCard: { margin: 14, padding: 14, borderRadius: 18, backgroundColor: '#181c22' }, videoDescriptionCard: { margin: 14, padding: 14, borderRadius: 18, backgroundColor: '#181c22', gap: 8 }, sectionTitle: { color: '#fff', fontSize: 16, fontWeight: '800', marginBottom: 5 }, rowButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, alignItems: 'center' }, youtubeCard: { marginHorizontal: 12, marginBottom: 8, padding: 12, borderRadius: 18, backgroundColor: '#181c22' }, ytResult: { paddingVertical: 10 }, album: { padding: 16, marginBottom: 8, borderRadius: 14, backgroundColor: '#181c22' }, playlistForm: { padding: 10, gap: 6 }, empty: { color: '#aeb4be', textAlign: 'center', padding: 30 },
+  root: { flex: 1, backgroundColor: '#0d0f12' }, modalBackdrop: { flex: 1, backgroundColor: '#000b', justifyContent: 'center', padding: 18 }, modalCard: { backgroundColor: '#181c22', borderRadius: 20, padding: 18, gap: 10 }, modalTitle: { color: '#fff', fontSize: 20, fontWeight: '800' }, audioEffectCard: { margin: 14, padding: 14, borderRadius: 18, backgroundColor: '#181c22', gap: 6 }, header: { flexDirection: 'row', alignItems: 'center', padding: 12 }, headerText: { flex: 1, paddingHorizontal: 8 }, title: { color: '#fff', fontSize: 21, fontWeight: '800' }, muted: { color: '#aeb4be', fontSize: 13, marginTop: 3 }, button: { minWidth: 52, minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 }, selectedButton: { backgroundColor: '#26303d' }, buttonText: { color: '#fff', fontWeight: '700' }, pressed: { opacity: .65 }, tabs: { flexDirection: 'row', paddingHorizontal: 8, gap: 4 }, searchWrap: { padding: 12 }, search: { minHeight: 48, borderRadius: 14, backgroundColor: '#181c22', color: '#fff', paddingHorizontal: 16, fontSize: 16 }, searchSmall: { flex: 1, minHeight: 44, borderRadius: 12, backgroundColor: '#181c22', color: '#fff', paddingHorizontal: 12 }, list: { padding: 10, paddingBottom: 30 }, row: { minHeight: 72, borderRadius: 14, padding: 10, flexDirection: 'row', alignItems: 'center' }, rowText: { flex: 1, paddingHorizontal: 12 }, rowTitle: { color: '#fff', fontSize: 15, fontWeight: '700' }, thumbnail: { width: 52, height: 52, borderRadius: 10, backgroundColor: '#262d37', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, thumbImage: { width: '100%', height: '100%' }, glyph: { color: '#aeb4be', fontSize: 90 }, glyphSmall: { color: '#aeb4be', fontSize: 20 }, video: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000' }, subtitle: { position: 'absolute', bottom: 16, left: 16, right: 16, alignItems: 'center' }, subtitleText: { color: '#fff', backgroundColor: '#000c', padding: 8, borderRadius: 7, fontSize: 16 }, artwork: { margin: 24, aspectRatio: 1, maxHeight: 340, borderRadius: 24, overflow: 'hidden', backgroundColor: '#1b2028', alignItems: 'center', justifyContent: 'center' }, artworkImage: { width: '100%', height: '100%' }, nowPlaying: { paddingHorizontal: 24, paddingTop: 8 }, trackTitle: { color: '#fff', fontSize: 21, fontWeight: '800' }, progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 18 }, time: { color: '#aeb4be', width: 44, textAlign: 'center' }, progress: { flex: 1, height: 36, justifyContent: 'center' }, progressFill: { height: 5, backgroundColor: '#fff', borderRadius: 3 }, controls: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 4 }, live: { textAlign: 'center', color: '#e4e7ec', fontSize: 12, padding: 12 }, vocalCard: { margin: 14, padding: 14, borderRadius: 18, backgroundColor: '#181c22' }, videoDescriptionCard: { margin: 14, padding: 14, borderRadius: 18, backgroundColor: '#181c22', gap: 8 }, sectionTitle: { color: '#fff', fontSize: 16, fontWeight: '800', marginBottom: 5 }, rowButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, alignItems: 'center' }, youtubeCard: { marginHorizontal: 12, marginBottom: 8, padding: 12, borderRadius: 18, backgroundColor: '#181c22' }, ytResult: { paddingVertical: 10 }, album: { padding: 16, marginBottom: 8, borderRadius: 14, backgroundColor: '#181c22' }, playlistForm: { padding: 10, gap: 6 }, empty: { color: '#aeb4be', textAlign: 'center', padding: 30 },
 });
