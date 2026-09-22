@@ -2,7 +2,7 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { , Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { announceClean } from '@/features/accessibility/spokenAnnouncement';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
