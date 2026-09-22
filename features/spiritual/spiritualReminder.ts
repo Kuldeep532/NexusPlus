@@ -41,12 +41,19 @@ export async function cancelSpiritualReminders(): Promise<void> {
   }
 }
 
+export async function requestSpiritualReminderPermission(): Promise<boolean> {
+  const current = await Notifications.getPermissionsAsync();
+  if (current.granted) return true;
+  const next = await Notifications.requestPermissionsAsync();
+  return next.granted;
+}
+
 export async function scheduleSpiritualReminders(): Promise<void> {
   await cancelSpiritualReminders();
   const prefs = await readSpiritualReminderPreferences();
   if (!prefs.enabled) return;
-  const permissions = await Notifications.getPermissionsAsync();
-  if (!permissions.granted) return;
+  const granted = await requestSpiritualReminderPermission();
+  if (!granted) return;
 
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: 'Geeta Nexus Spiritual Messages',
