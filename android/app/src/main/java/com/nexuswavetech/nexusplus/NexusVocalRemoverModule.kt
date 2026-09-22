@@ -11,21 +11,21 @@ import com.facebook.react.bridge.ReadableMap
 import com.nexuswavetech.nexusplus.vocal.VocalRemoverNative
 import java.io.File
 import java.util.concurrent.Executors
-import java.util.concurrent.Future
 
 class NexusVocalRemoverModule(private val reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var activeJob: Future<*>? = null
 
     override fun getName(): String = "NexusVocalRemover"
 
     @ReactMethod
     fun isAvailable(promise: Promise) {
-        try {
-            promise.resolve(VocalRemoverNative.nativeIsAvailable())
-        } catch (error: Throwable) {
-            promise.resolve(false)
+        executor.execute {
+            try {
+                promise.resolve(VocalRemoverNative.nativeIsAvailable())
+            } catch (error: Throwable) {
+                promise.resolve(false)
+            }
         }
     }
 
@@ -33,11 +33,16 @@ class NexusVocalRemoverModule(private val reactContext: ReactApplicationContext)
     fun separate(args: ReadableMap, promise: Promise) {
         val inputPath = args.getString("inputPath")?.trim().orEmpty()
         val outputPath = args.getString("outputPath")?.trim().orEmpty()
-        require(inputPath.isNotEmpty()) { "Input audio path is required." }
-        require(outputPath.isNotEmpty()) { "Output audio path is required." }
+        if (inputPath.isEmpty()) {
+            promise.reject("VOCAL_INPUT", "Input audio path is required.")
+            return
+        }
+        if (outputPath.isEmpty()) {
+            promise.reject("VOCAL_OUTPUT", "Output audio path is required.")
+            return
+        }
 
-        activeJob?.cancel(true)
-        activeJob = executor.submit {
+        executor.execute {
             try {
                 emit("preparing", 0.02, "Preparing native audio separator")
                 val quality = when (args.getString("quality")) {
@@ -54,14 +59,14 @@ class NexusVocalRemoverModule(private val reactContext: ReactApplicationContext)
                     preserveBass,
                     preserveStereo,
                 )
-
                 if (nativeResult.isNullOrBlank()) {
                     throw IllegalStateException("Vocal remover returned no output.")
                 }
                 if (nativeResult.startsWith("ERROR:")) {
                     throw IllegalStateException(nativeResult.removePrefix("ERROR:").ifBlank { "Native vocal removal failed." })
                 }
-                if (!File(nativeResult).isFile || File(nativeResult).length() <= 44L) {
+                val output = File(nativeResult)
+                if (!output.isFile || output.length() <= 44L) {
                     throw IllegalStateException("Vocal remover did not create a valid output file.")
                 }
                 emit("complete", 1.0, "Vocal separation complete")
@@ -83,22 +88,17 @@ class NexusVocalRemoverModule(private val reactContext: ReactApplicationContext)
                     putDouble("progress", progress)
                     putString("message", message)
                 }
-                sendEvent("vocalRemovalProgress", payload)
+                reactApplicationContext
+                    .getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                    .emit("vocalRemovalProgress", payload)
             } catch (_: Throwable) {}
         }
-    }
-
-    private fun sendEvent(name: String, payload: com.facebook.react.bridge.WritableMap) {
-        reactApplicationContext
-            .getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-            .emit(name, payload)
     }
 
     @ReactMethod
     fun cancel(promise: Promise) {
         executor.execute {
             try {
-                activeJob?.cancel(true)
                 VocalRemoverNative.nativeCancel()
                 promise.resolve(true)
             } catch (_: Throwable) {
@@ -111,7 +111,6 @@ class NexusVocalRemoverModule(private val reactContext: ReactApplicationContext)
     fun dispose(promise: Promise) {
         executor.execute {
             try {
-                activeJob?.cancel(true)
                 VocalRemoverNative.nativeDispose()
                 promise.resolve(true)
             } catch (_: Throwable) {
