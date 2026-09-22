@@ -154,7 +154,7 @@ class AudioEditorNativeModule : Module() {
           addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
           addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
         }
-        activity.startActivityForResult(intent, 4907)
+        activity.startActivityForResult(intent, if (kind == "video") 4908 else 4907)
         promise.resolve(true)
       } catch (error: Exception) {
         promise.reject("MEDIA_FOLDER_PICK_FAILED", error.message ?: "Unable to open media folder picker.", error)
