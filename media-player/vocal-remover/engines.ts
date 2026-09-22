@@ -1,14 +1,7 @@
 import { AudioEditorNative } from '@/modules/audio-editor-native';
 import type { VocalRemovalEngine, VocalRemovalOptions, VocalRemovalProgress } from './types';
 
-/**
- * Bridge to a native/on-device AI implementation.
- *
- * The bridge is intentionally tiny so the UI and job manager never depend on
- * a particular ML runtime. A development build can expose
- * globalThis.NexusVocalRemover with the methods below, backed by ONNX Runtime,
- * TFLite, or another native inference engine.
- */
+/** Native Android vocal-removal bridge. */
 type NativeBridge = {
   isAvailable?: () => Promise<boolean>;
   separate?: (
@@ -32,7 +25,7 @@ function outputPath(inputUri: string, stem: string, quality: string): string {
 
 export class NativeAiVocalRemovalEngine implements VocalRemovalEngine {
   readonly id = 'native-ai' as const;
-  readonly displayName = 'Nexus AI Vocal Separation';
+  readonly displayName = 'Nexus Android Vocal Separation';
 
   async isAvailable(): Promise<boolean> {
     if (AudioEditorNative?.vocalRemove) return true;
@@ -56,11 +49,7 @@ export class NativeAiVocalRemovalEngine implements VocalRemovalEngine {
       onProgress?.({ stage: 'complete', progress: 1, message: 'Vocal separation complete' });
       return { outputUri: result.outputPath, durationMs: result.durationMs };
     }
-    const bridge = getNativeBridge();
-    if (!bridge?.separate) throw new Error('Android vocal-removal engine is not installed in this build.');
-    const outputUri = outputPath(inputUri, options.outputStem, options.quality);
-    onProgress?.({ stage: 'preparing', progress: 0.05, message: 'Preparing legacy native vocal separation' });
-    return bridge.separate(inputUri, outputUri, options, onProgress ?? (() => undefined));
+    throw new Error('Android Audio Editor native vocal-removal module is unavailable. Rebuild the Android app.');
   }
 
   async cancel(): Promise<void> {
@@ -72,10 +61,7 @@ export class NativeAiVocalRemovalEngine implements VocalRemovalEngine {
   }
 }
 
-/**
- * Fast fallback for stereo mixes where vocals are strongly center-panned.
- * This is deliberately separate from the AI engine and can be replaced later.
- */
+/** Disabled compatibility engine; it previously returned a URI without processing audio. */
 export class PhaseCancelVocalRemovalEngine implements VocalRemovalEngine {
   readonly id = 'phase-cancel' as const;
   readonly displayName = 'Stereo Center-Channel Removal';
