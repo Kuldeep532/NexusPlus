@@ -37,6 +37,14 @@ const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
     order: 30,
   },
   {
+    id: 'vocal-remover',
+    title: 'Vocal Remover',
+    description: 'Separate center-panned vocals from local audio into an instrumental or vocal track using the Android native processor.',
+    route: '/audio-editor/vocal-remover',
+    icon: 'mic-off',
+    order: 40,
+  },
+  {
     id: 'audio-effects',
     title: 'Audio Effects',
     description: 'Apply real volume, fade-in, fade-out, and normalization effects to selected audio ranges.',
