@@ -119,7 +119,7 @@ type AudioEditorNativeModuleType = {
   synthesizePiper(input: PiperSynthesizeInput): Promise<PiperSynthesizeResult>;
   speedAndPitch(inputPath: string, outputPath: string, speed: number, pitchSemitones: number): Promise<SpeedPitchNativeResult>;
   removeSilence(inputPath: string, outputPath: string, settings: { thresholdDb: number; minSilenceMs: number; paddingMs: number }): Promise<RemoveSilenceNativeResult>;
-  vocalRemove(inputPath: string, outputPath: string, quality: string, preserveBass: boolean, preserveStereo: boolean): Promise<VocalRemovalNativeResult>;
+  vocalRemove(inputPath: string, outputPath: string, outputStem: "instrumental" | "vocals", quality: string, preserveBass: boolean, preserveStereo: boolean): Promise<VocalRemovalNativeResult>;
 };
 
 export const AudioEditorNative = requireOptionalNativeModule<AudioEditorNativeModuleType>('AudioEditorNative');
