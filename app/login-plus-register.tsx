@@ -1,10 +1,11 @@
 import { Feather } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/features/auth/useAuth';
+import { readLaunchPreferences, writeLaunchPreferences, hasPromptedForAppMode, markAppModePrompted, type HomeDestination } from '@/features/app-shell/launchPreferences';
 
 type Mode = 'chooser' | 'login' | 'register';
 
@@ -25,8 +26,32 @@ export default function LoginPlusRegisterScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [modeChoice, setModeChoice] = useState<HomeDestination | null>(null);
+  const [showModeChoice, setShowModeChoice] = useState(false);
 
-  const complete = () => router.replace('/home');
+  const complete = async () => {
+    const prompted = await hasPromptedForAppMode();
+    const prefs = await readLaunchPreferences();
+    if (!prompted) {
+      setModeChoice(prefs.homeDestination);
+      setShowModeChoice(true);
+      return;
+    }
+    router.replace((prefs.homeDestination === 'geeta-home' ? '/geeta-nexus' : '/home') as never);
+  };
+
+  useEffect(() => {
+    if (!auth.session) return;
+  }, [auth.session]);
+
+  const confirmAppMode = async () => {
+    if (!modeChoice) return;
+    const prefs = await readLaunchPreferences();
+    await writeLaunchPreferences({ ...prefs, homeDestination: modeChoice });
+    await markAppModePrompted();
+    setShowModeChoice(false);
+    router.replace((modeChoice === 'geeta-home' ? '/geeta-nexus' : '/home') as never);
+  };
 
   const signInGoogle = async () => {
     try { await auth.google(); complete(); } catch { /* Error is rendered below. */ }
@@ -49,9 +74,23 @@ export default function LoginPlusRegisterScreen() {
         <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Sign in with Google through Supabase or use your Nexus Plus email account.</Text>
       </View>
 
-      {!!displayError && <View accessible accessibilityRole="alert" style={[styles.errorBox, { backgroundColor: colors.destructive + '18', borderColor: colors.destructive }]}><Text style={[styles.errorText, { color: colors.destructive }]}>{displayError}</Text></View>}
+      {showModeChoice && <View accessibilityRole="dialog" style={[styles.modeCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.modeTitle, { color: colors.foreground }]}>Select App Mode</Text>
+        <Text style={[styles.modeBody, { color: colors.mutedForeground }]}>Choose the experience to open after login. You can change this later in Settings.</Text>
+        {([['nexus-home','Nexus Plus Home'],['geeta-home','Geeta Nexus']] as const).map(([value, title]) => (
+          <Pressable key={value} accessibilityRole="radio" accessibilityState={{ selected: modeChoice === value }} onPress={() => setModeChoice(value)} style={[styles.modeOption,{borderColor:modeChoice===value?colors.primary:colors.border,backgroundColor:modeChoice===value?colors.secondary:colors.card}]}>
+            <View style={[styles.radio,{borderColor:modeChoice===value?colors.primary:colors.mutedForeground}]}>{modeChoice===value?<View style={[styles.radioDot,{backgroundColor:colors.primary}]} />:null}</View>
+            <Text style={[styles.modeOptionText,{color:colors.foreground}]}>{title}</Text>
+          </Pressable>
+        ))}
+        <Pressable accessibilityRole="button" accessibilityLabel="Continue with selected app mode" disabled={!modeChoice} onPress={() => void confirmAppMode()} style={[styles.primaryButton,{backgroundColor:colors.primary,opacity:modeChoice?1:.45}]}>
+          <Text style={[styles.primaryText,{color:colors.primaryForeground}]}>Continue</Text>
+        </Pressable>
+      </View>}
 
-      {mode === 'chooser' && <View style={styles.stack}>
+      {!showModeChoice && {!!displayError && <View accessible accessibilityRole="alert" style={[styles.errorBox, { backgroundColor: colors.destructive + '18', borderColor: colors.destructive }]}><Text style={[styles.errorText, { color: colors.destructive }]}>{displayError}</Text></View>}
+
+      {!showModeChoice && mode === 'chooser' && <View style={styles.stack}>
         <Pressable accessibilityRole="button" accessibilityLabel="Login with Google" accessibilityHint="Opens Supabase web authentication with Google" disabled={auth.busy} onPress={() => void signInGoogle()} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: auth.busy ? 0.55 : 1 }]}>
           <Feather name="globe" size={18} color={colors.primaryForeground} />
           <Text style={[styles.primaryText, { color: colors.primaryForeground }]}>Login with Google</Text>
@@ -66,7 +105,7 @@ export default function LoginPlusRegisterScreen() {
         </Pressable>
       </View>}
 
-      {mode !== 'chooser' && <View style={styles.stack}>
+      {!showModeChoice && mode !== 'chooser' && <View style={styles.stack}>
         <Pressable accessibilityRole="button" accessibilityLabel="Back to login choices" onPress={() => setMode('chooser')} style={styles.backButton}>
           <Feather name="arrow-left" size={16} color={colors.foreground} /><Text style={[styles.backText, { color: colors.foreground }]}>Back</Text>
         </Pressable>
@@ -90,5 +129,6 @@ const styles = StyleSheet.create({
   secondaryButton: { minHeight: 50, borderRadius: 14, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }, secondaryText: { fontSize: 12, fontFamily: 'Inter_700Bold' },
   backButton: { minHeight: 38, alignSelf: 'flex-start', paddingHorizontal: 5, flexDirection: 'row', alignItems: 'center', gap: 6 }, backText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   label: { fontSize: 11, fontFamily: 'Inter_700Bold', marginBottom: 6 }, input: { minHeight: 48, borderWidth: 1, borderRadius: 13, paddingHorizontal: 13, fontSize: 12 },
+  modeCard:{borderWidth:1,borderRadius:18,padding:15,marginBottom:14,gap:9}, modeTitle:{fontSize:17,fontFamily:'Inter_700Bold'}, modeBody:{fontSize:11,lineHeight:17}, modeOption:{minHeight:52,borderWidth:1,borderRadius:13,padding:10,flexDirection:'row',alignItems:'center',gap:10}, radio:{width:20,height:20,borderRadius:10,borderWidth:2,alignItems:'center',justifyContent:'center'}, radioDot:{width:9,height:9,borderRadius:5}, modeOptionText:{fontSize:12,fontFamily:'Inter_700Bold'},
   errorBox: { borderWidth: 1, borderRadius: 13, padding: 12, marginBottom: 14 }, errorText: { fontSize: 11, lineHeight: 16 },
 });
