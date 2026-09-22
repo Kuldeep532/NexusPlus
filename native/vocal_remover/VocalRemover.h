@@ -41,6 +41,8 @@ class VocalRemover {
   void cancel();
   bool isCancelled() const;
 
+  void setCallback(const ProgressCallback& callback);
+
  private:
   std::atomic<bool> cancelled_{false};
 };
