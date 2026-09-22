@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { announceClean } from '@/features/accessibility/spokenAnnouncement';
 import { VideoView } from 'expo-video';
@@ -18,6 +18,7 @@ import { AUDIO_EFFECT_PRESETS, type AudioEffectPreset } from './audioEffects';
 import { readMediaBrowserPreferences, type MediaSort, type MediaBrowserPreferences } from './mediaBrowserPreferences';
 import { validateStreamUri } from './streamCapability';
 import { assertAudioEditorNative } from '@/modules/audio-editor-native';
+import { usePersistentMedia } from './PersistentMediaController';
 
 type Props = { initialItems?: MediaItemModel[]; onBack?: () => void };
 type LibraryTab = 'tracks' | 'albums' | 'playlists';
@@ -55,6 +56,7 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
   const [mediaUrl, setMediaUrl] = useState('');
   const descriptionBusy = useRef(false);
   const player = useMediaPlayer(library);
+  const persistent = usePersistentMedia();
 
   const refresh = useCallback(async () => {
     const result = await scanLocalMedia();
@@ -123,7 +125,11 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
     void run();
   }, [videoDescriptionEnabled, current?.id, current?.kind, current?.uri, player.state.isPlaying, Math.floor(player.state.positionMs / mediaPrefs.descriptionIntervalMs), mediaPrefs.descriptionIntervalMs]);
 
-  const loadItem = useCallback((item: MediaItemModel, queue = library) => { player.load(item, queue); setScreen('player'); }, [library, player]);
+  const loadItem = useCallback((item: MediaItemModel, queue = library) => {
+    player.load(item, queue);
+    if (item.kind === 'audio' && item.source !== 'radio') void persistent.load(item, queue);
+    setScreen('player');
+  }, [library, persistent, player]);
 
   const applyAudioEffect = useCallback(async (preset: AudioEffectPreset) => {
     if (!current || current.kind !== 'audio' || preset === 'normal' || audioEffectBusy) return;
