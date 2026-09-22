@@ -9,6 +9,7 @@ import { vocalRemoverService } from './vocal-remover/VocalRemoverService';
 import { findActiveCue, formatTime, parseSrt } from './subtitles';
 import { useMediaPlayer } from './useMediaPlayer';
 import type { MediaItemModel, SubtitleCue } from './types';
+import { DEFAULT_MEDIA_PLAYER_PREFERENCES, readMediaPlayerPreferences, type MediaPlayerPreferences } from '@/features/media-player/mediaPlayerPreferences';
 import { videoDescriptionAnalyzer } from './videoDescription';
 import { detectVideoDescriptionLanguage, speakVideoDescription } from './videoDescriptionTts';
 import { getNativeVideoDescriptionModule } from './videoDescriptionNative';
@@ -39,6 +40,7 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
   const [vocalProgress, setVocalProgress] = useState(0);
   const [vocalMode, setVocalMode] = useState<'instrumental' | 'vocals'>('instrumental');
   const [videoDescriptionEnabled, setVideoDescriptionEnabled] = useState(false);
+  const [mediaPrefs, setMediaPrefs] = useState<MediaPlayerPreferences>(DEFAULT_MEDIA_PLAYER_PREFERENCES);
   const [videoDescriptionStatus, setVideoDescriptionStatus] = useState('');
   const descriptionBusy = useRef(false);
   const player = useMediaPlayer(library);
@@ -51,7 +53,7 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
     setPlaylists(await loadDevicePlaylists());
   }, [player]);
 
-  useEffect(() => { void refresh(); void isYouTubeMusicInstalled().then(setYoutubeInstalled); }, [refresh]);
+  useEffect(() => { void refresh(); void isYouTubeMusicInstalled().then(setYoutubeInstalled); void readMediaPlayerPreferences().then((prefs) => { setMediaPrefs(prefs); setVideoDescriptionEnabled(prefs.videoDescriptionEnabled); }); }, [refresh]);
   useEffect(() => { if (player.state.current) void announceClean(`Playing ${player.state.current.title}`); }, [player.state.current?.id]);
 
   const audio = useMemo(() => library.filter((item) => item.kind === 'audio'), [library]);
@@ -95,7 +97,7 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
       } finally { descriptionBusy.current = false; }
     };
     void run();
-  }, [videoDescriptionEnabled, current?.id, current?.kind, current?.uri, player.state.isPlaying, Math.floor(player.state.positionMs / 5000)]);
+  }, [videoDescriptionEnabled, current?.id, current?.kind, current?.uri, player.state.isPlaying, Math.floor(player.state.positionMs / mediaPrefs.descriptionIntervalMs), mediaPrefs.descriptionIntervalMs]);
 
   const loadItem = useCallback((item: MediaItemModel, queue = library) => { player.load(item, queue); setScreen('player'); }, [library, player]);
 
