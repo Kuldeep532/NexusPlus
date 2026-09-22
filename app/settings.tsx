@@ -7,6 +7,7 @@ import { useColors, refreshThemeColor } from '@/hooks/useColors';
 import { readThemeColor, writeThemeColor, type ThemeColor } from '@/features/app-shell/themePreferences';
 import { readLaunchPreferences, writeLaunchPreferences } from '@/features/app-shell/launchPreferences';
 import { loadPasswordManagerPreferences, savePasswordManagerPreferences, type PasswordManagerPreferences } from '@/features/biometric-vault/passwordManagerPreferences';
+import { readGreetingPreferences, writeGreetingPreferences, type GreetingMode } from '@/features/app-shell/greetingPreferences';
 
 const SETTINGS = [
   { title:'Language & preferences',description:'Language, accessibility and general preferences.',route:'/language-and-preference',icon:'globe' as const },
@@ -14,6 +15,7 @@ const SETTINGS = [
   { title:'Payment Announcer',description:'Configure secure payment announcements.',route:'/payment-announcer',icon:'volume-2' as const },
   { title:'Media Player Settings',description:'Advanced video, audio, subtitles, playback and live video-description controls.',route:'/media-player-settings',icon:'play-circle' as const },
   { title:'Expense Tracker',description:'Manage expense detection and financial privacy.',route:'/expense-tracker',icon:'credit-card' as const },
+  { title:'Greeting & Home',description:'Choose Home greeting, launch greeting and home-screen presentation.',route:'/settings',icon:'smile' as const },
 ];
 const LEGAL_SETTINGS = [
   {title:'Privacy Policy',description:'How Nexus Plus handles data, permissions, analytics, APIs and security.',route:'/privacy-policy',icon:'lock' as const},
@@ -26,13 +28,17 @@ const THEME_OPTIONS:Array<{value:ThemeColor;title:string;description:string}>= [
  {value:'light',title:'Light Mode',description:'Always use a clean light palette.'},
  {value:'dark',title:'Dark Mode',description:'Always use a comfortable dark palette.'},
  {value:'system',title:'System Color',description:'Automatically follows your device Light or Dark appearance.'},
+ {value:'material',title:'Material System',description:'Material-style semantic colors across features.'},
+ {value:'black',title:'Black',description:'High-contrast black appearance for comfortable dark use.'},
+ {value:'spiritual',title:'Spiritual Mode',description:'Devotional-inspired gold, saffron and deep-blue accents in Light and Dark themes.'},
 ];
 
 export default function SettingsScreen(){
  const colors=useColors(); const router=useRouter(); const insets=useSafeAreaInsets();
  const [themeColor,setThemeColor]=useState<ThemeColor>('ocean-blue');
  const [passwordPrefs,setPasswordPrefs]=useState<PasswordManagerPreferences>({defaultGenerator:'nexus',showCopyAction:true,requireBiometricForReveal:true});
- useEffect(()=>{void Promise.all([readLaunchPreferences(),readThemeColor(),loadPasswordManagerPreferences()]).then(([,theme,prefs])=>{setThemeColor(theme);setPasswordPrefs(prefs);});},[]);
+ const [greetingMode,setGreetingMode]=useState<GreetingMode>('radhe-radhe');
+ useEffect(()=>{void Promise.all([readLaunchPreferences(),readThemeColor(),loadPasswordManagerPreferences(),readGreetingPreferences()]).then(([,theme,prefs,greeting])=>{setThemeColor(theme);setPasswordPrefs(prefs);setGreetingMode(greeting.mode);});},[]);
  const updateHomeVisibility=async()=>{await writeLaunchPreferences({launchTarget:'nexus-plus',showGeetaNexusOnHome:false});};
  const updateThemeColor=async(theme:ThemeColor)=>{setThemeColor(theme);refreshThemeColor(theme);await writeThemeColor(theme);};
  const updatePasswordPrefs=(next:PasswordManagerPreferences)=>{setPasswordPrefs(next);void savePasswordManagerPreferences(next);};
@@ -62,6 +68,13 @@ export default function SettingsScreen(){
       <View style={[styles.radio,{borderColor:themeColor===option.value?colors.primary:colors.mutedForeground}]}>{themeColor===option.value?<View style={[styles.radioDot,{backgroundColor:colors.primary}]} />:null}</View>
       <View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>{option.title}</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>{option.description}</Text></View>
     </Pressable>)}</View>
+   </View>
+   <View style={[styles.card,{backgroundColor:colors.card,borderColor:colors.border}]}>
+    <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Home Greeting</Text>
+    <Text style={[styles.body,{color:colors.mutedForeground}]}>Choose the single greeting shown at the top of Home. Launch greeting remains “Jai Shri Krishna”.</Text>
+    <View style={styles.modeList}>{([
+      ['radhe-radhe','Radhe Radhe'],['jai-shri-krishna','Jai Shri Krishna'],['hare-krishna','Hare Krishna'],['good-day','Good Morning'],['namaste','Namaste'],['hari-om','Hari Om'],['shri-radhe','Shri Radhe'],['govinda','Hare Govinda'],['time-aware','Time-based greeting']
+    ] as Array<[GreetingMode,string]>).map(([value,title])=><Pressable key={value} accessibilityRole="radio" accessibilityState={{selected:greetingMode===value}} accessibilityLabel={title} onPress={()=>{setGreetingMode(value);void writeGreetingPreferences({mode:value});}} style={[styles.modeItem,{borderColor:greetingMode===value?colors.primary:colors.border,backgroundColor:greetingMode===value?colors.secondary:colors.card}]}><View style={[styles.radio,{borderColor:greetingMode===value?colors.primary:colors.mutedForeground}]}>{greetingMode===value?<View style={[styles.radioDot,{backgroundColor:colors.primary}]} />:null}</View><View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>{title}</Text></View></Pressable>)}</View>
    </View>
    <Text style={[styles.sectionTitle,{color:colors.foreground,marginTop:20}]}>Feature settings</Text>
    <View style={styles.list}>{SETTINGS.map(item=><Pressable key={item.route} accessibilityRole="button" accessibilityLabel={item.title+'. '+item.description} onPress={()=>router.push(item.route as never)} style={[styles.item,{backgroundColor:colors.card,borderColor:colors.border}]}>
