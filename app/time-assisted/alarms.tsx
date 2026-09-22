@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { NativeModules } from 'react-native';
 import { useCallback, useEffect, useState } from 'react';
-import { , Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { announceClean } from '@/features/accessibility/spokenAnnouncement';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
