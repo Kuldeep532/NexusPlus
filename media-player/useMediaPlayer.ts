@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { createAudioPlayer, type AudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { useVideoPlayer } from 'expo-video';
 import type { MediaItemModel, PlayerState, RepeatMode } from './types';
@@ -136,6 +137,13 @@ export function useMediaPlayer(initialQueue: MediaItemModel[] = []) {
   }, []);
   const toggleShuffle = useCallback(() => setState((s) => ({ ...s, shuffle: !s.shuffle })), []);
   const updateQueue = useCallback((queue: MediaItemModel[]) => setState((s) => ({ ...s, queue })), []);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') syncFromNative();
+    });
+    return () => subscription.remove();
+  }, [syncFromNative]);
 
   useEffect(() => {
     const id = setInterval(syncFromNative, 250);
