@@ -54,7 +54,7 @@ export type AudioMixResult = {
 export type AudioEffectInput = {
   inputPath: string;
   outputPath: string;
-  effect: 'volume' | 'fade-in' | 'fade-out' | 'normalize';
+  effect: 'volume' | 'fade-in' | 'fade-out' | 'normalize' | 'lofi' | 'echo' | 'stereo-split';
   startMs?: number;
   endMs?: number;
   amount?: number;
