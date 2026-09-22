@@ -98,6 +98,8 @@ export type PiperSynthesizeResult = {
   outputPath: string;
 };
 
+export type SpeedPitchNativeResult = { outputPath: string; durationMs: number; sampleRate: number; channels: number; mimeType: string | null };
+
 type AudioEditorNativeModuleType = {
   probe(inputPath: string): Promise<AudioProbeResult>;
   decode(inputPath: string): Promise<DecodedAudioResult>;
@@ -107,6 +109,7 @@ type AudioEditorNativeModuleType = {
   applyEffect(input: AudioEffectInput): Promise<AudioEffectResult>;
   compress(input: AudioCompressionInput): Promise<AudioCompressionResult>;
   synthesizePiper(input: PiperSynthesizeInput): Promise<PiperSynthesizeResult>;
+  speedAndPitch(inputPath: string, outputPath: string, speed: number, pitchSemitones: number): Promise<SpeedPitchNativeResult>;
 };
 
 export const AudioEditorNative = requireOptionalNativeModule<AudioEditorNativeModuleType>('AudioEditorNative');
