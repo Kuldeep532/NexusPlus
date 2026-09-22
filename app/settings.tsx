@@ -8,7 +8,7 @@ import { readThemeColor, writeThemeColor, type ThemeColor } from '@/features/app
 import { readLaunchPreferences, writeLaunchPreferences } from '@/features/app-shell/launchPreferences';
 import { loadPasswordManagerPreferences, savePasswordManagerPreferences, type PasswordManagerPreferences } from '@/features/biometric-vault/passwordManagerPreferences';
 import { readGreetingPreferences, writeGreetingPreferences, type GreetingMode } from '@/features/app-shell/greetingPreferences';
-import { readSpiritualReminderPreferences, writeSpiritualReminderPreferences, type SpiritualReminderPreferences } from '@/features/spiritual/spiritualReminder';
+import { readSpiritualReminderPreferences, writeSpiritualReminderPreferences, scheduleSpiritualReminders, cancelSpiritualReminders, type SpiritualReminderPreferences } from '@/features/spiritual/spiritualReminder';
 
 const SETTINGS = [
   { title:'Language & preferences',description:'Language, accessibility and general preferences.',route:'/language-and-preference',icon:'globe' as const },
@@ -91,12 +91,12 @@ export default function SettingsScreen(){
    <View style={[styles.card,{backgroundColor:colors.card,borderColor:colors.border}]}>
     <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Geeta Nexus Messages</Text>
     <Text style={[styles.body,{color:colors.mutedForeground}]}>Receive optional local Gita/spiritual messages during the day. The app never requires you to read a verse to use Nexus Plus.</Text>
-    <Pressable accessibilityRole="switch" accessibilityState={{checked:spiritualPrefs.enabled}} onPress={()=>{const next={...spiritualPrefs,enabled:!spiritualPrefs.enabled};setSpiritualPrefs(next);void writeSpiritualReminderPreferences(next);}} style={styles.modeItem}>
+    <Pressable accessibilityRole="switch" accessibilityState={{checked:spiritualPrefs.enabled}} onPress={()=>{const next={...spiritualPrefs,enabled:!spiritualPrefs.enabled};setSpiritualPrefs(next);void writeSpiritualReminderPreferences(next).then(()=>next.enabled?scheduleSpiritualReminders():cancelSpiritualReminders());}} style={styles.modeItem}>
       <View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>Spiritual reminders</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>On-device notifications with Gita verses or reflections.</Text></View>
       <Text style={[styles.toggle,{color:colors.primary}]}>{spiritualPrefs.enabled?'On':'Off'}</Text>
     </Pressable>
     <View style={styles.modeList}>
-      {([4,5,6,8] as const).map(hours=><Pressable key={hours} accessibilityRole="radio" accessibilityState={{selected:spiritualPrefs.intervalHours===hours}} onPress={()=>{const next={...spiritualPrefs,intervalHours:hours};setSpiritualPrefs(next);void writeSpiritualReminderPreferences(next);}} style={[styles.modeItem,{borderColor:spiritualPrefs.intervalHours===hours?colors.primary:colors.border,backgroundColor:spiritualPrefs.intervalHours===hours?colors.secondary:colors.card}]}>
+      {([4,5,6,8] as const).map(hours=><Pressable key={hours} accessibilityRole="radio" accessibilityState={{selected:spiritualPrefs.intervalHours===hours}} onPress={()=>{const next={...spiritualPrefs,intervalHours:hours};setSpiritualPrefs(next);void writeSpiritualReminderPreferences(next).then(()=>spiritualPrefs.enabled?scheduleSpiritualReminders():undefined);}} style={[styles.modeItem,{borderColor:spiritualPrefs.intervalHours===hours?colors.primary:colors.border,backgroundColor:spiritualPrefs.intervalHours===hours?colors.secondary:colors.card}]}>
        <View style={[styles.radio,{borderColor:spiritualPrefs.intervalHours===hours?colors.primary:colors.mutedForeground}]}>{spiritualPrefs.intervalHours===hours?<View style={[styles.radioDot,{backgroundColor:colors.primary}]} />:null}</View>
        <View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>{hours} hour interval</Text></View>
       </Pressable>)}
