@@ -4,6 +4,8 @@ import { File, Directory, Paths } from 'expo-file-system';
 const STORAGE_KEY='@nexus-plus/opencv-wasm-cache-v2';
 const CACHE_VERSION='opencv.js-4.x-runtime';
 const DEFAULT_CDN='https://docs.opencv.org/4.x/opencv.js';
+// For strict offline distribution, set EXPO_PUBLIC_OPENCV_JS_URL to a locally
+// provisioned file and EXPO_PUBLIC_OPENCV_WASM_URL to its local .wasm path.
 const CACHE_DIR=new Directory(Paths.document,'opencv-wasm');
 
 export type OpenCvLoadState={
@@ -56,6 +58,7 @@ export async function getOpenCvWasmConfig():Promise<{scriptUrl:string;wasmUrl:st
  */
 export async function ensureOpenCvWasm():Promise<OpenCvLoadState>{
   if(state.status==='ready') return state;
+  // A downloaded WASM runtime remains offline-capable after the first successful install.
   if(inFlight) return inFlight;
   inFlight=(async()=>{
     state={status:'loading',version:CACHE_VERSION};
