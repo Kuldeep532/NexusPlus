@@ -29,7 +29,6 @@ class NexusReactApplication : Application(), ReactApplication {
             add(NexusCctvDiscoveryPackage())
             add(NexusCctvOnvifPackage())
             add(NexusPdfNativePackage())
-            add(NexusVideoEditorPackage())
             add(NexusVisionAssistPackage())
             add(NexusRemotePackage())
             add(NexusRemoteDiscoveryPackage())
