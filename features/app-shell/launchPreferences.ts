@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = '@nexus-plus/launch-preferences';
+const MODE_PROMPT_KEY = '@nexus-plus/app-mode-prompted';
 
 export type HomeDestination = 'nexus-home' | 'geeta-home';
 export type LaunchPreferences = {
@@ -26,7 +27,7 @@ export async function readLaunchPreferences(): Promise<LaunchPreferences> {
       launchTarget: 'nexus-plus',
       homeDestination: value.homeDestination === 'geeta-home' ? 'geeta-home' : 'nexus-home',
       showGeetaNexusOnHome: value.showGeetaNexusOnHome !== false,
-      showDiscoverOnHome: value.showDiscoverOnHome === true,
+      showDiscoverOnHome: false,
     };
   } catch {
     return DEFAULT_PREFERENCES;
@@ -38,6 +39,14 @@ export async function writeLaunchPreferences(next: LaunchPreferences): Promise<v
     launchTarget: 'nexus-plus',
     homeDestination: next.homeDestination === 'geeta-home' ? 'geeta-home' : 'nexus-home',
     showGeetaNexusOnHome: next.showGeetaNexusOnHome === true,
-    showDiscoverOnHome: next.showDiscoverOnHome === true,
+    showDiscoverOnHome: false,
   }));
+}
+
+export async function hasPromptedForAppMode(): Promise<boolean> {
+  return (await AsyncStorage.getItem(MODE_PROMPT_KEY)) === 'true';
+}
+
+export async function markAppModePrompted(): Promise<void> {
+  await AsyncStorage.setItem(MODE_PROMPT_KEY, 'true');
 }
