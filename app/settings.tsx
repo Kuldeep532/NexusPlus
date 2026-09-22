@@ -8,6 +8,7 @@ import { readThemeColor, writeThemeColor, type ThemeColor } from '@/features/app
 import { readLaunchPreferences, writeLaunchPreferences } from '@/features/app-shell/launchPreferences';
 import { loadPasswordManagerPreferences, savePasswordManagerPreferences, type PasswordManagerPreferences } from '@/features/biometric-vault/passwordManagerPreferences';
 import { readGreetingPreferences, writeGreetingPreferences, type GreetingMode } from '@/features/app-shell/greetingPreferences';
+import { readSpiritualReminderPreferences, writeSpiritualReminderPreferences, type SpiritualReminderPreferences } from '@/features/spiritual/spiritualReminder';
 
 const SETTINGS = [
   { title:'Language & preferences',description:'Language, accessibility and general preferences.',route:'/language-and-preference',icon:'globe' as const },
@@ -38,8 +39,9 @@ export default function SettingsScreen(){
  const [themeColor,setThemeColor]=useState<ThemeColor>('ocean-blue');
  const [passwordPrefs,setPasswordPrefs]=useState<PasswordManagerPreferences>({defaultGenerator:'nexus',showCopyAction:true,requireBiometricForReveal:true});
  const [greetingMode,setGreetingMode]=useState<GreetingMode>('radhe-radhe');
+ const [spiritualPrefs,setSpiritualPrefs]=useState<SpiritualReminderPreferences>({enabled:true,intervalHours:5,startHour:8});
  const [launchPrefs,setLaunchPrefs]=useState<Awaited<ReturnType<typeof readLaunchPreferences>>>({launchTarget:'nexus-plus',homeDestination:'nexus-home',showGeetaNexusOnHome:true,showDiscoverOnHome:false});
- useEffect(()=>{void Promise.all([readLaunchPreferences(),readThemeColor(),loadPasswordManagerPreferences(),readGreetingPreferences()]).then(([launch,theme,prefs,greeting])=>{setLaunchPrefs(launch);setThemeColor(theme);setPasswordPrefs(prefs);setGreetingMode(greeting.mode);});},[]);
+ useEffect(()=>{void Promise.all([readLaunchPreferences(),readThemeColor(),loadPasswordManagerPreferences(),readGreetingPreferences(),readSpiritualReminderPreferences()]).then(([launch,theme,prefs,greeting,spiritual])=>{setLaunchPrefs(launch);setThemeColor(theme);setPasswordPrefs(prefs);setGreetingMode(greeting.mode);setSpiritualPrefs(spiritual);});},[]);
  const updateLaunchPrefs=(next: typeof launchPrefs)=>{setLaunchPrefs(next);void writeLaunchPreferences(next);};
  const updateThemeColor=async(theme:ThemeColor)=>{setThemeColor(theme);refreshThemeColor(theme);await writeThemeColor(theme);};
  const updatePasswordPrefs=(next:PasswordManagerPreferences)=>{setPasswordPrefs(next);void savePasswordManagerPreferences(next);};
@@ -86,7 +88,21 @@ export default function SettingsScreen(){
     <Text style={[styles.appModeNote,{color:colors.mutedForeground}]}>Geeta Nexus mode uses the integrated Bhagavad Gita experience.</Text>
     <Pressable accessibilityRole="switch" accessibilityState={{checked:launchPrefs.showGeetaNexusOnHome}} onPress={()=>updateLaunchPrefs({...launchPrefs,showGeetaNexusOnHome:!launchPrefs.showGeetaNexusOnHome})} style={styles.modeItem}><View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>Show Geeta Access on Home</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>Keep the Geeta Access shortcut visible on the selected Home screen.</Text></View><Text style={[styles.toggle,{color:colors.primary}]}>{launchPrefs.showGeetaNexusOnHome?'On':'Off'}</Text></Pressable>
    </View>
-   <Text style={[styles.sectionTitle,{color:colors.foreground,marginTop:20}]}>Feature settings</Text>
+   <View style={[styles.card,{backgroundColor:colors.card,borderColor:colors.border}]}>
+    <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Geeta Nexus Messages</Text>
+    <Text style={[styles.body,{color:colors.mutedForeground}]}>Receive optional local Gita/spiritual messages during the day. The app never requires you to read a verse to use Nexus Plus.</Text>
+    <Pressable accessibilityRole="switch" accessibilityState={{checked:spiritualPrefs.enabled}} onPress={()=>{const next={...spiritualPrefs,enabled:!spiritualPrefs.enabled};setSpiritualPrefs(next);void writeSpiritualReminderPreferences(next);}} style={styles.modeItem}>
+      <View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>Spiritual reminders</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>On-device notifications with Gita verses or reflections.</Text></View>
+      <Text style={[styles.toggle,{color:colors.primary}]}>{spiritualPrefs.enabled?'On':'Off'}</Text>
+    </Pressable>
+    <View style={styles.modeList}>
+      {([4,5,6,8] as const).map(hours=><Pressable key={hours} accessibilityRole="radio" accessibilityState={{selected:spiritualPrefs.intervalHours===hours}} onPress={()=>{const next={...spiritualPrefs,intervalHours:hours};setSpiritualPrefs(next);void writeSpiritualReminderPreferences(next);}} style={[styles.modeItem,{borderColor:spiritualPrefs.intervalHours===hours?colors.primary:colors.border,backgroundColor:spiritualPrefs.intervalHours===hours?colors.secondary:colors.card}]}>
+       <View style={[styles.radio,{borderColor:spiritualPrefs.intervalHours===hours?colors.primary:colors.mutedForeground}]}>{spiritualPrefs.intervalHours===hours?<View style={[styles.radioDot,{backgroundColor:colors.primary}]} />:null}</View>
+       <View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>{hours} hour interval</Text></View>
+      </Pressable>)}
+    </View>
+   </View>
+      <Text style={[styles.sectionTitle,{color:colors.foreground,marginTop:20}]}>Feature settings</Text>
    <View style={styles.list}>{SETTINGS.map(item=><Pressable key={item.route} accessibilityRole="button" accessibilityLabel={item.title+'. '+item.description} onPress={()=>router.push(item.route as never)} style={[styles.item,{backgroundColor:colors.card,borderColor:colors.border}]}>
     <View style={[styles.icon,{backgroundColor:colors.secondary}]}><Feather name={item.icon} size={19} color={colors.primary}/></View><View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>{item.title}</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>{item.description}</Text></View><Feather name="chevron-right" size={19} color={colors.mutedForeground}/>
    </Pressable>)}</View>
