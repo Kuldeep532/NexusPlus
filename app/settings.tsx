@@ -15,7 +15,7 @@ const SETTINGS = [
   { title:'Payment Announcer',description:'Configure secure payment announcements.',route:'/payment-announcer',icon:'volume-2' as const },
   { title:'Media Player Settings',description:'Advanced video, audio, subtitles, playback and live video-description controls.',route:'/media-player-settings',icon:'play-circle' as const },
   { title:'Expense Tracker',description:'Manage expense detection and financial privacy.',route:'/expense-tracker',icon:'credit-card' as const },
-  { title:'Greeting & Home',description:'Choose Home greeting, launch greeting and home-screen presentation.',route:'/settings',icon:'smile' as const },
+
 ];
 const LEGAL_SETTINGS = [
   {title:'Privacy Policy',description:'How Nexus Plus handles data, permissions, analytics, APIs and security.',route:'/privacy-policy',icon:'lock' as const},
@@ -38,8 +38,9 @@ export default function SettingsScreen(){
  const [themeColor,setThemeColor]=useState<ThemeColor>('ocean-blue');
  const [passwordPrefs,setPasswordPrefs]=useState<PasswordManagerPreferences>({defaultGenerator:'nexus',showCopyAction:true,requireBiometricForReveal:true});
  const [greetingMode,setGreetingMode]=useState<GreetingMode>('radhe-radhe');
- useEffect(()=>{void Promise.all([readLaunchPreferences(),readThemeColor(),loadPasswordManagerPreferences(),readGreetingPreferences()]).then(([,theme,prefs,greeting])=>{setThemeColor(theme);setPasswordPrefs(prefs);setGreetingMode(greeting.mode);});},[]);
- const updateHomeVisibility=async()=>{await writeLaunchPreferences({launchTarget:'nexus-plus',showGeetaNexusOnHome:false});};
+ const [launchPrefs,setLaunchPrefs]=useState<Awaited<ReturnType<typeof readLaunchPreferences>>>({launchTarget:'nexus-plus',homeDestination:'nexus-home',showGeetaNexusOnHome:true,showDiscoverOnHome:false});
+ useEffect(()=>{void Promise.all([readLaunchPreferences(),readThemeColor(),loadPasswordManagerPreferences(),readGreetingPreferences()]).then(([launch,theme,prefs,greeting])=>{setLaunchPrefs(launch);setThemeColor(theme);setPasswordPrefs(prefs);setGreetingMode(greeting.mode);});},[]);
+ const updateLaunchPrefs=(next: typeof launchPrefs)=>{setLaunchPrefs(next);void writeLaunchPreferences(next);};
  const updateThemeColor=async(theme:ThemeColor)=>{setThemeColor(theme);refreshThemeColor(theme);await writeThemeColor(theme);};
  const updatePasswordPrefs=(next:PasswordManagerPreferences)=>{setPasswordPrefs(next);void savePasswordManagerPreferences(next);};
 
@@ -75,6 +76,15 @@ export default function SettingsScreen(){
     <View style={styles.modeList}>{([
       ['radhe-radhe','Radhe Radhe'],['jai-shri-krishna','Jai Shri Krishna'],['hare-krishna','Hare Krishna'],['good-day','Good Morning'],['namaste','Namaste'],['hari-om','Hari Om'],['shri-radhe','Shri Radhe'],['govinda','Hare Govinda'],['time-aware','Time-based greeting']
     ] as Array<[GreetingMode,string]>).map(([value,title])=><Pressable key={value} accessibilityRole="radio" accessibilityState={{selected:greetingMode===value}} accessibilityLabel={title} onPress={()=>{setGreetingMode(value);void writeGreetingPreferences({mode:value});}} style={[styles.modeItem,{borderColor:greetingMode===value?colors.primary:colors.border,backgroundColor:greetingMode===value?colors.secondary:colors.card}]}><View style={[styles.radio,{borderColor:greetingMode===value?colors.primary:colors.mutedForeground}]}>{greetingMode===value?<View style={[styles.radioDot,{backgroundColor:colors.primary}]} />:null}</View><View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>{title}</Text></View></Pressable>)}</View>
+   </View>
+   <View style={[styles.card,{backgroundColor:colors.card,borderColor:colors.border}]}>
+    <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Home Screen</Text>
+    <Text style={[styles.body,{color:colors.mutedForeground}]}>Choose which home experience opens after launch.</Text>
+    <View style={styles.modeList}>
+      {([['nexus-home','Nexus Plus Home'],['geeta-home','Geeta Access Home']] as const).map(([value,title])=><Pressable key={value} accessibilityRole="radio" accessibilityState={{selected:launchPrefs.homeDestination===value}} onPress={()=>updateLaunchPrefs({...launchPrefs,homeDestination:value})} style={[styles.modeItem,{borderColor:launchPrefs.homeDestination===value?colors.primary:colors.border,backgroundColor:launchPrefs.homeDestination===value?colors.secondary:colors.card}]}><View style={[styles.radio,{borderColor:launchPrefs.homeDestination===value?colors.primary:colors.mutedForeground}]}>{launchPrefs.homeDestination===value?<View style={[styles.radioDot,{backgroundColor:colors.primary}]} />:null}</View><View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>{title}</Text></View></Pressable>)}
+    </View>
+    <Pressable accessibilityRole="switch" accessibilityState={{checked:launchPrefs.showGeetaNexusOnHome}} onPress={()=>updateLaunchPrefs({...launchPrefs,showGeetaNexusOnHome:!launchPrefs.showGeetaNexusOnHome})} style={styles.modeItem}><View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>Show Geeta Access on Home</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>Keep the Geeta Access shortcut visible on the selected Home screen.</Text></View><Text style={[styles.toggle,{color:colors.primary}]}>{launchPrefs.showGeetaNexusOnHome?'On':'Off'}</Text></Pressable>
+    <Pressable accessibilityRole="switch" accessibilityState={{checked:launchPrefs.showDiscoverOnHome}} onPress={()=>updateLaunchPrefs({...launchPrefs,showDiscoverOnHome:!launchPrefs.showDiscoverOnHome})} style={styles.modeItem}><View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>Show Discover on Home</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>Disable it to keep the Home screen free of the Discover tab/section.</Text></View><Text style={[styles.toggle,{color:colors.primary}]}>{launchPrefs.showDiscoverOnHome?'On':'Off'}</Text></Pressable>
    </View>
    <Text style={[styles.sectionTitle,{color:colors.foreground,marginTop:20}]}>Feature settings</Text>
    <View style={styles.list}>{SETTINGS.map(item=><Pressable key={item.route} accessibilityRole="button" accessibilityLabel={item.title+'. '+item.description} onPress={()=>router.push(item.route as never)} style={[styles.item,{backgroundColor:colors.card,borderColor:colors.border}]}>
