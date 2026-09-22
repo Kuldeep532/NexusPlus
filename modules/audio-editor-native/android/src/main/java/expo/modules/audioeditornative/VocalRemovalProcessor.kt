@@ -162,19 +162,18 @@ internal object VocalRemovalProcessor {
     val dataBytes = samples.size * 2L
     require(dataBytes <= 0xFFFFFFFFL - 44L) { "Output is too large for WAV." }
 
-    fun u16(value: Int) {
-      fileOutput.write(value and 0xFF)
-      fileOutput.write((value ushr 8) and 0xFF)
-    }
-    fun u32(value: Long) {
-      fileOutput.write((value and 0xFF).toInt())
-      fileOutput.write(((value ushr 8) and 0xFF).toInt())
-      fileOutput.write(((value ushr 16) and 0xFF).toInt())
-      fileOutput.write(((value ushr 24) and 0xFF).toInt())
-    }
-
     file.outputStream().use { out ->
       val fileOutput = java.io.DataOutputStream(out)
+      fun u16(value: Int) {
+        fileOutput.write(value and 0xFF)
+        fileOutput.write((value ushr 8) and 0xFF)
+      }
+      fun u32(value: Long) {
+        fileOutput.write((value and 0xFF).toInt())
+        fileOutput.write(((value ushr 8) and 0xFF).toInt())
+        fileOutput.write(((value ushr 16) and 0xFF).toInt())
+        fileOutput.write(((value ushr 24) and 0xFF).toInt())
+      }
       fileOutput.writeBytes("RIFF")
       u32(dataBytes + 36L)
       fileOutput.writeBytes("WAVE")
