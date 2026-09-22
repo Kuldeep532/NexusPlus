@@ -14,113 +14,74 @@ class NexusMediaModule(private val reactContext: ReactApplicationContext) : Reac
     override fun getName(): String = "NexusMedia"
 
     @ReactMethod
-    fun isAvailable(promise: Promise) {
-        promise.resolve(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-    }
+    fun isAvailable(promise: Promise) { promise.resolve(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) }
 
     @ReactMethod
     fun play(uri: String, title: String, artist: String?, promise: Promise) {
         try {
             requireValidMediaUri(uri)
-            val safeTitle = title.trim().ifBlank { "Nexus Plus" }.take(200)
-            val safeArtist = artist?.trim()?.take(200)
-            startService(uri, safeTitle, safeArtist, true)
+            startOrUpdateService(title, artist, true)
             promise.resolve(true)
         } catch (error: IllegalArgumentException) {
             promise.reject("MEDIA_INPUT", error.message, null)
-        } catch (_: Throwable) {
-            promise.reject("MEDIA_PLAY", "Unable to start media playback.", null)
+        } catch (error: Throwable) {
+            promise.reject("MEDIA_PLAY", error.message ?: "Unable to start media notification.", null)
         }
     }
 
     @ReactMethod
-    fun pause(promise: Promise) {
-        send(ACTION_PAUSE)
-        promise.resolve(true)
-    }
+    fun pause(promise: Promise) { sendCommand(NexusMediaPlaybackService.ACTION_PAUSE); promise.resolve(true) }
 
     @ReactMethod
-    fun resume(promise: Promise) {
-        send(ACTION_RESUME)
-        promise.resolve(true)
-    }
+    fun resume(promise: Promise) { sendCommand(NexusMediaPlaybackService.ACTION_RESUME); promise.resolve(true) }
 
     @ReactMethod
-    fun stop(promise: Promise) {
-        send(ACTION_STOP)
-        promise.resolve(true)
-    }
+    fun stop(promise: Promise) { sendCommand(NexusMediaPlaybackService.ACTION_STOP); promise.resolve(true) }
 
     @ReactMethod
-    fun seekRelative(deltaMs: Double, promise: Promise) {
-        if (!deltaMs.isFinite() || deltaMs == 0.0) {
-            promise.reject("MEDIA_DELTA", "Seek delta must be a non-zero finite value.", null)
-            return
-        }
-        val delta = deltaMs.coerceIn(-60_000.0, 60_000.0).toLong()
-        send(ACTION_SEEK_RELATIVE, delta)
+    fun update(title: String, artist: String?, playing: Boolean, promise: Promise) {
+        startOrUpdateService(title, artist, playing)
         promise.resolve(true)
     }
 
     @ReactMethod
     fun sendSystemMediaKey(key: String, promise: Promise) {
-        val normalized = key.trim().lowercase()
-        val keyCode = when (normalized) {
+        val keyCode = when (key.trim().lowercase()) {
             "play", "resume", "play-pause" -> android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
             "pause" -> android.view.KeyEvent.KEYCODE_MEDIA_PAUSE
-            "next" -> android.view.KeyEvent.KEYCODE_MEDIA_NEXT
             "previous" -> android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS
+            "next" -> android.view.KeyEvent.KEYCODE_MEDIA_NEXT
             "stop" -> android.view.KeyEvent.KEYCODE_MEDIA_STOP
             else -> null
         }
-        if (keyCode == null) {
-            promise.reject("MEDIA_KEY", "Unsupported media key.", null)
-            return
-        }
+        if (keyCode == null) { promise.reject("MEDIA_KEY", "Unsupported media key.", null); return }
         val manager = reactContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-        if (manager == null) {
-            promise.resolve(false)
-            return
-        }
-        try {
+        if (manager == null) { promise.resolve(false); return }
+        runCatching {
             manager.dispatchMediaKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, keyCode))
             manager.dispatchMediaKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, keyCode))
             promise.resolve(true)
-        } catch (_: Throwable) {
-            promise.resolve(false)
-        }
+        }.onFailure { promise.resolve(false) }
     }
 
-    private fun send(action: String, positionMs: Long? = null) {
-        reactContext.sendBroadcast(
-            Intent(action).setPackage(reactContext.packageName).apply {
-                if (positionMs != null) putExtra(NexusMediaPlaybackService.EXTRA_POSITION_MS, positionMs)
-            },
-        )
+    private fun sendCommand(action: String) {
+        reactContext.sendBroadcast(Intent(action).setPackage(reactContext.packageName))
+    }
+
+    private fun startOrUpdateService(title: String, artist: String?, playing: Boolean) {
+        val intent = Intent(reactContext, NexusMediaPlaybackService::class.java).apply {
+            action = NexusMediaPlaybackService.ACTION_UPDATE
+            putExtra(NexusMediaPlaybackService.EXTRA_TITLE, title.trim().take(200).ifBlank { "Nexus Plus" })
+            putExtra(NexusMediaPlaybackService.EXTRA_ARTIST, artist?.trim()?.take(200).orEmpty().ifBlank { "Media Player" })
+            putExtra(NexusMediaPlaybackService.EXTRA_PLAYING, playing)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) reactContext.startForegroundService(intent)
+        else reactContext.startService(intent)
     }
 
     private fun requireValidMediaUri(uriString: String) {
         val uri = Uri.parse(uriString)
         require(uri.scheme in setOf("https", "http", "content", "file")) { "Unsupported media URI scheme." }
         require(!uriString.contains('\u0000')) { "Invalid media URI." }
-    }
-
-    private fun startService(uri: String, title: String, artist: String?, play: Boolean) {
-        val intent = Intent(reactContext, NexusMediaPlaybackService::class.java).apply {
-            action = NexusMediaPlaybackService.ACTION_PLAY
-            putExtra(NexusMediaPlaybackService.EXTRA_URI, uri)
-            putExtra(NexusMediaPlaybackService.EXTRA_TITLE, title)
-            putExtra(NexusMediaPlaybackService.EXTRA_ARTIST, artist)
-            putExtra(NexusMediaPlaybackService.EXTRA_AUTOPLAY, play)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) reactContext.startForegroundService(intent)
-        else reactContext.startService(intent)
-    }
-
-    companion object {
-        private const val ACTION_PAUSE = NexusMediaPlaybackService.ACTION_PAUSE
-        private const val ACTION_RESUME = NexusMediaPlaybackService.ACTION_RESUME
-        private const val ACTION_STOP = NexusMediaPlaybackService.ACTION_STOP
-        private const val ACTION_SEEK_RELATIVE = "com.nexuswavetech.nexusplus.media.SEEK_RELATIVE"
     }
 }
