@@ -16,6 +16,18 @@ export const palettes = {
     light: { text: '#111827', tint: '#2563EB', background: '#F8FAFC', foreground: '#111827', card: '#FFFFFF', cardForeground: '#111827', primary: '#2563EB', primaryForeground: '#FFFFFF', secondary: '#E8EEF9', secondaryForeground: '#1E3A8A', muted: '#EEF2F7', mutedForeground: '#64748B', accent: '#B7791F', accentForeground: '#FFFFFF', destructive: '#DC2626', destructiveForeground: '#FFFFFF', border: '#D8E0EA', input: '#CBD5E1' },
     dark: { text: '#F8FAFC', tint: '#93C5FD', background: '#0F172A', foreground: '#F8FAFC', card: '#1E293B', cardForeground: '#F8FAFC', primary: '#93C5FD', primaryForeground: '#0F172A', secondary: '#24324A', secondaryForeground: '#DBEAFE', muted: '#182337', mutedForeground: '#94A3B8', accent: '#F2C35B', accentForeground: '#171109', destructive: '#F87171', destructiveForeground: '#1F0A0A', border: '#334155', input: '#334155' },
   },
+  material: {
+    light: { text:'#1C1B1F', tint:'#6750A4', background:'#FFFBFE', foreground:'#1C1B1F', card:'#FFFBFE', cardForeground:'#1C1B1F', primary:'#6750A4', primaryForeground:'#FFFFFF', secondary:'#E8DEF8', secondaryForeground:'#4F378B', muted:'#F3EDF7', mutedForeground:'#79747E', accent:'#7D5260', accentForeground:'#FFFFFF', destructive:'#B3261E', destructiveForeground:'#FFFFFF', border:'#CAC4D0', input:'#79747E' },
+    dark: { text:'#E6E1E5', tint:'#D0BCFF', background:'#141218', foreground:'#E6E1E5', card:'#211F26', cardForeground:'#E6E1E5', primary:'#D0BCFF', primaryForeground:'#381E72', secondary:'#4A4458', secondaryForeground:'#E8DEF8', muted:'#2B2930', mutedForeground:'#CAC4D0', accent:'#EFB8C8', accentForeground:'#492532', destructive:'#F2B8B5', destructiveForeground:'#601410', border:'#49454F', input:'#938F99' },
+  },
+  black: {
+    light: { text:'#0A0A0A', tint:'#111111', background:'#F5F5F5', foreground:'#0A0A0A', card:'#FFFFFF', cardForeground:'#0A0A0A', primary:'#111111', primaryForeground:'#FFFFFF', secondary:'#E8E8E8', secondaryForeground:'#111111', muted:'#EDEDED', mutedForeground:'#5C5C5C', accent:'#6B4F00', accentForeground:'#FFFFFF', destructive:'#B42318', destructiveForeground:'#FFFFFF', border:'#CFCFCF', input:'#BDBDBD' },
+    dark: { text:'#FFFFFF', tint:'#FFFFFF', background:'#000000', foreground:'#FFFFFF', card:'#0A0A0A', cardForeground:'#FFFFFF', primary:'#FFFFFF', primaryForeground:'#000000', secondary:'#1A1A1A', secondaryForeground:'#FFFFFF', muted:'#121212', mutedForeground:'#B8B8B8', accent:'#FFD75E', accentForeground:'#1A1400', destructive:'#FF8A80', destructiveForeground:'#250000', border:'#303030', input:'#303030' },
+  },
+  spiritual: {
+    light: { text:'#2B1A12', tint:'#7A1FA2', background:'#FFF9F2', foreground:'#2B1A12', card:'#FFFFFF', cardForeground:'#2B1A12', primary:'#6A1B9A', primaryForeground:'#FFFFFF', secondary:'#F8EAFB', secondaryForeground:'#4A126B', muted:'#F4EEE8', mutedForeground:'#6E625A', accent:'#C88A1A', accentForeground:'#FFFFFF', destructive:'#B42318', destructiveForeground:'#FFFFFF', border:'#E6D9CC', input:'#D7C7B8' },
+    dark: { text:'#FFF8EF', tint:'#D8A44B', background:'#120D1B', foreground:'#FFF8EF', card:'#1D1625', cardForeground:'#FFF8EF', primary:'#D8A44B', primaryForeground:'#211402', secondary:'#33223C', secondaryForeground:'#F8EAFB', muted:'#261C2E', mutedForeground:'#C8B8C9', accent:'#F3C866', accentForeground:'#2A1B03', destructive:'#F08A7E', destructiveForeground:'#2A0805', border:'#4A3855', input:'#4A3855' },
+  },
 } as const;
 
 export type ColorTokens = (typeof palettes.oceanBlue.light);
