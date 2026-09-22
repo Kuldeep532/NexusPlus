@@ -13,7 +13,6 @@ const SETTINGS = [
   { title:'Biometric Vault',description:'Manage secure biometric protection.',route:'/biometric-vault',icon:'shield' as const },
   { title:'Payment Announcer',description:'Configure secure payment announcements.',route:'/payment-announcer',icon:'volume-2' as const },
   { title:'Expense Tracker',description:'Manage expense detection and financial privacy.',route:'/expense-tracker',icon:'credit-card' as const },
-  { title:'App Health',description:'Run lightweight release-readiness diagnostics.',route:'/app-health',icon:'activity' as const },
 ];
 const LEGAL_SETTINGS = [
   {title:'Privacy Policy',description:'How Nexus Plus handles data, permissions, analytics, APIs and security.',route:'/privacy-policy',icon:'lock' as const},
