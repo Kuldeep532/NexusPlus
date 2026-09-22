@@ -22,13 +22,14 @@ class AudioEditorNativeModule : Module() {
 
     AsyncFunction("vocalRemove") { inputPath: String, outputPath: String, quality: String, preserveBass: Boolean, preserveStereo: Boolean, promise: Promise ->
       try {
-        promise.resolve(VocalRemoverProcessor.process(
-          appContext.reactContext,
-          inputPath,
-          outputPath,
-          quality,
-          preserveBass,
-          preserveStereo,
+        val context = requireNotNull(appContext.reactContext) { "Audio editor context is unavailable." }
+        val result = VocalRemovalProcessor.process(context, inputPath, outputPath, quality, preserveBass, preserveStereo)
+        promise.resolve(mapOf(
+          "outputPath" to result.outputPath,
+          "durationMs" to result.durationMs,
+          "sampleRate" to result.sampleRate,
+          "channels" to result.channels,
+          "mimeType" to result.mimeType,
         ))
       } catch (error: Exception) {
         promise.reject("AUDIO_VOCAL_REMOVE_FAILED", error.message ?: "Unable to remove vocals", error)
