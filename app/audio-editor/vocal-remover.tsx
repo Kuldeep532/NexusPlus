@@ -68,6 +68,7 @@ export default function VocalRemoverScreen() {
       const next = await native.vocalRemove(
         source.uri,
         outputPath,
+        mode,
         quality,
         preserveBass,
         preserveStereo,
