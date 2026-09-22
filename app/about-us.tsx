@@ -27,7 +27,7 @@ const sections = [
   },
   {
     title: 'What is Nexus Plus?',
-    body: 'Nexus Plus is a versatile digital companion designed to simplify everyday tasks. Its current feature set includes document and PDF utilities, file management and protection, audio and media tools, voice and text-to-speech workflows, accessibility assistance, reminders and time tools, financial-organization utilities, QR tools, connected-device features, news and content aggregation, AI-assisted workflows, screen mirroring, authorized remote control, CCTV management, nearby file transfer, and access to the Geeta Nexus spiritual experience where enabled. Feature availability can vary by device, Android version, account status, network and required third-party service.',
+    body: 'Nexus Plus is a versatile digital companion designed to simplify everyday tasks. Its current feature set includes document and PDF utilities, file management and protection, audio and media tools, voice and text-to-speech workflows, accessibility assistance, reminders and time tools, financial-organization utilities, QR tools, connected-device features, news and content aggregation, AI-assisted workflows, authorized remote control, CCTV management, nearby file transfer, and access to the Geeta Nexus spiritual experience where enabled. Feature availability can vary by device, Android version, account status, network and required third-party service.',
   },
   {
     title: 'Accessibility by Design',
@@ -35,7 +35,7 @@ const sections = [
   },
   {
     title: 'Responsible Connected-Device Use',
-    body: 'Connected-device features such as remote control, screen mirroring and CCTV tools are intended for devices and networks that the user owns or is expressly authorized to operate. Security checks, Android permissions and device capabilities may limit or disable operations that cannot be safely verified.',
+    body: 'Connected-device features such as remote control and CCTV tools are intended for devices and networks that the user owns or is expressly authorized to operate. Security checks, Android permissions and device capabilities may limit or disable operations that cannot be safely verified.',
   },
   {
     title: 'Technology, APIs and Responsibility',
