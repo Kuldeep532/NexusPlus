@@ -10,6 +10,7 @@ import { FEATURE_CATEGORY_META, getCategoryTools, getFeaturedHomeFeatures, getUt
 import { NexusBrandMark } from '@/features/branding/NexusBrandMark';
 import { PDF_TOOL_COUNT } from '@/app/pdf-tools';
 import { getGreetingText, readGreetingPreferences } from '@/features/app-shell/greetingPreferences';
+import { readLaunchPreferences } from '@/features/app-shell/launchPreferences';
 
 const CATEGORY_ORDER: FeatureCategory[] = ['utility', 'pdf', 'media', 'security', 'productivity'];
 
@@ -19,7 +20,8 @@ export default function HomeScreen() {
   const categorySections = useMemo(() => CATEGORY_ORDER.map((category) => ({ category, meta: FEATURE_CATEGORY_META[category], count: category === 'pdf' ? PDF_TOOL_COUNT : category === 'utility' ? getUtilityTools().length : getCategoryTools(category).length })).filter((section) => section.count > 0), []);
   const dailyMessage = getDailySpiritualMessage();
   const [greeting, setGreeting] = useState('Radhe Radhe');
-  useEffect(() => { void readGreetingPreferences().then((prefs) => setGreeting(getGreetingText(prefs.mode))); }, []);
+  const [showDiscover, setShowDiscover] = useState(false);
+  useEffect(() => { void readGreetingPreferences().then((prefs) => setGreeting(getGreetingText(prefs.mode))); void readLaunchPreferences().then((prefs) => setShowDiscover(prefs.showDiscoverOnHome)); }, []);
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -29,10 +31,12 @@ export default function HomeScreen() {
         <View style={[styles.messageCard, { backgroundColor: colors.card, borderColor: colors.border }]} accessible accessibilityRole="summary"><Feather name="sunrise" size={21} color={colors.primary} /><View style={styles.messageCopy}><Text style={[styles.messageLabel, { color: colors.primary }]}>{greeting}</Text><Text style={[styles.message, { color: colors.foreground }]}>{dailyMessage.text}</Text></View></View>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Main features</Text>
         <View style={styles.list}>{featuredTools.map((tool) => <Pressable key={tool.id} accessibilityRole="button" accessibilityLabel={`${tool.title}. ${tool.description}`} onPress={() => router.push(tool.route as never)} style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.toolIcon, { backgroundColor: colors.secondary }]}><Feather name={tool.icon as never} size={20} color={colors.primary} /></View><View style={styles.toolCopy}><Text style={[styles.toolTitle, { color: colors.foreground }]}>{tool.title}</Text><Text style={[styles.toolDescription, { color: colors.mutedForeground }]}>{tool.description}</Text></View><Feather name="chevron-right" size={19} color={colors.mutedForeground} accessibilityElementsHidden /></Pressable>)}</View>
-        <Text style={[styles.categorySectionTitle, { color: colors.foreground }]}>Discover categories</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.discoverRow}>
-          {['World', 'Technology', 'Science'].map((label) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label + ' Discover category'} onPress={() => router.push('/discover')} style={[styles.discoverChip, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.discoverChipText, { color: colors.foreground }]}>{label}</Text></Pressable>)}
-        </ScrollView>
+        {showDiscover ? <>
+          <Text style={[styles.categorySectionTitle, { color: colors.foreground }]}>Discover categories</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.discoverRow}>
+            {['World', 'Technology', 'Science'].map((label) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label + ' Discover category'} onPress={() => router.push('/discover')} style={[styles.discoverChip, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.discoverChipText, { color: colors.foreground }]}>{label}</Text></Pressable>)}
+          </ScrollView>
+        </> : null}
         <Text style={[styles.categorySectionTitle, { color: colors.foreground }]}>Tool categories</Text><Text style={[styles.categoryIntro, { color: colors.mutedForeground }]}>Open a dedicated screen for individual tools. Utility tools include every registered utility, including featured utilities.</Text>
         <View style={styles.list}>{categorySections.map(({ category, meta, count }) => <Pressable key={category} accessibilityRole="button" accessibilityLabel={`${meta.title}. ${meta.description}. ${count} tools available.`} onPress={() => router.push(meta.route as never)} style={[styles.categoryCard, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.categoryIcon, { backgroundColor: colors.secondary }]}><Feather name={meta.icon as never} size={20} color={colors.primary} /></View><View style={styles.toolCopy}><Text style={[styles.toolTitle, { color: colors.foreground }]}>{meta.title}</Text><Text style={[styles.toolDescription, { color: colors.mutedForeground }]}>{meta.description}</Text><Text style={[styles.count, { color: colors.primary }]}>{count} tools</Text></View><Feather name="chevron-right" size={19} color={colors.mutedForeground} accessibilityElementsHidden /></Pressable>)}</View>
       </ScrollView>
