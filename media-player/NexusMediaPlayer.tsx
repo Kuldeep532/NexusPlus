@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, BackHandler, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { announceClean } from '@/features/accessibility/spokenAnnouncement';
 import { VideoView } from 'expo-video';
 import { scanLocalMedia, buildCollections } from './library';
@@ -91,6 +91,16 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
   const activeCue = findActiveCue(subtitleCues, player.state.positionMs);
 
   useEffect(() => {
+    if (screen !== 'player') return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setScreen('library');
+      return true;
+    });
+    return () => sub.remove();
+  }, [screen]);
+
+
+  useEffect(() => {
     const native = getNativeVideoDescriptionModule();
     if (!native?.describeVideoFrame) return;
     (videoDescriptionAnalyzer as unknown as { describeFrame: typeof videoDescriptionAnalyzer.describeFrame; isAvailable: () => Promise<boolean> }).describeFrame = async (uri, timestampMs, language) => {
@@ -127,8 +137,12 @@ export function NexusMediaPlayer({ initialItems = [], onBack }: Props) {
 
   const loadItem = useCallback((item: MediaItemModel, queue = library) => {
     if (item.kind === 'audio' && item.source !== 'radio') {
+      // Switching audio items is owned by the persistent audio engine; its load()
+      // disposes the prior player before creating the next one.
       void persistent.load(item, queue);
     } else {
+      // Video owns the visible player and must always stop persistent audio first.
+      persistent.stop();
       player.load(item, queue);
     }
     setScreen('player');
