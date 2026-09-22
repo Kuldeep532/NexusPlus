@@ -1,7 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { generateWithPiper, listTtsVoices, playGeneratedAudio, type TtsSettings, type TtsVoiceOption } from '@/features/audio-editor/ttsEngine';
@@ -14,6 +15,18 @@ function voiceLabel(voice: TtsVoiceOption, index: number): string {
 
 function isLocalVoice(voice: TtsVoiceOption): voice is Extract<TtsVoiceOption, { provider: 'piper' | 'clone' }> {
   return voice.provider === 'piper' || voice.provider === 'clone';
+}
+
+async function shareGeneratedAudio(uri: string): Promise<void> {
+  try {
+    if (!(await Sharing.isAvailableAsync())) {
+      Alert.alert('Sharing unavailable', 'The generated audio is already saved in Nexus Plus storage, but sharing is unavailable on this device.');
+      return;
+    }
+    await Sharing.shareAsync(uri, { mimeType: 'audio/wav', dialogTitle: 'Share generated speech' });
+  } catch {
+    Alert.alert('Share unavailable', 'The generated speech file could not be shared.');
+  }
 }
 
 export default function TextToSpeechScreen() {
@@ -145,7 +158,8 @@ export default function TextToSpeechScreen() {
           <Text selectable style={[styles.pathText, { color: colors.mutedForeground }]}>{generatedUri}</Text>
           <View style={styles.actionRow}>
             <Pressable disabled={playing} onPress={() => void play()} accessibilityRole="button" style={[styles.secondaryButton, { borderColor: colors.primary }]}><Feather name={playing ? 'pause' : 'play'} size={17} color={colors.primary} /><Text style={[styles.secondaryText, { color: colors.primary }]}>{playing ? 'Playing' : 'Play'}</Text></Pressable>
-            <Pressable onPress={clear} accessibilityRole="button" style={[styles.secondaryButton, { borderColor: colors.border }]}><Feather name="x" size={17} color={colors.foreground} /><Text style={[styles.secondaryText, { color: colors.foreground }]}>Clear</Text></Pressable>
+            <Pressable onPress={() => void shareGeneratedAudio(generatedUri)} accessibilityRole="button" style={[styles.secondaryButton, { borderColor: colors.primary }]}><Feather name="share-2" size={17} color={colors.primary} /><Text style={[styles.secondaryText, { color: colors.primary }]}>Share</Text></Pressable>
+            <Pressable onPress={clear} accessibilityRole="button" style={[styles.secondaryButton, { borderColor: colors.border }]}><Feather name="x" size={17} color={colors.foreground} /><Text style={[styles.secondaryText, { color: colors.foreground }]}>Close</Text></Pressable>
           </View>
         </View>
       )}
