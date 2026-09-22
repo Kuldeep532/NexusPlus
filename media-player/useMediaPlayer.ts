@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-import { createAudioPlayer, type AudioPlayer, setAudioModeAsync } from 'expo-audio';
+import { type AudioPlayer } from 'expo-audio';
 import { useVideoPlayer } from 'expo-video';
 import type { MediaItemModel, PlayerState, RepeatMode } from './types';
 
@@ -29,13 +29,7 @@ export function useMediaPlayer(initialQueue: MediaItemModel[] = []) {
   );
 
   const syncFromNative = useCallback(() => {
-    if (!current) return;
-    if (current.kind === 'audio') {
-      const player = audioRef.current;
-      if (!player) return;
-      setState((s) => ({ ...s, isPlaying: player.playing, positionMs: player.currentTime * 1000, durationMs: Number.isFinite(player.duration) ? player.duration * 1000 : s.durationMs }));
-      return;
-    }
+    if (!current || current.kind !== 'video') return;
     setState((s) => ({ ...s, isPlaying: videoPlayer.playing, positionMs: videoPlayer.currentTime * 1000, durationMs: Number.isFinite(videoPlayer.duration) ? videoPlayer.duration * 1000 : s.durationMs }));
   }, [current, videoPlayer]);
 
@@ -64,13 +58,13 @@ export function useMediaPlayer(initialQueue: MediaItemModel[] = []) {
 
   const play = useCallback(() => {
     if (!current) return;
-    if (current.kind === 'audio') audioRef.current?.play(); else videoPlayer.play();
+    if (current.kind === 'video') videoPlayer.play();
     setState((s) => ({ ...s, isPlaying: true }));
   }, [current, videoPlayer]);
 
   const pause = useCallback(() => {
     if (!current) return;
-    if (current.kind === 'audio') return; else videoPlayer.pause();
+    if (current.kind === 'audio') return; videoPlayer.pause();
     setState((s) => ({ ...s, isPlaying: false }));
   }, [current, videoPlayer]);
 
@@ -85,16 +79,6 @@ export function useMediaPlayer(initialQueue: MediaItemModel[] = []) {
   const load = useCallback((item: MediaItemModel, queue = state.queue) => {
     const index = queue.findIndex((candidate) => candidate.id === item.id);
     // This hook owns video playback only. Local audio is owned by PersistentMediaController.
-    if (item.kind === 'audio') {
-      audioRef.current?.pause();
-      audioRef.current?.remove();
-      audioRef.current = null;
-    }
-    if (item.kind === 'video') {
-      audioRef.current?.pause();
-      audioRef.current?.remove();
-      audioRef.current = null;
-    }
     setState((s) => ({ ...s, current: item, queue, index: index >= 0 ? index : s.index, positionMs: 0, durationMs: item.durationMs ?? 0, error: undefined }));
   }, [state.queue]);
 
