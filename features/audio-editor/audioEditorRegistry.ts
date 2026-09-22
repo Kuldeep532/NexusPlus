@@ -53,6 +53,14 @@ const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
     order: 50,
   },
   {
+    id: 'audio-normalizer',
+    title: 'Audio Normalizer',
+    description: 'Analyze the source peak and create a new copy at a controlled peak level with safety headroom.',
+    route: '/audio-editor/audio-normalizer',
+    icon: 'bar-chart-2',
+    order: 55,
+  },
+  {
     id: 'text-to-speech',
     title: 'Text to Speech',
     description: 'Generate speech with installed Nexus voices, speed, pitch, and automatic emotion tuning.',
