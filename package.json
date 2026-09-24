@@ -88,7 +88,12 @@
     "react-native-zip-archive": "9.0.2",
     "pdfnative": "^1.6.0",
     "zod": "catalog:",
-    "zod-validation-error": "^3.4.0"
+    "zod-validation-error": "^3.4.0",
+    "expo-secure-store": "~14.0.0"
   },
-  "pnpm": { "overrides": { "@react-native/codegen": "0.81.5" } }
+  "pnpm": {
+    "overrides": {
+      "@react-native/codegen": "0.81.5"
+    }
+  }
 }
