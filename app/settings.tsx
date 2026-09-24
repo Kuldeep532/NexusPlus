@@ -40,7 +40,7 @@ export default function SettingsScreen(){
  const [passwordPrefs,setPasswordPrefs]=useState<PasswordManagerPreferences>({defaultGenerator:'nexus',showCopyAction:true,requireBiometricForReveal:true});
  const [greetingMode,setGreetingMode]=useState<GreetingMode>('radhe-radhe');
  const [spiritualPrefs,setSpiritualPrefs]=useState<SpiritualReminderPreferences>({enabled:true,intervalHours:5,startHour:8});
- const [launchPrefs,setLaunchPrefs]=useState<Awaited<ReturnType<typeof readLaunchPreferences>>>({launchTarget:'nexus-plus',homeDestination:'nexus-home',showGeetaNexusOnHome:true,showDiscoverOnHome:false});
+ const [launchPrefs,setLaunchPrefs]=useState<Awaited<ReturnType<typeof readLaunchPreferences>>>({launchTarget:'nexus-plus',homeDestination:'nexus-home',showGeetaNexusOnHome:true});
  useEffect(()=>{void Promise.all([readLaunchPreferences(),readThemeColor(),loadPasswordManagerPreferences(),readGreetingPreferences(),readSpiritualReminderPreferences()]).then(([launch,theme,prefs,greeting,spiritual])=>{setLaunchPrefs(launch);setThemeColor(theme);setPasswordPrefs(prefs);setGreetingMode(greeting.mode);setSpiritualPrefs(spiritual);});},[]);
  const updateLaunchPrefs=(next: typeof launchPrefs)=>{setLaunchPrefs(next);void writeLaunchPreferences(next);};
  const updateThemeColor=async(theme:ThemeColor)=>{setThemeColor(theme);refreshThemeColor(theme);await writeThemeColor(theme);};
