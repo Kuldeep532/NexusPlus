@@ -3,7 +3,7 @@ import { readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const root = process.cwd();
-const ignored = new Set(['.git', '.expo', 'node_modules', 'android/build', 'android/app/build', 'coverage', 'dist', 'build']);
+const ignored = new Set(['.git', '.expo', 'node_modules', 'android/build', 'android/app/build', 'coverage', 'dist', 'build', '.turbo']);
 const sourceExtensions = new Set(['.js', '.jsx', '.mjs', '.cjs']);
 const sourceFiles = [];
 
@@ -29,8 +29,9 @@ function run(label, command, args) {
   }
 }
 
-console.log('NexusPlus prebuild source scan');
-console.log('Checking JavaScript-family syntax before any paid build starts.');
+console.log('NexusPlus exhaustive prebuild diagnostics');
+console.log('No paid EAS/Gradle build should start until source and bundle diagnostics pass.');
+
 walk(root);
 sourceFiles.sort();
 console.log(`JavaScript-family files discovered: ${sourceFiles.length}`);
@@ -40,9 +41,6 @@ for (const file of sourceFiles) {
   if (!run(`Syntax: ${relative(root, file)}`, process.execPath, ['--check', file])) failed = true;
 }
 
-// Run the complete TypeScript application-source scan exactly once.
-// The compiler is configured to emit the full diagnostic set instead of
-// stopping at the first reported problem. Keep the output untruncated.
 const typecheckPassed = run(
   'TypeScript/TSX: complete application source typecheck',
   'pnpm',
@@ -61,9 +59,33 @@ const typecheckPassed = run(
 );
 if (!typecheckPassed) failed = true;
 
+const expoConfigPassed = run(
+  'Expo configuration validation',
+  'pnpm',
+  ['exec', 'expo', 'config', '--type', 'public'],
+);
+if (!expoConfigPassed) failed = true;
+
+const exportDir = join('/tmp', 'nexusplus-prebuild-bundle-check');
+const expoBundlePassed = run(
+  'Expo Android bundle validation',
+  'pnpm',
+  [
+    'exec',
+    'expo',
+    'export',
+    '--platform',
+    'android',
+    '--output-dir',
+    exportDir,
+    '--clear',
+  ],
+);
+if (!expoBundlePassed) failed = true;
+
 if (failed) {
-  console.error('\nPrebuild source scan failed. EAS/Gradle build must not start.');
+  console.error('\nPrebuild diagnostics failed. Paid EAS/Gradle Android build must not start.');
   process.exitCode = 1;
 } else {
-  console.log('\nPrebuild source scan passed. It is safe to continue to the build stage.');
+  console.log('\nAll prebuild diagnostics passed. It is safe to start the Android build.');
 }
