@@ -134,7 +134,7 @@ function firstTagValue(xml: string, tag: string): string {
 
 function decodeXml(value: string): string {
   return value
-    .replace(/<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>/g, '$1')
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&amp;/gi, '&')
     .replace(/&lt;/gi, '<')
