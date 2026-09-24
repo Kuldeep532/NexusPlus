@@ -11,10 +11,14 @@ export default function RemoteHomeScreen() {
   return <View style={[styles.root,{backgroundColor:colors.background}]}>
     <Text accessibilityRole="header" style={[styles.title,{color:colors.foreground}]}>Nexus Remote</Text>
     <Text style={[styles.subtitle,{color:colors.mutedForeground}]}>Saved paired devices are shown here. Open one directly for the remote.</Text>
-    {devices.map((d)=><Pressable key={d.id} accessibilityRole="button" onPress={()=>router.push(d.type==='tv'?'/remote-control/tv':'/remote-control/computer')} style={[styles.device,{backgroundColor:colors.card,borderColor:colors.border}]}>
+    {devices.filter((d)=>d.type==='tv').map((d)=><Pressable key={d.id} accessibilityRole="button" onPress={()=>router.push('/remote-control/tv')} style={[styles.device,{backgroundColor:colors.card,borderColor:colors.border}]}>
       <Text style={[styles.name,{color:colors.foreground}]}>{d.name}</Text>
-      <Text style={[styles.meta,{color:colors.mutedForeground}]}>{d.type==='tv'?'TV':'Computer'} · Universal {d.transport.toUpperCase()} Remote</Text>
+      <Text style={[styles.meta,{color:colors.mutedForeground}]}>TV · Universal {d.transport.toUpperCase()} Remote</Text>
     </Pressable>)}
+    <Pressable accessibilityRole="button" onPress={()=>router.push('/remote-control/connect-computer')} style={[styles.device,{backgroundColor:colors.card,borderColor:colors.border}]}>
+      <Text style={[styles.name,{color:colors.foreground}]}>Computer Remote</Text>
+      <Text style={[styles.meta,{color:colors.mutedForeground}]}>Coming Soon · Nexus PC receiver</Text>
+    </Pressable>
     <Pressable accessibilityRole="button" onPress={()=>router.push('/remote-control/add-new-connection')} style={[styles.add,{backgroundColor:colors.primary}]}>
       <Text style={{color:colors.primaryForeground,fontFamily:'Inter_700Bold'}}>Add New Connection</Text>
     </Pressable>
