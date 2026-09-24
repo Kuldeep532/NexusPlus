@@ -147,7 +147,7 @@ function decodeXml(value: string): string {
 
 function parseRss(xml: string, feed: DiscoverFeed): DiscoverItem[] {
   const items: DiscoverItem[] = [];
-  const blocks = xml.match(/<item[\\s\\S]*?<\\/item>/gi) ?? [];
+  const blocks = xml.match(/<item[\s\S]*?<\/item>/gi) ?? [];
   for (const block of blocks.slice(0, 30)) {
     const title = firstTagValue(block, 'title');
     const link = firstTagValue(block, 'link');
