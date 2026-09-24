@@ -9,7 +9,6 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarAccessibilityLabel: 'Home tab', tabBarIcon: ({ color, size }) => <Feather name="home" color={color} size={size} /> }} />
       <Tabs.Screen name="more" options={{ title: 'More', tabBarAccessibilityLabel: 'More tab', tabBarIcon: ({ color, size }) => <Feather name="more-horizontal" color={color} size={size} /> }} />
       <Tabs.Screen name="spiritual" options={{ title: 'Spiritual', tabBarAccessibilityLabel: 'Spiritual tab', tabBarIcon: ({ color, size }) => <Feather name="sun" color={color} size={size} /> }} />
-      <Tabs.Screen name="discover" options={{ href: null }} />
     </Tabs>
   );
 }
