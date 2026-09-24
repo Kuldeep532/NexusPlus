@@ -51,7 +51,7 @@ const sections = [
   },
   {
     title: 'Current Feature Scope',
-    body: 'The app can include live RSS-based discovery, audio editing and playback, local or provider-backed speech tools, document and PDF processing, e-paper generation, calculator and finance utilities, QR generation and scanning, secure file handling, reminders and time announcements, nearby file transfer, authorized remote-device control, screen casting, CCTV workflows, Nexus Assistant and other accessibility-focused utilities. Some capabilities remain device-dependent or require an installed/native engine and are deliberately not presented as available when those requirements are not met.',
+    body: 'The app can include audio editing and playback, local or provider-backed speech tools, document and PDF processing, e-paper generation, calculator and finance utilities, QR generation and scanning, secure file handling, reminders and time announcements, nearby file transfer, authorized remote-device control, screen casting, CCTV workflows, Nexus Assistant and other accessibility-focused utilities. Some capabilities remain device-dependent or require an installed/native engine and are deliberately not presented as available when those requirements are not met.',
   },
   {
     title: 'Connect With Us',
