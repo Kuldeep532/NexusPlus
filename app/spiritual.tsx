@@ -2,6 +2,8 @@ import { Feather } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect, useState } from 'react';
+import { readLaunchPreferences } from '@/features/app-shell/launchPreferences';
 import { useColors } from '@/hooks/useColors';
 
 const TOOLS = [
@@ -15,11 +17,12 @@ const TOOLS = [
 ];
 
 export default function SpiritualScreen() {
-  const colors=useColors(); const router=useRouter(); const insets=useSafeAreaInsets();
+  const colors=useColors(); const router=useRouter(); const insets=useSafeAreaInsets(); const [spiritualMode,setSpiritualMode]=useState(false);
+  useEffect(()=>{void readLaunchPreferences().then(p=>setSpiritualMode(p.homeDestination==='spiritual-home'))},[]);
   return <View style={[styles.root,{backgroundColor:colors.background}]}>
-    <Stack.Screen options={{title:'Spiritual'}} />
+    <Stack.Screen options={{title:spiritualMode?'Nexus Spiritual':'Spiritual'}} />
     <ScrollView contentContainerStyle={{padding:18,paddingTop:insets.top+12,paddingBottom:insets.bottom+28}}>
-      <Text accessibilityRole="header" style={[styles.title,{color:colors.foreground}]}>Spiritual</Text>
+      <Text accessibilityRole="header" style={[styles.title,{color:colors.foreground}]}>{spiritualMode?'Nexus Spiritual':'Spiritual'}</Text>
       <Text style={[styles.subtitle,{color:colors.mutedForeground}]}>Practical tools for mantra, meditation, breath practice and daily sadhana.</Text>
       <View style={styles.list}>{TOOLS.map(t=><Pressable key={t.route} accessibilityRole="button" accessibilityLabel={t.title+'. '+t.description} onPress={()=>router.push(t.route as never)} style={[styles.card,{backgroundColor:colors.card,borderColor:colors.border}]}>
         <View style={[styles.icon,{backgroundColor:colors.secondary}]}><Feather name={t.icon as never} size={21} color={colors.primary}/></View>
