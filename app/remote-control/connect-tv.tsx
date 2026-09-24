@@ -13,7 +13,7 @@ export default function ConnectTvScreen(){
  useEffect(()=>{ void refresh(); void isUniversalIrAvailable().then(setIrAvailable); },[]);
  const refresh=async()=>{setBusy(true); try{setDevices(await discoverWifiTvs());}finally{setBusy(false);}};
  const useUniversal=async (transport:'wifi'|'ir', chosen?:{name:string;address?:string;brand?:string})=>{
-   const connection=createRemoteConnection({name:chosen?.name ?? name.trim() || (transport==='ir'?'IR TV':'Wi-Fi TV'),type:'tv',transport,capabilities:{...getDefaultCapabilities('tv',transport),apps:true,navigation:true,volume:true,power:true,ir:transport==='ir'},address:chosen?.address,online:transport==='wifi'&&Boolean(chosen?.address),paired:true,pairingState:'paired'});
+   const connection=createRemoteConnection({name: chosen?.name ?? (name.trim() || (transport === 'ir' ? 'IR TV' : 'Wi-Fi TV')),type:'tv',transport,capabilities:{...getDefaultCapabilities('tv',transport),apps:true,navigation:true,volume:true,power:true,ir:transport==='ir'},address:chosen?.address,online:transport==='wifi'&&Boolean(chosen?.address),paired:true,pairingState:'paired'});
    await saveRemoteConnection(connection); router.replace('/remote-control/tv');
  };
  return <View style={[styles.root,{backgroundColor:colors.background}]}>
