@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import * as Speech from 'expo-speech';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -7,6 +8,9 @@ import { useColors } from '@/hooks/useColors';
 import { GITA_CHAPTERS, type GitaVerse } from '@/features/geeta-nexus/geetaTypes';
 import { loadCachedVerseBundle } from '@/features/geeta-nexus/geetaStage5Repository';
 import { saveReadingProgress } from '@/features/geeta-nexus/geetaReadingProgress';
+import { KRISHNA_MANTRAS } from '@/features/spiritual/krishnaMantraCatalog';
+import { ensureGitaChapterCached, getCachedChapterVerses } from '@/features/geeta-nexus/gitaChapterDownloadQueue';
+import { loadChapterVersesFromRemote } from '@/features/geeta-nexus/gitaRemoteSource';
 
 function toNumber(value: string | string[] | undefined): number {
   const raw = Array.isArray(value) ? value[0] : value;
@@ -27,6 +31,8 @@ export default function GeetaNexusReader() {
   const [index, setIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
+  const [mantraPlaying, setMantraPlaying] = useState(false);
+  const [mantraIndex, setMantraIndex] = useState(0);
 
   const chapterMeta = GITA_CHAPTERS[safeChapter - 1];
   const chapterVerses = useMemo(
@@ -40,21 +46,28 @@ export default function GeetaNexusReader() {
     setLoading(true);
     setMissing(false);
     setIndex(0);
-    void loadCachedVerseBundle().then((bundle) => {
-      if (!active) return;
-      const nextVerses = bundle?.verses ?? [];
-      const nextChapterVerses = nextVerses.filter((item) => item.chapter === safeChapter).sort((a, b) => a.verse - b.verse);
-      setVerses(nextVerses);
-      const startIndex = nextChapterVerses.findIndex((item) => item.verse >= safeVerse);
-      if (startIndex >= 0) setIndex(startIndex);
-      setMissing(nextChapterVerses.length === 0);
-      setLoading(false);
-    }).catch(() => {
-      if (!active) return;
-      setVerses([]);
-      setMissing(true);
-      setLoading(false);
-    });
+    void (async () => {
+      try {
+        await ensureGitaChapterCached(safeChapter, loadChapterVersesFromRemote);
+        const cached = await getCachedChapterVerses(safeChapter);
+        if (!active) return;
+        const nextChapterVerses = cached.sort((a, b) => a.verse - b.verse);
+        setVerses(nextChapterVerses);
+        const startIndex = nextChapterVerses.findIndex((item) => item.verse >= safeVerse);
+        if (startIndex >= 0) setIndex(startIndex);
+        setMissing(nextChapterVerses.length === 0);
+      } catch {
+        if (!active) return;
+        const fallback = await loadCachedVerseBundle().catch(() => null);
+        const nextVerses = fallback?.verses.filter((item) => item.chapter === safeChapter).sort((a,b)=>a.verse-b.verse) ?? [];
+        setVerses(nextVerses);
+        const startIndex = nextVerses.findIndex((item) => item.verse >= safeVerse);
+        if (startIndex >= 0) setIndex(startIndex);
+        setMissing(nextVerses.length === 0);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
     return () => { active = false; };
   }, [safeChapter, safeVerse]);
 
@@ -72,6 +85,12 @@ export default function GeetaNexusReader() {
   };
 
   const goToChapter = (chapter: number) => router.replace('/geeta-nexus/read?chapter=' + chapter + '&verse=1' as never);
+  const currentMantra = KRISHNA_MANTRAS[mantraIndex];
+  const toggleMantra = () => {
+    if (mantraPlaying) { Speech.stop(); setMantraPlaying(false); return; }
+    Speech.speak(currentMantra.sanskrit, { language: 'hi-IN', rate: 0.72, onDone: () => setMantraPlaying(false), onStopped: () => setMantraPlaying(false), onError: () => setMantraPlaying(false) });
+    setMantraPlaying(true);
+  };
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -110,6 +129,16 @@ export default function GeetaNexusReader() {
               {!!current.translationHindi && <View style={[styles.translationBlock, { borderTopColor: colors.border }]}><Text style={[styles.blockLabel, { color: colors.primary }]}>हिंदी अर्थ</Text><Text style={[styles.translation, { color: colors.foreground }]}>{current.translationHindi}</Text></View>}
               {!!current.meaningHindi && <View style={[styles.translationBlock, { borderTopColor: colors.border }]}><Text style={[styles.blockLabel, { color: colors.primary }]}>हिंदी भावार्थ</Text><Text style={[styles.translation, { color: colors.foreground }]}>{current.meaningHindi}</Text></View>}
               {!!current.translationEnglish && <View style={[styles.translationBlock, { borderTopColor: colors.border }]}><Text style={[styles.blockLabel, { color: colors.primary }]}>English</Text><Text style={[styles.translation, { color: colors.foreground }]}>{current.translationEnglish}</Text></View>}
+            </View>
+            <View style={[styles.mantraCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.mantraCopy}>
+                <Text style={[styles.blockLabel, { color: colors.primary }]}>KRISHNA MANTRA • CHANT WHILE READING</Text>
+                <Text style={[styles.mantraText, { color: colors.foreground }]}>{currentMantra.sanskrit}</Text>
+              </View>
+              <View style={styles.mantraActions}>
+                <Pressable accessibilityRole="button" accessibilityLabel={mantraPlaying ? 'Stop Krishna mantra' : 'Play Krishna mantra'} onPress={toggleMantra} style={[styles.mantraButton, { backgroundColor: colors.primary }]}><Feather name={mantraPlaying ? 'square' : 'play'} size={17} color={colors.primaryForeground} /></Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel="Next Krishna mantra" onPress={() => { Speech.stop(); setMantraPlaying(false); setMantraIndex((i) => (i + 1) % KRISHNA_MANTRAS.length); }} style={[styles.mantraButton, { borderColor: colors.border, backgroundColor: colors.background }]}><Feather name="skip-forward" size={17} color={colors.foreground} /></Pressable>
+              </View>
             </View>
             <View style={styles.controls}>
               <Pressable accessibilityRole="button" accessibilityLabel="Previous verse" accessibilityState={{ disabled: index === 0 }} disabled={index === 0} onPress={() => goToVerse(index - 1)} style={[styles.control, { backgroundColor: colors.card, borderColor: colors.border, opacity: index === 0 ? 0.45 : 1 }]}><Feather name="chevron-left" size={19} color={colors.foreground} /><Text style={[styles.controlText, { color: colors.foreground }]}>Previous</Text></Pressable>
@@ -163,4 +192,9 @@ const styles = StyleSheet.create({
   chapterButtonText: { fontSize: 10, fontFamily: 'Inter_700Bold' },
   note: { marginTop: 12, borderWidth: 1, borderRadius: 15, padding: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
   noteText: { flex: 1, fontSize: 10, lineHeight: 15 },
+  mantraCard: { borderWidth: 1, borderRadius: 18, padding: 13, marginTop: 12, flexDirection: 'row', alignItems: 'center' },
+  mantraCopy: { flex: 1, paddingRight: 10 },
+  mantraText: { fontSize: 13, lineHeight: 21, fontFamily: 'Inter_600SemiBold' },
+  mantraActions: { flexDirection: 'row', gap: 8 },
+  mantraButton: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
 });
