@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { , ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { announceClean } from '@/features/accessibility/spokenAnnouncement';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
