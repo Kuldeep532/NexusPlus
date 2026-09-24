@@ -6,7 +6,6 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { GITA_CHAPTERS, type GitaVerse } from '@/features/geeta-nexus/geetaTypes';
-import { loadCachedVerseBundle } from '@/features/geeta-nexus/geetaStage5Repository';
 import { saveReadingProgress } from '@/features/geeta-nexus/geetaReadingProgress';
 import { KRISHNA_MANTRAS } from '@/features/spiritual/krishnaMantraCatalog';
 import { ensureGitaChapterCached, getCachedChapterVerses } from '@/features/geeta-nexus/gitaChapterDownloadQueue';
@@ -58,12 +57,8 @@ export default function GeetaNexusReader() {
         setMissing(nextChapterVerses.length === 0);
       } catch {
         if (!active) return;
-        const fallback = await loadCachedVerseBundle().catch(() => null);
-        const nextVerses = fallback?.verses.filter((item) => item.chapter === safeChapter).sort((a,b)=>a.verse-b.verse) ?? [];
-        setVerses(nextVerses);
-        const startIndex = nextVerses.findIndex((item) => item.verse >= safeVerse);
-        if (startIndex >= 0) setIndex(startIndex);
-        setMissing(nextVerses.length === 0);
+        setVerses([]);
+        setMissing(true);
       } finally {
         if (active) setLoading(false);
       }
