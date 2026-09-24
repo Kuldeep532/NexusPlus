@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Audio } from 'expo-av';
+import { AudioRecorder, RecordingPresets, setAudioModeAsync } from 'expo-audio';
 import { useColors } from '@/hooks/useColors';
 import type { Note, NoteAttachment, NoteCategory, NoteKind } from '../notepadTypes';
 import { NoteCategoryPicker } from './NoteCategoryPicker';
@@ -40,7 +40,7 @@ export function NoteForm({ categories, initial, saving, onSave, onDraftChange, o
   const [attachments,setAttachments]=useState<NoteAttachment[]>(initial?.attachments ?? []);
   const [saveToSecureVault,setSaveToSecureVault]=useState(false);
   const [persisting,setPersisting]=useState(false);
-  const recorder=useRef<Audio.Recording|null>(null);
+  const recorder=useRef<AudioRecorder|null>(null);
   const [recording,setRecording]=useState(false);
 
   const touchDraft=()=>onDraftChange?.();
@@ -58,8 +58,8 @@ export function NoteForm({ categories, initial, saving, onSave, onDraftChange, o
 
   const toggleRecording=async()=>{
     if(recording&&recorder.current){
-      await recorder.current.stopAndUnloadAsync();
-      const uri=recorder.current.getURI();
+      await recorder.current.stop();
+      const uri=recorder.current.uri;
       recorder.current=null;
       setRecording(false);
       if(uri){
@@ -68,13 +68,18 @@ export function NoteForm({ categories, initial, saving, onSave, onDraftChange, o
       }
       return;
     }
-    const permission=await Audio.requestPermissionsAsync();
-    if(!permission.granted){Alert.alert('Microphone permission required','Allow microphone access to record an audio note.');return;}
-    await Audio.setAudioModeAsync({allowsRecordingIOS:true,playsInSilentModeIOS:true});
-    const {recording:active}=await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-    recorder.current=active;
-    setKind(kind==='TEXT'?'AUDIO':'MIXED');
-    setRecording(true);
+    try{
+      const permission=await AudioRecorder.requestPermissionsAsync();
+      if(!permission.granted){Alert.alert('Microphone permission required','Allow microphone access to record an audio note.');return;}
+      await setAudioModeAsync({allowsRecording:true,playsInSilentMode:true});
+      const active=new AudioRecorder(RecordingPresets.HIGH_QUALITY);
+      active.record();
+      recorder.current=active;
+      setKind(kind==='TEXT'?'AUDIO':'MIXED');
+      setRecording(true);
+    }catch(error){
+      Alert.alert('Recording failed',error instanceof Error?error.message:'Unable to start audio recording.');
+    }
   };
 
   const submit=async()=>{
