@@ -27,12 +27,12 @@ const BACKGROUND_IDLE_CLOSE_MS = 60 * 60 * 1000;
 
 declare global {
   // eslint-disable-next-line no-var
-  var NexusMedia?: {
+  var NexusMedia: {
     update?: (title: string, artist: string | null, playing: boolean) => Promise<boolean>;
     stop?: () => Promise<boolean>;
     pause?: () => Promise<boolean>;
     resume?: () => Promise<boolean>;
-  };
+  } | undefined;
 }
 
 export function PersistentMediaProvider({ children }: { children: React.ReactNode }) {
