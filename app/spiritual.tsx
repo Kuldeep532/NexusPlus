@@ -13,6 +13,7 @@ const TOOLS = [
   { route:'/spiritual-daily-sadhana', title:'Daily Sadhana', description:'Create a simple spiritual practice checklist and track completed practices each day.', icon:'check-circle' },
   { route:'/spiritual-mantra', title:'Mantra Player', description:'Play licensed remote mantra recordings or use the device speech engine.', icon:'volume-2' },
   { route:'/spiritual-krishna-mantras', title:'Krishna Mantras', description:'Dedicated Krishna mantra library including the Hare Krishna Mahamantra.', icon:'heart' },
+  { route:'/spiritual-krishna-leela', title:'कृष्ण लीला', description:'बालकृष्ण की सरल कथाएँ पढ़ें और हिंदी टेक्स्ट-टू-स्पीच से सुनें।', icon:'book-open' },
   { route:'/spiritual-sadhana-streak', title:'Sadhana Streak', description:'Track consecutive days of your self-chosen spiritual practice.', icon:'trending-up' },
 ];
 
