@@ -88,7 +88,7 @@ export default function LoginPlusRegisterScreen() {
         </Pressable>
       </View>}
 
-      {!showModeChoice && {!!displayError && <View accessible accessibilityRole="alert" style={[styles.errorBox, { backgroundColor: colors.destructive + '18', borderColor: colors.destructive }]}><Text style={[styles.errorText, { color: colors.destructive }]}>{displayError}</Text></View>}
+      {!showModeChoice && displayError ? <View accessible accessibilityRole="alert" style={[styles.errorBox, { backgroundColor: colors.destructive + '18', borderColor: colors.destructive }]}><Text style={[styles.errorText, { color: colors.destructive }]}>{displayError}</Text></View> : null}
 
       {!showModeChoice && mode === 'chooser' && <View style={styles.stack}>
         <Pressable accessibilityRole="button" accessibilityLabel="Login with Google" accessibilityHint="Opens Supabase web authentication with Google" disabled={auth.busy} onPress={() => void signInGoogle()} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: auth.busy ? 0.55 : 1 }]}>
