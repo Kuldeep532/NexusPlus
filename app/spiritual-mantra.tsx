@@ -1,4 +1,4 @@
-import { Audio } from 'expo-av';
+import { useAudioPlayer } from 'expo-audio';
 import * as Speech from 'expo-speech';
 import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -15,20 +15,25 @@ export default function MantraScreen(){
  const [reps,setReps]=useState(11);
  const [running,setRunning]=useState(false);
  const [spoken,setSpoken]=useState(0);
- const [audio,setAudio]=useState<Audio.Sound|null>(null);
  const [loading,setLoading]=useState<string|null>(null);
  const [selected,setSelected]=useState<RemoteMantraAudio|null>(null);
  const [message,setMessage]=useState('');
- useEffect(()=>()=>{Speech.stop();void audio?.unloadAsync()},[audio]);
- const stop=async()=>{Speech.stop();setRunning(false);if(audio){try{await audio.stopAsync()}catch{}}};
+ const player=useAudioPlayer(null);
+ useEffect(()=>()=>{Speech.stop();try{player.pause()}catch{}},[player]);
+ const stop=async()=>{
+   Speech.stop();
+   setRunning(false);
+   try{player.pause()}catch{}
+ };
  const playAudio=async(item:RemoteMantraAudio)=>{
    await stop(); setLoading(item.id); setMessage('');
    try{
      const resolved={...item,url:resolveMantraAudioUrl(item.id+'.ogg',item.url)};
      const uri=await getCachedMantraAudio(resolved);
-     const {sound}=await Audio.Sound.createAsync({uri},{shouldPlay:true});
-     setAudio(sound);setSelected(item);
-     sound.setOnPlaybackStatusUpdate(status=>{if(!status.isLoaded)return;if(status.didJustFinish){void sound.unloadAsync();setAudio(null)}});
+     player.replace(uri);
+     player.seekTo(0);
+     player.play();
+     setSelected(item);
      setMessage('Audio is downloaded to this device and reused from local cache next time.');
    }catch(error){setMessage(error instanceof Error?error.message:'Unable to play mantra audio.')}
    finally{setLoading(null)}
