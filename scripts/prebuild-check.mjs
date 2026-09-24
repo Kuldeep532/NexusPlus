@@ -30,7 +30,8 @@ function runCapture(label, command, args) {
 }
 
 function runTypecheckDiagnostics() {
-  console.log('\n=== TypeScript/TSX diagnostics (informational) ===');
+  console.log('\n=== TypeScript/TSX diagnostics (non-blocking) ===');
+  console.log('TypeScript diagnostics are advisory here; Metro/Expo bundle validation below is the build gate.');
   try {
     execFileSync(
       'pnpm',
@@ -52,7 +53,7 @@ function runTypecheckDiagnostics() {
   } catch {
     // TypeScript can report diagnostics which are not necessarily fatal to the
     // actual Metro/Gradle build. Keep these visible, but do not block the build.
-    console.warn('[WARN] TypeScript/TSX diagnostics reported issues; continuing to hard-blocker checks.');
+    console.warn('[WARN] TypeScript/TSX diagnostics reported issues; continuing because Metro/Expo bundle validation is authoritative for the Android JS build.');
   }
   return true;
 }
