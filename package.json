@@ -89,7 +89,8 @@
     "pdfnative": "^1.6.0",
     "zod": "catalog:",
     "zod-validation-error": "^3.4.0",
-    "expo-secure-store": "~15.0.8"
+    "expo-secure-store": "~15.0.8",
+    "expo-sharing": "~14.0.8"
   },
   "pnpm": {
     "overrides": {
