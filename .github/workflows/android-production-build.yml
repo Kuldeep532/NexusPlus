@@ -233,9 +233,9 @@ jobs:
         working-directory: android
         run: |
           if [ -n "${PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER:-}" ]; then
-            gradle assembleRelease --no-daemon --no-build-cache --stacktrace --info -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
+            gradle assembleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
           else
-            gradle assembleRelease --no-daemon --no-build-cache --stacktrace --info
+            gradle assembleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a
           fi
       - name: Verify release APK output
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
