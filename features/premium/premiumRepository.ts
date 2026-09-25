@@ -1,72 +1,127 @@
 import { getSupabaseAccessToken } from '@/features/auth/supabaseAuthAdapter';
-import { mapPremiumPlan, type PremiumPlan, type PremiumPlanRow } from './premiumPlans';
+import type { PremiumPlan } from './premiumPlans';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL?.replace(/\/$/, '') ?? '';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? '';
+const SUPABASE_KEY = (process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY)?.trim() ?? '';
 
 function assertConfigured() {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error('SUPABASE_PREMIUM_NOT_CONFIGURED');
+  if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('SUPABASE_PREMIUM_NOT_CONFIGURED');
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+async function request<T>(path: string, options?: RequestInit, requireAuth = true): Promise<T> {
   assertConfigured();
-  const token = await getSupabaseAccessToken();
-  if (!token) throw new Error('AUTH_REQUIRED');
-  const response = await fetch(`${SUPABASE_URL}${path}`, {
+  const token = requireAuth ? await getSupabaseAccessToken() : null;
+  if (requireAuth && !token) throw new Error('AUTH_REQUIRED');
+  const response = await fetch(SUPABASE_URL + path, {
     ...options,
     headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${token}`,
+      apikey: SUPABASE_KEY,
+      Authorization: 'Bearer ' + (token ?? SUPABASE_KEY),
+      Accept: 'application/json',
       ...(options?.headers ?? {}),
     },
   });
-  if (!response.ok) throw new Error(`SUPABASE_PREMIUM_REQUEST_${response.status}`);
+  if (!response.ok) throw new Error('SUPABASE_PREMIUM_REQUEST_' + response.status);
   return response.json() as Promise<T>;
 }
 
-export async function getActivePremiumPlans(): Promise<PremiumPlan[]> {
-  const rows = await request<PremiumPlanRow[]>('/rest/v1/app_subscription_plans?select=plan_id,plan_name,amount,upi_id,merchant_name&is_active=eq.true&order=amount.asc');
-  return rows.map(mapPremiumPlan);
-}
-
-export type PaymentTransaction = {
-  transactionId: string;
-  planId: string;
-  amount: number;
-  upiId: string;
-  merchantName: string;
-  status: 'PENDING' | 'SUCCESS' | 'FAILED';
+type PlanRow = {
+  plan_id: number;
+  plan_code: string;
+  plan_name: string;
+  tier_level: number;
+  description: string | null;
+  price_inr: number | string;
+  duration_days: number;
+  blocks_ads: boolean;
+  unlocks_premium_features: boolean;
 };
 
-export async function createPendingTransaction(planId: string): Promise<PaymentTransaction> {
-  const response = await request<{
-    transactionId: string;
-    planId: number;
-    amount: number;
-    upiId: string;
-    merchantName: string;
-    status: PaymentTransaction['status'];
-  }>('/rest/v1/rpc/create_upi_payment_transaction', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ p_plan_id: Number(planId) }),
-  });
-  return {
-    transactionId: response.transactionId,
-    planId: String(response.planId),
-    amount: Number(response.amount),
-    upiId: response.upiId,
-    merchantName: response.merchantName,
-    status: response.status,
-  };
+export type PremiumCatalogPlan = PremiumPlan & {
+  code: string;
+  tierLevel: number;
+  durationDays: number;
+  blocksAds: boolean;
+  unlocksPremiumFeatures: boolean;
+  description: string;
+};
+
+export async function getActivePremiumPlans(): Promise<PremiumCatalogPlan[]> {
+  const rows = await request<PlanRow[]>(
+    '/rest/v1/subscription_plans?select=plan_id,plan_code,plan_name,tier_level,description,price_inr,duration_days,blocks_ads,unlocks_premium_features&is_active=eq.true&order=tier_level.asc',
+    undefined,
+    false,
+  );
+
+  return rows.map((row) => ({
+    id: String(row.plan_id),
+    name: row.plan_name,
+    amount: Number(row.price_inr),
+    code: row.plan_code,
+    tierLevel: row.tier_level,
+    durationDays: row.duration_days,
+    blocksAds: row.blocks_ads,
+    unlocksPremiumFeatures: row.unlocks_premium_features,
+    description: row.description ?? '',
+  }));
 }
 
-export async function getTransaction(transactionId: string): Promise<PaymentTransaction> {
-  const rows = await request<Array<{ transaction_id: string; plan_id: number; amount_paid: number; payment_status: PaymentTransaction['status'] }>>(`/rest/v1/payment_transactions?select=transaction_id,plan_id,amount_paid,payment_status&transaction_id=eq.${encodeURIComponent(transactionId)}&limit=1`);
-  const row = rows[0];
-  if (!row) throw new Error('PAYMENT_TRANSACTION_NOT_FOUND');
-  const plan = (await request<PremiumPlanRow[]>(`/rest/v1/app_subscription_plans?select=plan_id,plan_name,amount,upi_id,merchant_name&plan_id=eq.${row.plan_id}&limit=1`))[0];
-  if (!plan) throw new Error('PREMIUM_PLAN_NOT_FOUND');
-  const mapped = mapPremiumPlan(plan);
-  return { transactionId: row.transaction_id, planId: String(row.plan_id), amount: Number(row.amount_paid), upiId: mapped.upiId, merchantName: mapped.merchantName, status: row.payment_status };
+export type PremiumEntitlement = {
+  status: string | null;
+  planCode: string | null;
+  planName: string | null;
+  tierLevel: number;
+  expiresAt: string | null;
+  blocksAds: boolean;
+  unlocksPremiumFeatures: boolean;
+  productScope: 'nexus_plus';
+};
+
+export async function getMyPremiumEntitlement(): Promise<PremiumEntitlement> {
+  return request<PremiumEntitlement>('/rest/v1/rpc/get_my_premium_entitlement', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: '{}',
+  });
+}
+
+export async function getMyAiCreditBalance(): Promise<number> {
+  return request<number>('/rest/v1/rpc/get_my_ai_credit_balance', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: '{}',
+  });
+}
+
+export type AiCreditPlan = {
+  id: string;
+  code: string;
+  name: string;
+  credits: number;
+  amount: number;
+  tagline: string;
+};
+
+export async function getActiveAiCreditPlans(): Promise<AiCreditPlan[]> {
+  const rows = await request<Array<{
+    credit_plan_id: number;
+    plan_code: string;
+    plan_name: string;
+    credits_offered: number;
+    price_inr: number | string;
+    tagline: string | null;
+  }>>(
+    '/rest/v1/credit_plans?select=credit_plan_id,plan_code,plan_name,credits_offered,price_inr,tagline&is_active=eq.true&order=credits_offered.asc',
+    undefined,
+    false,
+  );
+
+  return rows.map((row) => ({
+    id: String(row.credit_plan_id),
+    code: row.plan_code,
+    name: row.plan_name,
+    credits: row.credits_offered,
+    amount: Number(row.price_inr),
+    tagline: row.tagline ?? '',
+  }));
 }
