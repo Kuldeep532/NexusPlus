@@ -13,7 +13,7 @@ export default function ExpenseTrackerScreen() {
   const expense = useExpenseTracker(null);
 
   if (!expense.isReady) {
-    return <View style={[styles.root, { backgroundColor: colors.background }]} accessible accessibilityLabel="Loading Expense Tracker security" />;
+    return <View style={[styles.root, { backgroundColor: colors.background }]} accessible accessibilityLabel="Loading Expense Tracker" />;
   }
 
   const totalMinor = expense.expenses.reduce((sum, item) => sum + item.amountMinor, 0);
@@ -26,18 +26,18 @@ export default function ExpenseTrackerScreen() {
         <View style={styles.header}>
           <Text style={[styles.kicker, { color: colors.primary }]}>SECURE FINANCES</Text>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Expense Tracker</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Track expenses automatically or add them manually, with biometric protection for your financial data.</Text>
+          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Keep track of your spending manually or automatically, with biometric protection for your financial information.</Text>
         </View>
 
         <View style={[styles.securityCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.securityIcon, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="shield-lock" size={27} color={colors.primary} /></View>
-          <View style={styles.copy}><Text style={[styles.cardTitle, { color: colors.foreground }]}>{expense.isUnlocked ? 'Expense Tracker unlocked' : 'Biometric protected'}</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>Strong biometric authentication is required. Device PIN/password fallback is disabled.</Text></View>
+          <View style={styles.copy}><Text style={[styles.cardTitle, { color: colors.foreground }]}>{expense.isUnlocked ? 'Expense Tracker unlocked' : 'Biometric protected'}</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>Your financial information is protected with biometric authentication.</Text></View>
         </View>
 
         {!expense.isUnlocked ? (
           <View style={[styles.lockCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Unlock to view your expenses</Text>
-            <Text style={[styles.body, { color: colors.mutedForeground }]}>Expense amounts, merchant details, notes, and synced financial data stay behind the biometric gate.</Text>
+            <Text style={[styles.body, { color: colors.mutedForeground }]}>Your expense details remain protected until you unlock the tracker.</Text>
             <Pressable accessibilityRole="button" accessibilityLabel="Unlock Expense Tracker with biometric" onPress={() => void expense.unlock().then((ok) => { if (!ok && expense.error) Alert.alert('Expense Tracker', expense.error); })} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><MaterialCommunityIcons name="fingerprint" size={17} color={colors.primaryForeground} /><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Unlock with biometric</Text></Pressable>
           </View>
         ) : (
@@ -49,10 +49,10 @@ export default function ExpenseTrackerScreen() {
             </View>
 
             <ActionCard icon="plus-circle" title="Add expense" description="Manually enter amount, category, merchant, and note." onPress={() => router.push('/expense-tracker/add')} colors={colors} />
-            <ActionCard icon="zap" title="Automatic detection" description="Use trusted Payment Announcer events and a future SMS adapter to add expenses automatically." onPress={() => router.push('/expense-tracker/automatic')} colors={colors} />
+            <ActionCard icon="zap" title="Automatic detection" description="Automatically add supported payment activity as expenses when available." onPress={() => router.push('/expense-tracker/automatic')} colors={colors} />
             <ActionCard icon="grid" title="Categories" description={`${Object.keys(EXPENSE_CATEGORY_LABELS).length} financial categories with an Other / Saved fallback.`} onPress={() => router.push('/expense-tracker/categories')} colors={colors} />
-            <ActionCard icon="bar-chart-2" title="Insights" description="See totals by category, merchant patterns, and saved transactions." onPress={() => router.push('/expense-tracker/insights')} colors={colors} />
-            <ActionCard icon="cloud" title="Secure sync" description="Connect the same authenticated account to restore expenses from Supabase." onPress={() => router.push('/expense-tracker/sync')} colors={colors} />
+            <ActionCard icon="bar-chart-2" title="Insights" description="Review spending totals, categories, and saved transactions." onPress={() => router.push('/expense-tracker/insights')} colors={colors} />
+            <ActionCard icon="cloud" title="Secure sync" description="Sync your expenses with the same account on supported devices." onPress={() => router.push('/expense-tracker/sync')} colors={colors} />
 
             <Pressable accessibilityRole="button" accessibilityLabel="Lock Expense Tracker" onPress={() => void expense.lock()} style={[styles.lockButton, { borderColor: colors.border }]}><Feather name="lock" size={16} color={colors.foreground} /><Text style={[styles.lockButtonText, { color: colors.foreground }]}>Lock Expense Tracker</Text></Pressable>
           </>
