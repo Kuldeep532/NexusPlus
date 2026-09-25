@@ -83,7 +83,7 @@ class NexusMediaPlaybackService : Service() {
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
             .addAction(if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play, if (playing) "Pause" else "Play", servicePendingIntent(pauseAction, 1))
-            .addAction(android.R.drawable.ic_media_stop, "Stop", servicePendingIntent(ACTION_STOP, 2))
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", servicePendingIntent(ACTION_STOP, 2))
             .build()
     }
 
