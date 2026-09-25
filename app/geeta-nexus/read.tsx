@@ -47,8 +47,11 @@ export default function GeetaNexusReader() {
     setIndex(0);
     void (async () => {
       try {
-        await ensureGitaChapterCached(safeChapter, loadChapterVersesFromRemote);
-        const cached = await getCachedChapterVerses(safeChapter);
+        let cached = await getCachedChapterVerses(safeChapter);
+        if (cached.length === 0) {
+          await ensureGitaChapterCached(safeChapter, loadChapterVersesFromRemote);
+          cached = await getCachedChapterVerses(safeChapter);
+        }
         if (!active) return;
         const nextChapterVerses = cached.sort((a, b) => a.verse - b.verse);
         setVerses(nextChapterVerses);
