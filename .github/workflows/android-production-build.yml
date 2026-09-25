@@ -77,7 +77,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -Eq '^[[:space:]]*newArchEnabled=false[[:space:]]*
+          grep -Eq '^[[:space:]]*newArchEnabled=false[[:space:]]*$' android/gradle.properties
+          node - <<'NODE'
+          const fs = require('fs');
+          const config = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+          if (config.expo?.newArchEnabled !== false) {
+            throw new Error('Expo newArchEnabled must remain false for the production baseline.');
+          }
+          const rn = require('./package.json').devDependencies?.['react-native'];
+          if (rn !== '0.81.5') throw new Error(`Unexpected React Native version: ${rn}`);
+          console.log('Production baseline: legacy architecture + React Native 0.81.5');
+          NODE
+      - name: Exhaustive source and bundle diagnostics
         run: node scripts/prebuild-check.mjs
       - name: Validate EAS token
         run: test -n "$EAS_TOKEN"
@@ -142,7 +153,7 @@ jobs:
           rm -rf /tmp/metro-* /tmp/haste-map-* /tmp/nexusplus-*
           echo "Clean Expo/Metro/Gradle/CMake build workspace prepared."
       - name: Install dependencies from workspace manifests
-        run: pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false --reporter=append-only
+        run: pnpm install --frozen-lockfile --prefer-frozen-lockfile=false --reporter=append-only
       - name: Materialize Firebase configuration
         shell: bash
         env:
