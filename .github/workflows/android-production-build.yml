@@ -61,11 +61,7 @@ jobs:
       - name: Install dependencies
         run: |
           set -euo pipefail
-          if ! pnpm install --frozen-lockfile; then
-            echo "pnpm lockfile is invalid or stale; rebuilding it from package/workspace manifests."
-            pnpm install --lockfile-only --no-frozen-lockfile
-            pnpm install --frozen-lockfile
-          fi
+          pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false --reporter=append-only
       - name: Validate Expo configuration
         run: pnpm exec expo config --type public
       - name: Validate EAS token
