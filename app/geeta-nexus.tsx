@@ -78,15 +78,13 @@ export default function GeetaNexusHome() {
           </View>
         </View>
 
-        {(
-          <Pressable accessibilityRole="button" accessibilityLabel={continueLabel} onPress={() => router.push(currentProgress ? `/geeta-nexus/read?chapter=${currentProgress.chapter}&verse=${currentProgress.verse}` as never : '/geeta-nexus/read?chapter=1&verse=1' as never)} style={[styles.continueCard, { backgroundColor: colors.primary }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel={continueLabel} onPress={() => router.push(currentProgress ? `/geeta-nexus/read?chapter=${currentProgress.chapter}&verse=${currentProgress.verse}` as never : '/geeta-nexus/read?chapter=1&verse=1' as never)} style={[styles.continueCard, { backgroundColor: colors.primary }]}>
             <View style={styles.continueCopy}>
               <Text style={[styles.cardKicker, { color: colors.primaryForeground }]}>CONTINUE READING</Text>
               <Text style={[styles.continueTitle, { color: colors.primaryForeground }]}>{continueLabel}</Text>
             </View>
             <Feather name="play" size={20} color={colors.primaryForeground} />
-          </Pressable>
-        )}
+        </Pressable>
 
         {!!progress.length && (
           <View style={[styles.previousCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
