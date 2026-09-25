@@ -142,17 +142,15 @@ internal object VocalRemovalProcessor {
                   val instrumentalRight: Float
 
                   if (outputStem == "vocals") {
-                    instrumentalLeft = mid
-                    instrumentalRight = mid
+                    bassState += bassAlpha * (mid - bassState)
+                    val centerBass = bassGain * bassState
+                    instrumentalLeft = mid + centerBass
+                    instrumentalRight = if (preserveStereo) mid + centerBass else instrumentalLeft
                   } else {
                     bassState += bassAlpha * (mid - bassState)
                     val centerBass = bassGain * bassState
                     instrumentalLeft = side + centerBass
-                    instrumentalRight = if (preserveStereo) {
-                      -side + centerBass
-                    } else {
-                      instrumentalLeft
-                    }
+                    instrumentalRight = if (preserveStereo) -side + centerBass else instrumentalLeft
                   }
 
                   file.writeShortLE(toPcm16(instrumentalLeft))
