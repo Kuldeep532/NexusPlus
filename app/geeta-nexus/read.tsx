@@ -12,6 +12,10 @@ import { ensureGitaChapterCached, getCachedChapterVerses } from '@/features/geet
 import { loadChapterVersesFromRemote } from '@/features/geeta-nexus/gitaRemoteSource';
 import { askEraAI } from '@/features/era-ai/eraAiService';
 
+type NativeTranslation = { downloadModel:(source:string,target:string)=>Promise<void>; translate:(text:string,source:string,target:string)=>Promise<string> };
+function translationBridge(): NativeTranslation | undefined { return (globalThis as typeof globalThis & { NexusTranslation?: NativeTranslation }).NexusTranslation; }
+async function translateToHindi(text: string): Promise<string> { const value=text.trim(); if (!value) return ''; const bridge=translationBridge(); if (!bridge) return ''; await bridge.downloadModel('en','hi'); return bridge.translate(value,'en','hi'); }
+
 function toNumber(value: string | string[] | undefined): number {
   const raw = Array.isArray(value) ? value[0] : value;
   const parsed = Number(raw);
@@ -36,6 +40,8 @@ export default function GeetaNexusReader() {
   const [eraLanguage, setEraLanguage] = useState<'hi' | 'en'>('hi');
   const [eraBusy, setEraBusy] = useState(false);
   const [eraAnswer, setEraAnswer] = useState('');
+  const [autoHindi, setAutoHindi] = useState('');
+  const [translationBusy, setTranslationBusy] = useState(false);
 
   const chapterMeta = GITA_CHAPTERS[safeChapter - 1];
   const chapterVerses = useMemo(
@@ -150,6 +156,27 @@ export default function GeetaNexusReader() {
               {!!current.translationHindi && <View style={[styles.translationBlock, { borderTopColor: colors.border }]}><Text style={[styles.blockLabel, { color: colors.primary }]}>हिंदी अर्थ</Text><Text style={[styles.translation, { color: colors.foreground }]}>{current.translationHindi}</Text></View>}
               {!!current.meaningHindi && <View style={[styles.translationBlock, { borderTopColor: colors.border }]}><Text style={[styles.blockLabel, { color: colors.primary }]}>हिंदी भावार्थ</Text><Text style={[styles.translation, { color: colors.foreground }]}>{current.meaningHindi}</Text></View>}
               {!!current.translationEnglish && <View style={[styles.translationBlock, { borderTopColor: colors.border }]}><Text style={[styles.blockLabel, { color: colors.primary }]}>English</Text><Text style={[styles.translation, { color: colors.foreground }]}>{current.translationEnglish}</Text></View>}
+              {!current.translationHindi && current.translationEnglish ? (
+                <View style={[styles.translationBlock, { borderTopColor: colors.border }]}>
+                  <Text style={[styles.blockLabel, { color: colors.primary }]}>हिंदी अनुवाद</Text>
+                  {autoHindi ? <Text selectable style={[styles.translation, { color: colors.foreground }]}>{autoHindi}</Text> : (
+                    <Pressable accessibilityRole="button" accessibilityLabel="Download Hindi translation model and translate this verse" disabled={translationBusy} onPress={async () => {
+                      setTranslationBusy(true);
+                      try {
+                        const translated = await translateToHindi(current.translationEnglish || current.sanskrit);
+                        setAutoHindi(translated || 'Hindi translation is not available in the current build.');
+                      } catch {
+                        setAutoHindi('Hindi translation model download या translation अभी पूरा नहीं हो पाया।');
+                      } finally {
+                        setTranslationBusy(false);
+                      }
+                    }} style={[styles.hindiButton, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                      <Feather name="download-cloud" size={16} color={colors.primary} />
+                      <Text style={[styles.hindiButtonText, { color: colors.foreground }]}>{translationBusy ? 'Hindi model डाउनलोड हो रहा है…' : 'Hindi में अनुवाद करें'}</Text>
+                    </Pressable>
+                  )}
+                </View>
+              ) : null}
             </View>
             <View style={[styles.eraCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.eraHeader}>
@@ -240,4 +267,6 @@ const styles = StyleSheet.create({
   mantraText: { fontSize: 13, lineHeight: 21, fontFamily: 'Inter_600SemiBold' },
   mantraActions: { flexDirection: 'row', gap: 8 },
   mantraButton: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  hindiButton: { minHeight: 44, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 11 },
+  hindiButtonText: { fontSize: 10.5, fontFamily: 'Inter_700Bold' },
 });
