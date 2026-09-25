@@ -24,9 +24,9 @@ export default function ExpenseTrackerScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 14, paddingBottom: insets.bottom + 36 }]}>
         <View style={styles.header}>
-          <Text style={[styles.kicker, { color: colors.primary }]}>SECURE FINANCES</Text>
+          <Text style={[styles.kicker, { color: colors.primary }]}>FINANCES</Text>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Expense Tracker</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Keep track of your spending manually or automatically, with biometric protection for your financial information.</Text>
+          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Manage your spending with simple tracking, helpful insights and biometric protection.</Text>
         </View>
 
         <View style={[styles.securityCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -49,10 +49,10 @@ export default function ExpenseTrackerScreen() {
             </View>
 
             <ActionCard icon="plus-circle" title="Add expense" description="Manually enter amount, category, merchant, and note." onPress={() => router.push('/expense-tracker/add')} colors={colors} />
-            <ActionCard icon="zap" title="Automatic detection" description="Automatically add supported payment activity as expenses when available." onPress={() => router.push('/expense-tracker/automatic')} colors={colors} />
+            <ActionCard icon="zap" title="Automatic detection" description="Add supported payment activity automatically when available." onPress={() => router.push('/expense-tracker/automatic')} colors={colors} />
             <ActionCard icon="grid" title="Categories" description={`${Object.keys(EXPENSE_CATEGORY_LABELS).length} financial categories with an Other / Saved fallback.`} onPress={() => router.push('/expense-tracker/categories')} colors={colors} />
             <ActionCard icon="bar-chart-2" title="Insights" description="Review spending totals, categories, and saved transactions." onPress={() => router.push('/expense-tracker/insights')} colors={colors} />
-            <ActionCard icon="cloud" title="Secure sync" description="Sync your expenses with the same account on supported devices." onPress={() => router.push('/expense-tracker/sync')} colors={colors} />
+            <ActionCard icon="cloud" title="Secure sync" description="Keep your expenses available across supported devices with your account." onPress={() => router.push('/expense-tracker/sync')} colors={colors} />
 
             <Pressable accessibilityRole="button" accessibilityLabel="Lock Expense Tracker" onPress={() => void expense.lock()} style={[styles.lockButton, { borderColor: colors.border }]}><Feather name="lock" size={16} color={colors.foreground} /><Text style={[styles.lockButtonText, { color: colors.foreground }]}>Lock Expense Tracker</Text></Pressable>
           </>
