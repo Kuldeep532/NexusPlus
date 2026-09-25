@@ -86,5 +86,6 @@ export async function decryptCloudPayload(input: {
 }
 
 export async function sha256Hex(value: string): Promise<string> {
-  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, value, { encoding: Crypto.CryptoEncoding.HEX });
+  const digest = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, value);
+  return digest;
 }
