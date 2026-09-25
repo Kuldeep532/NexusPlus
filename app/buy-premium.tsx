@@ -1,139 +1,29 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback,useEffect,useState } from 'react';
 import { Feather } from '@expo/vector-icons';
-import { Pressable, ScrollView, StyleSheet, Text, View, Alert } from 'react-native';
+import { Alert,Linking,Pressable,ScrollView,StyleSheet,Text,TextInput,View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { getActiveAiCreditPlans, getActivePremiumPlans, getMyPremiumEntitlement, type AiCreditPlan, type PremiumCatalogPlan, type PremiumEntitlement } from '@/features/premium/premiumRepository';
-import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
+import { createPaymentOrder,getActiveAiCreditPlans,getActivePremiumPlans,getMyPremiumEntitlement,getPaymentSettings,submitPaymentReference,type AiCreditPlan,type PaymentSettings,type PremiumCatalogPlan,type PremiumEntitlement } from '@/features/premium/premiumRepository';
 
-export default function BuyPremiumScreen() {
-  const colors = useColors();
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const [plans, setPlans] = useState<PremiumCatalogPlan[]>([]);
-  const [creditPlans, setCreditPlans] = useState<AiCreditPlan[]>([]);
-  const [entitlement, setEntitlement] = useState<PremiumEntitlement | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [premium, credits, current] = await Promise.all([
-        getActivePremiumPlans(),
-        getActiveAiCreditPlans(),
-        getMyPremiumEntitlement().catch(() => null),
-      ]);
-      setPlans(premium);
-      setCreditPlans(credits);
-      setEntitlement(current);
-    } catch (error) {
-      Alert.alert('Premium', getUserFriendlyMessage(error, 'Premium plans could not be loaded right now.'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { void load(); }, [load]);
-
-  return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 32 }} accessibilityLabel="Nexus Plus Premium">
-        <View style={styles.header}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} style={styles.iconButton}>
-            <Feather name="arrow-left" size={22} color={colors.foreground} />
-          </Pressable>
-          <Text accessibilityRole="header" style={[styles.headerTitle, { color: colors.foreground }]}>Nexus Plus Premium</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Refresh Premium plans" onPress={() => void load()} style={styles.iconButton}>
-            <Feather name="refresh-cw" size={19} color={colors.foreground} />
-          </Pressable>
-        </View>
-
-        {entitlement?.unlocksPremiumFeatures && (
-          <View style={[styles.activeCard, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Premium is active</Text>
-            <Text style={[styles.body, { color: colors.mutedForeground }]}>
-              {entitlement.planName ?? 'Premium'} • Tier {entitlement.tierLevel} • Expires {entitlement.expiresAt ? new Date(entitlement.expiresAt).toLocaleDateString() : 'soon'}
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.hero}>
-          <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="zap" size={25} color={colors.primary} /></View>
-          <Text style={[styles.title, { color: colors.foreground }]}>Premium tools for Nexus Plus</Text>
-          <Text style={[styles.body, { color: colors.mutedForeground }]}>Premium access applies only to Nexus Plus premium tools. Free tools and spiritual features are not part of Premium entitlement.</Text>
-        </View>
-
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Membership</Text>
-        {plans.map((plan) => (
-          <View key={plan.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.cardTitle, { color: colors.foreground }]}>{plan.name}</Text>
-                <Text style={[styles.body, { color: colors.mutedForeground }]}>{plan.description}</Text>
-              </View>
-              <Text style={[styles.price, { color: colors.primary }]}>₹{plan.amount}</Text>
-            </View>
-            <Text style={[styles.meta, { color: colors.mutedForeground }]}>{plan.durationDays} days • Tier {plan.tierLevel} • {plan.unlocksPremiumFeatures ? 'Premium tools included' : 'Membership benefits'}</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Select ${plan.name} membership`}
-              onPress={() => Alert.alert('Premium', 'Checkout is not enabled yet. The selected plan is ready in Supabase for the payment integration stage.')}
-              style={[styles.button, { backgroundColor: colors.primary }]}
-            >
-              <Text style={styles.buttonText}>Select {plan.name}</Text>
-            </Pressable>
-          </View>
-        ))}
-
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>AI Credits</Text>
-        {creditPlans.map((plan) => (
-          <View key={plan.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.cardTitle, { color: colors.foreground }]}>{plan.name}</Text>
-                <Text style={[styles.body, { color: colors.mutedForeground }]}>{plan.tagline}</Text>
-              </View>
-              <Text style={[styles.price, { color: colors.primary }]}>₹{plan.amount}</Text>
-            </View>
-            <Text style={[styles.meta, { color: colors.mutedForeground }]}>{plan.credits} AI credits</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Select ${plan.name}`}
-              onPress={() => Alert.alert('AI Credits', 'Checkout is not enabled yet. The credit plan is ready in Supabase for the payment integration stage.')}
-              style={[styles.button, { backgroundColor: colors.secondary, borderColor: colors.border, borderWidth: 1 }]}
-            >
-              <Text style={[styles.buttonText, { color: colors.foreground }]}>Select {plan.name}</Text>
-            </Pressable>
-          </View>
-        ))}
-
-        {loading && <Text style={[styles.loading, { color: colors.mutedForeground }]}>Loading Premium plans…</Text>}
-        {!loading && plans.length === 0 && creditPlans.length === 0 && (
-          <Text style={[styles.loading, { color: colors.mutedForeground }]}>Premium plans are unavailable right now. Please try again later.</Text>
-        )}
-      </ScrollView>
-    </View>
-  );
+export default function BuyPremiumScreen(){
+ const colors=useColors(); const router=useRouter(); const insets=useSafeAreaInsets();
+ const [plans,setPlans]=useState<PremiumCatalogPlan[]>([]); const [creditPlans,setCreditPlans]=useState<AiCreditPlan[]>([]); const [entitlement,setEntitlement]=useState<PremiumEntitlement|null>(null); const [payment,setPayment]=useState<PaymentSettings|null>(null); const [selected,setSelected]=useState<{type:'PREMIUM'|'AI_CREDITS';code:string;amount:number}|null>(null); const [orderId,setOrderId]=useState<string|null>(null); const [reference,setReference]=useState(''); const [loading,setLoading]=useState(true);
+ const load=useCallback(async()=>{setLoading(true);try{const [p,c,e,s]=await Promise.all([getActivePremiumPlans(),getActiveAiCreditPlans(),getMyPremiumEntitlement().catch(()=>null),getPaymentSettings()]);setPlans(p);setCreditPlans(c);setEntitlement(e);setPayment(s);}catch{Alert.alert('Premium','Plans or payment settings could not be loaded right now.');}finally{setLoading(false);}},[]);
+ useEffect(()=>{void load();},[load]);
+ const start=async(type:'PREMIUM'|'AI_CREDITS',code:string,amount:number)=>{try{const o=await createPaymentOrder(type,code);setSelected({type,code,amount});setOrderId(o.orderId);const url='upi://pay?pa='+encodeURIComponent(o.upiId)+'&pn='+encodeURIComponent(o.receiverName)+'&am='+encodeURIComponent(String(o.amountInr))+'&cu=INR&tn='+encodeURIComponent('Nexus Plus '+code);const ok=await Linking.canOpenURL(url);if(ok)await Linking.openURL(url);else Alert.alert('UPI payment','No UPI app is available. Pay manually to '+o.upiId+'.');}catch{Alert.alert('Payment','Could not create the payment request. Please try again.');}};
+ const submit=async()=>{if(!orderId||reference.trim().length<6)return;try{await submitPaymentReference(orderId,reference.trim());Alert.alert('Payment submitted','Your payment reference was submitted for verification. Premium or credits are activated only after verification.');setOrderId(null);setSelected(null);setReference('');}catch{Alert.alert('Payment','We could not submit the payment reference. Please check it and try again.');}};
+ return <View style={[styles.root,{backgroundColor:colors.background}]}><ScrollView contentContainerStyle={{paddingTop:insets.top+8,paddingBottom:insets.bottom+32}}>
+  <View style={styles.header}><Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={()=>router.back()} style={styles.iconButton}><Feather name="arrow-left" size={22} color={colors.foreground}/></Pressable><Text accessibilityRole="header" style={[styles.headerTitle,{color:colors.foreground}]}>Nexus Plus Premium</Text><Pressable accessibilityRole="button" accessibilityLabel="Refresh" onPress={()=>void load()} style={styles.iconButton}><Feather name="refresh-cw" size={19} color={colors.foreground}/></Pressable></View>
+  {entitlement?.unlocksPremiumFeatures&&<View style={[styles.activeCard,{backgroundColor:colors.secondary,borderColor:colors.border}]}><Text style={[styles.cardTitle,{color:colors.foreground}]}>Premium is active</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>Tier {entitlement.tierLevel} • Expires {entitlement.expiresAt?new Date(entitlement.expiresAt).toLocaleDateString():'soon'}</Text></View>}
+  <View style={styles.hero}><View style={[styles.icon,{backgroundColor:colors.secondary}]}><Feather name="zap" size={25} color={colors.primary}/></View><Text style={[styles.title,{color:colors.foreground}]}>Premium tools for Nexus Plus</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>Free tools and spiritual features stay free. Premium access applies only to the features configured as Premium in the live Supabase catalog.</Text></View>
+  {payment&&<View style={[styles.upiCard,{backgroundColor:colors.card,borderColor:colors.border}]}><Text style={[styles.cardTitle,{color:colors.foreground}]}>Pay with UPI</Text><Text selectable style={[styles.upi,{color:colors.primary}]}>{payment.upiId}</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>{payment.instructions}</Text></View>}
+  <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Membership</Text>
+  {plans.map(p=><View key={p.id} style={[styles.card,{backgroundColor:colors.card,borderColor:colors.border}]}><View style={styles.row}><View style={{flex:1}}><Text style={[styles.cardTitle,{color:colors.foreground}]}>{p.name}</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>{p.description}</Text></View><Text style={[styles.price,{color:colors.primary}]}>₹{p.amount}</Text></View><Text style={[styles.meta,{color:colors.mutedForeground}]}>{p.durationDays} days • Tier {p.tierLevel}</Text><Pressable accessibilityRole="button" onPress={()=>void start('PREMIUM',p.code,p.amount)} style={[styles.button,{backgroundColor:colors.primary}]}><Text style={styles.buttonText}>Pay ₹{p.amount} with UPI</Text></Pressable></View>)}
+  <Text style={[styles.sectionTitle,{color:colors.foreground}]}>AI Credits</Text>
+  {creditPlans.map(p=><View key={p.id} style={[styles.card,{backgroundColor:colors.card,borderColor:colors.border}]}><View style={styles.row}><View style={{flex:1}}><Text style={[styles.cardTitle,{color:colors.foreground}]}>{p.name}</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>{p.tagline}</Text></View><Text style={[styles.price,{color:colors.primary}]}>₹{p.amount}</Text></View><Text style={[styles.meta,{color:colors.mutedForeground}]}>{p.credits.toLocaleString()} AI credits</Text><Pressable accessibilityRole="button" onPress={()=>void start('AI_CREDITS',p.code,p.amount)} style={[styles.button,{backgroundColor:colors.secondary,borderColor:colors.border,borderWidth:1}]}><Text style={[styles.buttonText,{color:colors.foreground}]}>Pay ₹{p.amount} with UPI</Text></Pressable></View>)}
+  {selected&&orderId&&<View style={[styles.verifyCard,{backgroundColor:colors.card,borderColor:colors.border}]}><Text style={[styles.cardTitle,{color:colors.foreground}]}>After payment</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>Enter the UPI transaction reference/UTR. Your purchase is activated only after admin verification.</Text><TextInput value={reference} onChangeText={setReference} placeholder="UPI transaction reference / UTR" placeholderTextColor={colors.mutedForeground} style={[styles.input,{color:colors.foreground,borderColor:colors.border}]}/><Pressable accessibilityRole="button" onPress={()=>void submit()} style={[styles.button,{backgroundColor:colors.primary}]}><Text style={styles.buttonText}>Submit for verification</Text></Pressable></View>}
+  {loading&&<Text style={[styles.loading,{color:colors.mutedForeground}]}>Loading…</Text>}
+ </ScrollView></View>;
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  header: { minHeight: 52, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontFamily: 'Inter_700Bold' },
-  hero: { alignItems: 'center', paddingHorizontal: 22, paddingTop: 24, paddingBottom: 18 },
-  icon: { width: 60, height: 60, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  title: { fontSize: 23, lineHeight: 30, fontFamily: 'Inter_700Bold', textAlign: 'center' },
-  body: { fontSize: 12, lineHeight: 18, marginTop: 7 },
-  sectionTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', marginHorizontal: 16, marginTop: 12, marginBottom: 9 },
-  card: { marginHorizontal: 16, marginBottom: 10, borderWidth: 1, borderRadius: 16, padding: 15 },
-  activeCard: { marginHorizontal: 16, marginBottom: 8, borderWidth: 1, borderRadius: 16, padding: 15 },
-  cardTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  row: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  price: { fontSize: 18, fontFamily: 'Inter_700Bold' },
-  meta: { fontSize: 11, marginTop: 8 },
-  button: { minHeight: 46, borderRadius: 13, marginTop: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
-  buttonText: { color: '#FFFFFF', fontSize: 12, fontFamily: 'Inter_700Bold' },
-  loading: { textAlign: 'center', marginHorizontal: 18, marginTop: 18, fontSize: 12 },
-});
+const styles=StyleSheet.create({root:{flex:1},header:{minHeight:52,paddingHorizontal:14,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},iconButton:{width:44,height:44,alignItems:'center',justifyContent:'center'},headerTitle:{fontSize:18,fontFamily:'Inter_700Bold'},hero:{alignItems:'center',paddingHorizontal:22,paddingTop:24,paddingBottom:18},icon:{width:60,height:60,borderRadius:18,alignItems:'center',justifyContent:'center',marginBottom:14},title:{fontSize:23,lineHeight:30,fontFamily:'Inter_700Bold',textAlign:'center'},body:{fontSize:12,lineHeight:18,marginTop:7},sectionTitle:{fontSize:15,fontFamily:'Inter_700Bold',marginHorizontal:16,marginTop:12,marginBottom:9},card:{marginHorizontal:16,marginBottom:10,borderWidth:1,borderRadius:16,padding:15},activeCard:{marginHorizontal:16,marginBottom:8,borderWidth:1,borderRadius:16,padding:15},upiCard:{marginHorizontal:16,marginBottom:10,borderWidth:1,borderRadius:16,padding:15},verifyCard:{marginHorizontal:16,marginTop:6,borderWidth:1,borderRadius:16,padding:15},cardTitle:{fontSize:15,fontFamily:'Inter_700Bold',marginBottom:4},row:{flexDirection:'row',alignItems:'flex-start',gap:10},price:{fontSize:18,fontFamily:'Inter_700Bold'},meta:{fontSize:11,marginTop:8},upi:{fontSize:18,fontFamily:'Inter_700Bold',marginTop:4},button:{minHeight:46,borderRadius:13,marginTop:12,alignItems:'center',justifyContent:'center',paddingHorizontal:12},buttonText:{color:'#fff',fontSize:12,fontFamily:'Inter_700Bold'},input:{minHeight:48,borderWidth:1,borderRadius:12,paddingHorizontal:12,marginTop:12,fontSize:13},loading:{textAlign:'center',marginTop:18,fontSize:12}});
