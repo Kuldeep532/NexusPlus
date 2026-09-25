@@ -1,8 +1,20 @@
 # Nexus Plus release R8/ProGuard hardening.
 # Keep only actual Android/JNI/React Native entry points.
+
 -keepclasseswithmembernames,includedescriptorclasses class * {
     native <methods>;
 }
+
+# React Native runtime classes are loaded/reflected by the bridge.
+# Keep the base runtime intact while allowing unrelated app code to shrink.
+-keep class com.facebook.react.bridge.** { *; }
+-keep class com.facebook.react.modules.core.** { *; }
+-keep class com.facebook.react.modules.deviceinfo.** { *; }
+-keep class com.facebook.react.modules.systeminfo.** { *; }
+-keep class com.facebook.react.devsupport.** { *; }
+-keep class com.facebook.react.uimanager.** { *; }
+-keep class com.facebook.react.common.** { *; }
+-keep class com.facebook.hermes.** { *; }
 
 # Android framework / manifest entry points.
 -keep class com.nexuswavetech.nexusplus.MainActivity { *; }
@@ -31,7 +43,6 @@
 -keep class com.nexuswavetech.nexusplus.NexusIntegrityModule { *; }
 -keep class com.nexuswavetech.nexusplus.NexusAuthModule { *; }
 -keep class com.nexuswavetech.nexusplus.NexusAlarmModule { *; }
--keep class com.nexuswavetech.nexusplus.NexusNativeSecurityModule { *; }
 -keep class com.nexuswavetech.nexusplus.encryption.FileEncryptionNative { *; }
 
 # Keep annotations needed by React Native reflection/JNI.
