@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
   languageChip: { width: 38, height: 38, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   languageChipText: { fontSize: 10, fontFamily: 'Inter_700Bold' },
   eraText: { fontSize: 10.5, lineHeight: 16 },
-  eraAnswer: { fontSize: 11.5, lineHeight: 18, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'transparent' },
+  eraAnswer: { fontSize: 11.5, lineHeight: 18, marginTop: 10, paddingTop: 10 },
   mantraCard: { borderWidth: 1, borderRadius: 18, padding: 13, marginTop: 12, flexDirection: 'row', alignItems: 'center' },
   mantraCopy: { flex: 1, paddingRight: 10 },
   mantraText: { fontSize: 13, lineHeight: 21, fontFamily: 'Inter_600SemiBold' },
