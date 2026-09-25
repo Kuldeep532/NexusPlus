@@ -62,7 +62,7 @@ export default function ProfileScreen() {
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Your account</Text>
           <ProfileRow title="Account ID" value={user?.uid || 'Available after authentication'} colors={colors} />
           <ProfileRow title="Cloud data" value="User-owned and protected by backend policies." colors={colors} />
-          <ProfileRow title="Financial data" value="Protected by the existing biometric security boundary." colors={colors} />
+          <ProfileRow title="Financial data" value="Protected with the biometric security you enabled." colors={colors} />
         </View>
 
         <Pressable accessibilityRole="button" accessibilityLabel="Open Settings" onPress={() => router.push('/settings')} style={[styles.action, { backgroundColor: colors.secondary, borderColor: colors.border }]}><Feather name="settings" size={18} color={colors.foreground} /><Text style={[styles.actionText, { color: colors.foreground }]}>Settings</Text></Pressable>
