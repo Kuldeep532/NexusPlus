@@ -10,6 +10,7 @@ import { saveReadingProgress } from '@/features/geeta-nexus/geetaReadingProgress
 import { KRISHNA_MANTRAS } from '@/features/spiritual/krishnaMantraCatalog';
 import { ensureGitaChapterCached, getCachedChapterVerses } from '@/features/geeta-nexus/gitaChapterDownloadQueue';
 import { loadChapterVersesFromRemote } from '@/features/geeta-nexus/gitaRemoteSource';
+import { askEraAI } from '@/features/era-ai/eraAiService';
 
 function toNumber(value: string | string[] | undefined): number {
   const raw = Array.isArray(value) ? value[0] : value;
@@ -32,6 +33,9 @@ export default function GeetaNexusReader() {
   const [missing, setMissing] = useState(false);
   const [mantraPlaying, setMantraPlaying] = useState(false);
   const [mantraIndex, setMantraIndex] = useState(0);
+  const [eraLanguage, setEraLanguage] = useState<'hi' | 'en'>('hi');
+  const [eraBusy, setEraBusy] = useState(false);
+  const [eraAnswer, setEraAnswer] = useState('');
 
   const chapterMeta = GITA_CHAPTERS[safeChapter - 1];
   const chapterVerses = useMemo(
@@ -84,6 +88,25 @@ export default function GeetaNexusReader() {
 
   const goToChapter = (chapter: number) => router.replace('/geeta-nexus/read?chapter=' + chapter + '&verse=1' as never);
   const currentMantra = KRISHNA_MANTRAS[mantraIndex];
+  const askEraForVerse = async () => {
+    if (!current || eraBusy) return;
+    setEraBusy(true);
+    try {
+      const result = await askEraAI({
+        message: eraLanguage === 'hi'
+          ? 'इस श्लोक का सरल हिंदी अर्थ और मेरे जीवन में इसका व्यावहारिक उपयोग समझाइए।'
+          : 'Explain this verse in simple English and how I can apply it in daily life.',
+        language: eraLanguage,
+        gitaContext: { chapter: current.chapter, verse: current.verse, text: current.translationHindi || current.meaningHindi || current.sanskrit },
+      });
+      setEraAnswer(result.text);
+    } catch {
+      setEraAnswer(eraLanguage === 'hi' ? 'अभी Era AI उत्तर नहीं दे पाया।' : 'Era AI could not answer right now.');
+    } finally {
+      setEraBusy(false);
+    }
+  };
+
   const toggleMantra = () => {
     if (mantraPlaying) { Speech.stop(); setMantraPlaying(false); return; }
     Speech.speak(currentMantra.sanskrit, { language: 'hi-IN', rate: 0.72, onDone: () => setMantraPlaying(false), onStopped: () => setMantraPlaying(false), onError: () => setMantraPlaying(false) });
@@ -128,6 +151,21 @@ export default function GeetaNexusReader() {
               {!!current.meaningHindi && <View style={[styles.translationBlock, { borderTopColor: colors.border }]}><Text style={[styles.blockLabel, { color: colors.primary }]}>हिंदी भावार्थ</Text><Text style={[styles.translation, { color: colors.foreground }]}>{current.meaningHindi}</Text></View>}
               {!!current.translationEnglish && <View style={[styles.translationBlock, { borderTopColor: colors.border }]}><Text style={[styles.blockLabel, { color: colors.primary }]}>English</Text><Text style={[styles.translation, { color: colors.foreground }]}>{current.translationEnglish}</Text></View>}
             </View>
+            <View style={[styles.eraCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.eraHeader}>
+                <View style={styles.mantraCopy}>
+                  <Text style={[styles.blockLabel, { color: colors.primary }]}>ERA AI</Text>
+                  <Text style={[styles.eraText, { color: colors.mutedForeground }]}>Ask Era AI about this shloka in Hindi or English.</Text>
+                </View>
+                <View style={styles.eraActions}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Era AI Hindi" onPress={() => setEraLanguage('hi')} style={[styles.languageChip, { backgroundColor: eraLanguage === 'hi' ? colors.secondary : colors.background, borderColor: colors.border }]}><Text style={[styles.languageChipText, { color: colors.foreground }]}>हिं</Text></Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Era AI English" onPress={() => setEraLanguage('en')} style={[styles.languageChip, { backgroundColor: eraLanguage === 'en' ? colors.secondary : colors.background, borderColor: colors.border }]}><Text style={[styles.languageChipText, { color: colors.foreground }]}>EN</Text></Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Ask Era AI about this shloka" onPress={() => void askEraForVerse()} style={[styles.mantraButton, { backgroundColor: colors.primary }]}><Feather name="heart" size={16} color={colors.primaryForeground} /></Pressable>
+                </View>
+              </View>
+              {eraAnswer ? <Text selectable style={[styles.eraAnswer, { color: colors.foreground }]}>{eraBusy ? '…' : eraAnswer}</Text> : null}
+            </View>
+
             <View style={[styles.mantraCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.mantraCopy}>
                 <Text style={[styles.blockLabel, { color: colors.primary }]}>KRISHNA MANTRA • CHANT WHILE READING</Text>
@@ -190,6 +228,13 @@ const styles = StyleSheet.create({
   chapterButtonText: { fontSize: 10, fontFamily: 'Inter_700Bold' },
   note: { marginTop: 12, borderWidth: 1, borderRadius: 15, padding: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
   noteText: { flex: 1, fontSize: 10, lineHeight: 15 },
+  eraCard: { borderWidth: 1, borderRadius: 18, padding: 13, marginTop: 12 },
+  eraHeader: { flexDirection: 'row', alignItems: 'center' },
+  eraActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  languageChip: { width: 38, height: 38, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  languageChipText: { fontSize: 10, fontFamily: 'Inter_700Bold' },
+  eraText: { fontSize: 10.5, lineHeight: 16 },
+  eraAnswer: { fontSize: 11.5, lineHeight: 18, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'transparent' },
   mantraCard: { borderWidth: 1, borderRadius: 18, padding: 13, marginTop: 12, flexDirection: 'row', alignItems: 'center' },
   mantraCopy: { flex: 1, paddingRight: 10 },
   mantraText: { fontSize: 13, lineHeight: 21, fontFamily: 'Inter_600SemiBold' },
