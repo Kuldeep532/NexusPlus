@@ -14,7 +14,12 @@ function friendlyAuthError(error: string | null): string | null {
   if (error === 'ACCOUNT_CREATED_CHECK_EMAIL') return 'Account created. Please verify your email, then log in.';
   if (error === 'AUTH_SESSION_NOT_CREATED') return 'Authentication did not create a valid session. Please try again.';
   if (error === 'SUPABASE_AUTH_NOT_CONFIGURED') return 'Authentication is temporarily unavailable. Please try again later.';
-  return error;
+  if (/INVALID_LOGIN_CREDENTIALS|invalid login credentials|invalid_credentials/i.test(error)) return 'Email or password is incorrect.';
+  if (/EMAIL_NOT_CONFIRMED|email not confirmed/i.test(error)) return 'Please verify your email before logging in.';
+  if (/USER_ALREADY_EXISTS|already registered|user already registered/i.test(error)) return 'An account with this email already exists. Try logging in.';
+  if (/RATE_LIMIT|too many requests/i.test(error)) return 'Too many sign-in attempts. Please wait a moment and try again.';
+  if (/SUPABASE_AUTH_ERROR_5\d\d/.test(error)) return 'The account service is temporarily unavailable. Please try again later.';
+  return 'We could not complete your sign-in. Please try again.';
 }
 
 export default function LoginPlusRegisterScreen() {
