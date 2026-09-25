@@ -34,5 +34,5 @@ const sections = [
 ];
 
 export default function TermsAndConditionsScreen() {
-  return <LegalDocumentScreen title="Terms & Conditions" subtitle="Rules for lawful, safe, secure and responsible use of Nexus Plus and its connected-device capabilities." sections={sections} />;
+  return <LegalDocumentScreen title="Terms & Conditions" subtitle="The terms that govern your use of Nexus Plus, its features and connected services." sections={sections} />;
 }
