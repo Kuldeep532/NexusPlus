@@ -5,7 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { completeWelcome } from '@/features/app-shell/onboardingPreferences';
-import { NexusBrandMark } from '@/features/branding/NexusBrandMark';
+import { RadhaKrishnaWelcomeArt } from '@/features/branding/RadhaKrishnaWelcomeArt';
 
 export default function WelcomeScreen() {
   const colors = useColors();
@@ -27,7 +27,7 @@ export default function WelcomeScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <NexusBrandMark size={120} />
+        <RadhaKrishnaWelcomeArt width={300} height={244} />
         <Text style={[styles.greeting, { color: colors.primary }]}>जय श्री कृष्ण</Text>
         <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Welcome to Nexus Plus</Text>
         <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
