@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { OPEN_ASSETS, type OpenAssetId } from '@/features/geeta-nexus/openAssets';
@@ -46,14 +46,14 @@ export default function OpenAssetsScreen() {
 
         <View style={[styles.searchCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Feather name="search" size={18} color={colors.mutedForeground} />
-          <Text
-            accessibilityRole="search"
+          <TextInput
             accessibilityLabel="Search Open Assets"
-            style={[styles.searchText, { color: colors.foreground }]}
-            onPress={() => undefined}
-          >
-            {query || 'Use the filters below to browse the complete collection'}
-          </Text>
+            placeholder="Search Gita, Upanishad or source file"
+            placeholderTextColor={colors.mutedForeground}
+            value={query}
+            onChangeText={setQuery}
+            style={[styles.searchInput, { color: colors.foreground }]}
+          />
         </View>
 
         <View style={styles.filters}>
@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 27, fontFamily: 'Inter_700Bold', marginBottom: 5 },
   subtitle: { fontSize: 11.5, lineHeight: 18 },
   searchCard: { borderWidth: 1, borderRadius: 15, minHeight: 48, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, marginBottom: 10 },
-  searchText: { flex: 1, marginLeft: 9, fontSize: 11.5 },
+  searchInput: { flex: 1, marginLeft: 9, fontSize: 11.5, paddingVertical: 0 },
   filters: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   filter: { minWidth: 72, minHeight: 38, borderWidth: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
   summary: { borderWidth: 1, borderRadius: 17, padding: 14, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 18 },
