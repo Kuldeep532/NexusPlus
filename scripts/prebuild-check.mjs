@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const root = process.cwd();
@@ -17,10 +17,10 @@ function walk(dir) {
   }
 }
 
-function runCapture(label, command, args) {
+function runCapture(label, command, args, options = {}) {
   console.log(`\n=== ${label} ===`);
   try {
-    execFileSync(command, args, { stdio: 'inherit' });
+    execFileSync(command, args, { stdio: 'inherit', ...options });
     console.log(`[PASS] ${label}`);
     return true;
   } catch {
@@ -32,22 +32,10 @@ function runCapture(label, command, args) {
 function runTypecheckDiagnostics() {
   console.log('\n=== TypeScript/TSX diagnostics (advisory) ===');
   console.log('TypeScript diagnostics are reported before Android compilation, but Metro/Gradle remain the source of truth for release build viability.');
-
   try {
     execFileSync(
       'pnpm',
-      [
-        'exec',
-        'tsc',
-        '-p',
-        'tsconfig.prebuild.json',
-        '--noEmit',
-        '--pretty',
-        'false',
-        '--noErrorTruncation',
-        '--incremental',
-        'false',
-      ],
+      ['exec', 'tsc', '-p', 'tsconfig.prebuild.json', '--noEmit', '--pretty', 'false', '--noErrorTruncation', '--incremental', 'false'],
       { stdio: 'inherit' },
     );
     console.log('[PASS] TypeScript/TSX diagnostics');
@@ -56,6 +44,45 @@ function runTypecheckDiagnostics() {
     console.error('[WARN] TypeScript/TSX diagnostics reported errors; continuing to the actual Expo Android bundle validation.');
     return true;
   }
+}
+
+function validateArchitectureBaseline() {
+  console.log('\n=== React Native architecture baseline ===');
+  const gradlePath = join(root, 'android', 'gradle.properties');
+  const appJsonPath = join(root, 'app.json');
+  const gradleText = readFileSync(gradlePath, 'utf8');
+  const appJson = JSON.parse(readFileSync(appJsonPath, 'utf8'));
+  const gradleDisabled = /(^|\n)\s*newArchEnabled\s*=\s*false\s*(\n|$)/m.test(gradleText);
+  const expoDisabled = appJson?.expo?.newArchEnabled === false;
+  if (!gradleDisabled || !expoDisabled) {
+    console.error('[FAIL] Production baseline requires New Architecture disabled in both app.json and android/gradle.properties.');
+    return false;
+  }
+  console.log('[PASS] New Architecture is disabled consistently.');
+  return true;
+}
+
+function validateLockfileAndReactNative() {
+  console.log('\n=== React Native dependency baseline ===');
+  const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  const rnVersion = packageJson?.devDependencies?.['react-native'];
+  if (!rnVersion || rnVersion !== '0.81.5') {
+    console.error(`[FAIL] Expected pinned React Native 0.81.5, found ${rnVersion ?? 'missing'}.`);
+    return false;
+  }
+  if (!existsSync(join(root, 'pnpm-lock.yaml'))) {
+    console.error('[FAIL] pnpm-lock.yaml is missing; reproducible production installs require the lockfile.');
+    return false;
+  }
+  const lockText = readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8');
+  const versions = [...lockText.matchAll(/react-native@(\d+\.\d+\.\d+)/g)].map((m) => m[1]);
+  const unique = [...new Set(versions)];
+  if (unique.length > 1 || (unique.length === 1 && unique[0] !== '0.81.5')) {
+    console.error(`[FAIL] Multiple/unexpected React Native versions found in pnpm-lock.yaml: ${unique.join(', ')}`);
+    return false;
+  }
+  console.log('[PASS] React Native version is pinned and lockfile contains a single RN version.');
+  return true;
 }
 
 console.log('NexusPlus prebuild diagnostics');
@@ -68,18 +95,15 @@ console.log(`JavaScript-family files discovered: ${sourceFiles.length}`);
 let hardFailure = false;
 
 for (const file of sourceFiles) {
-  if (!runCapture(`Syntax: ${relative(root, file)}`, process.execPath, ['--check', file])) {
-    hardFailure = true;
-  }
+  if (!runCapture(`Syntax: ${relative(root, file)}`, process.execPath, ['--check', file])) hardFailure = true;
 }
 
 runTypecheckDiagnostics();
 
-if (!runCapture(
-  'Expo configuration validation',
-  'pnpm',
-  ['exec', 'expo', 'config', '--type', 'public'],
-)) {
+if (!validateArchitectureBaseline()) hardFailure = true;
+if (!validateLockfileAndReactNative()) hardFailure = true;
+
+if (!runCapture('Expo configuration validation', 'pnpm', ['exec', 'expo', 'config', '--type', 'public'])) {
   hardFailure = true;
 }
 
@@ -87,16 +111,7 @@ const exportDir = join('/tmp', 'nexusplus-prebuild-bundle-check');
 if (!runCapture(
   'Expo Android bundle validation',
   'pnpm',
-  [
-    'exec',
-    'expo',
-    'export',
-    '--platform',
-    'android',
-    '--output-dir',
-    exportDir,
-    '--clear',
-  ],
+  ['exec', 'expo', 'export', '--platform', 'android', '--output-dir', exportDir, '--clear'],
 )) {
   hardFailure = true;
 }
