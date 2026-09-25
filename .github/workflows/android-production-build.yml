@@ -259,9 +259,9 @@ jobs:
         working-directory: android
         run: |
           if [ -n "${PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER:-}" ]; then
-            gradle bundleRelease --no-daemon --no-build-cache --stacktrace --info -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
+            gradle bundleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
           else
-            gradle bundleRelease --no-daemon --no-build-cache --stacktrace --info
+            gradle bundleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a
           fi
       - name: Verify release AAB output
         if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
