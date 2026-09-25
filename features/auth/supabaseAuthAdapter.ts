@@ -5,7 +5,7 @@ import { SUPABASE_URL } from './authConfig';
 import type { AuthUserProfile, EmailPasswordInput } from './authTypes';
 import type { SupabaseAuthAdapter } from './authRepository';
 
-const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? '';
+const ANON_KEY = (process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY)?.trim() ?? '';
 const SESSION_KEY = 'nexus-plus.supabase.session.v1';
 const PKCE_VERIFIER_KEY = 'nexus-plus.supabase.google.pkce.v1';
 const PKCE_STATE_KEY = 'nexus-plus.supabase.google.state.v1';
