@@ -5,6 +5,11 @@ import type { EraLanguage, EraResponse, EraHabitSignal, EraRecommendation } from
 
 const HABIT_KEY = '@nexus-plus/era-ai/habits.v1';
 const HISTORY_KEY = '@nexus-plus/era-ai/history.v1';
+const QA_ASSET_HINTS = [
+  'life', 'problem', 'trouble', 'stress', 'anxiety', 'anger', 'purpose', 'career',
+  'relationship', 'family', 'parent', 'student', 'failure', 'success', 'grief',
+  'दुःख', 'चिंता', 'तनाव', 'क्रोध', 'जीवन', 'समस्या', 'करियर', 'रिश्ता', 'परिवार',
+];
 
 function detectSignals(text: string): EraHabitSignal[] {
   const lower = text.toLowerCase();
@@ -38,15 +43,9 @@ async function updateHabits(text: string): Promise<EraHabitSignal[]> {
 function makeRecommendations(habits: EraHabitSignal[]): EraRecommendation[] {
   const top = habits[0];
   if (!top) return [];
-  if (top.id === 'stress') {
-    return [{ id: 'stress-gita', title: 'शांति के लिए गीता', body: 'आज कुछ मिनट शांत होकर गीता का एक श्लोक पढ़ें।', action: 'open-gita', chapter: 2, verse: 47 }];
-  }
-  if (top.id === 'anger') {
-    return [{ id: 'anger-gita', title: 'क्रोध पर चिंतन', body: 'अध्याय 2 का एक संबंधित श्लोक पढ़कर प्रतिक्रिया से पहले ठहरें।', action: 'open-gita', chapter: 2, verse: 63 }];
-  }
-  if (top.id === 'consistency') {
-    return [{ id: 'consistency-reminder', title: 'दैनिक साधना', body: 'आज 5 मिनट का छोटा आध्यात्मिक अभ्यास तय करें।', action: 'reminder', reminderText: 'Era AI: 5 मिनट शांत ध्यान या गीता पाठ का समय।' }];
-  }
+  if (top.id === 'stress') return [{ id: 'stress-gita', title: 'शांति के लिए गीता', body: 'आज कुछ मिनट शांत होकर गीता का एक श्लोक पढ़ें।', action: 'open-gita', chapter: 2, verse: 47 }];
+  if (top.id === 'anger') return [{ id: 'anger-gita', title: 'क्रोध पर चिंतन', body: 'अध्याय 2 का एक संबंधित श्लोक पढ़कर प्रतिक्रिया से पहले ठहरें।', action: 'open-gita', chapter: 2, verse: 63 }];
+  if (top.id === 'consistency') return [{ id: 'consistency-reminder', title: 'दैनिक साधना', body: 'आज 5 मिनट का छोटा आध्यात्मिक अभ्यास तय करें।', action: 'reminder', reminderText: 'Era AI: 5 मिनट शांत ध्यान या गीता पाठ का समय।' }];
   return [{ id: 'reflection', title: 'आज का चिंतन', body: 'कुछ मिनट मौन में बैठकर अपने विचारों को देखें।', action: 'reminder', reminderText: 'Era AI: आज कुछ मिनट आत्म-चिंतन के लिए रुकें।' }];
 }
 
@@ -61,16 +60,31 @@ async function callEraProvider(message: string, language: EraLanguage, context?:
   }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score);
   const endpoint = ranked[0]?.endpoint;
   if (!endpoint) return null;
-  const prompt = `${eraSystemPrompt(language)}\n\nSpiritual context: ${context || 'none'}\nUser question: ${message}`;
+
+  const prompt = [
+    eraSystemPrompt(language),
+    'Use the supplied spiritual Q&A examples as inspiration only. Never copy an example verbatim.',
+    'Generate a fresh response each time. Rephrase, expand or shorten naturally based on the user\'s exact situation.',
+    'Ground advice in broad Bhagavad Gita principles when relevant, but do not fabricate verse quotations.',
+    'A useful answer should usually contain: acknowledgement, spiritual perspective, 2-4 practical steps, and one reflective question.',
+    `Language: ${language === 'hi' ? 'Hindi' : 'English'}`,
+    `User question: ${message}`,
+    `Relevant Q&A asset themes: ${QA_ASSET_HINTS.join(', ')}`,
+    `Gita context: ${context || 'none'}`,
+  ].join('\\n\\n');
+
   const payload = await callGateway<any>(endpoint.path, {
     method: endpoint.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     body: {
       model: endpoint.id || undefined,
-      messages: [{ role: 'system', content: eraSystemPrompt(language) }, { role: 'user', content: message }],
+      messages: [
+        { role: 'system', content: eraSystemPrompt(language) },
+        { role: 'user', content: prompt },
+      ],
       input: prompt,
       prompt,
-      generationConfig: { temperature: 0.5, maxOutputTokens: 700 },
-      max_tokens: 700,
+      generationConfig: { temperature: 0.85, topP: 0.9, maxOutputTokens: 800 },
+      max_tokens: 800,
     },
   });
   const text = payload?.choices?.[0]?.message?.content
@@ -93,11 +107,15 @@ export async function askEraAI(input: {
     return { text, language: input.language, allowed: true };
   }
   const habits = await updateHabits(input.message);
-  let text = await callEraProvider(input.message, input.language, input.gitaContext ? `Bhagavad Gita chapter ${input.gitaContext.chapter}, verse ${input.gitaContext.verse}: ${input.gitaContext.text || ''}` : undefined);
+  let text = await callEraProvider(
+    input.message,
+    input.language,
+    input.gitaContext ? `Bhagavad Gita chapter ${input.gitaContext.chapter}, verse ${input.gitaContext.verse}: ${input.gitaContext.text || ''}` : undefined,
+  );
   if (!text) {
     text = input.language === 'hi'
-      ? 'इस स्थिति में पहले मन को थोड़ा शांत करें, फिर अपने नियंत्रण में आने वाले एक छोटे कर्म पर ध्यान दें। गीता का मार्ग अपने कर्तव्य को सजगता से करने और फल की चिंता कम करने की प्रेरणा देता है।'
-      : 'First calm the mind, then focus on one small action within your control. The Gita encourages sincere action while reducing fixation on the result.';
+      ? 'पहले मन को थोड़ा शांत करें और अपने नियंत्रण में आने वाले एक छोटे कर्म से शुरुआत करें। आज केवल एक स्पष्ट कदम चुनें और उसे बिना परिणाम की चिंता के पूरा करने पर ध्यान दें।'
+      : 'First calm the mind and choose one small action within your control. Focus on completing that step with sincerity rather than worrying about the final outcome.';
   }
   await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify({ lastQuestion: input.message, updatedAt: Date.now() }));
   return { text, language: input.language, allowed: true, suggestions: makeRecommendations(habits) };
