@@ -14,11 +14,7 @@ async function createVerifier(): Promise<string> {
 }
 
 async function challenge(verifier: string): Promise<string> {
-  const digest = await Crypto.digestStringAsync(
-    Crypto.CryptoDigestAlgorithm.SHA256,
-    verifier,
-    { encoding: Crypto.CryptoEncoding.BASE64 },
-  );
+  const digest = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, verifier);
   return digest.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
