@@ -7,7 +7,6 @@ import { useColors, refreshThemeColor } from '@/hooks/useColors';
 import { readThemeColor, writeThemeColor, type ThemeColor } from '@/features/app-shell/themePreferences';
 import { readLaunchPreferences, writeLaunchPreferences } from '@/features/app-shell/launchPreferences';
 import { loadPasswordManagerPreferences, savePasswordManagerPreferences, type PasswordManagerPreferences } from '@/features/biometric-vault/passwordManagerPreferences';
-import { readGreetingPreferences, writeGreetingPreferences, type GreetingMode } from '@/features/app-shell/greetingPreferences';
 import { readSpiritualReminderPreferences, writeSpiritualReminderPreferences, scheduleSpiritualReminders, cancelSpiritualReminders, type SpiritualReminderPreferences } from '@/features/spiritual/spiritualReminder';
 
 const SETTINGS = [
@@ -38,10 +37,9 @@ export default function SettingsScreen(){
  const colors=useColors(); const router=useRouter(); const insets=useSafeAreaInsets();
  const [themeColor,setThemeColor]=useState<ThemeColor>('ocean-blue');
  const [passwordPrefs,setPasswordPrefs]=useState<PasswordManagerPreferences>({defaultGenerator:'nexus',showCopyAction:true,requireBiometricForReveal:true});
- const [greetingMode,setGreetingMode]=useState<GreetingMode>('radhe-radhe');
  const [spiritualPrefs,setSpiritualPrefs]=useState<SpiritualReminderPreferences>({enabled:true,intervalHours:5,startHour:8});
  const [launchPrefs,setLaunchPrefs]=useState<Awaited<ReturnType<typeof readLaunchPreferences>>>({launchTarget:'nexus-plus',homeDestination:'nexus-home',showGeetaNexusOnHome:true});
- useEffect(()=>{void Promise.all([readLaunchPreferences(),readThemeColor(),loadPasswordManagerPreferences(),readGreetingPreferences(),readSpiritualReminderPreferences()]).then(([launch,theme,prefs,greeting,spiritual])=>{setLaunchPrefs(launch);setThemeColor(theme);setPasswordPrefs(prefs);setGreetingMode(greeting.mode);setSpiritualPrefs(spiritual);});},[]);
+ useEffect(()=>{void Promise.all([readLaunchPreferences(),readThemeColor(),loadPasswordManagerPreferences(),readSpiritualReminderPreferences()]).then(([launch,theme,prefs,spiritual])=>{setLaunchPrefs(launch);setThemeColor(theme);setPasswordPrefs(prefs);setSpiritualPrefs(spiritual);});},[]);
  const updateLaunchPrefs=(next: typeof launchPrefs)=>{setLaunchPrefs(next);void writeLaunchPreferences(next);};
  const updateThemeColor=async(theme:ThemeColor)=>{setThemeColor(theme);refreshThemeColor(theme);await writeThemeColor(theme);};
  const updatePasswordPrefs=(next:PasswordManagerPreferences)=>{setPasswordPrefs(next);void savePasswordManagerPreferences(next);};
@@ -71,13 +69,6 @@ export default function SettingsScreen(){
       <View style={[styles.radio,{borderColor:themeColor===option.value?colors.primary:colors.mutedForeground}]}>{themeColor===option.value?<View style={[styles.radioDot,{backgroundColor:colors.primary}]} />:null}</View>
       <View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>{option.title}</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>{option.description}</Text></View>
     </Pressable>)}</View>
-   </View>
-   <View style={[styles.card,{backgroundColor:colors.card,borderColor:colors.border}]}>
-    <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Home Greeting</Text>
-    <Text style={[styles.body,{color:colors.mutedForeground}]}>Choose the single greeting shown at the top of Home. Launch greeting remains “Jai Shri Krishna”.</Text>
-    <View style={styles.modeList}>{([
-      ['radhe-radhe','Radhe Radhe'],['jai-shri-krishna','Jai Shri Krishna'],['hare-krishna','Hare Krishna'],['good-day','Good Morning'],['namaste','Namaste'],['hari-om','Hari Om'],['shri-radhe','Shri Radhe'],['govinda','Hare Govinda'],['time-aware','Time-based greeting']
-    ] as Array<[GreetingMode,string]>).map(([value,title])=><Pressable key={value} accessibilityRole="radio" accessibilityState={{selected:greetingMode===value}} accessibilityLabel={title} onPress={()=>{setGreetingMode(value);void writeGreetingPreferences({mode:value});}} style={[styles.modeItem,{borderColor:greetingMode===value?colors.primary:colors.border,backgroundColor:greetingMode===value?colors.secondary:colors.card}]}><View style={[styles.radio,{borderColor:greetingMode===value?colors.primary:colors.mutedForeground}]}>{greetingMode===value?<View style={[styles.radioDot,{backgroundColor:colors.primary}]} />:null}</View><View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>{title}</Text></View></Pressable>)}</View>
    </View>
    <View style={[styles.card,{backgroundColor:colors.card,borderColor:colors.border}]}>
     <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Select App Mode</Text>
