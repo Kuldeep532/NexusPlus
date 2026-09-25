@@ -170,7 +170,7 @@ class NexusVaultModule(private val reactContext: ReactApplicationContext) : Reac
         } else {
             builder.setUserAuthenticationRequired(false)
         }
-        keyGenerator.init(builder)
+        keyGenerator.init(builder.build())
         return keyGenerator.generateKey()
     }
 }
