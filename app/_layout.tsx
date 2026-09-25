@@ -13,8 +13,12 @@ import { startAssistantBootstrap } from '@/features/nexus-assistant/assistantBoo
 import { readSpiritualReminderPreferences, scheduleSpiritualReminders } from '@/features/spiritual/spiritualReminder';
 import DebugErrorBoundary from '../DebugErrorBoundary';
 
-void SplashScreen.preventAutoHideAsync();
-SplashScreen.setOptions({ duration: 350, fade: true });
+void SplashScreen.preventAutoHideAsync().catch(() => undefined);
+try {
+  SplashScreen.setOptions({ duration: 350, fade: true });
+} catch {
+  // Splash configuration must never block app startup.
+}
 
 function RootLayoutContent() {
   const auth = useAuth();
@@ -24,21 +28,62 @@ function RootLayoutContent() {
 
   useEffect(() => {
     if (auth.loading) return;
-    const timer = setTimeout(() => void SplashScreen.hideAsync(), 150);
+    const timer = setTimeout(() => {
+      void SplashScreen.hideAsync().catch(() => undefined);
+    }, 150);
     return () => clearTimeout(timer);
   }, [auth.loading]);
 
   useEffect(() => {
     if (!auth.loading && auth.session) {
-      void registerForFirebaseNotifications();
-      return attachFirebaseTokenRefreshListener();
+      let cancelled = false;
+      void Promise.resolve()
+        .then(() => registerForFirebaseNotifications())
+        .catch(() => undefined);
+      const detach = (() => {
+        try {
+          return attachFirebaseTokenRefreshListener();
+        } catch {
+          return undefined;
+        }
+      })();
+      return () => {
+        cancelled = true;
+        void cancelled;
+        try {
+          detach?.();
+        } catch {
+          // Notification cleanup is optional.
+        }
+      };
     }
     return undefined;
   }, [auth.loading, auth.session]);
 
   useEffect(() => {
-    if (!auth.loading && auth.session) return startAssistantBootstrap();
-    return undefined;
+    if (auth.loading || !auth.session) return undefined;
+
+    let active = true;
+    const timer = setTimeout(() => {
+      if (!active) return;
+      Promise.resolve()
+        .then(() => startAssistantBootstrap())
+        .then((cleanup) => {
+          if (!active) {
+            try {
+              cleanup?.();
+            } catch {
+              // Ignore late bootstrap cleanup failures.
+            }
+          }
+        })
+        .catch(() => undefined);
+    }, 1000);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, [auth.loading, auth.session]);
 
   useEffect(() => {
@@ -70,14 +115,25 @@ function RootLayoutContent() {
         }
         if (inAuth) return;
         router.replace('/login-plus-register');
+      }).catch(() => {
+        // Navigation fallback must not become a startup crash.
       });
       return;
     }
 
     if (inAuth || inWelcome || (!firstSegment && !inTabs && !inHome && !inGeetaNexus && !inSpiritual && !inLegal)) {
-      void import('@/features/app-shell/launchPreferences').then(({ readLaunchPreferences }) => readLaunchPreferences()).then((prefs) => {
-        router.replace((prefs.homeDestination === 'geeta-home' ? '/geeta-nexus' : prefs.homeDestination === 'spiritual-home' ? '/(tabs)/spiritual' : '/home') as never);
-      });
+      void import('@/features/app-shell/launchPreferences')
+        .then(({ readLaunchPreferences }) => readLaunchPreferences())
+        .then((prefs) => {
+          router.replace((prefs.homeDestination === 'geeta-home'
+            ? '/geeta-nexus'
+            : prefs.homeDestination === 'spiritual-home'
+              ? '/(tabs)/spiritual'
+              : '/home') as never);
+        })
+        .catch(() => {
+          router.replace('/home');
+        });
     }
   }, [auth.loading, auth.session, router, segments]);
 
