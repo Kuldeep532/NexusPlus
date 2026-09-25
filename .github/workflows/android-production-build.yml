@@ -44,6 +44,7 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
     steps:
@@ -171,6 +172,7 @@ jobs:
           set -euo pipefail
           test -n "$SUPABASE_URL"
           test -n "$SUPABASE_ANON_KEY"
+          test -n "${EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-$SUPABASE_ANON_KEY}"
           test -n "$FIREBASE_API_KEY"
           test -n "$FIREBASE_AUTH_DOMAIN"
           test -n "$FIREBASE_PROJECT_ID"
