@@ -132,9 +132,10 @@ jobs:
           test -f android/app/build.gradle
           test -f android/app/src/main/AndroidManifest.xml
           test -f android/app/src/main/cpp/CMakeLists.txt
-          test -f android/app/src/main/cpp/nexus_vocal_remover.cpp
-          test -f android/app/src/main/cpp/nexus_vocal_remover.h
-          test -f android/app/src/main/cpp/nexus_vocal_remover_jni.cpp
+          test -f android/app/src/main/cpp/nexus_filter_core.cpp
+          test -f android/app/src/main/cpp/nexus_filter_core_jni.cpp
+          test -f android/app/src/main/cpp/nexus_filter_trie.cpp
+          test -f android/app/src/main/cpp/nexus_docs_engine_jni.cpp
       - name: Materialize Firebase configuration
         shell: bash
         env:
