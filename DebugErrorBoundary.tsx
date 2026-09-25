@@ -5,8 +5,8 @@ type Props = { children: React.ReactNode };
 type State = { hasError: boolean; error: Error | null };
 
 /**
- * Development-only crash diagnostics for JavaScript/render errors.
- * This component intentionally shows nothing special in release builds.
+ * Crash diagnostics for JavaScript/render errors.
+ * Release builds keep the app usable by showing a recoverable fallback instead of a blank screen.
  */
 export default class DebugErrorBoundary extends React.Component<Props, State> {
   state: State = { hasError: false, error: null };
@@ -16,18 +16,16 @@ export default class DebugErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    if (__DEV__) {
-      console.error('[Nexus Plus] Crash Details:', error, errorInfo);
-    }
+    console.error('[Nexus Plus] Crash Details:', error, errorInfo);
   }
 
   render() {
-    if (__DEV__ && this.state.hasError) {
+    if (this.state.hasError) {
       const message = this.state.error?.stack || this.state.error?.toString() || 'Unknown JavaScript error';
 
       return (
         <View style={styles.container}>
-          <Text style={styles.title}>App Crashed (Debug Mode)</Text>
+          <Text style={styles.title}>Nexus Plus recovered from an app error</Text>
           <ScrollView style={styles.box} contentContainerStyle={styles.boxContent}>
             <Text selectable style={styles.errorText}>
               {message}
