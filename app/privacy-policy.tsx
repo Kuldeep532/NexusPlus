@@ -35,5 +35,5 @@ const sections = [
 ];
 
 export default function PrivacyPolicyScreen() {
-  return <LegalDocumentScreen title="Privacy Policy" subtitle="Clear, feature-specific information about data access, permissions, storage, cloud sync, accessibility, connected devices, security and your choices." sections={sections} />;
+  return <LegalDocumentScreen title="Privacy Policy" subtitle="How Nexus Plus handles information, permissions, connected features, storage and your privacy choices." sections={sections} />;
 }
