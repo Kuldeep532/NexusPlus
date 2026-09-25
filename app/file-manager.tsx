@@ -56,7 +56,7 @@ export default function FileManagerScreen() {
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>File Manager</Text>
           <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Browse, organize, preview and secure local files.</Text>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={[styles.iconButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} style={[styles.iconButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Feather name="arrow-left" size={20} color={colors.foreground} />
         </Pressable>
       </View>
