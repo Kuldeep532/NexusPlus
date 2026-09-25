@@ -99,11 +99,11 @@ export default function GeetaNexusHome() {
         </View>
 
         <Pressable accessibilityRole="button" accessibilityLabel={continueLabel} onPress={() => router.push(currentProgress ? `/geeta-nexus/read?chapter=${currentProgress.chapter}&verse=${currentProgress.verse}` as never : '/geeta-nexus/read?chapter=1&verse=1' as never)} style={[styles.continueCard, { backgroundColor: colors.primary }]}>
-            <View style={styles.continueCopy}>
-              <Text style={[styles.cardKicker, { color: colors.primaryForeground }]}>CONTINUE READING</Text>
-              <Text style={[styles.continueTitle, { color: colors.primaryForeground }]}>{continueLabel}</Text>
-            </View>
-            <Feather name="play" size={20} color={colors.primaryForeground} />
+          <View style={styles.continueCopy}>
+            <Text style={[styles.cardKicker, { color: colors.primaryForeground }]}>CONTINUE READING</Text>
+            <Text style={[styles.continueTitle, { color: colors.primaryForeground }]}>{continueLabel}</Text>
+          </View>
+          <Feather name="play" size={20} color={colors.primaryForeground} />
         </Pressable>
 
         {!!progress.length && (
@@ -112,36 +112,31 @@ export default function GeetaNexusHome() {
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Previously Read</Text>
               <Feather name="clock" size={18} color={colors.primary} />
             </View>
-            {progress.map((item) => (
-              <Pressable key={item.textId} accessibilityRole="button" accessibilityLabel={`Resume ${item.textId}. Chapter ${item.chapter}, verse ${item.verse}`} onPress={() => { if (item.textId === 'bhagavad-gita') router.push(`/geeta-nexus/read?chapter=${item.chapter}&verse=${item.verse}` as never); }} style={[styles.progressRow, { borderTopColor: colors.border }]}>
-                <View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{item.textId === 'bhagavad-gita' ? 'Bhagavad Gita' : 'Ramcharitmanas'}</Text><Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>Chapter {item.chapter}, Verse {item.verse}</Text></View>
+            {progress.filter((item) => item.textId === 'bhagavad-gita').map((item) => (
+              <Pressable key={item.textId} accessibilityRole="button" accessibilityLabel={`Resume Bhagavad Gita. Chapter ${item.chapter}, verse ${item.verse}`} onPress={() => router.push(`/geeta-nexus/read?chapter=${item.chapter}&verse=${item.verse}` as never)} style={[styles.progressRow, { borderTopColor: colors.border }]}>
+                <View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Bhagavad Gita</Text><Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>Chapter {item.chapter}, Verse {item.verse}</Text></View>
                 <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
               </Pressable>
             ))}
           </View>
         )}
 
-        {gitaAvailable && (
-          <>
-            <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View><Text style={[styles.statNumber, { color: colors.foreground }]}>18</Text><Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Chapters</Text></View>
-              <View><Text style={[styles.statNumber, { color: colors.foreground }]}>{cachedVerses || '—'}</Text><Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Cached verses</Text></View>
-              <View><Text style={[styles.statNumber, { color: colors.foreground }]}>{cacheVersion ? 'Offline' : 'Library'}</Text><Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{cacheVersion ? `v${cacheVersion}` : 'Local data'}</Text></View>
-            </View>
+        <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View><Text style={[styles.statNumber, { color: colors.foreground }]}>18</Text><Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Chapters</Text></View>
+          <View><Text style={[styles.statNumber, { color: colors.foreground }]}>{cachedVerses || '—'}</Text><Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Cached verses</Text></View>
+          <View><Text style={[styles.statNumber, { color: colors.foreground }]}>{cacheVersion ? 'Offline' : 'Library'}</Text><Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{cacheVersion ? `v${cacheVersion}` : 'Local data'}</Text></View>
+        </View>
 
-            <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 22 }]}>All Chapters</Text>
-            <View style={styles.list}>
-              {GITA_CHAPTERS.map((chapter) => (
-                <Pressable key={chapter.number} accessibilityRole="button" accessibilityLabel={`Open Chapter ${chapter.number}, ${chapter.nameEnglish}`} onPress={() => router.push(`/geeta-nexus/chapters?chapter=${chapter.number}` as never)} style={[styles.chapterRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="book-open" size={18} color={colors.primary} /></View>
-                  <View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Chapter {chapter.number}</Text><Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{chapter.nameEnglish} · {chapter.verseCount} verses</Text></View>
-                  <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
-                </Pressable>
-              ))}
-            </View>
-          </>
-        )}
-
+        <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 22 }]}>All Chapters</Text>
+        <View style={styles.list}>
+          {GITA_CHAPTERS.map((chapter) => (
+            <Pressable key={chapter.number} accessibilityRole="button" accessibilityLabel={`Open Chapter ${chapter.number}, ${chapter.nameEnglish}`} onPress={() => router.push(`/geeta-nexus/chapters?chapter=${chapter.number}` as never)} style={[styles.chapterRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="book-open" size={18} color={colors.primary} /></View>
+              <View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Chapter {chapter.number}</Text><Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>{chapter.nameEnglish} · {chapter.verseCount} verses</Text></View>
+              <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+            </Pressable>
+          ))}
+        </View>
       </ScrollView>
 
       <View style={[styles.bottomBar, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 8) }]}>
@@ -196,7 +191,6 @@ const styles = StyleSheet.create({
   copy: { flex: 1, marginRight: 10 },
   rowTitle: { fontSize: 12.5, fontFamily: 'Inter_700Bold', marginBottom: 3 },
   rowMeta: { fontSize: 10, lineHeight: 15 },
-  unavailableCard: { borderWidth: 1, borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'flex-start' },
   bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, minHeight: 64, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-around', paddingTop: 8 },
   tab: { alignItems: 'center', justifyContent: 'center', minWidth: 110, gap: 3 },
   tabLabel: { fontSize: 10, fontFamily: 'Inter_700Bold' },
