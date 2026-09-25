@@ -70,9 +70,7 @@ android {
             crunchPngs enablePngCrunchInReleaseBuilds
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
-            // The backend remains the authoritative trust boundary. This value is a build-time
-            // declaration used by release diagnostics and should match the Play/App signing cert.
-            buildConfigField 'String', 'EXPECTED_RELEASE_CERT_SHA256', "\"${requiredReleaseCertSha256}\""
+            buildConfigField 'String', 'EXPECTED_RELEASE_CERT_SHA256', "\"\${requiredReleaseCertSha256}\""
         }
     }
 }
@@ -83,8 +81,6 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.biometric:biometric:1.1.0'
     implementation 'com.google.android.play:integrity:1.6.0'
-    // Keep the Android credential stack on a resolvable stable line. The alpha 1.7.0 artifacts pull
-    // an unavailable googleid:1.2.2 module in the current CI repository resolution path.
     implementation 'androidx.credentials:credentials:1.3.0'
     implementation 'androidx.credentials:credentials-play-services-auth:1.3.0'
     implementation 'com.google.android.gms:play-services-nearby:19.3.0'
@@ -92,5 +88,4 @@ dependencies {
     implementation 'com.google.android.gms:play-services-cast-framework:22.1.0'
     implementation 'com.tom-roush:pdfbox-android:2.0.27.0'
     implementation 'com.facebook.react:react-android'
-    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.22.0'
 }
