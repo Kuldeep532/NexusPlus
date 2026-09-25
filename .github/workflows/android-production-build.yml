@@ -185,7 +185,7 @@ jobs:
           const fs = require("fs");
           const app = JSON.parse(fs.readFileSync("app.json", "utf8"));
           const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-          if (app.expo?.newArchEnabled !== true) throw new Error("newArchEnabled must remain true.");
+          if (app.expo?.newArchEnabled !== false) throw new Error("newArchEnabled must remain false.");
           if (pkg.devDependencies?.["react-native"] !== "0.81.5") throw new Error("Unexpected React Native version.");
           NODE
       - name: Set up Gradle
