@@ -36,7 +36,7 @@ export default function ExpenseTrackerAddScreen() {
     <Stack.Screen options={{ title: 'Add Expense', headerShown: true }} />
     <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 32 }}>
       <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Add expense</Text>
-      <Text style={[styles.body, { color: colors.mutedForeground }]}>Manual entries are stored under your account boundary and remain protected by biometric access.</Text>
+      <Text style={[styles.body, { color: colors.mutedForeground }]}>Your manual entries are saved to your account and remain protected by biometric access.</Text>
       <Text style={[styles.label, { color: colors.foreground }]}>Amount</Text>
       <TextInput accessibilityLabel="Expense amount in rupees" keyboardType="decimal-pad" value={amount} onChangeText={setAmount} placeholder="0.00" placeholderTextColor={colors.mutedForeground} style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]} />
       <Text style={[styles.label, { color: colors.foreground }]}>Merchant or place</Text>
