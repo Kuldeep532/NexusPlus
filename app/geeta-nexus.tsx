@@ -7,7 +7,6 @@ import { GITA_CHAPTERS } from '@/features/geeta-nexus/geetaTypes';
 import { loadCachedVerseBundle } from '@/features/geeta-nexus/geetaStage5Repository';
 import { getDailySpiritualMessage } from '@/features/spiritual/spiritualMessageLibrary';
 import { getAllReadingProgress, type ReadingProgress } from '@/features/geeta-nexus/geetaReadingProgress';
-import { SACRED_TEXTS } from '@/features/geeta-nexus/sacredTextTypes';
 import { useEffect, useState } from 'react';
 
 export default function GeetaNexusHome() {
@@ -16,7 +15,6 @@ export default function GeetaNexusHome() {
   const daily = getDailySpiritualMessage();
   const [cachedVerses, setCachedVerses] = useState(0);
   const [cacheVersion, setCacheVersion] = useState<string | null>(null);
-  const [selectedText, setSelectedText] = useState<'bhagavad-gita' | 'ramcharitmanas'>('bhagavad-gita');
   const [progress, setProgress] = useState<ReadingProgress[]>([]);
 
   useEffect(() => {
@@ -32,8 +30,7 @@ export default function GeetaNexusHome() {
     return () => { active = false; };
   }, []);
 
-  const currentProgress = progress.find((item) => item.textId === selectedText) ?? null;
-  const gitaAvailable = selectedText === 'bhagavad-gita';
+  const currentProgress = progress.find((item) => item.textId === 'bhagavad-gita') ?? null;
   const continueLabel = currentProgress
     ? `Continue Chapter ${currentProgress.chapter}, Verse ${currentProgress.verse}`
     : 'Start Bhagavad Gita';
@@ -64,23 +61,13 @@ export default function GeetaNexusHome() {
           </Pressable>
         </View>
 
-        <View style={[styles.switchCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.switchTitle, { color: colors.foreground }]}>Sacred text</Text>
-          <View style={styles.switchRow}>
-            {SACRED_TEXTS.map((text) => (
-              <Pressable
-                key={text.id}
-                accessibilityRole="button"
-                accessibilityState={{ selected: selectedText === text.id, disabled: !text.available }}
-                accessibilityLabel={`${text.title}. ${text.available ? 'Available' : 'Coming later'}`}
-                disabled={!text.available}
-                onPress={() => setSelectedText(text.id)}
-                style={[styles.switchOption, { backgroundColor: selectedText === text.id ? colors.primary : colors.background, borderColor: selectedText === text.id ? colors.primary : colors.border, opacity: text.available ? 1 : 0.5 }]}
-              >
-                <Text style={{ color: selectedText === text.id ? colors.primaryForeground : colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 11 }}>{text.title}</Text>
-              </Pressable>
-            ))}
+        <View style={[styles.gitaFocusCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.gitaFocusCopy}>
+            <Text style={[styles.gitaFocusLabel, { color: colors.primary }]}>PRIMARY LIBRARY</Text>
+            <Text style={[styles.gitaFocusTitle, { color: colors.foreground }]}>Bhagavad Gita</Text>
+            <Text style={[styles.gitaFocusText, { color: colors.mutedForeground }]}>The main Geeta Nexus reading experience contains only the Bhagavad Gita.</Text>
           </View>
+          <Feather name="book-open" size={22} color={colors.primary} />
         </View>
 
         <View style={[styles.messageCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -91,7 +78,7 @@ export default function GeetaNexusHome() {
           </View>
         </View>
 
-        {gitaAvailable && (
+        {(
           <Pressable accessibilityRole="button" accessibilityLabel={continueLabel} onPress={() => router.push(currentProgress ? `/geeta-nexus/read?chapter=${currentProgress.chapter}&verse=${currentProgress.verse}` as never : '/geeta-nexus/read?chapter=1&verse=1' as never)} style={[styles.continueCard, { backgroundColor: colors.primary }]}>
             <View style={styles.continueCopy}>
               <Text style={[styles.cardKicker, { color: colors.primaryForeground }]}>CONTINUE READING</Text>
@@ -137,15 +124,6 @@ export default function GeetaNexusHome() {
           </>
         )}
 
-        {!gitaAvailable && (
-          <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="info" size={22} color={colors.primary} />
-            <View style={styles.messageCopy}>
-              <Text style={[styles.rowTitle, { color: colors.foreground }]}>Ramcharitmanas library is not bundled yet.</Text>
-              <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>The selector is ready, but Nexus Plus will not display placeholder chapters or claim content is available until a verified source is added.</Text>
-            </View>
-          </View>
-        )}
       </ScrollView>
 
       <View style={[styles.bottomBar, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 8) }]}>
@@ -170,10 +148,11 @@ const styles = StyleSheet.create({
   quickCopy: { flex: 1, marginLeft: 10 },
   quickTitle: { fontSize: 12.5, fontFamily: 'Inter_700Bold', marginBottom: 3 },
   quickMeta: { fontSize: 9.5, lineHeight: 14 },
-  switchCard: { borderWidth: 1, borderRadius: 18, padding: 14, marginBottom: 12 },
-  switchTitle: { fontSize: 12, fontFamily: 'Inter_700Bold', marginBottom: 9 },
-  switchRow: { flexDirection: 'row', gap: 8 },
-  switchOption: { flex: 1, minHeight: 40, borderWidth: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  gitaFocusCard: { borderWidth: 1, borderRadius: 18, padding: 14, marginBottom: 12, flexDirection: 'row', alignItems: 'center' },
+  gitaFocusCopy: { flex: 1, paddingRight: 12 },
+  gitaFocusLabel: { fontSize: 9, letterSpacing: 1.3, fontFamily: 'Inter_700Bold', marginBottom: 4 },
+  gitaFocusTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', marginBottom: 3 },
+  gitaFocusText: { fontSize: 10.5, lineHeight: 15 },
   messageCard: { borderWidth: 1, borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
   messageCopy: { flex: 1, marginLeft: 11 },
   cardKicker: { fontSize: 9, letterSpacing: 1.4, fontFamily: 'Inter_700Bold', marginBottom: 6 },
