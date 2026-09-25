@@ -1,201 +1,252 @@
-name: Nexus Plus - Stable Multi-Stage Build
+name: Android Production Build
 
 on:
   workflow_dispatch:
     inputs:
-      target:
-        description: "Build target"
+      build_source:
+        description: Build with Expo EAS or GitHub Runner
         required: true
-        default: "apk"
+        default: expo
         type: choice
-        options: [apk, aab, github, expo]
-      variant:
-        description: "Build variant"
+        options:
+          - expo
+          - github
+      build_type:
+        description: Android package type
         required: true
-        default: "release"
+        default: apk
         type: choice
-        options: [debug, release]
+        options:
+          - apk
+          - aab
+          - both
+          - development
 
 permissions:
   contents: read
 
 concurrency:
-  group: nexusplus-${{ github.workflow }}-${{ github.ref }}-${{ inputs.target }}-${{ inputs.variant }}
-  cancel-in-progress: true
+  group: android-production
+  cancel-in-progress: false
 
 env:
-  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-  SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-  FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-  FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-  FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-  FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-  FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-  FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-  FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
-  EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-  EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-  EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-  EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-  EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-  EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-  EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-  EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-  PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER: ${{ secrets.PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER }}
+  PNPM_VERSION: "9.15.4"
+  NODE_VERSION: "20"
+  GRADLE_VERSION: "8.13"
 
 jobs:
-  validate:
-    name: Stage 1 - Validate
+  expo:
+    name: Expo EAS Production Build
+    if: ${{ inputs.build_source == 'expo' }}
     runs-on: ubuntu-latest
+    environment: production
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
         with:
-          version: 9.15.4
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
           run_install: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
-      - name: Install
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Validate files
-        shell: bash
-        run: |
-          set -euo pipefail
-          for f in package.json pnpm-lock.yaml app.json eas.json android/gradlew android/settings.gradle android/build.gradle android/app/build.gradle android/app/src/main/AndroidManifest.xml android/app/src/main/cpp/CMakeLists.txt; do
-            test -f "$f"
-          done
-      - name: Validate secrets
-        shell: bash
-        run: |
-          set -euo pipefail
-          for n in SUPABASE_URL SUPABASE_ANON_KEY FIREBASE_API_KEY FIREBASE_AUTH_DOMAIN FIREBASE_PROJECT_ID FIREBASE_STORAGE_BUCKET FIREBASE_MESSAGING_SENDER_ID FIREBASE_APP_ID; do
-            test -n "${!n}"
-          done
-      - name: Typecheck
-        run: pnpm run typecheck:all
+      - name: Validate Expo configuration
+        run: pnpm exec expo config --type public
+      - name: Validate EAS token
+        run: test -n "$EAS_TOKEN"
+      - name: Build Android Development APK with Expo EAS
+        if: ${{ inputs.build_type == 'development' }}
+        run: pnpm dlx eas-cli@latest build --platform android --profile development --non-interactive --wait --clear-cache
+      - name: Build Android APK with Expo EAS
+        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
+        run: pnpm dlx eas-cli@latest build --platform android --profile preview --non-interactive --wait --clear-cache
+      - name: Build Android AAB with Expo EAS
+        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
+        run: pnpm dlx eas-cli@latest build --platform android --profile production --non-interactive --wait --clear-cache
 
-  github_build:
-    name: Stage 2 - GitHub Native Android
-    needs: validate
-    if: ${{ inputs.target == 'github' || inputs.target == 'apk' || inputs.target == 'aab' }}
+  github:
+    name: GitHub Runner Android Build
+    if: ${{ inputs.build_source == 'github' }}
     runs-on: ubuntu-latest
+    environment: production
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+      FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+      FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+      FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+      FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+      FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+      EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+      EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+      EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+      PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER: ${{ secrets.PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.4
-          run_install: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
-      - name: Install
-        run: pnpm install --frozen-lockfile
-      - uses: actions/setup-java@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-          cache: gradle
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
         with:
-          gradle-version: 8.10.2
-      - name: Firebase config
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Validate required files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f package.json
+          test -f pnpm-lock.yaml
+          test -f app.json
+          test -f eas.json
+          test -f android/gradlew
+          test -f android/settings.gradle
+          test -f android/build.gradle
+          test -f android/app/build.gradle
+          test -f android/app/src/main/AndroidManifest.xml
+          test -f android/app/src/main/cpp/CMakeLists.txt
+          test -f android/app/src/main/cpp/nexus_vocal_remover.cpp
+          test -f android/app/src/main/cpp/nexus_vocal_remover.h
+          test -f android/app/src/main/cpp/nexus_vocal_remover_jni.cpp
+      - name: Materialize Firebase configuration
+        shell: bash
         env:
           FIREBASE_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
-        shell: bash
         run: |
           set -euo pipefail
           test -n "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64"
           mkdir -p android/app
           printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
+          test -s android/app/google-services.json
           chmod 600 android/app/google-services.json
-      - name: Release signing
-        if: ${{ inputs.variant == 'release' }}
+      - name: Materialize Android signing configuration
+        shell: bash
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nexusplus-release.jks"
+          test -s "$RUNNER_TEMP/nexusplus-release.jks"
+          chmod 600 "$RUNNER_TEMP/nexusplus-release.jks"
+          printf '%s\n'             "storeFile=$RUNNER_TEMP/nexusplus-release.jks"             "storePassword=$ANDROID_KEYSTORE_PASSWORD"             "keyAlias=$ANDROID_KEY_ALIAS"             "keyPassword=$ANDROID_KEY_PASSWORD"             > android/key.properties
+          chmod 600 android/key.properties
+      - name: Validate build secrets
         shell: bash
         run: |
           set -euo pipefail
-          for n in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do test -n "${!n}"; done
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nexusplus-release.jks"
-          chmod 600 "$RUNNER_TEMP/nexusplus-release.jks"
-          printf '%s\n' "storeFile=$RUNNER_TEMP/nexusplus-release.jks" "storePassword=$ANDROID_KEYSTORE_PASSWORD" "keyAlias=$ANDROID_KEY_ALIAS" "keyPassword=$ANDROID_KEY_PASSWORD" > android/key.properties
-          chmod 600 android/key.properties
-      - name: Build APK
-        if: ${{ inputs.target == 'apk' }}
+          test -n "$SUPABASE_URL"
+          test -n "$SUPABASE_ANON_KEY"
+          test -n "$FIREBASE_API_KEY"
+          test -n "$FIREBASE_AUTH_DOMAIN"
+          test -n "$FIREBASE_PROJECT_ID"
+          test -n "$FIREBASE_STORAGE_BUCKET"
+          test -n "$FIREBASE_MESSAGING_SENDER_ID"
+          test -n "$FIREBASE_APP_ID"
+      - name: Validate stable Android baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require("fs");
+          const app = JSON.parse(fs.readFileSync("app.json", "utf8"));
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          if (app.expo?.newArchEnabled !== false) throw new Error("newArchEnabled must remain false.");
+          if (pkg.devDependencies?.["react-native"] !== "0.81.5") throw new Error("Unexpected React Native version.");
+          NODE
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ env.GRADLE_VERSION }}
+          cache-disabled: true
+      - name: Make Gradle wrapper executable
+        run: chmod +x android/gradlew
+      - name: Build Debug/Development APK
+        if: ${{ inputs.build_type == 'development' }}
         working-directory: android
-        run: ./gradlew ${{ inputs.variant == 'debug' && 'assembleDebug' || 'assembleRelease' }} --no-daemon --stacktrace --warning-mode all
-      - name: Build AAB
-        if: ${{ inputs.target == 'aab' }}
+        run: gradle assembleDebug --no-daemon --no-build-cache --stacktrace --info
+      - name: Build release APK
+        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         working-directory: android
-        run: ./gradlew ${{ inputs.variant == 'debug' && 'bundleDebug' || 'bundleRelease' }} --no-daemon --stacktrace --warning-mode all
-      - name: Build both
-        if: ${{ inputs.target == 'github' }}
+        run: |
+          if [ -n "${PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER:-}" ]; then
+            gradle assembleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
+          else
+            gradle assembleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a
+          fi
+      - name: Build release AAB
+        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
         working-directory: android
-        run: ./gradlew ${{ inputs.variant == 'debug' && 'assembleDebug bundleDebug' || 'assembleRelease bundleRelease' }} --no-daemon --stacktrace --warning-mode all
-      - name: Upload APK
-        if: ${{ inputs.target == 'apk' }}
+        run: |
+          if [ -n "${PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER:-}" ]; then
+            gradle bundleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
+          else
+            gradle bundleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a
+          fi
+      - name: Verify APK output
+        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
+        shell: bash
+        run: test -s android/app/build/outputs/apk/release/*.apk
+      - name: Verify AAB output
+        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
+        shell: bash
+        run: test -s android/app/build/outputs/bundle/release/*.aab
+      - name: Upload Development APK
+        if: ${{ inputs.build_type == 'development' }}
         uses: actions/upload-artifact@v4
         with:
-          name: nexusplus-apk-${{ inputs.variant }}
-          path: android/app/build/outputs/apk/${{ inputs.variant }}/*.apk
+          name: nexusplus-android-dev-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+      - name: Upload APK
+        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexusplus-android-apk
+          path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
       - name: Upload AAB
-        if: ${{ inputs.target == 'aab' }}
+        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
         uses: actions/upload-artifact@v4
         with:
-          name: nexusplus-aab-${{ inputs.variant }}
-          path: android/app/build/outputs/bundle/${{ inputs.variant }}/*.aab
+          name: nexusplus-android-aab
+          path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
-      - name: Upload GitHub build
-        if: ${{ inputs.target == 'github' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-github-${{ inputs.variant }}
-          path: |
-            android/app/build/outputs/apk/${{ inputs.variant }}/*.apk
-            android/app/build/outputs/bundle/${{ inputs.variant }}/*.aab
-          if-no-files-found: error
-      - name: Cleanup
+      - name: Cleanup credentials
         if: ${{ always() }}
-        run: rm -f android/app/google-services.json android/key.properties "$RUNNER_TEMP/nexusplus-release.jks"
-
-  expo_build:
-    name: Stage 3 - Expo EAS
-    needs: validate
-    if: ${{ inputs.target == 'expo' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.4
-          run_install: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
-      - name: Install
-        run: pnpm install --frozen-lockfile
-      - name: Expo authentication
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: test -n "$EXPO_TOKEN"
-      - name: Expo debug APK
-        if: ${{ inputs.variant == 'debug' }}
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: pnpm exec eas build --platform android --profile preview --non-interactive
-      - name: Expo release AAB
-        if: ${{ inputs.variant == 'release' }}
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: pnpm exec eas build --platform android --profile production --non-interactive
+        shell: bash
+        run: |
+          rm -f android/app/google-services.json
+          rm -f android/key.properties
+          rm -f "$RUNNER_TEMP/nexusplus-release.jks"
