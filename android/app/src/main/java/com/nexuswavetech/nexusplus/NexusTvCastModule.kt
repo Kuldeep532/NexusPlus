@@ -3,7 +3,6 @@ package com.nexuswavetech.nexusplus
 import android.net.Uri
 import com.facebook.react.bridge.*
 import com.google.android.gms.cast.CastDevice
-import com.google.android.gms.cast.CastSession
 import com.google.android.gms.cast.MediaInfo
 import com.google.android.gms.cast.MediaLoadRequestData
 import com.google.android.gms.cast.MediaMetadata
