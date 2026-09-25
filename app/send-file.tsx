@@ -69,7 +69,7 @@ export default function SendFileScreen() {
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Send File</Text>
           <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Simple phone-to-phone sharing over nearby Wi-Fi or Bluetooth.</Text>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={[styles.iconButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} style={[styles.iconButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Feather name="arrow-left" size={20} color={colors.foreground} />
         </Pressable>
       </View>
