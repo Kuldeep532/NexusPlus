@@ -21,7 +21,7 @@ export function LegalDocumentScreen({ title, subtitle, sections }: Props) {
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 28 }}>
         <View style={styles.content}>
           <View style={styles.topBar}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.iconSlot}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} style={styles.iconSlot}>
               <Feather name="arrow-left" size={21} color={colors.foreground} />
             </Pressable>
             <Text accessibilityRole="header" style={[styles.header, { color: colors.foreground }]}>{title}</Text>
