@@ -1,8 +1,7 @@
 import { SUPABASE_URL } from '@/features/auth/authConfig';
 import { getSupabaseAccessToken } from '@/features/auth/supabaseAuthAdapter';
-import type { NexusFeatureCode, NexusFeatureFlag } from './featureFlags';
-
-export type { NexusFeatureCode, NexusFeatureFlag };
+export type NexusFeatureCode='nexus_discover'|'nexus_assist'|'audio_editor'|'voice_studio'|'pdf_tools'|'secure_vault'|'cctv'|'file_transfer';
+export type NexusFeatureFlag={feature_code:NexusFeatureCode;feature_name:string;enabled:boolean;min_tier:1|2|3;message_when_disabled:string|null};
 
 const KEY=(process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY??process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY)?.trim()??'';
 const cache=new Map<NexusFeatureCode,NexusFeatureFlag>(); let loadedAt=0; const CACHE_TTL_MS=60_000;
