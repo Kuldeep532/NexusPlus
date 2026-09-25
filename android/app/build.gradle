@@ -35,7 +35,9 @@ android {
     compileSdk 35
     defaultConfig {
         if (project.hasProperty('nexusReleaseAbi')) {
-            ndk { abiFilters project.property('nexusReleaseAbi').toString().split(',').collect { it.trim() }.findAll { it } }
+            ndk {
+                abiFilters = project.property('nexusReleaseAbi').toString().split(',').collect { it.trim() }.findAll { it }
+            }
         }
         applicationId 'com.nexuswavetech.nexusplus'
         minSdk 26
@@ -71,7 +73,7 @@ android {
             crunchPngs enablePngCrunchInReleaseBuilds
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
-            buildConfigField 'String', 'EXPECTED_RELEASE_CERT_SHA256', "\"${requiredReleaseCertSha256}\""
+            buildConfigField 'String', 'EXPECTED_RELEASE_CERT_SHA256', '"' + requiredReleaseCertSha256 + '"'
         }
     }
 }
