@@ -10,6 +10,7 @@ import { GlobalMiniPlayer } from '@/features/media/GlobalMiniPlayer';
 import { RemoteConfigOverlay } from '@/features/supabase/RemoteConfigOverlay';
 import { attachFirebaseTokenRefreshListener, registerForFirebaseNotifications } from '@/features/notifications/pushNotifications';
 import { startAssistantBootstrap } from '@/features/nexus-assistant/assistantBootstrap';
+import { refreshNexusFeatureFlags } from '@/features/remote-config/featureFlags';
 import { readSpiritualReminderPreferences, scheduleSpiritualReminders } from '@/features/spiritual/spiritualReminder';
 import DebugErrorBoundary from '../DebugErrorBoundary';
 
@@ -84,6 +85,11 @@ function RootLayoutContent() {
       active = false;
       clearTimeout(timer);
     };
+  }, [auth.loading, auth.session]);
+
+  useEffect(() => {
+    if (auth.loading || !auth.session) return;
+    void refreshNexusFeatureFlags(true).catch(() => undefined);
   }, [auth.loading, auth.session]);
 
   useEffect(() => {
