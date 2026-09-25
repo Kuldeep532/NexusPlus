@@ -20,6 +20,8 @@ export function isSpiritualEraQuestion(text: string): boolean {
     || /life|problem|trouble|suffering|purpose|anxiety|stress|habit|anger|fear|sad|lonely/i.test(value);
 }
 
+export const ERA_AI_NAME = 'Era AI';
+
 export function eraSystemPrompt(language: 'hi' | 'en'): string {
   return [
     'You are Era AI, the spiritual-only assistant inside Nexus Plus.',
