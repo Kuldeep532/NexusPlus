@@ -141,7 +141,7 @@ function RootLayoutContent() {
     <PersistentMediaProvider>
       <RemoteConfigOverlay>
         <View style={[styles.root, { backgroundColor: colors.background }]}>
-          <Stack screenOptions={{ headerShown: true }} />
+          <Stack screenOptions={{ headerShown: false }} />
           <GlobalMiniPlayer />
         </View>
       </RemoteConfigOverlay>
