@@ -26,7 +26,7 @@ export default function MoreScreen() {
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={{ padding: 18, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 32 }}>
         <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>More</Text>
-        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Nexus Plus settings, profile, information and support.</Text>
+        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Manage your preferences, account and Nexus Plus information.</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Open Profile" onPress={() => router.push('/profile')} style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="user" size={20} color={colors.primary} /></View>
           <View style={styles.copy}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Profile</Text><Text style={[styles.body, { color: colors.mutedForeground }]}>Settings, Manage Account, Privacy Policy and Terms & Conditions.</Text></View>
