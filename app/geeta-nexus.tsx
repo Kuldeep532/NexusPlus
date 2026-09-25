@@ -53,6 +53,17 @@ export default function GeetaNexusHome() {
           </Pressable>
         </View>
 
+        <View style={[styles.quickCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Open Open Assets" onPress={() => router.push('/open-assets' as never)} style={styles.quickButton}>
+            <View style={[styles.quickIcon, { backgroundColor: colors.secondary }]}><Feather name="archive" size={19} color={colors.primary} /></View>
+            <View style={styles.quickCopy}>
+              <Text style={[styles.quickTitle, { color: colors.foreground }]}>Open Assets</Text>
+              <Text style={[styles.quickMeta, { color: colors.mutedForeground }]}>All supplied Gita and Upanishad datasets</Text>
+            </View>
+            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+          </Pressable>
+        </View>
+
         <View style={[styles.switchCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.switchTitle, { color: colors.foreground }]}>Sacred text</Text>
           <View style={styles.switchRow}>
@@ -153,6 +164,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
   subtitle: { fontSize: 12, lineHeight: 18, marginBottom: 18 },
   settingsButton: { width: 42, height: 42, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  quickCard: { borderWidth: 1, borderRadius: 18, marginBottom: 12 },
+  quickButton: { minHeight: 62, padding: 12, flexDirection: 'row', alignItems: 'center' },
+  quickIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  quickCopy: { flex: 1, marginLeft: 10 },
+  quickTitle: { fontSize: 12.5, fontFamily: 'Inter_700Bold', marginBottom: 3 },
+  quickMeta: { fontSize: 9.5, lineHeight: 14 },
   switchCard: { borderWidth: 1, borderRadius: 18, padding: 14, marginBottom: 12 },
   switchTitle: { fontSize: 12, fontFamily: 'Inter_700Bold', marginBottom: 9 },
   switchRow: { flexDirection: 'row', gap: 8 },
