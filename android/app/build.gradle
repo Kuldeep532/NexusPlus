@@ -50,12 +50,13 @@ android {
     externalNativeBuild { cmake { path file('src/main/cpp/CMakeLists.txt'); version '3.22.1' } }
     signingConfigs {
         release {
-            if (keystorePropertiesFile.exists()) {
-                storeFile rootProject.file(keystoreProperties['storeFile'])
-                storePassword keystoreProperties['storePassword']
-                keyAlias keystoreProperties['keyAlias']
-                keyPassword keystoreProperties['keyPassword']
+            if (!keystorePropertiesFile.exists()) {
+                throw new GradleException("Release signing is required. Provide android/key.properties (CI creates it from the protected release keystore). Do not install unsigned/debug APKs for Play Protect testing.")
             }
+            storeFile rootProject.file(keystoreProperties['storeFile'])
+            storePassword keystoreProperties['storePassword']
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
         }
     }
     packaging {
@@ -70,7 +71,7 @@ android {
             crunchPngs enablePngCrunchInReleaseBuilds
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
-            buildConfigField 'String', 'EXPECTED_RELEASE_CERT_SHA256', "\"\${requiredReleaseCertSha256}\""
+            buildConfigField 'String', 'EXPECTED_RELEASE_CERT_SHA256', "\"${requiredReleaseCertSha256}\""
         }
     }
 }
