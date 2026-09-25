@@ -7,6 +7,7 @@ import { GITA_CHAPTERS } from '@/features/geeta-nexus/geetaTypes';
 import { loadCachedVerseBundle } from '@/features/geeta-nexus/geetaStage5Repository';
 import { getDailySpiritualMessage } from '@/features/spiritual/spiritualMessageLibrary';
 import { getAllReadingProgress, type ReadingProgress } from '@/features/geeta-nexus/geetaReadingProgress';
+import { OPEN_ASSETS } from '@/features/geeta-nexus/openAssets';
 import { useEffect, useState } from 'react';
 
 export default function GeetaNexusHome() {
@@ -16,6 +17,7 @@ export default function GeetaNexusHome() {
   const [cachedVerses, setCachedVerses] = useState(0);
   const [cacheVersion, setCacheVersion] = useState<string | null>(null);
   const [progress, setProgress] = useState<ReadingProgress[]>([]);
+  const [assetsOpen, setAssetsOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -51,14 +53,32 @@ export default function GeetaNexusHome() {
         </View>
 
         <View style={[styles.quickCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Open Open Assets" onPress={() => router.push('/open-assets' as never)} style={styles.quickButton}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Open Assets menu" accessibilityState={{ expanded: assetsOpen }} onPress={() => setAssetsOpen((value) => !value)} style={styles.quickButton}>
             <View style={[styles.quickIcon, { backgroundColor: colors.secondary }]}><Feather name="archive" size={19} color={colors.primary} /></View>
             <View style={styles.quickCopy}>
               <Text style={[styles.quickTitle, { color: colors.foreground }]}>Open Assets</Text>
-              <Text style={[styles.quickMeta, { color: colors.mutedForeground }]}>All supplied Gita and Upanishad datasets</Text>
+              <Text style={[styles.quickMeta, { color: colors.mutedForeground }]}>Browse all supplied Gita and Upanishad datasets</Text>
             </View>
-            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+            <Feather name={assetsOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.mutedForeground} />
           </Pressable>
+          {assetsOpen && (
+            <View style={[styles.assetMenu, { borderTopColor: colors.border }]}>
+              {OPEN_ASSETS.map((asset) => (
+                <Pressable key={asset.id} accessibilityRole="button" accessibilityLabel={'Open ' + asset.title} onPress={() => {
+                  setAssetsOpen(false);
+                  if (asset.id === 'bhagavad-gita') router.push('/geeta-nexus/chapters' as never);
+                  else router.push('/geeta-nexus/open-asset?id=' + asset.id as never);
+                }} style={[styles.assetRow, { borderBottomColor: colors.border }]}>
+                  <View style={[styles.assetDot, { backgroundColor: colors.secondary }]}><Feather name={asset.category === 'Upanishad' ? 'compass' : 'book'} size={15} color={colors.primary} /></View>
+                  <View style={styles.quickCopy}>
+                    <Text style={[styles.assetTitle, { color: colors.foreground }]}>{asset.title}</Text>
+                    <Text style={[styles.assetMeta, { color: colors.mutedForeground }]}>{asset.subtitle}</Text>
+                  </View>
+                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                </Pressable>
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={[styles.gitaFocusCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -93,7 +113,7 @@ export default function GeetaNexusHome() {
               <Feather name="clock" size={18} color={colors.primary} />
             </View>
             {progress.map((item) => (
-              <Pressable key={item.textId} accessibilityRole="button" accessibilityLabel={`Resume ${item.textId}. Chapter ${item.chapter}, verse ${item.verse}`} onPress={() => { setSelectedText(item.textId); if (item.textId === 'bhagavad-gita') router.push(`/geeta-nexus/read?chapter=${item.chapter}&verse=${item.verse}` as never); }} style={[styles.progressRow, { borderTopColor: colors.border }]}>
+              <Pressable key={item.textId} accessibilityRole="button" accessibilityLabel={`Resume ${item.textId}. Chapter ${item.chapter}, verse ${item.verse}`} onPress={() => { if (item.textId === 'bhagavad-gita') router.push(`/geeta-nexus/read?chapter=${item.chapter}&verse=${item.verse}` as never); }} style={[styles.progressRow, { borderTopColor: colors.border }]}>
                 <View style={styles.copy}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{item.textId === 'bhagavad-gita' ? 'Bhagavad Gita' : 'Ramcharitmanas'}</Text><Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>Chapter {item.chapter}, Verse {item.verse}</Text></View>
                 <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
               </Pressable>
@@ -146,6 +166,11 @@ const styles = StyleSheet.create({
   quickCopy: { flex: 1, marginLeft: 10 },
   quickTitle: { fontSize: 12.5, fontFamily: 'Inter_700Bold', marginBottom: 3 },
   quickMeta: { fontSize: 9.5, lineHeight: 14 },
+  assetMenu: { borderTopWidth: 1 },
+  assetRow: { minHeight: 58, borderBottomWidth: 1, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center' },
+  assetDot: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  assetTitle: { fontSize: 11.5, fontFamily: 'Inter_700Bold', marginBottom: 2 },
+  assetMeta: { fontSize: 9.5 },
   gitaFocusCard: { borderWidth: 1, borderRadius: 18, padding: 14, marginBottom: 12, flexDirection: 'row', alignItems: 'center' },
   gitaFocusCopy: { flex: 1, paddingRight: 12 },
   gitaFocusLabel: { fontSize: 9, letterSpacing: 1.3, fontFamily: 'Inter_700Bold', marginBottom: 4 },
