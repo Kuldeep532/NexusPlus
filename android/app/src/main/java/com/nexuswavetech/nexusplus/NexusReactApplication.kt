@@ -26,6 +26,7 @@ class NexusReactApplication : Application(), ReactApplication {
                     add(NexusVaultPackage())
                     add(NexusDocumentReaderPackage())
                     add(NexusMediaPackage())
+                    add(NexusMusicPackage())
                     add(NexusFileUriPackage())
                     add(NexusCctvDiscoveryPackage())
                     add(NexusCctvOnvifPackage())
