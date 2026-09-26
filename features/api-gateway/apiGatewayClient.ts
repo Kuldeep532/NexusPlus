@@ -53,7 +53,7 @@ export async function discoverGatewayEndpoints(force = false): Promise<GatewayEn
 
   discoveryPromise = (async () => {
     const token = await getSupabaseAccessToken();
-    const response = await fetch(APP_API_BASE_URL + '/', {
+    const response = await fetch(APP_API_BASE_URL, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
@@ -61,10 +61,10 @@ export async function discoverGatewayEndpoints(force = false): Promise<GatewayEn
       },
     });
     if (!response.ok) throw new Error(`GATEWAY_DISCOVERY_FAILED_${response.status}`);
-    const endpoints = normalizeEndpoints(await response.json() as DiscoveryPayload);
-    cachedEndpoints = endpoints;
+    const payload = await response.json() as DiscoveryPayload & { apiBase?: string };
+    cachedEndpoints = normalizeEndpoints(payload);
     discoveryExpiresAt = Date.now() + DISCOVERY_TTL_MS;
-    return endpoints;
+    return cachedEndpoints;
   })().finally(() => {
     discoveryPromise = null;
   });
@@ -72,15 +72,13 @@ export async function discoverGatewayEndpoints(force = false): Promise<GatewayEn
   return discoveryPromise;
 }
 
-function mapGatewayPathToSupabase(path: string): string {
+function buildGatewayUrl(path: string, query?: Record<string, string | number | boolean | null | undefined>): URL {
   const normalized = path.replace(/^\/+/, '');
-  if (normalized.startsWith('functions/')) return normalized.replace(/^functions\//, '/functions/');
-  if (normalized.startsWith('rest/')) return normalized.replace(/^rest\//, '/rest/');
-  if (normalized.startsWith('storage/')) return normalized.replace(/^storage\//, '/storage/');
-  if (normalized.startsWith('auth/')) return normalized.replace(/^auth\//, '/auth/');
-  if (normalized.startsWith('v1/functions/')) return normalized.replace(/^v1\//, '/');
-  if (normalized.startsWith('v1/')) return normalized.replace(/^v1\//, '/');
-  return '/' + normalized;
+  const url = new URL(APP_API_BASE_URL + (normalized ? `/${normalized}` : ''));
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
+  }
+  return url;
 }
 
 export async function callGateway<T = unknown>(
@@ -97,11 +95,7 @@ export async function callGateway<T = unknown>(
   }
 
   const token = await getSupabaseAccessToken();
-  const url = new URL(APP_API_BASE_URL + mapGatewayPathToSupabase(path));
-
-  for (const [key, value] of Object.entries(options.query ?? {})) {
-    if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
-  }
+  const url = buildGatewayUrl(path, options.query);
 
   const response = await fetch(url.toString(), {
     method: options.method ?? 'GET',
@@ -122,6 +116,32 @@ export async function callGateway<T = unknown>(
     throw new Error(message);
   }
   return response.json() as Promise<T>;
+}
+
+export async function getServerSecurityState(): Promise<{
+  security: { status: string; app_id: string | null; detection_count: number; reason: string | null; updated_at: string | null } | null;
+  entitlement: {
+    status: string | null;
+    planCode: string | null;
+    planName: string | null;
+    tierLevel: number;
+    expiresAt: string | null;
+    blocksAds: boolean;
+    unlocksPremiumFeatures: boolean;
+    productScope: 'nexus_plus';
+  };
+}> {
+  return callGateway('/security/status', { method: 'GET' });
+}
+
+export async function getServerFeatureAccess(featureCode: string): Promise<{
+  enabled: boolean;
+  accessType?: string;
+  minTier?: number;
+  creditCost?: number;
+  message?: string;
+}> {
+  return callGateway('/premium/feature-access', { method: 'POST', body: { featureCode } });
 }
 
 export function clearGatewayEndpointCache(): void {
