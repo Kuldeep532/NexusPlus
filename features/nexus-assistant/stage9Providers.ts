@@ -1,90 +1,78 @@
-import { callGateway, discoverGatewayEndpoints, type GatewayEndpoint } from '@/features/api-gateway/apiGatewayClient';
-import { getAssistantModelPreference } from './aiModelPreferences';
+import { getAssistantModelPreference, type AssistantModelId } from './aiModelPreferences';
 import { getCustomProviderApiKey } from './aiProviderPreferences';
 import { getSupabaseAccessToken } from '@/features/auth/supabaseAuthAdapter';
 import { SUPABASE_URL } from '@/features/auth/authConfig';
 
-export type AssistantProvider = 'gemini' | 'openai' | 'anthropic';
+export type AssistantProvider = AssistantModelId;
 
 export type ProviderResult = {
   text: string;
   provider: AssistantProvider;
+  model?: string;
 };
 
+function parseProviderError(status: number, payload: any): Error {
+  const message = String(payload?.error ?? payload?.message ?? 'AI_REQUEST_FAILED');
+  return new Error(message || `AI_REQUEST_${status}`);
+}
+
 function readText(payload: any): string | null {
-  const text = payload?.choices?.[0]?.message?.content
-    ?? payload?.choices?.[0]?.text
-    ?? payload?.output_text
-    ?? payload?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text).filter(Boolean).join('')
-    ?? payload?.text
-    ?? payload?.output
-    ?? payload?.response?.text
-    ?? payload?.result?.text;
-  return typeof text === 'string' && text.trim() ? text.trim() : null;
+  const value =
+    payload?.text ??
+    payload?.output_text ??
+    payload?.choices?.[0]?.message?.content ??
+    payload?.choices?.[0]?.text ??
+    payload?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text).filter(Boolean).join('') ??
+    payload?.content?.map?.((item: any) => item?.text).filter(Boolean).join('') ??
+    payload?.response?.text ??
+    payload?.result?.text;
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function rankGatewayEndpoint(endpoints: GatewayEndpoint[], provider: Exclude<AssistantProvider, 'anthropic'>): GatewayEndpoint | null {
-  const ranked = endpoints.map((endpoint) => {
-    const haystack = `${endpoint.id} ${endpoint.path} ${endpoint.feature ?? ''} ${endpoint.description ?? ''}`.toLowerCase();
-    let score = 0;
-    if (provider === 'openai') {
-      if (haystack.includes('openai')) score += 8;
-      if (haystack.includes('responses')) score += 3;
-      if (haystack.includes('chat')) score += 2;
-      if (haystack.includes('completion')) score += 2;
-    } else {
-      if (haystack.includes('gemini')) score += 8;
-      if (haystack.includes('google')) score += 3;
-      if (haystack.includes('generate')) score += 2;
-      if (haystack.includes('completion') || haystack.includes('message')) score += 2;
-    }
-    return { endpoint, score };
-  }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score);
-  return ranked[0]?.endpoint ?? null;
-}
-
-async function askGatewayProvider(provider: Exclude<AssistantProvider, 'anthropic'>, input: {
+async function callSupabaseAiFunction(provider: AssistantModelId, input: {
   message: string;
   history?: Array<{ role: 'user' | 'assistant'; text: string }>;
 }): Promise<ProviderResult | null> {
-  const endpoints = await discoverGatewayEndpoints();
-  const endpoint = rankGatewayEndpoint(endpoints, provider);
-  if (!endpoint) return null;
-  const messages = (input.history ?? []).map((item) => ({ role: item.role, content: item.text }));
-  messages.push({ role: 'user', content: input.message });
-  const payload = await callGateway<any>(endpoint.path, {
-    method: endpoint.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
-    body: {
-      model: endpoint.id || undefined,
-      messages,
-      input: input.message,
-      prompt: input.message,
-      contents: messages.map((item) => ({ role: item.role === 'assistant' ? 'model' : 'user', parts: [{ text: item.content }] })),
-      generationConfig: { temperature: 0.4, maxOutputTokens: 900 },
-      max_tokens: 900,
+  const token = await getSupabaseAccessToken();
+  if (!token || !SUPABASE_URL) throw new Error('AUTH_REQUIRED');
+
+  const response = await fetch(SUPABASE_URL + '/functions/v1/nexus-ai-chat', {
+    method: 'POST',
+    headers: {
+      apikey: token,
+      Authorization: 'Bearer ' + token,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
     },
+    body: JSON.stringify({
+      provider,
+      message: input.message,
+      history: (input.history ?? []).slice(-20),
+    }),
   });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw parseProviderError(response.status, payload);
   const text = readText(payload);
-  return text ? { text, provider } : null;
+  return text ? { text, provider, model: payload?.model } : null;
 }
 
 async function askOwnOpenAiKey(input: { message: string; history?: Array<{ role: 'user' | 'assistant'; text: string }> }, key: string): Promise<ProviderResult | null> {
   const messages = (input.history ?? []).map((item) => ({ role: item.role, content: item.text }));
   messages.push({ role: 'user', content: input.message });
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ model: 'gpt-4.1-mini', messages, temperature: 0.4, max_tokens: 900 }),
+    body: JSON.stringify({ model: 'gpt-5.6-luna', input: messages.map((item) => ({ role: item.role, content: [{ type: 'input_text', text: item.content }] })), max_output_tokens: 900 }),
   });
   const payload = await response.json();
   if (!response.ok) throw new Error(String(payload?.error?.message ?? 'OPENAI_REQUEST_FAILED'));
   const text = readText(payload);
-  return text ? { text, provider: 'openai' } : null;
+  return text ? { text, provider: 'openai', model: payload?.model } : null;
 }
 
 async function askOwnAnthropicKey(input: { message: string; history?: Array<{ role: 'user' | 'assistant'; text: string }> }, key: string): Promise<ProviderResult | null> {
-  const system = 'You are Nexus Assistant. Answer clearly and helpfully.';
-  const messages = (input.history ?? []).filter((item) => item.role === 'user' || item.role === 'assistant').map((item) => ({ role: item.role, content: item.text }));
+  const messages = (input.history ?? []).map((item) => ({ role: item.role, content: item.text }));
   messages.push({ role: 'user', content: input.message });
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -94,56 +82,12 @@ async function askOwnAnthropicKey(input: { message: string; history?: Array<{ ro
       'content-type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify({ model: 'claude-3-5-haiku-latest', max_tokens: 900, temperature: 0.4, system, messages }),
+    body: JSON.stringify({ model: 'claude-3-7-sonnet-latest', max_tokens: 900, temperature: 0.4, system: 'You are Nexus Assistant. Answer clearly and helpfully.', messages }),
   });
   const payload = await response.json();
   if (!response.ok) throw new Error(String(payload?.error?.message ?? 'ANTHROPIC_REQUEST_FAILED'));
-  const text = Array.isArray(payload?.content) ? payload.content.map((item: any) => item?.text).filter(Boolean).join('') : null;
-  return text ? { text, provider: 'anthropic' } : null;
-}
-
-async function hasPremiumAccess(): Promise<boolean> {
-  const token = await getSupabaseAccessToken();
-  if (!token || !SUPABASE_URL) return false;
-  try {
-    const response = await fetch(SUPABASE_URL + '/rest/v1/rpc/get_my_premium_entitlement', {
-      method: 'POST',
-      headers: { apikey: token, Authorization: 'Bearer ' + token, 'content-type': 'application/json', Accept: 'application/json' },
-      body: '{}',
-    });
-    if (!response.ok) return false;
-    const payload = await response.json();
-    const row = Array.isArray(payload) ? payload[0] : payload;
-    return Number(row?.tierLevel ?? 1) >= 2 && String(row?.status ?? '').toUpperCase() === 'ACTIVE';
-  } catch {
-    return false;
-  }
-}
-
-async function askSelectedPremiumOrOwnKey(provider: 'openai' | 'anthropic', input: { message: string; history?: Array<{ role: 'user' | 'assistant'; text: string }> }): Promise<ProviderResult | null> {
-  const personalKey = await getCustomProviderApiKey(provider);
-  if (personalKey) {
-    return provider === 'openai' ? askOwnOpenAiKey(input, personalKey) : askOwnAnthropicKey(input, personalKey);
-  }
-  if (!await hasPremiumAccess()) throw new Error('PREMIUM_MODEL_REQUIRED_' + provider.toUpperCase());
-  if (provider === 'openai') {
-    return askGatewayProvider('openai', input);
-  }
-  // Anthropic is kept behind the same authenticated model gateway when Premium.
-  const endpoints = await discoverGatewayEndpoints();
-  const endpoint = endpoints.find((item) => {
-    const h = `${item.id} ${item.path} ${item.feature ?? ''} ${item.description ?? ''}`.toLowerCase();
-    return h.includes('anthropic') || h.includes('claude');
-  });
-  if (!endpoint) throw new Error('ANTHROPIC_GATEWAY_NOT_CONFIGURED');
-  const messages = (input.history ?? []).map((item) => ({ role: item.role, content: item.text }));
-  messages.push({ role: 'user', content: input.message });
-  const payload = await callGateway<any>(endpoint.path, {
-    method: endpoint.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
-    body: { model: endpoint.id || undefined, messages, input: input.message, max_tokens: 900, temperature: 0.4 },
-  });
   const text = readText(payload);
-  return text ? { text, provider: 'anthropic' } : null;
+  return text ? { text, provider: 'anthropic', model: payload?.model } : null;
 }
 
 export async function askCloudWithFallback(input: {
@@ -151,15 +95,22 @@ export async function askCloudWithFallback(input: {
   history?: Array<{ role: 'user' | 'assistant'; text: string }>;
 }): Promise<ProviderResult | null> {
   const preference = await getAssistantModelPreference();
+  const selectedModel = preference.selectedModel;
 
-  if (preference.selectedModel === 'gemini') {
-    try { return await askGatewayProvider('gemini', input); } catch { return null; }
+  if (selectedModel === 'gemini') {
+    try {
+      return await callSupabaseAiFunction('gemini', input);
+    } catch {
+      return null;
+    }
   }
 
-  try {
-    return await askSelectedPremiumOrOwnKey(preference.selectedModel, input);
-  } catch (error) {
-    if (error instanceof Error && error.message.startsWith('PREMIUM_MODEL_REQUIRED_')) throw error;
-    throw error;
+  const personalKey = await getCustomProviderApiKey(selectedModel);
+  if (personalKey) {
+    return selectedModel === 'openai'
+      ? askOwnOpenAiKey(input, personalKey)
+      : askOwnAnthropicKey(input, personalKey);
   }
+
+  return callSupabaseAiFunction(selectedModel, input);
 }
