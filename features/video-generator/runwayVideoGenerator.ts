@@ -7,9 +7,18 @@ const HISTORY_FILE = `${FileSystem.documentDirectory}nexus-video-history.json`;
 
 export type VideoGenerationRequest = {
   prompt: string;
-  model?: string;
+  model?: 'gen4_turbo' | 'gen4.5';
   duration?: number;
   aspectRatio?: string;
+};
+
+export type VideoGenerationResult = {
+  videoUrl: string;
+  taskId?: string;
+  creditsCharged?: number;
+  model?: string;
+  duration?: number;
+  ratio?: string;
 };
 
 export type VideoHistoryItem = {
@@ -17,32 +26,37 @@ export type VideoHistoryItem = {
   prompt: string;
   videoUrl: string;
   createdAt: number;
+  model?: string;
+  duration?: number;
 };
 
-export async function generateRunwayVideo(request: VideoGenerationRequest) {
+export async function generateRunwayVideo(request: VideoGenerationRequest): Promise<VideoGenerationResult> {
   const token = await getSupabaseAccessToken();
   if (!token || !SUPABASE_URL) throw new Error('SIGN_IN_REQUIRED');
 
-  const response = await fetch(
-    `${SUPABASE_URL}/functions/v1/runway-video-generate`,
-    {
-      method: 'POST',
-      headers: {
-        apikey: token,
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(request),
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/runway-video-generate`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
     },
-  );
+    body: JSON.stringify(request),
+  });
 
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(typeof body?.error === 'string' ? body.error : 'VIDEO_GENERATION_FAILED');
   }
-
   if (!body?.videoUrl) throw new Error('VIDEO_URL_MISSING');
-  return String(body.videoUrl);
+
+  return {
+    videoUrl: String(body.videoUrl),
+    taskId: typeof body.taskId === 'string' ? body.taskId : undefined,
+    creditsCharged: Number.isFinite(Number(body.creditsCharged)) ? Number(body.creditsCharged) : undefined,
+    model: typeof body.model === 'string' ? body.model : undefined,
+    duration: Number.isFinite(Number(body.duration)) ? Number(body.duration) : undefined,
+    ratio: typeof body.ratio === 'string' ? body.ratio : undefined,
+  };
 }
 
 async function readHistory(): Promise<VideoHistoryItem[]> {
@@ -66,13 +80,18 @@ async function writeHistory(items: VideoHistoryItem[]) {
   );
 }
 
-export async function saveVideoHistory(prompt: string, videoUrl: string) {
+export async function saveVideoHistory(
+  prompt: string,
+  videoUrl: string,
+  metadata: Pick<VideoHistoryItem, 'model' | 'duration'> = {},
+) {
   const items = await readHistory();
   items.unshift({
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     prompt,
     videoUrl,
     createdAt: Date.now(),
+    ...metadata,
   });
   await writeHistory(items);
 }
