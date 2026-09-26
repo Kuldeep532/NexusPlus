@@ -28,7 +28,7 @@ const OUTPUT_DIR = new Directory(Paths.cache, 'nexus-elevenlabs');
 OUTPUT_DIR.create({ intermediates: true, idempotent: true });
 
 function assertConfigured() {
-  if (!SUPABASE_URL) throw new Error('SUPABASE_NOT_CONFIGURED');
+  if (!SUPABASE_URL) throw new Error('SETUP_REQUIRED');
 }
 
 async function request<T extends TtsApiResponse>(body: Record<string, unknown>): Promise<T> {
@@ -70,7 +70,7 @@ async function request<T extends TtsApiResponse>(body: Record<string, unknown>):
   }
   assertConfigured();
   const token = await getSupabaseAccessToken();
-  if (!token) throw new Error('AUTH_REQUIRED');
+  if (!token) throw new Error('SIGN_IN_REQUIRED');
   const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
     method: 'POST',
     headers: {
@@ -83,7 +83,7 @@ async function request<T extends TtsApiResponse>(body: Record<string, unknown>):
   });
   const payload = await response.json().catch(() => ({} as T));
   if (!response.ok) {
-    const code = String((payload as T).error ?? `ELEVENLABS_REQUEST_${response.status}`);
+    const code = String((payload as T).error ?? `ElevenLabs request could not be completed (${response.status}).`);
     if (response.status === 402 || code === 'INSUFFICIENT_CREDITS') throw new Error('INSUFFICIENT_CREDITS');
     throw new Error(code);
   }
