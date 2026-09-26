@@ -22,6 +22,9 @@ import type { Stage6VoiceBridge, VoiceInputState } from '@/features/nexus-assist
 import { routeAssistantRequest } from '@/features/nexus-assistant/stage9AssistantRouter';
 import { getResolvedAssistantContext } from '@/features/nexus-assistant/assistantContextService';
 import { getAssetStatus } from '@/features/nexus-assistant/stage8AssetManager';
+import { MusicAppsPanel } from '@/features/nexus-assistant/musicApps';
+import { executeNativeMusicIntent, parseMusicIntent } from '@/features/nexus-assistant/musicIntent';
+import { usePersistentMedia } from '@/media-player/PersistentMediaController';
 
 const SESSION_ID = 'default';
 const CALCULATOR_SYSTEM_CONTRACT = 'For calculator requests, identify the module first; give an exact deterministic answer when calculator context contains one; then provide smart analysis as a compact table-like set of rows covering inflation, available live market context and what-if scenarios; finish with exactly two practical suggestions. Never invent live rates, salaries, prices or market trends. State when data is cached or unavailable.';
@@ -60,12 +63,14 @@ export default function NexusAssistantScreen() {
   const [showTools, setShowTools] = useState(false);
   const [generatedResult, setGeneratedResult] = useState<{ title: string; message: string } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [selectedMusicPackage, setSelectedMusicPackage] = useState<string | undefined>();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyEnabled, setHistoryEnabledState] = useState(true);
   const [sessionList, setSessionList] = useState<Array<{ id: string; title: string; createdAt: number; messageCount: number }>>([]);
   const toolCatalog = useMemo(() => getAssistantToolCatalog(), []);
   const pinnedTools = useMemo(() => toolCatalog.filter((tool) => ['file','qr-code','pdf-lock','pdf-unlock','pdf-compress'].includes(tool.id) || /PDF|File|QR/i.test(tool.title)).slice(0, 10), [toolCatalog]);
   const hasText = input.trim().length > 0;
+  const persistentMedia = usePersistentMedia();
 
   useEffect(() => {
     const created = createStage7VoiceBridge(
@@ -168,6 +173,8 @@ export default function NexusAssistantScreen() {
     }
     if (!text || busy) return;
 
+    const musicIntent = parseMusicIntent(text);
+    if (musicIntent) musicIntent.appPackage = selectedMusicPackage;
     const pdfCommand = parseAssistantPdfCommand(text);
     const identity = answerNexusIdentityQuestion(text);
 
@@ -206,6 +213,17 @@ export default function NexusAssistantScreen() {
           await speakResponseForMode(result.message, fromLiveMode);
           return;
         }
+      }
+
+      if (musicIntent) {
+        const handled = await executeNativeMusicIntent(musicIntent);
+        const musicMessage = handled
+          ? musicIntent.action === 'play' ? 'Music playback command sent.' : 'Music control sent.'
+          : 'This music app does not accept the requested Android music command.';
+        await addMessage(SESSION_ID, 'assistant', musicMessage);
+        await refreshMessages();
+        setStatus(musicMessage);
+        return;
       }
 
       const proposal = planCapability(text);
@@ -522,6 +540,8 @@ export default function NexusAssistantScreen() {
 }
 
 const styles = StyleSheet.create({
+  backgroundMusicCard: { marginHorizontal: 12, marginBottom: 8, borderWidth: 1, borderRadius: 16, padding: 12, flexDirection: 'row', alignItems: 'center' },
+  backgroundMusicCopy: { flex: 1 }, musicTitle: { fontSize: 15, fontWeight: '800', marginTop: 3 }, musicArtist: { fontSize: 12, marginTop: 2 }, musicActions: { flexDirection: 'row', gap: 4 }, iconButton: { minWidth: 42, minHeight: 42, alignItems: 'center', justifyContent: 'center' },
   root: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
