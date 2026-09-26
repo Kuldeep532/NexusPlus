@@ -6,7 +6,7 @@ export type AssistantModelPreference = {
   selectedModel: AssistantModelId;
 };
 
-const KEY = 'nexus-plus.assistant.model-preference.v1';
+const KEY = 'nexus-plus.assistant.model-preference.v2';
 
 export async function getAssistantModelPreference(): Promise<AssistantModelPreference> {
   try {
