@@ -27,17 +27,16 @@ class NexusReactApplication : Application(), ReactApplication {
                     add(NexusDocumentReaderPackage())
                     add(NexusMediaPackage())
                     add(NexusMusicPackage())
+                    add(NexusContactsCallPackage())
                     add(NexusFileUriPackage())
                     add(NexusCctvDiscoveryPackage())
                     add(NexusCctvOnvifPackage())
                     add(NexusPdfNativePackage())
                     add(NexusVisionAssistPackage())
-                    // Remote control is intentionally retained.
                     add(NexusRemotePackage())
                     add(NexusRemoteDiscoveryPackage())
                     add(NexusTvCastPackage())
                     add(NexusTvRemotePackage())
-                    // Translation is retained because it is an exposed app capability.
                     add(NexusTranslationPackage())
                 }
 
@@ -53,15 +52,11 @@ class NexusReactApplication : Application(), ReactApplication {
     override fun onCreate() {
         super.onCreate()
         SoLoader.init(this, OpenSourceMergedSoMapping)
-        runCatching {
-            ApplicationLifecycleDispatcher.onApplicationCreate(this)
-        }
+        runCatching { ApplicationLifecycleDispatcher.onApplicationCreate(this) }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        runCatching {
-            ApplicationLifecycleDispatcher.onConfigurationChanged(this, newConfig)
-        }
+        runCatching { ApplicationLifecycleDispatcher.onConfigurationChanged(this, newConfig) }
     }
 }
