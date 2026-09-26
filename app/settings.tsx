@@ -12,6 +12,7 @@ import { readSpiritualReminderPreferences, writeSpiritualReminderPreferences, sc
 import { listInstalledMusicApps, readSelectedMusicApp, selectMusicApp, type InstalledMusicApp } from '@/features/nexus-assistant/musicIntent';
 import { getVoiceCommandsEnabled, setVoiceCommandsEnabled } from '@/features/nexus-assistant/voiceCommandSettings';
 import { getAssistantModelPreference, setAssistantModelPreference, type AssistantModelId } from '@/features/nexus-assistant/aiModelPreferences';
+import { readTtsVoicePreferences } from '@/features/audio-editor/ttsPreferences';
 
 
 const SETTINGS = [
@@ -49,7 +50,8 @@ export default function SettingsScreen(){
  const [launchPrefs,setLaunchPrefs]=useState<Awaited<ReturnType<typeof readLaunchPreferences>>>({launchTarget:'nexus-plus',homeDestination:'nexus-home',showGeetaNexusOnHome:true});
  const [voiceCommandsEnabled,setVoiceCommandsEnabledState]=useState(true);
  const [assistantModel,setAssistantModel]=useState<AssistantModelId>('gemini');
- useEffect(()=>{void Promise.all([readLaunchPreferences(),readThemeColor(),loadPasswordManagerPreferences(),readGreetingPreferences(),readSpiritualReminderPreferences(),readSelectedMusicApp(),listInstalledMusicApps(),getVoiceCommandsEnabled(),getAssistantModelPreference()]).then(([launch,theme,prefs,greeting,spiritual,music,apps,voice,model])=>{setLaunchPrefs(launch);setThemeColor(theme);setPasswordPrefs(prefs);setGreetingMode(greeting.mode);setSpiritualPrefs(spiritual);setSelectedMusicApp(music);setMusicApps(apps);setVoiceCommandsEnabledState(Boolean(voice));setAssistantModel(model.selectedModel);});},[]);
+ const [voicePreferenceLabel,setVoicePreferenceLabel]=useState('Local TTS');
+ useEffect(()=>{void Promise.all([readLaunchPreferences(),readThemeColor(),loadPasswordManagerPreferences(),readGreetingPreferences(),readSpiritualReminderPreferences(),readSelectedMusicApp(),listInstalledMusicApps(),getVoiceCommandsEnabled(),getAssistantModelPreference(),readTtsVoicePreferences()]).then(([launch,theme,prefs,greeting,spiritual,music,apps,voice,model,tts])=>{setLaunchPrefs(launch);setThemeColor(theme);setPasswordPrefs(prefs);setGreetingMode(greeting.mode);setSpiritualPrefs(spiritual);setSelectedMusicApp(music);setMusicApps(apps);setVoiceCommandsEnabledState(Boolean(voice));setAssistantModel(model.selectedModel);setVoicePreferenceLabel(tts.provider==='elevenlabs'?'ElevenLabs • '+(tts.voiceName||'Voice not selected'):tts.provider==='piper'?'Nexus Piper • '+(tts.voiceName||'Local voice'):tts.provider==='clone'?'Nexus Clone • '+(tts.voiceName||'Local voice'):'Local TTS • Device voice');});},[]);
  const updateLaunchPrefs=(next: typeof launchPrefs)=>{setLaunchPrefs(next);void writeLaunchPreferences(next);};
  const updateThemeColor=async(theme:ThemeColor)=>{setThemeColor(theme);refreshThemeColor(theme);await writeThemeColor(theme);};
  const updatePasswordPrefs=(next:PasswordManagerPreferences)=>{setPasswordPrefs(next);void savePasswordManagerPreferences(next);};
@@ -118,7 +120,7 @@ export default function SettingsScreen(){
     </Pressable>
     <Pressable accessibilityRole="button" onPress={()=>router.push('/reminders' as never)} style={[styles.item,{marginTop:10,borderColor:colors.border,backgroundColor:colors.card}]}>
       <View style={[styles.icon,{backgroundColor:colors.secondary}]}><Feather name="bell" size={19} color={colors.primary}/></View>
-      <View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>Voice Reminder</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>Manage spoken reminder language and downloaded voice preferences.</Text></View>
+      <View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>Voice Reminder</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>Manage spoken reminder language and the selected voice. Current: {voicePreferenceLabel}.</Text></View>
       <Feather name="chevron-right" size={19} color={colors.mutedForeground}/>
     </Pressable>
    </View>
