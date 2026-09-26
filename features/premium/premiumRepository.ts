@@ -14,11 +14,11 @@ async function request<T>(path: string, options?: RequestInit, requireAuth = tru
 }
 async function rpc<T>(name:string, body:Record<string,unknown>):Promise<T>{ return request<T>('/rest/v1/rpc/'+name,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}); }
 
-type PlanRow={plan_id:number;plan_code:string;plan_name:string;tier_level:number;description:string|null;price_inr:number|string;duration_days:number;blocks_ads:boolean;unlocks_premium_features:boolean;};
-export type PremiumCatalogPlan=PremiumPlan&{code:string;tierLevel:number;durationDays:number;blocksAds:boolean;unlocksPremiumFeatures:boolean;description:string;};
+type PlanRow={plan_id:number;plan_code:string;plan_name:string;tier_level:number;description:string|null;price_inr:number|string;duration_days:number;blocks_ads:boolean;unlocks_premium_features:boolean;included_credits?:number;};
+export type PremiumCatalogPlan=PremiumPlan&{code:string;tierLevel:number;durationDays:number;blocksAds:boolean;unlocksPremiumFeatures:boolean;description:string;includedCredits:number;};
 export async function getActivePremiumPlans():Promise<PremiumCatalogPlan[]>{
- const rows=await request<PlanRow[]>('/rest/v1/subscription_plans?select=plan_id,plan_code,plan_name,tier_level,description,price_inr,duration_days,blocks_ads,unlocks_premium_features&is_active=eq.true&order=tier_level.asc,duration_days.asc',undefined,false);
- return rows.map(r=>({id:String(r.plan_id),name:r.plan_name,amount:Number(r.price_inr),code:r.plan_code,tierLevel:r.tier_level,durationDays:r.duration_days,blocksAds:r.blocks_ads,unlocksPremiumFeatures:r.unlocks_premium_features,description:r.description??''}));
+ const rows=await request<PlanRow[]>('/rest/v1/subscription_plans?select=plan_id,plan_code,plan_name,tier_level,description,price_inr,duration_days,blocks_ads,unlocks_premium_features,included_credits&is_active=eq.true&order=tier_level.asc,duration_days.asc',undefined,false);
+ return rows.map(r=>({id:String(r.plan_id),name:r.plan_name,amount:Number(r.price_inr),code:r.plan_code,tierLevel:r.tier_level,durationDays:r.duration_days,blocksAds:r.blocks_ads,unlocksPremiumFeatures:r.unlocks_premium_features,description:r.description??'',includedCredits:Number(r.included_credits??0)}));
 }
 export type PremiumEntitlement={status:string|null;planCode:string|null;planName:string|null;tierLevel:number;expiresAt:string|null;blocksAds:boolean;unlocksPremiumFeatures:boolean;productScope:'nexus_plus';};
 export async function getMyPremiumEntitlement():Promise<PremiumEntitlement>{const rows=await rpc<PremiumEntitlement[]>('get_my_premium_entitlement',{});return Array.isArray(rows)?(rows[0]??{status:null,planCode:null,planName:null,tierLevel:1,expiresAt:null,blocksAds:false,unlocksPremiumFeatures:false,productScope:'nexus_plus'}):rows;}
@@ -34,3 +34,5 @@ export async function getPremiumFeatureCatalog():Promise<PremiumFeatureCatalogRo
 export async function adminSetPremiumFeature(input:Omit<PremiumFeatureCatalogRow,'feature_name'>){return rpc('admin_set_premium_feature',{p_feature_code:input.feature_code,p_access_type:input.access_type,p_min_tier:input.min_tier,p_credit_cost:input.credit_cost,p_is_active:input.is_active,p_description:input.description??null});}
 export async function adminListPendingOrders(){return rpc<Array<{order_id:string;user_id:string;product_type:string;plan_code:string;amount_inr:number|string;upi_id:string;status:string;payment_reference:string|null;created_at:string}>>('admin_list_pending_orders',{});}
 export async function adminVerifyPayment(orderId:string,approved:boolean,reference?:string){return rpc('admin_verify_payment',{p_order_id:orderId,p_approved:approved,p_payment_reference:reference??null});}
+
+export async function canPurchaseCreditTopup():Promise<boolean>{return rpc<boolean>('can_purchase_credit_topup',{});}
