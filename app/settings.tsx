@@ -11,6 +11,7 @@ import { readGreetingPreferences, writeGreetingPreferences, type GreetingMode } 
 import { readSpiritualReminderPreferences, writeSpiritualReminderPreferences, scheduleSpiritualReminders, cancelSpiritualReminders, type SpiritualReminderPreferences } from '@/features/spiritual/spiritualReminder';
 import { listInstalledMusicApps, readSelectedMusicApp, selectMusicApp, type InstalledMusicApp } from '@/features/nexus-assistant/musicIntent';
 import { getVoiceCommandsEnabled, setVoiceCommandsEnabled } from '@/features/nexus-assistant/voiceCommandSettings';
+import { getAssistantModelPreference, setAssistantModelPreference, type AssistantModelId } from '@/features/nexus-assistant/aiModelPreferences';
 
 
 const SETTINGS = [
@@ -47,7 +48,8 @@ export default function SettingsScreen(){
  const [musicApps,setMusicApps]=useState<InstalledMusicApp[]>([]);
  const [launchPrefs,setLaunchPrefs]=useState<Awaited<ReturnType<typeof readLaunchPreferences>>>({launchTarget:'nexus-plus',homeDestination:'nexus-home',showGeetaNexusOnHome:true});
  const [voiceCommandsEnabled,setVoiceCommandsEnabledState]=useState(true);
- useEffect(()=>{void Promise.all([readLaunchPreferences(),readThemeColor(),loadPasswordManagerPreferences(),readGreetingPreferences(),readSpiritualReminderPreferences(),readSelectedMusicApp(),listInstalledMusicApps(),getVoiceCommandsEnabled()]).then(([launch,theme,prefs,greeting,spiritual,music,apps,voice])=>{setLaunchPrefs(launch);setThemeColor(theme);setPasswordPrefs(prefs);setGreetingMode(greeting.mode);setSpiritualPrefs(spiritual);setSelectedMusicApp(music);setMusicApps(apps);setVoiceCommandsEnabledState(Boolean(voice));});},[]);
+ const [assistantModel,setAssistantModel]=useState<AssistantModelId>('gemini');
+ useEffect(()=>{void Promise.all([readLaunchPreferences(),readThemeColor(),loadPasswordManagerPreferences(),readGreetingPreferences(),readSpiritualReminderPreferences(),readSelectedMusicApp(),listInstalledMusicApps(),getVoiceCommandsEnabled(),getAssistantModelPreference()]).then(([launch,theme,prefs,greeting,spiritual,music,apps,voice,model])=>{setLaunchPrefs(launch);setThemeColor(theme);setPasswordPrefs(prefs);setGreetingMode(greeting.mode);setSpiritualPrefs(spiritual);setSelectedMusicApp(music);setMusicApps(apps);setVoiceCommandsEnabledState(Boolean(voice));setAssistantModel(model.selectedModel);});},[]);
  const updateLaunchPrefs=(next: typeof launchPrefs)=>{setLaunchPrefs(next);void writeLaunchPreferences(next);};
  const updateThemeColor=async(theme:ThemeColor)=>{setThemeColor(theme);refreshThemeColor(theme);await writeThemeColor(theme);};
  const updatePasswordPrefs=(next:PasswordManagerPreferences)=>{setPasswordPrefs(next);void savePasswordManagerPreferences(next);};
