@@ -24,6 +24,7 @@ function buildPrompt(language: string, mode: AudioDescriptionMode, customInstruc
   else parts.push('Keep the narration concise and focus on the most important scenes and actions. Return one clean narration script.');
   if (customInstruction?.trim()) parts.push('Additional user instruction: ' + customInstruction.trim());
   return parts.join(' ');
+  await callGateway('/ai/credits/consume', { method: 'POST', body: { featureCode: input.mode === 'advanced' ? 'audio_description_advanced' : 'audio_description_basic', mode: input.mode, durationSeconds: input.durationSeconds } });
 }
 
 export async function createAudioDescription(input: AudioDescriptionRequest): Promise<AudioDescriptionResult> {
