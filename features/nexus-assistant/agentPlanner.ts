@@ -88,7 +88,7 @@ export function planCapability(request: string): CapabilityProposal | null {
         ...(natural.delayMinutes !== undefined ? { delayMinutes: String(natural.delayMinutes) } : {}),
         message: natural.text ?? 'Nexus Assistant reminder',
       },
-      'ElizaOS capability semantics matched a natural-language reminder and extracted its time/message slots.',
+      'ElizaOS action semantics matched a natural-language reminder and extracted its time/message slots.',
     );
   }
 
