@@ -6,6 +6,7 @@ import {
 import { parseAssistantPdfCommand } from './pdfAssistantCommands';
 import { searchAssistantTools } from './assistantToolAdapter';
 import { parseMusicIntent } from './musicIntent';
+import { parseNaturalCommand } from './naturalCommandParser';
 
 export type CapabilityProposal = {
   capability: AssistantCapability;
@@ -97,6 +98,34 @@ export function planCapability(request: string): CapabilityProposal | null {
 
   const text = request.trim();
   if (!text) return null;
+
+  const natural = parseNaturalCommand(text);
+  if (natural.kind === 'reminder') {
+    const capability = getAssistantCapability('create-reminder');
+    if (capability) {
+      return {
+        capability,
+        args: {
+          ...(natural.hour !== undefined ? { hour: String(natural.hour), minute: String(natural.minute ?? 0) } : {}),
+          ...(natural.delayMinutes !== undefined ? { delayMinutes: String(natural.delayMinutes) } : {}),
+          message: natural.text ?? 'Nexus Assistant reminder',
+        },
+        requiresConfirmation: requiresCapabilityConfirmation('create-reminder'),
+        reason: 'Natural-language reminder request parsed into time and reminder text.',
+      };
+    }
+  }
+  if (natural.kind === 'alarm') {
+    const capability = getAssistantCapability('set-alarm');
+    if (capability && natural.hour !== undefined) {
+      return {
+        capability,
+        args: { hour: String(natural.hour), minute: String(natural.minute ?? 0) },
+        requiresConfirmation: requiresCapabilityConfirmation('set-alarm'),
+        reason: 'Natural-language alarm request parsed into a clock time.',
+      };
+    }
+  }
 
   const music = parseMusicIntent(text);
   if (music) {
