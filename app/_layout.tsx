@@ -13,7 +13,7 @@ import { startAssistantBootstrap } from '@/features/nexus-assistant/assistantBoo
 import { refreshNexusFeatureFlags } from '@/features/remote-config/featureFlags';
 import { readSpiritualReminderPreferences, scheduleSpiritualReminders } from '@/features/spiritual/spiritualReminder';
 import { readLaunchPreferences } from '@/features/app-shell/launchPreferences';
-import { requestDeviceIntegrityToken } from '@/features/security/deviceSecurityGate';
+import { requestDeviceIntegrityToken, submitIntegrityToken } from '@/features/security/deviceSecurityGate';
 import DebugErrorBoundary from '../DebugErrorBoundary';
 
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -37,7 +37,13 @@ function RootLayoutContent() {
 
   useEffect(() => {
     if (auth.loading || !auth.session) return;
-    void requestDeviceIntegrityToken('nexus-plus-startup').catch(() => null);
+    const requestHash = 'nexus-plus-startup';
+    void requestDeviceIntegrityToken(requestHash)
+      .then((token) => {
+        if (!token) return null;
+        return submitIntegrityToken(token, requestHash);
+      })
+      .catch(() => undefined);
   }, [auth.loading, auth.session]);
 
   useEffect(() => {
