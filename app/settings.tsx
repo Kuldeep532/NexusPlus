@@ -10,6 +10,7 @@ import { loadPasswordManagerPreferences, savePasswordManagerPreferences, type Pa
 import { readGreetingPreferences, writeGreetingPreferences, type GreetingMode } from '@/features/app-shell/greetingPreferences';
 import { readSpiritualReminderPreferences, writeSpiritualReminderPreferences, scheduleSpiritualReminders, cancelSpiritualReminders, type SpiritualReminderPreferences } from '@/features/spiritual/spiritualReminder';
 import { listInstalledMusicApps, readSelectedMusicApp, selectMusicApp, type InstalledMusicApp } from '@/features/nexus-assistant/musicIntent';
+import { getVoiceCommandsEnabled, setVoiceCommandsEnabled } from '@/features/nexus-assistant/voiceCommandSettings';
 
 
 const SETTINGS = [
@@ -45,7 +46,8 @@ export default function SettingsScreen(){
  const [selectedMusicApp,setSelectedMusicApp]=useState<InstalledMusicApp|null>(null);
  const [musicApps,setMusicApps]=useState<InstalledMusicApp[]>([]);
  const [launchPrefs,setLaunchPrefs]=useState<Awaited<ReturnType<typeof readLaunchPreferences>>>({launchTarget:'nexus-plus',homeDestination:'nexus-home',showGeetaNexusOnHome:true});
- useEffect(()=>{void Promise.all([readLaunchPreferences(),readThemeColor(),loadPasswordManagerPreferences(),readGreetingPreferences(),readSpiritualReminderPreferences(),readSelectedMusicApp(),listInstalledMusicApps()]).then(([launch,theme,prefs,greeting,spiritual,music,apps])=>{setLaunchPrefs(launch);setThemeColor(theme);setPasswordPrefs(prefs);setGreetingMode(greeting.mode);setSpiritualPrefs(spiritual);setSelectedMusicApp(music);setMusicApps(apps);});},[]);
+ const [voiceCommandsEnabled,setVoiceCommandsEnabledState]=useState(true);
+ useEffect(()=>{void Promise.all([readLaunchPreferences(),readThemeColor(),loadPasswordManagerPreferences(),readGreetingPreferences(),readSpiritualReminderPreferences(),readSelectedMusicApp(),listInstalledMusicApps(),getVoiceCommandsEnabled()]).then(([launch,theme,prefs,greeting,spiritual,music,apps,voice])=>{setLaunchPrefs(launch);setThemeColor(theme);setPasswordPrefs(prefs);setGreetingMode(greeting.mode);setSpiritualPrefs(spiritual);setSelectedMusicApp(music);setMusicApps(apps);setVoiceCommandsEnabledState(Boolean(voice));});},[]);
  const updateLaunchPrefs=(next: typeof launchPrefs)=>{setLaunchPrefs(next);void writeLaunchPreferences(next);};
  const updateThemeColor=async(theme:ThemeColor)=>{setThemeColor(theme);refreshThemeColor(theme);await writeThemeColor(theme);};
  const updatePasswordPrefs=(next:PasswordManagerPreferences)=>{setPasswordPrefs(next);void savePasswordManagerPreferences(next);};
@@ -91,6 +93,19 @@ export default function SettingsScreen(){
     </View>
     <Text style={[styles.appModeNote,{color:colors.mutedForeground}]}>Nexus Spiritual mode opens the dedicated Spiritual experience first. The in-app navigation remains available for returning to Nexus Plus.</Text>
     <Pressable accessibilityRole="switch" accessibilityState={{checked:launchPrefs.showGeetaNexusOnHome}} onPress={()=>updateLaunchPrefs({...launchPrefs,showGeetaNexusOnHome:!launchPrefs.showGeetaNexusOnHome})} style={styles.modeItem}><View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>Show Geeta Access on Home</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>Keep the Geeta Access shortcut visible on the selected Home screen.</Text></View><Text style={[styles.toggle,{color:colors.primary}]}>{launchPrefs.showGeetaNexusOnHome?'On':'Off'}</Text></Pressable>
+   </View>
+   <View style={[styles.card,{backgroundColor:colors.card,borderColor:colors.border}]}>
+    <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Nexus Assistant</Text>
+    <Text style={[styles.body,{color:colors.mutedForeground}]}>Voice controls and spoken reminder settings for Nexus Assistant.</Text>
+    <Pressable accessibilityRole="switch" accessibilityState={{checked:voiceCommandsEnabled}} onPress={()=>{const next=!voiceCommandsEnabled;setVoiceCommandsEnabledState(next);void setVoiceCommandsEnabled(next);}} style={styles.modeItem}>
+      <View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>Voice Assistant Commands</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>Allow Nexus Assistant to listen for explicit voice commands while you use the voice control.</Text></View>
+      <Text style={[styles.toggle,{color:colors.primary}]}>{voiceCommandsEnabled?'On':'Off'}</Text>
+    </Pressable>
+    <Pressable accessibilityRole="button" onPress={()=>router.push('/reminders' as never)} style={[styles.item,{marginTop:10,borderColor:colors.border,backgroundColor:colors.card}]}>
+      <View style={[styles.icon,{backgroundColor:colors.secondary}]}><Feather name="bell" size={19} color={colors.primary}/></View>
+      <View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>Voice Reminder</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>Manage spoken reminder language and downloaded voice preferences.</Text></View>
+      <Feather name="chevron-right" size={19} color={colors.mutedForeground}/>
+    </Pressable>
    </View>
    <View style={[styles.card,{backgroundColor:colors.card,borderColor:colors.border}]}>
     <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Geeta Nexus Messages</Text>
