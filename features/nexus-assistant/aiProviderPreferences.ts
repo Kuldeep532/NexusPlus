@@ -1,28 +1,33 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import * as SecureStore from 'expo-secure-store';
 import { getAssistantModelPreference, type AssistantModelId } from './aiModelPreferences';
 
-const KEY_PREFIX = 'nexus-plus.assistant.provider-api-key.v1.';
+const KEY_PREFIX = 'nexus-plus.assistant.provider-api-key.v2.';
+const LEGACY_PREFIX = 'nexus-plus.assistant.provider-api-key.v1.';
 
 export async function getCustomProviderApiKey(provider: Exclude<AssistantModelId, 'gemini'>): Promise<string | null> {
   try {
-    const value = await AsyncStorage.getItem(KEY_PREFIX + provider);
-    return value?.trim() || null;
+    const secure = await SecureStore.getItemAsync(KEY_PREFIX + provider);
+    if (secure?.trim()) return secure.trim();
+    const legacy = await AsyncStorage.getItem(LEGACY_PREFIX + provider);
+    if (legacy?.trim()) {
+      await SecureStore.setItemAsync(KEY_PREFIX + provider, legacy.trim());
+      await AsyncStorage.removeItem(LEGACY_PREFIX + provider);
+      return legacy.trim();
+    }
+    return null;
   } catch {
     return null;
   }
 }
 
-export async function setCustomProviderApiKey(
-  provider: Exclude<AssistantModelId, 'gemini'>,
-  key: string,
-): Promise<void> {
+export async function setCustomProviderApiKey(provider: Exclude<AssistantModelId, 'gemini'>, key: string): Promise<void> {
   const normalized = key.trim();
   if (!normalized) {
-    await AsyncStorage.removeItem(KEY_PREFIX + provider);
+    await SecureStore.deleteItemAsync(KEY_PREFIX + provider);
     return;
   }
-  await AsyncStorage.setItem(KEY_PREFIX + provider, normalized);
+  await SecureStore.setItemAsync(KEY_PREFIX + provider, normalized);
 }
 
 export async function getConfiguredAssistantModel(): Promise<AssistantModelId> {
