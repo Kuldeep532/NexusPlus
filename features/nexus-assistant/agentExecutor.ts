@@ -146,7 +146,7 @@ export async function executeCapability(
       return {
         capabilityId: proposal.capability.id,
         success: false,
-        message: 'This capability is registered but its native executor is scheduled for a later Nexus Assistant stage.',
+        message: 'This capability is registered but its Android executor is not available yet.',
       };
   }
 }
