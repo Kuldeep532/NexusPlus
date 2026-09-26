@@ -11,6 +11,7 @@ import { useColors } from '@/hooks/useColors';
 import { createEmptyDocument, generateEPaperLayout, normalizeForPreview } from '@/features/e-paper/ePaperEngine';
 import type { EPaperDocument, EPaperImageElement, EPaperTextElement } from '@/features/e-paper/ePaperTypes';
 import { getMyPremiumEntitlement, type PremiumEntitlement } from '@/features/premium/premiumRepository';
+import { runEPaperAi, type EPaperAiAction } from '@/features/e-paper/ePaperAiService';
 
 type Asset = { uri: string; name: string };
 function isTextElement(element: EPaperDocument['pages'][number]['elements'][number]): element is EPaperTextElement { return element.type === 'headline' || element.type === 'subheadline' || element.type === 'body' || element.type === 'caption' || element.type === 'quote'; }
@@ -23,6 +24,33 @@ export default function EPaperGeneratorScreen() {
   const isPremium = Boolean(entitlement?.unlocksPremiumFeatures && entitlement.tierLevel > 1 && (!entitlement.expiresAt || new Date(entitlement.expiresAt).getTime() > Date.now()));
   const requirePremium = () => { if (isPremium) return true; Alert.alert('Premium feature', 'Advanced AI tools are available with Nexus Plus Premium.', [{ text: 'Not now', style: 'cancel' }, { text: 'View Premium', onPress: () => router.push('/buy-premium') }]); return false; };
   useEffect(() => { void getMyPremiumEntitlement().then(setEntitlement).catch(() => setEntitlement(null)).finally(() => setPremiumLoading(false)); }, []);
+  async function runAi(action: EPaperAiAction) {
+    const text = body.trim();
+    if (!text || text === INITIAL_BODY) {
+      setStatus('Add your article or paper content first.');
+      return;
+    }
+    const premiumAction = action === 'advanced-rewrite' || action === 'headline-polish' || action === 'exam-paper' || action === 'news-edition';
+    if (premiumAction && !isPremium) {
+      requirePremium();
+      return;
+    }
+    setBusy(true);
+    setStatus('Preparing your AI result…');
+    try {
+      const result = await runEPaperAi({
+        action,
+        text,
+        language: /[\\u0900-\\u097F]/.test(text) ? 'hi' : 'en',
+      });
+      setBody(result);
+      setStatus('AI result is ready. Review it before publishing.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'AI could not complete this request.');
+    } finally {
+      setBusy(false);
+    }
+  }
   async function addAssets() { try { const picked = await DocumentPicker.getDocumentAsync({ type: ['image/*', 'text/*'], multiple: true, copyToCacheDirectory: true }); if (picked.canceled || !picked.assets?.length) return; const next = picked.assets.map((asset) => ({ uri: asset.uri, name: asset.name || 'asset' })); setAssets((value) => [...value, ...next]); setStatus(`${next.length} asset${next.length === 1 ? '' : 's'} added.`); } catch { setStatus('Could not add those files.'); } }
   function generate() { const imageAssets = assets.filter((asset) => /\.(png|jpe?g|webp|gif)$/i.test(asset.name)); const generatedSections = [{ heading: 'Top Story', body: body.trim() || INITIAL_BODY, image: imageAssets[0] ? makeImageElement(imageAssets[0], 0) : undefined }, ...sections, ...imageAssets.slice(1).map((asset, index) => ({ heading: asset.name.replace(/\.[^.]+$/, ''), body: 'Image story', image: makeImageElement(asset, index + 1) }))]; const generated = generateEPaperLayout({ ...doc, title: title.trim() || 'My E-Paper', publisher: publisher.trim() || 'Nexus Plus' }, { title: title.trim() || 'My E-Paper', intro: intro.trim(), sections: generatedSections }); setDoc(generated); setStatus(`Generated ${generated.pages.length} page${generated.pages.length === 1 ? '' : 's'} successfully.`); setOutputUri(null); }
   function updateDoc<K extends keyof EPaperDocument>(key: K, value: EPaperDocument[K]) { setDoc((current) => ({ ...current, [key]: value })); }
@@ -79,27 +107,27 @@ export default function EPaperGeneratorScreen() {
               </View>
             </View>
             <View style={styles.aiGrid}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Basic AI summarize" onPress={() => setStatus('Basic AI summary is available for free. Open Nexus Assistant to summarize this article.')} style={[styles.aiButton, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Basic AI summarize" onPress={() => void runAi('summarize')} style={[styles.aiButton, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Feather name="file-text" size={17} color={colors.primary} />
                 <View style={styles.aiCopy}><Text style={[styles.aiTitle, { color: colors.foreground }]}>Basic Summary</Text><Text style={[styles.aiMeta, { color: colors.mutedForeground }]}>Free</Text></View>
               </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Basic text improvement" onPress={() => setStatus('Basic text improvement is available for free. Open Nexus Assistant to improve your wording.')} style={[styles.aiButton, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Basic text improvement" onPress={() => void runAi('improve')} style={[styles.aiButton, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Feather name="edit-3" size={17} color={colors.primary} />
                 <View style={styles.aiCopy}><Text style={[styles.aiTitle, { color: colors.foreground }]}>Basic Text Improvement</Text><Text style={[styles.aiMeta, { color: colors.mutedForeground }]}>Free</Text></View>
               </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Advanced e-paper rewrite" onPress={() => { if (requirePremium()) setStatus('Advanced rewrite is ready for your e-paper workflow.'); }} style={[styles.aiButton, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Advanced e-paper rewrite" onPress={() => void runAi('advanced-rewrite')} style={[styles.aiButton, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <MaterialCommunityIcons name="star-four-points-outline" size={18} color={colors.primary} />
                 <View style={styles.aiCopy}><Text style={[styles.aiTitle, { color: colors.foreground }]}>Advanced Rewrite</Text><Text style={[styles.aiMeta, { color: colors.mutedForeground }]}>Premium</Text></View>
               </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Advanced headline and article polish" onPress={() => { if (requirePremium()) setStatus('Advanced headline and article polish is ready.'); }} style={[styles.aiButton, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Advanced headline and article polish" onPress={() => void runAi('headline-polish')} style={[styles.aiButton, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <MaterialCommunityIcons name="auto-fix" size={18} color={colors.primary} />
                 <View style={styles.aiCopy}><Text style={[styles.aiTitle, { color: colors.foreground }]}>Headline & Article Polish</Text><Text style={[styles.aiMeta, { color: colors.mutedForeground }]}>Premium</Text></View>
               </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Advanced exam paper generation" onPress={() => { if (requirePremium()) setStatus('Advanced exam-paper generation is ready.'); }} style={[styles.aiButton, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Advanced exam paper generation" onPress={() => void runAi('exam-paper')} style={[styles.aiButton, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <MaterialCommunityIcons name="school-outline" size={18} color={colors.primary} />
                 <View style={styles.aiCopy}><Text style={[styles.aiTitle, { color: colors.foreground }]}>Exam Paper Assistant</Text><Text style={[styles.aiMeta, { color: colors.mutedForeground }]}>Premium</Text></View>
               </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Advanced news edition generation" onPress={() => { if (requirePremium()) setStatus('Advanced news-edition generation is ready.'); }} style={[styles.aiButton, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Advanced news edition generation" onPress={() => void runAi('news-edition')} style={[styles.aiButton, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <MaterialCommunityIcons name="newspaper-variant-outline" size={18} color={colors.primary} />
                 <View style={styles.aiCopy}><Text style={[styles.aiTitle, { color: colors.foreground }]}>News Edition Builder</Text><Text style={[styles.aiMeta, { color: colors.mutedForeground }]}>Premium</Text></View>
               </Pressable>
