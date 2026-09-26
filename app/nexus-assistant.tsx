@@ -448,9 +448,9 @@ export default function NexusAssistantScreen() {
 
     <View style={[styles.settingsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <Text style={[styles.statusTitle, { color: colors.foreground }]}>Assistant Settings</Text>
-      <Text style={[styles.note, { color: colors.mutedForeground }]}>Choose the model directly inside Nexus Assistant. Gemini is free; OpenAI and Claude use Premium access or your own API key.</Text>
+      <Text style={[styles.note, { color: colors.mutedForeground }]}>Choose the model directly inside Nexus Assistant. Cloud AI models use Nexus credits; local Nexus Core AI remains on-device.</Text>
       <View style={styles.modelPickerRow}>
-        {([['gemini','Gemini','Free'],['openai','OpenAI','Premium'],['anthropic','Claude','Premium']] as const).map(([value,title,badge]) => (
+        {([['gemini','Gemini','1 credit'],['openai','OpenAI','4 credits'],['anthropic','Claude','6 credits']] as const).map(([value,title,badge]) => (
           <Pressable key={value} accessibilityRole="radio" accessibilityState={{ selected: assistantModel === value }} onPress={() => void changeAssistantModel(value)} style={[styles.modelChip, { borderColor: assistantModel === value ? colors.primary : colors.border, backgroundColor: assistantModel === value ? colors.secondary : colors.background }]}>
             <Text style={[styles.modelChipTitle, { color: colors.foreground }]}>{title}</Text>
             <Text style={[styles.modelChipBadge, { color: assistantModel === value ? colors.primary : colors.mutedForeground }]}>{badge}</Text>
