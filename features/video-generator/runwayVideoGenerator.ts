@@ -1,6 +1,9 @@
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
-import { supabase } from '@/features/supabase/client';
+import { getSupabaseAccessToken } from '@/features/auth/supabaseAuthAdapter';
+
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL?.replace(/\/$/, '') ?? '';
+const HISTORY_FILE = `${FileSystem.documentDirectory}nexus-video-history.json`;
 
 export type VideoGenerationRequest = {
   prompt: string;
@@ -16,19 +19,12 @@ export type VideoHistoryItem = {
   createdAt: number;
 };
 
-const HISTORY_KEY = 'nexus_plus_video_generator_history_v1';
-
-async function getAccessToken() {
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token ?? null;
-}
-
 export async function generateRunwayVideo(request: VideoGenerationRequest) {
-  const token = await getAccessToken();
-  if (!token) throw new Error('SIGN_IN_REQUIRED');
+  const token = await getSupabaseAccessToken();
+  if (!token || !SUPABASE_URL) throw new Error('SIGN_IN_REQUIRED');
 
   const response = await fetch(
-    `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/runway-video-generate`,
+    `${SUPABASE_URL}/functions/v1/runway-video-generate`,
     {
       method: 'POST',
       headers: {
@@ -42,8 +38,7 @@ export async function generateRunwayVideo(request: VideoGenerationRequest) {
 
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const message = typeof body?.error === 'string' ? body.error : 'VIDEO_GENERATION_FAILED';
-    throw new Error(message);
+    throw new Error(typeof body?.error === 'string' ? body.error : 'VIDEO_GENERATION_FAILED');
   }
 
   if (!body?.videoUrl) throw new Error('VIDEO_URL_MISSING');
@@ -51,10 +46,9 @@ export async function generateRunwayVideo(request: VideoGenerationRequest) {
 }
 
 async function readHistory(): Promise<VideoHistoryItem[]> {
-  const raw = await FileSystem.readAsStringAsync(
-    `${FileSystem.documentDirectory}nexus-video-history.json`,
-    { encoding: FileSystem.EncodingType.UTF8 },
-  ).catch(() => null);
+  const raw = await FileSystem.readAsStringAsync(HISTORY_FILE, {
+    encoding: FileSystem.EncodingType.UTF8,
+  }).catch(() => null);
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -66,34 +60,47 @@ async function readHistory(): Promise<VideoHistoryItem[]> {
 
 async function writeHistory(items: VideoHistoryItem[]) {
   await FileSystem.writeAsStringAsync(
-    `${FileSystem.documentDirectory}nexus-video-history.json`,
-    JSON.stringify(items),
+    HISTORY_FILE,
+    JSON.stringify(items.slice(0, 100)),
     { encoding: FileSystem.EncodingType.UTF8 },
   );
 }
 
-export async function addVideoHistory(item: Omit<VideoHistoryItem, 'id' | 'createdAt'>) {
+export async function saveVideoHistory(prompt: string, videoUrl: string) {
   const items = await readHistory();
-  items.unshift({ ...item, id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, createdAt: Date.now() });
-  await writeHistory(items.slice(0, 100));
+  items.unshift({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    prompt,
+    videoUrl,
+    createdAt: Date.now(),
+  });
+  await writeHistory(items);
 }
 
 export async function listVideoHistory() {
   return readHistory();
 }
 
+export async function deleteVideoHistoryItem(id: string) {
+  await writeHistory((await readHistory()).filter(item => item.id !== id));
+}
+
 export async function clearVideoHistory() {
   await writeHistory([]);
 }
 
-export async function downloadGeneratedVideo(videoUrl: string, filename = `Nexus-Video-${Date.now()}.mp4`) {
-  const target = `${FileSystem.cacheDirectory}${filename}`;
-  const result = await FileSystem.downloadAsync(videoUrl, target);
+export async function downloadGeneratedVideo(
+  videoUrl: string,
+  filename = `Nexus-Video-${Date.now()}.mp4`,
+) {
+  const base = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
+  if (!base) throw new Error('VIDEO_STORAGE_UNAVAILABLE');
+
+  const result = await FileSystem.downloadAsync(videoUrl, `${base}${filename}`);
   if (!result.uri) throw new Error('VIDEO_DOWNLOAD_FAILED');
 
   const permission = await MediaLibrary.requestPermissionsAsync();
   if (permission.status !== 'granted') throw new Error('MEDIA_PERMISSION_REQUIRED');
 
-  const asset = await MediaLibrary.createAssetAsync(result.uri);
-  return asset.uri;
+  return (await MediaLibrary.createAssetAsync(result.uri)).uri;
 }
