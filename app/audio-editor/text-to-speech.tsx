@@ -150,10 +150,10 @@ export default function TextToSpeechScreen() {
       <View style={styles.voiceList}>
         {preferences.provider === 'elevenlabs' ? elevenVoices.map((voice) => (
           <Pressable key={voice.id} onPress={() => setSelectedId(voice.id)} accessibilityRole="radio" accessibilityState={{ selected: selectedId === voice.id }} style={[styles.voiceCard, { backgroundColor: selectedId === voice.id ? colors.secondary : colors.card, borderColor: selectedId === voice.id ? colors.primary : colors.border }]}>
-            <Feather name={voice.provider === 'clone' ? 'copy' : 'mic'} size={17} color={colors.primary} />
+            <Feather name="cloud" size={17} color={colors.primary} />
             <View style={styles.voiceCopy}>
-              <Text style={[styles.voiceName, { color: colors.foreground }]}>{voiceLabel(voice, index)}</Text>
-              <Text style={[styles.voiceMeta, { color: colors.mutedForeground }]}>{voice.language || 'Unknown language'} • {voice.provider === 'clone' ? 'Clone' : 'Piper'} • Downloaded</Text>
+              <Text style={[styles.voiceName, { color: colors.foreground }]}>{voice.name || voice.id}</Text>
+              <Text style={[styles.voiceMeta, { color: colors.mutedForeground }]}>{voice.language || 'Language not specified'}{voice.gender ? ` • ${voice.gender}` : ''}{voice.category ? ` • ${voice.category}` : ''}</Text>
             </View>
           </Pressable>
         )) : voices.map((voice, index) => (
