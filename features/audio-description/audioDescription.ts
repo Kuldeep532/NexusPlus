@@ -2,7 +2,7 @@ import { callGateway } from '@/features/api-gateway/apiGatewayClient';
 
 export type AudioDescriptionMode = 'basic' | 'advanced';
 export type AudioDescriptionRequest = {
-  uri: string; mimeType?: string; language: string; mode: AudioDescriptionMode; customInstruction?: string;
+  uri: string; mimeType?: string; language: string; mode: AudioDescriptionMode; customInstruction?: string; durationSeconds?: number;
 };
 export type AudioDescriptionResult = { description: string; provider: 'gemini'; mode: AudioDescriptionMode; creditsCharged: number };
 
@@ -30,6 +30,7 @@ export async function createAudioDescription(input: AudioDescriptionRequest): Pr
   const mimeType = guessMime(input.uri, input.mimeType);
   if (!mimeType.startsWith('video/')) throw new Error('VIDEO_MIME_TYPE_REQUIRED');
   const creditsCharged = input.mode === 'advanced' ? 12 : 4;
+  await callGateway('/ai/credits/consume', { method: 'POST', body: { featureCode: input.mode === 'advanced' ? 'audio_description_advanced' : 'audio_description_basic', mode: input.mode, durationSeconds: input.durationSeconds } });
   const payload = await callGateway<Record<string, unknown>>('/ai/video/audio-description', {
     method: 'POST',
     body: { media: { uri: input.uri, mimeType, displayName: 'Nexus Plus audio description video' }, prompt: buildPrompt(input.language,input.mode,input.customInstruction), mode: input.mode, multimodal: true, processing: input.mode === 'advanced' ? 'agentic' : 'static', modelClass: input.mode === 'advanced' ? 'premium' : 'basic', creditCost: creditsCharged, responseFormat: 'text' },
