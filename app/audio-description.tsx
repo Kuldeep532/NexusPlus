@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { useMemo, useState } from 'react';
@@ -6,6 +7,15 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, Text
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { createAudioDescription, type AudioDescriptionMode } from '@/features/audio-description/audioDescription';
+import { SUPABASE_URL } from '@/features/auth/authConfig';
+import { getSupabaseAccessToken } from '@/features/auth/supabaseAuthAdapter';
+
+async function recordAttestation(verdict: 'TRUSTED'|'MODIFIED'|'UNTRUSTED'|'UNKNOWN') {
+  const token = await getSupabaseAccessToken();
+  const key = (process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY)?.trim() ?? '';
+  if (!token || !SUPABASE_URL || !key) return;
+  await fetch(`${SUPABASE_URL}/functions/v1/nexus-app-attestation`, {method:'POST',headers:{apikey:key,Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({appId:'nexus-plus-android',verdict,packageName:'com.nexuswavetech.nexusplus',provider:'play_integrity',metadata:{platform:Platform.OS}})}).catch(()=>{});
+}
 
 const LANGUAGES = ['English', 'Hindi'];
 
@@ -19,6 +29,7 @@ export default function AudioDescriptionScreen() {
   const [instruction, setInstruction] = useState('');
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
+  void recordAttestation('UNKNOWN');
   const [advancedNotice, setAdvancedNotice] = useState('');
 
   const credits = mode === 'advanced' ? 12 : 4;
