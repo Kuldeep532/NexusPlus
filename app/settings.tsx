@@ -9,6 +9,8 @@ import { readLaunchPreferences, writeLaunchPreferences } from '@/features/app-sh
 import { loadPasswordManagerPreferences, savePasswordManagerPreferences, type PasswordManagerPreferences } from '@/features/biometric-vault/passwordManagerPreferences';
 import { readGreetingPreferences, writeGreetingPreferences, type GreetingMode } from '@/features/app-shell/greetingPreferences';
 import { readSpiritualReminderPreferences, writeSpiritualReminderPreferences, scheduleSpiritualReminders, cancelSpiritualReminders, type SpiritualReminderPreferences } from '@/features/spiritual/spiritualReminder';
+import { listInstalledMusicApps, readSelectedMusicApp, selectMusicApp, type InstalledMusicApp } from '@/features/nexus-assistant/musicIntent';
+
 
 const SETTINGS = [
   { title:'Language & preferences',description:'Language, accessibility and general preferences.',route:'/language-and-preference',icon:'globe' as const },
@@ -40,8 +42,10 @@ export default function SettingsScreen(){
  const [passwordPrefs,setPasswordPrefs]=useState<PasswordManagerPreferences>({defaultGenerator:'nexus',showCopyAction:true,requireBiometricForReveal:true});
  const [greetingMode,setGreetingMode]=useState<GreetingMode>('radhe-radhe');
  const [spiritualPrefs,setSpiritualPrefs]=useState<SpiritualReminderPreferences>({enabled:true,intervalHours:5,startHour:8});
+ const [selectedMusicApp,setSelectedMusicApp]=useState<InstalledMusicApp|null>(null);
+ const [musicApps,setMusicApps]=useState<InstalledMusicApp[]>([]);
  const [launchPrefs,setLaunchPrefs]=useState<Awaited<ReturnType<typeof readLaunchPreferences>>>({launchTarget:'nexus-plus',homeDestination:'nexus-home',showGeetaNexusOnHome:true});
- useEffect(()=>{void Promise.all([readLaunchPreferences(),readThemeColor(),loadPasswordManagerPreferences(),readGreetingPreferences(),readSpiritualReminderPreferences()]).then(([launch,theme,prefs,greeting,spiritual])=>{setLaunchPrefs(launch);setThemeColor(theme);setPasswordPrefs(prefs);setGreetingMode(greeting.mode);setSpiritualPrefs(spiritual);});},[]);
+ useEffect(()=>{void Promise.all([readLaunchPreferences(),readThemeColor(),loadPasswordManagerPreferences(),readGreetingPreferences(),readSpiritualReminderPreferences(),readSelectedMusicApp(),listInstalledMusicApps()]).then(([launch,theme,prefs,greeting,spiritual,music,apps])=>{setLaunchPrefs(launch);setThemeColor(theme);setPasswordPrefs(prefs);setGreetingMode(greeting.mode);setSpiritualPrefs(spiritual);setSelectedMusicApp(music);setMusicApps(apps);});},[]);
  const updateLaunchPrefs=(next: typeof launchPrefs)=>{setLaunchPrefs(next);void writeLaunchPreferences(next);};
  const updateThemeColor=async(theme:ThemeColor)=>{setThemeColor(theme);refreshThemeColor(theme);await writeThemeColor(theme);};
  const updatePasswordPrefs=(next:PasswordManagerPreferences)=>{setPasswordPrefs(next);void savePasswordManagerPreferences(next);};
