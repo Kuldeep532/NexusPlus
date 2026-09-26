@@ -13,7 +13,7 @@ import { startAssistantBootstrap } from '@/features/nexus-assistant/assistantBoo
 import { refreshNexusFeatureFlags } from '@/features/remote-config/featureFlags';
 import { readSpiritualReminderPreferences, scheduleSpiritualReminders } from '@/features/spiritual/spiritualReminder';
 import { readLaunchPreferences } from '@/features/app-shell/launchPreferences';
-import { initializeAppSecurity } from '@/features/security/appSecurity';
+import { requestDeviceIntegrityToken } from '@/features/security/deviceSecurityGate';
 import DebugErrorBoundary from '../DebugErrorBoundary';
 
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -37,21 +37,15 @@ function RootLayoutContent() {
 
   useEffect(() => {
     if (auth.loading || !auth.session) return;
-    void initializeAppSecurity().catch(() => undefined);
+    void requestDeviceIntegrityToken('nexus-plus-startup').catch(() => null);
   }, [auth.loading, auth.session]);
 
   useEffect(() => {
     if (!auth.loading && auth.session) {
       let cancelled = false;
-      void Promise.resolve()
-        .then(() => registerForFirebaseNotifications())
-        .catch(() => undefined);
+      void Promise.resolve().then(() => registerForFirebaseNotifications()).catch(() => undefined);
       const detach = (() => {
-        try {
-          return attachFirebaseTokenRefreshListener();
-        } catch {
-          return undefined;
-        }
+        try { return attachFirebaseTokenRefreshListener(); } catch { return undefined; }
       })();
       return () => {
         cancelled = true;
@@ -91,7 +85,6 @@ function RootLayoutContent() {
 
   useEffect(() => {
     if (auth.loading) return;
-
     const firstSegment = segments[0];
     const inAuth = firstSegment === 'login-plus-register';
     const inWelcome = firstSegment === 'welcome';
@@ -113,7 +106,11 @@ function RootLayoutContent() {
 
     if (inAuth || inWelcome || (!firstSegment && !inTabs && !inHome && !inGeetaNexus && !inSpiritual && !inLegal)) {
       void readLaunchPreferences().then((prefs) => {
-        router.replace((prefs.homeDestination === 'geeta-home' ? '/geeta-nexus' : prefs.homeDestination === 'spiritual-home' ? '/(tabs)/spiritual' : '/home') as never);
+        router.replace((prefs.homeDestination === 'geeta-home'
+          ? '/geeta-nexus'
+          : prefs.homeDestination === 'spiritual-home'
+            ? '/(tabs)/spiritual'
+            : '/home') as never);
       }).catch(() => router.replace('/home'));
     }
   }, [auth.loading, auth.session, router, segments]);
@@ -133,4 +130,5 @@ function RootLayoutContent() {
 export default function RootLayout() {
   return <DebugErrorBoundary><RootLayoutContent /></DebugErrorBoundary>;
 }
+
 const styles = StyleSheet.create({ root: { flex: 1 } });
