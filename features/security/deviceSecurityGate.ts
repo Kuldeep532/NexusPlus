@@ -29,7 +29,12 @@ export async function submitIntegrityToken(token: string, requestHash: string): 
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify({ token, requestHash }),
+    body: JSON.stringify({
+      token,
+      requestHash,
+      packageName: 'com.nexuswavetech.nexusplus',
+      appId: 'nexus-plus-android',
+    }),
   }).then(async (response) => {
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
