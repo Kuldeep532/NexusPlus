@@ -1,3 +1,5 @@
+import { APP_API_BASE_URL } from '@/features/api-gateway/apiGatewayClient';
+
 export type RemoteConfigKind = 'top_banner' | 'dialog' | 'feature_flag' | 'content';
 
 export type RemoteConfigRow = {
@@ -15,39 +17,25 @@ export type RemoteConfigRow = {
   updated_at: string;
 };
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? '';
-const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? '';
-
 function configured(): boolean {
-  return Boolean(SUPABASE_URL && ANON_KEY);
-}
-
-function isActive(row: RemoteConfigRow): boolean {
-  if (!row.enabled) return false;
-  const now = Date.now();
-  if (row.starts_at && Date.parse(row.starts_at) > now) return false;
-  if (row.ends_at && Date.parse(row.ends_at) < now) return false;
-  return true;
+  return Boolean(APP_API_BASE_URL);
 }
 
 export async function fetchRemoteConfig(signal?: AbortSignal): Promise<RemoteConfigRow[]> {
   if (!configured()) return [];
-
-  const response = await fetch(
-    `${SUPABASE_URL}/rest/v1/remote_config?select=*&enabled=eq.true&order=priority.desc,updated_at.desc`,
-    {
-      headers: {
-        apikey: ANON_KEY,
-        Authorization: `Bearer ${ANON_KEY}`,
-        Accept: 'application/json',
-      },
-      signal,
-    },
-  );
-
+  const response = await fetch(APP_API_BASE_URL + '/remote-config', {
+    headers: { Accept:'application/json' },
+    signal,
+  });
   if (!response.ok) return [];
   const rows = await response.json() as RemoteConfigRow[];
-  return rows.filter(isActive);
+  const now = Date.now();
+  return rows.filter((row) => {
+    if (!row.enabled) return false;
+    if (row.starts_at && Date.parse(row.starts_at) > now) return false;
+    if (row.ends_at && Date.parse(row.ends_at) < now) return false;
+    return true;
+  });
 }
 
 export function getRemoteConfigValue<T = unknown>(
