@@ -3,21 +3,24 @@ import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { getCustomProviderApiKey, setCustomProviderApiKey } from '@/features/nexus-assistant/aiProviderPreferences';
+import { getCustomElevenLabsApiKey, getCustomProviderApiKey, setCustomElevenLabsApiKey, setCustomProviderApiKey } from '@/features/nexus-assistant/aiProviderPreferences';
 
 export default function ApiStudioScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [openAiKey, setOpenAiKey] = useState('');
   const [anthropicKey, setAnthropicKey] = useState('');
+  const [elevenLabsKey, setElevenLabsKey] = useState('');
 
   useEffect(() => {
     void Promise.all([
       getCustomProviderApiKey('openai'),
       getCustomProviderApiKey('anthropic'),
-    ]).then(([openai, anthropic]) => {
+      getCustomElevenLabsApiKey(),
+    ]).then(([openai, anthropic, elevenlabs]) => {
       setOpenAiKey(openai ?? '');
       setAnthropicKey(anthropic ?? '');
+      setElevenLabsKey(elevenlabs ?? '');
     });
   }, []);
 
@@ -25,8 +28,9 @@ export default function ApiStudioScreen() {
     await Promise.all([
       setCustomProviderApiKey('openai', openAiKey),
       setCustomProviderApiKey('anthropic', anthropicKey),
+      setCustomElevenLabsApiKey(elevenLabsKey),
     ]);
-    Alert.alert('API Studio', 'Your personal provider keys were saved on this device.');
+    Alert.alert('API Studio', 'Your API keys were saved securely on this device.');
   };
 
   return (
@@ -39,7 +43,7 @@ export default function ApiStudioScreen() {
         <View style={styles.copy}>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>API Studio</Text>
           <Text style={[styles.body, { color: colors.mutedForeground }]}>
-            Add your own OpenAI or Anthropic API key to use those providers without Nexus Plus Premium access.
+            Add your own provider keys when you want to use your own accounts and billing.
           </Text>
         </View>
       </View>
@@ -71,6 +75,22 @@ export default function ApiStudioScreen() {
           autoCorrect={false}
           secureTextEntry
           placeholder="sk-ant-..."
+          placeholderTextColor={colors.mutedForeground}
+          style={[styles.input, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border }]}
+        />
+      </View>
+
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>ElevenLabs API</Text>
+        <Text style={[styles.body, { color: colors.mutedForeground }]}>Add your personal ElevenLabs key to use your own ElevenLabs account. Your key is stored securely on this device.</Text>
+        <TextInput
+          accessibilityLabel="ElevenLabs API key"
+          value={elevenLabsKey}
+          onChangeText={setElevenLabsKey}
+          autoCapitalize="none"
+          autoCorrect={false}
+          secureTextEntry
+          placeholder="sk_..."
           placeholderTextColor={colors.mutedForeground}
           style={[styles.input, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border }]}
         />
