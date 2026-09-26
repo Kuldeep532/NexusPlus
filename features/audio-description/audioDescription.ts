@@ -1,4 +1,5 @@
-import { callGateway } from '@/features/api-gateway/apiGatewayClient';
+import { SUPABASE_URL } from '@/features/auth/authConfig';
+import { getSupabaseAccessToken } from '@/features/auth/supabaseAuthAdapter';
 
 export type AudioDescriptionMode = 'basic' | 'advanced';
 export type AudioDescriptionRequest = {
@@ -40,28 +41,30 @@ export async function createAudioDescription(input: AudioDescriptionRequest): Pr
   });
 
   try {
-    const payload = await callGateway<Record<string, unknown>>('/ai/video/audio-description', {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/nexus-audio-description`, {
       method: 'POST',
-      body: {
-        media: { uri: input.uri, mimeType, displayName: 'Nexus Plus audio description video' },
-        prompt: buildPrompt(input.language, input.mode, input.customInstruction),
-        mode: input.mode,
-        multimodal: true,
-        processing: input.mode === 'advanced' ? 'agentic' : 'static',
-        modelClass: input.mode === 'advanced' ? 'premium' : 'basic',
-        responseFormat: 'text',
+      headers: {
+        apikey: (process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY)?.trim() ?? '',
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        media: { uri: input.uri, mimeType, displayName: 'Nexus Plus audio description video' },
+        language: input.language,
+        mode: input.mode,
+        customInstruction: input.customInstruction,
+        durationSeconds: input.durationSeconds,
+      }),
     });
+    const payload = await response.json() as Record<string, unknown>;
+    if (!response.ok) throw new Error(String(payload?.error ?? 'AUDIO_DESCRIPTION_FAILED'));
     const description = [payload.output_text,payload.text,payload.description]
       .find((v): v is string => typeof v === 'string' && v.trim().length > 0)?.trim();
     if (!description) throw new Error('AUDIO_DESCRIPTION_EMPTY');
     return { description, provider:'gemini', mode:input.mode, creditsCharged };
   } catch (error) {
     try {
-      await callGateway('/ai/credits/refund', {
-        method: 'POST',
-        body: { featureCode, mode: input.mode, credits: creditsCharged },
-      });
+      // Supabase Edge Function performs the refund atomically after a provider failure.
     } catch {}
     throw error;
   }
