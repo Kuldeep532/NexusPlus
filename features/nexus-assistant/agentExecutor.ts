@@ -96,8 +96,12 @@ export async function executeCapability(
         delayMinutes = Math.max(1, Math.ceil((target.getTime() - Date.now()) / 60000));
       }
       const message = proposal.args.message || 'Nexus Assistant reminder';
+      const reminderTitle = message
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 80) || 'Nexus Reminder';
       const item = await scheduleReminder({
-        title: message.slice(0, 80),
+        title: reminderTitle,
         body: message,
         delayMinutes: String(delayMinutes),
         language: /[\u0900-\u097F]/.test(message) ? 'hi-IN' : 'en-US',
