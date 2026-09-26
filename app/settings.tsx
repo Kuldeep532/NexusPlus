@@ -23,6 +23,7 @@ const SETTINGS = [
   { title:'Video Generator',description:'Create AI videos and manage generated-video settings and history.',route:'/video-generator',icon:'video' as const },
   { title:'Video Generator Settings',description:'Manage saved video history and Video Generator preferences.',route:'/video-generator-settings',icon:'settings' as const },
   { title:'History Settings',description:'Manage saved histories from one place.',route:'/history-settings',icon:'clock' as const },
+  { title:'Manage Subscription',description:'View your membership, included credits and eligible top-ups.',route:'/manage-subscription',icon:'credit-card' as const },
   { title:'Expense Tracker',description:'Manage expense detection and financial privacy.',route:'/expense-tracker',icon:'credit-card' as const },
 ];
 const LEGAL_SETTINGS = [
