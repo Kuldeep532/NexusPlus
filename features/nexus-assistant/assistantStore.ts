@@ -91,6 +91,14 @@ export async function setHistoryEnabled(enabled: boolean): Promise<void> {
   if (!enabled) await clearAllAssistantData();
 }
 
+export async function listAllHistory(): Promise<Array<{ id: string; title: string; createdAt: number; messageCount: number }>> {
+  return listSessions();
+}
+
+export async function listSessionMessages(sessionId: string): Promise<ChatMessage[]> {
+  return listMessages(sessionId);
+}
+
 export async function listSessions(): Promise<Array<{ id: string; title: string; createdAt: number; messageCount: number }>> {
   const db = await dbPromise;
   return db.getAllAsync(
