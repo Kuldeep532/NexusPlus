@@ -158,7 +158,8 @@ export async function askCloudWithFallback(input: {
 
   try {
     return await askSelectedPremiumOrOwnKey(preference.selectedModel, input);
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('PREMIUM_MODEL_REQUIRED_')) throw error;
+    throw error;
   }
 }
