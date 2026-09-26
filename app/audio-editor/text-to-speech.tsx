@@ -1,11 +1,13 @@
 import { Feather } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { generateWithPiper, listTtsVoices, playGeneratedAudio, type TtsSettings, type TtsVoiceOption } from '@/features/audio-editor/ttsEngine';
+import { generateWithElevenLabs, listElevenLabsVoices, type ElevenLabsVoice } from '@/features/audio-editor/elevenLabsTts';
+import { readTtsVoicePreferences, type TtsVoicePreferences } from '@/features/audio-editor/ttsPreferences';
 
 const FALLBACK_VOICE_NAMES = ['Voice 1', 'Voice 2', 'Voice 3'];
 
@@ -31,9 +33,12 @@ async function shareGeneratedAudio(uri: string): Promise<void> {
 
 export default function TextToSpeechScreen() {
   const colors = useColors();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const [voices, setVoices] = useState<TtsVoiceOption[]>([]);
+  const [elevenVoices, setElevenVoices] = useState<ElevenLabsVoice[]>([]);
+  const [preferences, setPreferences] = useState<TtsVoicePreferences>({ provider: 'system', voiceId: '', voiceName: 'System voice', language: '' });
   const [selectedId, setSelectedId] = useState('');
   const [speed, setSpeed] = useState('1');
   const [pitch, setPitch] = useState('1');
@@ -45,21 +50,31 @@ export default function TextToSpeechScreen() {
 
   const refreshVoices = useCallback(async () => {
     try {
-      const items = await listTtsVoices();
-      const local = items.filter((voice) => isLocalVoice(voice) && voice.installed);
-      setVoices(local);
-      if (!local.some((voice) => voice.id === selectedId)) setSelectedId(local[0]?.id ?? '');
-      if (!local.length) setStatus('No downloaded Nexus voices are available. Download a voice from the Voice Library first.');
+      const prefs = await readTtsVoicePreferences();
+      setPreferences(prefs);
+      setSelectedId(prefs.voiceId);
+      if (prefs.provider === 'elevenlabs') {
+        setVoices([]);
+        setElevenVoices(await listElevenLabsVoices());
+        if (!prefs.voiceId) setStatus('Open Model Settings to select an ElevenLabs voice.');
+      } else {
+        const items = await listTtsVoices();
+        const local = items.filter((voice) => isLocalVoice(voice) && voice.installed);
+        setVoices(local);
+        if (!local.some((voice) => voice.id === prefs.voiceId)) setSelectedId(local[0]?.id ?? '');
+        if (!local.length) setStatus('No downloaded Nexus voices are available. Download a voice from the Voice Library first.');
+      }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Unable to load available voices.');
     }
-  }, [selectedId]);
+  }, []);
 
   useEffect(() => {
     void refreshVoices();
   }, [refreshVoices]);
 
   const selectedVoice = useMemo(() => voices.find((voice) => voice.id === selectedId), [selectedId, voices]);
+  const selectedElevenVoice = useMemo(() => elevenVoices.find((voice) => voice.id === selectedId), [selectedId, elevenVoices]);
   const numericSpeed = Number(speed);
   const numericPitch = Number(pitch);
   const validSettings =
@@ -69,24 +84,32 @@ export default function TextToSpeechScreen() {
   const generate = useCallback(async () => {
     const normalized = text.trim();
     if (!normalized) { setStatus('Enter text before generating speech.'); return; }
-    if (!selectedVoice) { setStatus('Select a downloaded Nexus voice first.'); return; }
+    if (preferences.provider === 'elevenlabs') {
+      if (!selectedElevenVoice) { setStatus('Open Model Settings and select an ElevenLabs voice first.'); return; }
+    } else if (!selectedVoice) { setStatus('Select a downloaded Nexus voice first.'); return; }
     if (!validSettings) { setStatus('Speed must be 0.65–1.35 and pitch must be 0.75–1.35.'); return; }
 
     setBusy(true);
     setPlaying(false);
     setStatus('Generating speech…');
     try {
-      const settings: TtsSettings = { speed: numericSpeed, pitch: numericPitch, autoTune };
-      const result = await generateWithPiper(normalized, selectedVoice, settings);
-      setGeneratedUri(result.outputUri);
-      setStatus(`Speech generated with ${voiceLabel(selectedVoice, 0)} (${result.analysis.emotion}).`);
+      if (preferences.provider === 'elevenlabs') {
+        const result = await generateWithElevenLabs({ text: normalized, voiceId: selectedElevenVoice!.id, languageCode: selectedElevenVoice!.language || undefined });
+        setGeneratedUri(result.outputUri);
+        setStatus(`Speech generated with ${selectedElevenVoice!.name}. ${result.characters} characters • ${result.creditsCharged} credits used. Remaining balance: ${result.balance}.`);
+      } else {
+        const settings: TtsSettings = { speed: numericSpeed, pitch: numericPitch, autoTune };
+        const result = await generateWithPiper(normalized, selectedVoice!, settings);
+        setGeneratedUri(result.outputUri);
+        setStatus(`Speech generated with ${voiceLabel(selectedVoice!, 0)} (${result.analysis.emotion}).`);
+      }
     } catch (error) {
       setGeneratedUri('');
       setStatus(error instanceof Error ? error.message : 'Speech generation failed.');
     } finally {
       setBusy(false);
     }
-  }, [autoTune, numericPitch, numericSpeed, selectedVoice, text, validSettings]);
+  }, [autoTune, numericPitch, numericSpeed, selectedVoice, selectedElevenVoice, text, validSettings, preferences.provider]);
 
   const play = useCallback(async () => {
     if (!generatedUri || playing) return;
@@ -116,9 +139,16 @@ export default function TextToSpeechScreen() {
 
       <TextInput value={text} onChangeText={setText} multiline placeholder="Enter text to convert to speech" placeholderTextColor={colors.mutedForeground} style={[styles.textArea, { color: colors.foreground, backgroundColor: colors.card, borderColor: colors.border }]} accessibilityLabel="Text to convert to speech" />
 
+      <View style={[styles.modelSettingsRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.voiceCopy}>
+          <Text style={[styles.voiceName, { color: colors.foreground }]}>Voice Provider</Text>
+          <Text style={[styles.voiceMeta, { color: colors.mutedForeground }]}>{preferences.provider === 'elevenlabs' ? `ElevenLabs • ${preferences.voiceName || 'No voice selected'}` : preferences.provider === 'piper' ? `Nexus Piper • ${preferences.voiceName || 'No voice selected'}` : preferences.provider === 'clone' ? `Nexus Clone • ${preferences.voiceName || 'No voice selected'}` : `System TTS • ${preferences.voiceName || 'Device voice'}`}</Text>
+        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open Model Settings" onPress={()=>router.push('/tts-preferences')} style={[styles.secondaryButton,{borderColor:colors.primary}]}><Feather name="settings" size={17} color={colors.primary}/><Text style={[styles.secondaryText,{color:colors.primary}]}>Open Model Settings</Text></Pressable>
+      </View>
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Voice</Text>
       <View style={styles.voiceList}>
-        {voices.map((voice, index) => (
+        {preferences.provider === 'elevenlabs' ? elevenVoices.map((voice) => (
           <Pressable key={voice.id} onPress={() => setSelectedId(voice.id)} accessibilityRole="radio" accessibilityState={{ selected: selectedId === voice.id }} style={[styles.voiceCard, { backgroundColor: selectedId === voice.id ? colors.secondary : colors.card, borderColor: selectedId === voice.id ? colors.primary : colors.border }]}>
             <Feather name={voice.provider === 'clone' ? 'copy' : 'mic'} size={17} color={colors.primary} />
             <View style={styles.voiceCopy}>
@@ -126,10 +156,15 @@ export default function TextToSpeechScreen() {
               <Text style={[styles.voiceMeta, { color: colors.mutedForeground }]}>{voice.language || 'Unknown language'} • {voice.provider === 'clone' ? 'Clone' : 'Piper'} • Downloaded</Text>
             </View>
           </Pressable>
+        )) : voices.map((voice, index) => (
+          <Pressable key={voice.id} onPress={() => setSelectedId(voice.id)} accessibilityRole="radio" accessibilityState={{ selected: selectedId === voice.id }} style={[styles.voiceCard, { backgroundColor: selectedId === voice.id ? colors.secondary : colors.card, borderColor: selectedId === voice.id ? colors.primary : colors.border }]}>
+            <Feather name={voice.provider === 'clone' ? 'copy' : 'mic'} size={17} color={colors.primary} />
+            <View style={styles.voiceCopy}><Text style={[styles.voiceName, { color: colors.foreground }]}>{voiceLabel(voice, index)}</Text><Text style={[styles.voiceMeta, { color: colors.mutedForeground }]}>{voice.language || 'Unknown language'} • {voice.provider === 'clone' ? 'Clone' : 'Piper'} • Downloaded</Text></View>
+          </Pressable>
         ))}
       </View>
 
-      {!voices.length && <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No local Nexus voices are installed.</Text>}
+      {!voices.length && !elevenVoices.length && <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No voices are available. Open Model Settings to choose a provider and voice.</Text>}
 
       <View style={styles.controlsRow}>
         <View style={styles.control}>
@@ -147,7 +182,7 @@ export default function TextToSpeechScreen() {
         <Text style={[styles.toggleText, { color: colors.foreground }]}>Automatic emotion tuning {autoTune ? 'On' : 'Off'}</Text>
       </Pressable>
 
-      <Pressable disabled={busy || !voices.length} onPress={() => void generate()} accessibilityRole="button" style={[styles.primaryButton, { backgroundColor: busy || !voices.length ? colors.muted : colors.primary }]}>
+      <Pressable disabled={busy || (preferences.provider === 'elevenlabs' ? !selectedElevenVoice : !selectedVoice)} onPress={() => void generate()} accessibilityRole="button" style={[styles.primaryButton, { backgroundColor: busy || (preferences.provider === 'elevenlabs' ? !selectedElevenVoice : !selectedVoice) ? colors.muted : colors.primary }]}>
         {busy ? <ActivityIndicator color={colors.primaryForeground} /> : <Feather name="volume-2" size={19} color={colors.primaryForeground} />}
         <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{busy ? 'Generating…' : 'Generate Speech'}</Text>
       </Pressable>
@@ -190,6 +225,7 @@ const styles = StyleSheet.create({
   input: { minHeight: 46, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, fontSize: 13 },
   toggle: { minHeight: 48, borderWidth: 1, borderRadius: 14, marginTop: 12, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
   toggleText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  modelSettingsRow: { minHeight: 66, borderWidth: 1, borderRadius: 15, marginTop: 12, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
   primaryButton: { minHeight: 52, borderRadius: 16, marginTop: 14, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
   buttonText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
   resultCard: { marginTop: 14, borderWidth: 1, borderRadius: 16, padding: 13 },
