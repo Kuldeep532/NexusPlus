@@ -34,11 +34,8 @@ export async function createAudioDescription(input: AudioDescriptionRequest): Pr
   if (!mimeType.startsWith('video/')) throw new Error('VIDEO_MIME_TYPE_REQUIRED');
 
   const creditsCharged = input.mode === 'advanced' ? 12 : 4;
-  const featureCode = input.mode === 'advanced' ? 'audio_description_advanced' : 'audio_description_basic';
-  await callGateway('/ai/credits/consume', {
-    method: 'POST',
-    body: { featureCode, mode: input.mode, durationSeconds: input.durationSeconds, credits: creditsCharged },
-  });
+  const token = await getSupabaseAccessToken();
+  if (!token || !SUPABASE_URL) throw new Error('AUTH_REQUIRED');
 
   try {
     const response = await fetch(`${SUPABASE_URL}/functions/v1/nexus-audio-description`, {
@@ -63,9 +60,6 @@ export async function createAudioDescription(input: AudioDescriptionRequest): Pr
     if (!description) throw new Error('AUDIO_DESCRIPTION_EMPTY');
     return { description, provider:'gemini', mode:input.mode, creditsCharged };
   } catch (error) {
-    try {
-      // Supabase Edge Function performs the refund atomically after a provider failure.
-    } catch {}
     throw error;
   }
 }
