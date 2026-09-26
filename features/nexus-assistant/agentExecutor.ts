@@ -8,6 +8,7 @@ import type { CapabilityProposal } from './agentPlanner';
 import { setAssistantAlarm, openCalendarEventDraft } from './assistantNativeActions';
 import { scheduleReminder } from '@/features/reminders/reminderScheduler';
 import { registerReminder } from '@/features/reminders/reminderBackend';
+import { callContact } from './contactCallIntent';
 
 export type ExecutionContext = {
   confirmed: boolean;
@@ -134,6 +135,12 @@ export async function executeCapability(
       if (!qr?.route) throw new Error('The existing QR generator is not registered.');
       openAssistantTool(qr);
       return { capabilityId: proposal.capability.id, success: true, message: 'Opened the existing QR generator. You can enter the data manually or let Nexus Assistant prepare the payload.' };
+    }
+    case 'call-contact': {
+      const target = proposal.args.target?.trim();
+      if (!target) return { capabilityId: proposal.capability.id, success: false, message: 'Please tell me who to call.' };
+      const result = await callContact(target);
+      return { capabilityId: proposal.capability.id, success: result.success, message: result.message };
     }
     case 'tool-open': {
       const toolId = proposal.args.toolId ?? '';
