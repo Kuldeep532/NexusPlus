@@ -27,10 +27,20 @@ function parseClockTime(text: string): { hour: number; minute: number } | null {
 }
 
 function parseRelativeMinutes(text: string): number | null {
-  const match = /(?:in|after|में)\s*(\d+)\s*(minute|minutes|min|मिनट|hour|hours|घंटे|घंटा)/i.exec(text);
+  const match = /(?:in|after|within|में|बाद)\s*(\d+)\s*(minute|minutes|min|mins|मिनट|hour|hours|hr|hrs|घंटे|घंटा)/i.exec(text);
   if (!match) return null;
   const value = Math.max(1, Number(match[1]));
-  return /hour|घंटे|घंटा/i.test(match[2]) ? value * 60 : value;
+  return /hour|hr|hrs|घंटे|घंटा/i.test(match[2]) ? value * 60 : value;
+}
+
+function cleanReminderText(text: string): string {
+  let value = text.trim();
+  value = value.replace(/^\s*(?:remind me|reminder|please remind me|remember to|याद दिलाना|रिमाइंडर|मुझे याद दिलाना)\s*/i, '');
+  value = value.replace(/^\s*(?:at|around|by|for|पर|को)\s*\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)?\s*/i, '');
+  value = value.replace(/^\s*(?:in|after|within|में|बाद)\s*\d+\s*(?:minute|minutes|min|mins|मिनट|hour|hours|hr|hrs|घंटे|घंटा)\s*/i, '');
+  value = value.replace(/^\s*(?:for|to|के लिए|कि)\s*/i, '');
+  value = value.replace(/^[,;:\-]+\s*/, '');
+  return value.trim() || 'Nexus Assistant reminder';
 }
 
 const COMMAND_PATTERNS: Array<{
@@ -42,13 +52,14 @@ const COMMAND_PATTERNS: Array<{
   { id: 'battery-status', pattern: /(?:battery|बैटरी)/i, reason: 'The user appears to be asking for battery state.', args: () => ({}) },
   { id: 'device-info', pattern: /(?:device information|phone info|डिवाइस|फोन की जानकारी)/i, reason: 'The request appears to ask for basic device information.', args: () => ({}) },
   { id: 'open-url', pattern: /(?:open|खोलो|खोलना)\s+(https?:\/\/\\S+)/i, reason: 'The user requested opening a specific URL.', args: (match) => ({ url: match[1] }) },
-  { id: 'create-reminder', pattern: /(?:remind me|reminder|याद दिलाना|रिमाइंडर)/i, reason: 'The request appears to create a reminder.', args: (match) => {
+  { id: 'create-reminder', pattern: /(?:remind|reminder|remember|याद|रिमाइंडर)/i, reason: 'The request appears to create a reminder.', args: (match) => {
       const minutes = parseRelativeMinutes(match.input);
       const clock = parseClockTime(match.input);
+      const message = cleanReminderText(match.input);
       return {
         ...(minutes ? { delayMinutes: String(minutes) } : {}),
         ...(clock ? { hour: String(clock.hour), minute: String(clock.minute) } : {}),
-        message: match.input.trim(),
+        message,
       };
     } },
   { id: 'set-alarm', pattern: /(?:set|start|wake me|लगाओ|सेट करो|जगाना).*\b(?:alarm|अलार्म)\b/i, reason: 'The user requested a device alarm.', args: (match) => {
