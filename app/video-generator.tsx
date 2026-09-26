@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,8 +25,6 @@ export default function VideoGeneratorScreen() {
   const [videoUrl, setVideoUrl] = useState<string|null>(null);
   const [busy, setBusy] = useState(false);
   const [downloading, setDownloading] = useState(false);
-
-  void useEffect;
   const generate = async () => {
     const text = prompt.trim();
     if (!text) {
