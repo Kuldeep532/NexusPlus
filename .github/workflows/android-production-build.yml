@@ -58,9 +58,7 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
           run_install: false
       - name: Install dependencies
-        run: |
-          set -euo pipefail
-          pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false --reporter=append-only
+        run: pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false --reporter=append-only
       - name: Validate API build configuration
         run: |
           set -euo pipefail
@@ -103,7 +101,6 @@ jobs:
       EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
       EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
       EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-      PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER: ${{ secrets.PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -122,9 +119,7 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
           run_install: false
       - name: Install dependencies
-        run: |
-          set -euo pipefail
-          pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false --reporter=append-only
+        run: pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false --reporter=append-only
       - name: Validate required files
         shell: bash
         run: |
@@ -216,21 +211,11 @@ jobs:
       - name: Build release APK
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         working-directory: android
-        run: |
-          if [ -n "${PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER:-}" ]; then
-            gradle assembleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
-          else
-            gradle assembleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a
-          fi
+        run: gradle assembleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a
       - name: Build release AAB
         if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
         working-directory: android
-        run: |
-          if [ -n "${PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER:-}" ]; then
-            gradle bundleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
-          else
-            gradle bundleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a
-          fi
+        run: gradle bundleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a
       - name: Verify APK output
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         shell: bash
