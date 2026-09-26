@@ -9,7 +9,7 @@ import {
   generateRunwayVideo,
   downloadGeneratedVideo,
   saveVideoHistory,
-  type VideoHistoryItem,
+  type VideoGenerationRequest,
 } from '@/features/video-generator/runwayVideoGenerator';
 
 function GeneratedVideo({ uri }: { uri: string }) {
@@ -23,8 +23,12 @@ export default function VideoGeneratorScreen() {
   const insets = useSafeAreaInsets();
   const [prompt, setPrompt] = useState('');
   const [videoUrl, setVideoUrl] = useState<string|null>(null);
+  const [lastMeta, setLastMeta] = useState<Pick<VideoGenerationRequest,'model'|'duration'>>({});
   const [busy, setBusy] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [model, setModel] = useState<VideoGenerationRequest['model']>('gen4_turbo');
+  const [duration, setDuration] = useState(5);
+
   const generate = async () => {
     const text = prompt.trim();
     if (!text) {
@@ -33,12 +37,23 @@ export default function VideoGeneratorScreen() {
     }
     setBusy(true);
     try {
-      const uri = await generateRunwayVideo({ prompt:text });
-      setVideoUrl(uri);
+      const result = await generateRunwayVideo({
+        prompt:text,
+        model,
+        duration,
+        aspectRatio:'1280:720',
+      });
+      setVideoUrl(result.videoUrl);
+      setLastMeta({ model: result.model as VideoGenerationRequest['model'] ?? model, duration: result.duration ?? duration });
+      if (result.creditsCharged) {
+        Alert.alert('Video created', `Your video is ready. ${result.creditsCharged} credits were used.`);
+      }
     } catch (error) {
       const code = error instanceof Error ? error.message : '';
       const message =
         code === 'SIGN_IN_REQUIRED' ? 'Please sign in to generate videos.' :
+        code === 'ACTIVE_SUBSCRIPTION_REQUIRED' ? 'An active Nexus Plus subscription is required for video generation.' :
+        code === 'INSUFFICIENT_CREDITS' ? 'You do not have enough credits for this video.' :
         code === 'MEDIA_PERMISSION_REQUIRED' ? 'Allow photo and video access to download the video.' :
         'The video could not be generated right now. Please try again.';
       Alert.alert('Video generation', message);
@@ -63,7 +78,7 @@ export default function VideoGeneratorScreen() {
   };
 
   const goBack = () => {
-    if (videoUrl) void saveVideoHistory(prompt.trim(), videoUrl);
+    if (videoUrl) void saveVideoHistory(prompt.trim(), videoUrl, lastMeta);
     router.back();
   };
 
@@ -97,6 +112,30 @@ export default function VideoGeneratorScreen() {
         accessibilityLabel='Video description'
         style={[styles.input,{color:colors.foreground,borderColor:colors.border,backgroundColor:colors.background}]}
       />
+
+      <View style={styles.optionRow}>
+        <View style={[styles.optionCard,{borderColor:colors.border,backgroundColor:colors.background}]}>
+          <Text style={[styles.optionLabel,{color:colors.mutedForeground}]}>Model</Text>
+          <View style={styles.choiceRow}>
+            <Pressable accessibilityRole='button' onPress={()=>setModel('gen4_turbo')} style={[styles.choice,{borderColor:colors.border,backgroundColor:model==='gen4_turbo'?colors.primary:colors.card}]}>
+              <Text style={[styles.choiceText,{color:model==='gen4_turbo'?colors.primaryForeground:colors.foreground}]}>Gen-4 Turbo</Text>
+            </Pressable>
+            <Pressable accessibilityRole='button' onPress={()=>setModel('gen4.5')} style={[styles.choice,{borderColor:colors.border,backgroundColor:model==='gen4.5'?colors.primary:colors.card}]}>
+              <Text style={[styles.choiceText,{color:model==='gen4.5'?colors.primaryForeground:colors.foreground}]}>Gen-4.5</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={[styles.optionCard,{borderColor:colors.border,backgroundColor:colors.background}]}>
+          <Text style={[styles.optionLabel,{color:colors.mutedForeground}]}>Duration</Text>
+          <View style={styles.choiceRow}>
+            {[5,10].map(value=><Pressable key={value} accessibilityRole='button' onPress={()=>setDuration(value)} style={[styles.choice,{borderColor:colors.border,backgroundColor:duration===value?colors.primary:colors.card}]}>
+              <Text style={[styles.choiceText,{color:duration===value?colors.primaryForeground:colors.foreground}]}>{value}s</Text>
+            </Pressable>)}
+          </View>
+        </View>
+      </View>
+
       <Pressable accessibilityRole='button' disabled={busy} onPress={()=>void generate()} style={[styles.primary,{backgroundColor:colors.primary,opacity:busy?0.6:1}]}>
         {busy?<ActivityIndicator color={colors.primaryForeground}/>:<Feather name='video' size={18} color={colors.primaryForeground}/>}
         <Text style={[styles.primaryText,{color:colors.primaryForeground}]}>{busy?'Creating video…':'Generate Video'}</Text>
@@ -118,16 +157,19 @@ export default function VideoGeneratorScreen() {
       </View>
       <Text style={[styles.hint,{color:colors.mutedForeground}]}>Going back saves this video in your local Video Generator history.</Text>
     </View> : null}
-
   </ScrollView>;
 }
 
 const styles=StyleSheet.create({
- root:{flex:1},header:{flexDirection:'row',alignItems:'center',gap:10,marginBottom:4},
+ header:{flexDirection:'row',alignItems:'center',gap:10,marginBottom:4},
  back:{width:44,height:44,borderRadius:13,borderWidth:1,alignItems:'center',justifyContent:'center'},
  title:{fontSize:24,fontFamily:'Inter_700Bold'},subtitle:{fontSize:11,lineHeight:16,marginTop:3},
  card:{borderWidth:1,borderRadius:18,padding:14},section:{fontSize:15,fontFamily:'Inter_700Bold',marginBottom:8},
  input:{minHeight:130,borderWidth:1,borderRadius:14,padding:12,textAlignVertical:'top',fontSize:12},
+ optionRow:{gap:8,marginTop:10},optionCard:{borderWidth:1,borderRadius:13,padding:10},
+ optionLabel:{fontSize:10,marginBottom:7},choiceRow:{flexDirection:'row',gap:8,flexWrap:'wrap'},
+ choice:{minHeight:38,paddingHorizontal:12,borderWidth:1,borderRadius:10,alignItems:'center',justifyContent:'center'},
+ choiceText:{fontSize:10.5,fontFamily:'Inter_700Bold'},
  primary:{minHeight:50,borderRadius:14,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,marginTop:10},
  primaryText:{fontSize:12,fontFamily:'Inter_700Bold'},actions:{gap:8,marginTop:10},
  secondary:{minHeight:48,borderWidth:1,borderRadius:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8},
