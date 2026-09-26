@@ -111,7 +111,7 @@ export default function SettingsScreen(){
    </View>
    <View style={[styles.card,{backgroundColor:colors.card,borderColor:colors.border}]}>
     <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Nexus Assistant AI</Text>
-    <Text style={[styles.body,{color:colors.mutedForeground}]}>Select which cloud model Nexus Assistant uses for chat. Gemini stays free; OpenAI and Claude (Anthropic) are Premium unless you add your own API key in API Studio.</Text>
+    <Text style={[styles.body,{color:colors.mutedForeground}]}>Select which cloud model Nexus Assistant uses for chat. Cloud models use Nexus credits; local Nexus Core AI stays on-device.</Text>
     <View style={styles.modeList}>
       {([['gemini','Gemini','1 credit'],['openai','OpenAI','4 credits'],['anthropic','Claude','6 credits']] as const).map(([value,title,badge])=><Pressable key={value} accessibilityRole="radio" accessibilityState={{selected:assistantModel===value}} onPress={()=>{setAssistantModel(value);void setAssistantModelPreference(value);}} style={[styles.modeItem,{borderColor:assistantModel===value?colors.primary:colors.border,backgroundColor:assistantModel===value?colors.secondary:colors.card}]}><View style={[styles.radio,{borderColor:assistantModel===value?colors.primary:colors.mutedForeground}]}>{assistantModel===value?<View style={[styles.radioDot,{backgroundColor:colors.primary}]} />:null}</View><View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>{title}</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>{badge}</Text></View></Pressable>)}
     </View>
