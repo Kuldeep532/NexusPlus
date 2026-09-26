@@ -267,7 +267,17 @@ export default function NexusAssistantScreen() {
           await speakResponseForMode(responseText, fromLiveMode);
           return;
         }
-      } catch {}
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith('PREMIUM_MODEL_REQUIRED_')) {
+          const provider = error.message.includes('ANTHROPIC') ? 'Claude (Anthropic)' : 'OpenAI';
+          const premiumMessage = provider + ' is a Premium model. Subscribe to Nexus Plus Premium or add your own API key in Settings > Nexus Assistant AI > API Studio.';
+          await addMessage(SESSION_ID, 'assistant', premiumMessage);
+          await refreshMessages();
+          setStatus('Premium model access is required, or use your own API key in API Studio.');
+          await speakResponseForMode(premiumMessage, fromLiveMode);
+          return;
+        }
+      }
 
       if (!engineReady) {
         const fallback = context.prompt
