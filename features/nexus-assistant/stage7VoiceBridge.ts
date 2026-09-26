@@ -26,7 +26,7 @@ export function createStage7VoiceBridge(onStatus?: (status: VoiceRuntimeStatus) 
   const subscription = emitter.addListener('NexusAssistantVoiceState', (payload: VoiceRuntimeStatus & { transcript?: string }) => { onStatus?.(payload); if (payload.transcript) onTranscript?.(payload.transcript); });
   return { bridge: {
     async isAvailable() { return (await getVoiceCommandsEnabled()) && (await ensureMicrophonePermission()) && nativeVoice.isAvailable(); },
-    async startListening() { if (!(await getVoiceCommandsEnabled())) throw new Error('VOICE_COMMANDS_DISABLED'); if (!(await ensureMicrophonePermission())) throw new Error('MIC_PERMISSION_REQUIRED'); await nativeVoice.startListening({ locales: ['en-IN', 'hi-IN', 'en-US'] }); },
+    async startListening() { if (!(await getVoiceCommandsEnabled())) throw new Error('Voice commands are turned off. Turn them on in Assistant settings.'); if (!(await ensureMicrophonePermission())) throw new Error('Microphone access is needed for voice calls.'); await nativeVoice.startListening({ locales: ['en-IN', 'hi-IN', 'en-US'] }); },
     async stopListening() { await nativeVoice.stopListening(); onStatus?.({ state: 'idle' }); },
     async stopOutput() { await nativeVoice.stopOutput().catch(() => undefined); await Speech.stop().catch(() => undefined); },
     async speak(text: string) { await nativeVoice.speak(text); },
