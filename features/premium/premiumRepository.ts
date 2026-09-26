@@ -2,8 +2,6 @@ import { getSupabaseAccessToken } from '@/features/auth/supabaseAuthAdapter';
 import { APP_API_BASE_URL } from '@/features/api-gateway/apiGatewayClient';
 import type { PremiumPlan } from './premiumPlans';
 
-const SUPABASE_KEY = (process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY)?.trim() ?? '';
-
 function assertConfigured() {
   if (!APP_API_BASE_URL) throw new Error('SUPABASE_PREMIUM_NOT_CONFIGURED');
 }
@@ -23,30 +21,17 @@ async function request<T>(path: string, options?: RequestInit, requireAuth = tru
     ...options,
     headers,
   });
-
-  if (!response.ok) throw new Error('SUPABASE_PREMIUM_REQUEST_' + response.status);
+  if (!response.ok) throw new Error('NEXUS_PREMIUM_REQUEST_' + response.status);
   return response.json() as Promise<T>;
 }
 
 async function rpc<T>(name:string, body:Record<string,unknown>):Promise<T>{
-  return request<T>('/functions/rpc/'+name,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  return request<T>('/rpc/'+name,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
 }
 
 type PlanRow={plan_id:number;plan_code:string;plan_name:string;tier_level:number;description:string|null;price_inr:number|string;duration_days:number;blocks_ads:boolean;unlocks_premium_features:boolean;included_credits?:number;};
 export type PremiumCatalogPlan=PremiumPlan&{code:string;tierLevel:number;durationDays:number;blocksAds:boolean;unlocksPremiumFeatures:boolean;description:string;includedCredits:number;};
-
-type BundleRow={
-  bundle_id:number;
-  bundle_code:string;
-  bundle_name:string;
-  duration_days:number;
-  price_inr:number|string;
-  included_credits:number;
-  tier_level:number;
-  blocks_ads:boolean;
-  unlocks_premium_features:boolean;
-  description:string|null;
-};
+type BundleRow={bundle_id:number;bundle_code:string;bundle_name:string;duration_days:number;price_inr:number|string;included_credits:number;tier_level:number;blocks_ads:boolean;unlocks_premium_features:boolean;description:string|null;};
 
 export async function getActivePremiumPlans():Promise<PremiumCatalogPlan[]>{
   const [baseRows, bundleRows] = await Promise.all([
