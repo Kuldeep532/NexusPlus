@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getSupabaseAccessToken } from '@/features/auth/supabaseAuthAdapter';
+import { getSupabaseAccessToken, getStoredAuthSession } from '@/features/auth/supabaseAuthAdapter';
 import { SUPABASE_URL } from '@/features/auth/authConfig';
-import { getStoredAuthSession } from '@/features/auth/supabaseAuthAdapter';
 
 export type TtsVoiceProvider = 'system' | 'piper' | 'clone' | 'elevenlabs';
 export type TtsVoicePreferences = { provider: TtsVoiceProvider; voiceId: string; voiceName: string; language: string; };
