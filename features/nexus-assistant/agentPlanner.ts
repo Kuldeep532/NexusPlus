@@ -5,6 +5,7 @@ import {
 } from './agentCapabilities';
 import { parseAssistantPdfCommand } from './pdfAssistantCommands';
 import { searchAssistantTools } from './assistantToolAdapter';
+import { parseMusicIntent } from './musicIntent';
 
 export type CapabilityProposal = {
   capability: AssistantCapability;
@@ -51,6 +52,22 @@ export function planCapability(request: string): CapabilityProposal | null {
 
   const text = request.trim();
   if (!text) return null;
+
+  const music = parseMusicIntent(text);
+  if (music) {
+    const capability = getAssistantCapability('play-media');
+    if (capability) {
+      return {
+        capability,
+        args: {
+          action: music.action,
+          ...(music.query ? { query: music.query } : {}),
+        },
+        requiresConfirmation: false,
+        reason: 'The request is a direct music playback control or song search command.',
+      };
+    }
+  }
 
   const qrRequest = /(?:qr|qrcode|qr code|क्यूआर|क्यूआर कोड|upi qr|wifi qr|whatsapp qr)/i.test(text);
   if (qrRequest) {
