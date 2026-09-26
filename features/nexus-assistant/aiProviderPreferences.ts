@@ -30,6 +30,24 @@ export async function setCustomProviderApiKey(provider: Exclude<AssistantModelId
   await SecureStore.setItemAsync(KEY_PREFIX + provider, normalized);
 }
 
+export async function getCustomElevenLabsApiKey(): Promise<string | null> {
+  try {
+    const value = await SecureStore.getItemAsync('nexus-plus.assistant.provider-api-key.v2.elevenlabs');
+    return value?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function setCustomElevenLabsApiKey(key: string): Promise<void> {
+  const normalized = key.trim();
+  if (!normalized) {
+    await SecureStore.deleteItemAsync('nexus-plus.assistant.provider-api-key.v2.elevenlabs');
+    return;
+  }
+  await SecureStore.setItemAsync('nexus-plus.assistant.provider-api-key.v2.elevenlabs', normalized);
+}
+
 export async function getConfiguredAssistantModel(): Promise<AssistantModelId> {
   return (await getAssistantModelPreference()).selectedModel;
 }
