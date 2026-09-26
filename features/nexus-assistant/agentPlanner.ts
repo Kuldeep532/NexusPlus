@@ -161,7 +161,7 @@ export function planCapability(request: string): CapabilityProposal | null {
       case 'CREATE_CALENDAR_EVENT':
         return proposalForCapability('calendar-event', { title: text }, 'ElizaOS action registry matched the calendar intent.');
       case 'OPEN_URL': {
-        const url = /https?:\/\/\\S+/i.exec(text)?.[0];
+        const url = /https?:\/\/\S+/i.exec(text)?.[0];
         return url ? proposalForCapability('open-url', { url }, 'ElizaOS action registry matched the URL action.') : null;
       }
       case 'GENERATE_QR':
@@ -189,10 +189,6 @@ export function planCapability(request: string): CapabilityProposal | null {
         return null;
     }
   }
-
-  // Keep the ElizaOS catalog imported and available as the semantic action registry.
-  // The actual execution still occurs through planCapability -> stage3Agent -> executor.
-  void getNexusElizaPlugins;
 
   const battery = /(?:battery|बैटरी)/i.test(text);
   if (battery) return proposalForCapability('battery-status', {}, 'The request asks for battery state.');
