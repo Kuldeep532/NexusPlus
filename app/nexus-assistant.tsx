@@ -500,16 +500,28 @@ export default function NexusAssistantScreen() {
           <Pressable accessibilityRole="button" onPress={() => setShowTools(false)} style={[styles.iconButton, { borderColor: colors.border, backgroundColor: colors.background }]}><Feather name="x" size={18} color={colors.foreground} /></Pressable>
         </View>
         <View style={styles.toolGrid}>
-          {pinnedTools.map((tool) => (
+          <MusicAppsPanel />
+          {pinnedTools.filter((tool) => !['file', 'qr-code'].includes(tool.id)).map((tool) => (
             <Pressable key={tool.id} accessibilityRole="button" accessibilityLabel={tool.title} onPress={() => {
-              if (tool.id === 'file') { void choosePdf(); return; }
               openAssistantTool(tool);
               setStatus(tool.title + ' opened through the existing Nexus Plus tool.');
             }} style={[styles.toolChip, { borderColor: colors.border, backgroundColor: colors.background }]}>
-              <Feather name={tool.id === 'file' ? 'file' : tool.id === 'qr-code' ? 'grid' : 'tool'} size={16} color={colors.primary} />
+              <Feather name="tool" size={16} color={colors.primary} />
               <Text style={[styles.toolChipText, { color: colors.foreground }]}>{tool.title}</Text>
             </Pressable>
           ))}
+          <Pressable accessibilityRole="button" accessibilityLabel="Document" onPress={() => void choosePdf()} style={[styles.toolChip, { borderColor: colors.border, backgroundColor: colors.background }]}>
+            <Feather name="file-text" size={16} color={colors.primary} />
+            <Text style={[styles.toolChipText, { color: colors.foreground }]}>Document</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="QR code generation" onPress={() => { const qr = pinnedTools.find((tool) => tool.id === 'qr-code'); if (qr) openAssistantTool(qr); }} style={[styles.toolChip, { borderColor: colors.border, backgroundColor: colors.background }]}>
+            <Feather name="grid" size={16} color={colors.primary} />
+            <Text style={[styles.toolChipText, { color: colors.foreground }]}>QR Code</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Document reader" onPress={() => { const reader = toolCatalog.find((tool) => /document reader|book reader|reader/i.test(tool.title)); if (reader) openAssistantTool(reader); else setStatus('Document Reader is not registered on this build.'); }} style={[styles.toolChip, { borderColor: colors.border, backgroundColor: colors.background }]}>
+            <Feather name="book-open" size={16} color={colors.primary} />
+            <Text style={[styles.toolChipText, { color: colors.foreground }]}>Document Reader</Text>
+          </Pressable>
         </View>
       </View>
     ) : null}
