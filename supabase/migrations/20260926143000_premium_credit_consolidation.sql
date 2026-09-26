@@ -19,9 +19,9 @@ set
   duration_days = 30,
   is_active = true,
   included_credits = case tier_level
-    when 1 then 100
-    when 2 then 350
-    when 3 then 1000
+    when 1 then 150
+    when 2 then 500
+    when 3 then 1400
     else included_credits
   end,
   description = case tier_level
