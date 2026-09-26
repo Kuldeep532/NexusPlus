@@ -15,7 +15,7 @@ export type CapabilityProposal = {
 };
 
 function parseClockTime(text: string): { hour: number; minute: number } | null {
-  const match = /(?:at|for|पर|को)\s*(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?/i.exec(text);
+  const match = /(?:at|around|by|for|on|पर|को|लगभग)\s*(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?/i.exec(text);
   if (!match) return null;
   let hour = Number(match[1]);
   const minute = Number(match[2] ?? 0);
@@ -39,6 +39,7 @@ function cleanReminderText(text: string): string {
   value = value.replace(/^\s*(?:at|around|by|for|पर|को)\s*\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)?\s*/i, '');
   value = value.replace(/^\s*(?:in|after|within|में|बाद)\s*\d+\s*(?:minute|minutes|min|mins|मिनट|hour|hours|hr|hrs|घंटे|घंटा)\s*/i, '');
   value = value.replace(/^\s*(?:for|to|के लिए|कि)\s*/i, '');
+  value = value.replace(/^\s*(?:at|around|by|for|पर|को)\s*\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)?\s*(?:for|to|के लिए)?\s*/i, '');
   value = value.replace(/^[,;:\-]+\s*/, '');
   return value.trim() || 'Nexus Assistant reminder';
 }
