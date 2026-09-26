@@ -3,7 +3,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { getAssistantModelPreference, setAssistantModelPreference, type AssistantModelId } from '@/features/nexus-assistant/aiModelPreferences';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { ASSISTANT_LIMITS, ASSISTANT_MODELS, ASSISTANT_VOICES, NEXUS_CORE_MODEL_ID } from '@/features/nexus-assistant/assistantConfig';
@@ -19,6 +19,9 @@ import { parseAssistantPdfCommand, type AssistantPdfAttachment } from '@/feature
 import { runStage3Agent } from '@/features/nexus-assistant/stage3Agent';
 import { getWeatherLocalFirst } from '@/features/nexus-assistant/stage6Weather';
 import { createStage7VoiceBridge, speakAssistant, type VoiceRuntimeStatus } from '@/features/nexus-assistant/stage7VoiceBridge';
+import { getAssistantVoicePreference, setAssistantVoicePreference } from '@/features/nexus-assistant/assistantVoicePreferences';
+import { getInstalledVoices, downloadVoice } from '@/features/voice-library/voiceStore';
+import { UNIQUE_VOICE_CATALOG } from '@/features/voice-library/voiceCatalog';
 import type { Stage6VoiceBridge, VoiceInputState } from '@/features/nexus-assistant/stage6Voice';
 import { routeAssistantRequest } from '@/features/nexus-assistant/stage9AssistantRouter';
 import { getResolvedAssistantContext } from '@/features/nexus-assistant/assistantContextService';
@@ -67,6 +70,8 @@ export default function NexusAssistantScreen() {
   const [historyEnabled, setHistoryEnabledState] = useState(true);
   const [sessionList, setSessionList] = useState<Array<{ id: string; title: string; createdAt: number; messageCount: number }>>([]);
   const [assistantModel, setAssistantModel] = useState<AssistantModelId>('gemini');
+  const [assistantVoiceId, setAssistantVoiceId] = useState('en-us-amy-medium');
+  const [assistantVoiceMode, setAssistantVoiceMode] = useState<'local'|'device'>('local');
   const toolCatalog = useMemo(() => getAssistantToolCatalog(), []);
   const pinnedTools = useMemo(() => toolCatalog.filter((tool) => ['file','qr-code','pdf-lock','pdf-unlock','pdf-compress'].includes(tool.id) || /PDF|File|QR/i.test(tool.title)).slice(0, 10), [toolCatalog]);
   const hasText = input.trim().length > 0;
@@ -77,13 +82,13 @@ export default function NexusAssistantScreen() {
         if (next.state === 'listening') setVoiceState('listening');
         else if (next.state === 'processing') setVoiceState('processing');
         else setVoiceState('idle');
-        if (next.error) setStatus('Voice error: ' + next.error);
+        if (next.error) setStatus('Voice could not be started. Please try again.');
       },
       (text: string) => {
         setInput(text);
         setVoiceState('idle');
         setVoiceInput(true);
-        setStatus('Voice transcription ready. Press Send to submit.');
+        setStatus('Voice input is ready. Press Send when you are finished.');
         if (liveMode) void send(text, true);
       },
     );
@@ -100,14 +105,17 @@ export default function NexusAssistantScreen() {
       setMessages(retention ? await listMessages(SESSION_ID) : []);
       const context = await getResolvedAssistantContext();
       const modelPreference = await getAssistantModelPreference();
+      const voicePreference = await getAssistantVoicePreference();
       setAssistantModel(modelPreference.selectedModel);
+      setAssistantVoiceId(voicePreference.voiceId);
+      setAssistantVoiceMode(voicePreference.mode);
       setActiveContextLabel(context.book?.title ?? context.file?.name ?? null);
       const engine = await getLocalInferenceEngine();
       const available = await engine.isAvailable();
       setEngineReady(available);
-      setStatus(available ? 'Local assistant ready. Cloud model and Nexus agent actions are ready.' : 'Assistant ready. The selected cloud model is available through Supabase when configured.');
+      setStatus(available ? 'Nexus Assistant is ready.' : 'Nexus Assistant is ready to use the selected online model.');
       if (calculatorContext) setInput('Explain and analyze the calculator context I just opened.');
-    })().catch(() => setStatus('Local chat storage could not be opened.'));
+    })().catch(() => setStatus('Nexus Assistant could not open your chat history. Please try again.'));
   }, []);
 
   const history = useMemo(
@@ -140,6 +148,30 @@ export default function NexusAssistantScreen() {
     setSessionList([]);
     setStatus('All Nexus Assistant chats cleared from this device.');
   };
+  const startAssistantLiveVoice = async () => {
+    const preference = await getAssistantVoicePreference();
+    setAssistantVoiceId(preference.voiceId);
+    setAssistantVoiceMode(preference.mode);
+    if (preference.mode === 'local') {
+      const installed = await getInstalledVoices();
+      if (!installed.some((voice) => voice.id === preference.voiceId)) {
+        const item = UNIQUE_VOICE_CATALOG.find((voice) => voice.id === preference.voiceId);
+        if (item) {
+          const choice = await new Promise<'download'|'device'|'cancel'>(resolve => Alert.alert('Voice ready to use', 'Download the selected Nexus voice for offline voice calls, or use your Android device voice instead.', [{text:'Not now',style:'cancel',onPress:()=>resolve('cancel')},{text:'Use Device Voice',onPress:()=>resolve('device')},{text:'Download Voice',onPress:()=>resolve('download')}],{cancelable:true,onDismiss:()=>resolve('cancel')}));
+          if (choice === 'download') {
+            setStatus('Downloading the selected voice…');
+            try { await downloadVoice(item); await setAssistantVoicePreference({voiceId: preference.voiceId, mode:'local'}); setAssistantVoiceMode('local'); setStatus('Voice ready. Starting Live Voice Call.'); }
+            catch { setStatus('The voice could not be downloaded. You can use your device voice instead.'); return; }
+          } else if (choice === 'device') {
+            await setAssistantVoicePreference({voiceId: preference.voiceId, mode:'device'});
+            setAssistantVoiceMode('device');
+          } else return;
+        }
+      }
+    }
+    setLiveMode(true);
+  };
+
   const speakResponseForMode = async (text: string, live: boolean) => {
     if (!live || !text.trim()) return;
     const result = await speakAssistant(text, 'en-US', 'live-call');
@@ -429,6 +461,8 @@ export default function NexusAssistantScreen() {
     finally { setAssetBusy(null); }
   };
 
+  const selectedVoiceName = UNIQUE_VOICE_CATALOG.find((voice) => voice.id === assistantVoiceId)?.name ?? 'Device voice';
+
   return <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 18, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 28 }}>
     <View style={styles.header}>
       <View style={styles.headerLeft}>
@@ -441,7 +475,7 @@ export default function NexusAssistantScreen() {
       <View accessibilityLabel="Nexus Assistant menu" style={[styles.sideMenu, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Pressable accessibilityRole="button" onPress={() => { setMenuOpen(false); void router.push('/my-history'); }} style={styles.menuRow}><Feather name="clock" size={18} color={colors.primary} /><Text style={[styles.menuText, { color: colors.foreground }]}>My History</Text></Pressable>
         <Pressable accessibilityRole="button" onPress={() => { setMenuOpen(false); void router.push('/nexus-ai-settings'); }} style={styles.menuRow}><Feather name="cpu" size={18} color={colors.primary} /><Text style={[styles.menuText, { color: colors.foreground }]}>AI Settings</Text></Pressable>
-        <Pressable accessibilityRole="button" onPress={() => { setMenuOpen(false); void router.push('/tts-preferences'); }} style={styles.menuRow}><Feather name="volume-2" size={18} color={colors.primary} /><Text style={[styles.menuText, { color: colors.foreground }]}>Reminder Voice</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => { setMenuOpen(false); void router.push('/nexus-ai-settings'); }} style={styles.menuRow}><Feather name="volume-2" size={18} color={colors.primary} /><Text style={[styles.menuText, { color: colors.foreground }]}>Assistant Voice</Text></Pressable>
         <Pressable accessibilityRole="button" onPress={() => { setMenuOpen(false); void router.push('/settings'); }} style={styles.menuRow}><Feather name="settings" size={18} color={colors.primary} /><Text style={[styles.menuText, { color: colors.foreground }]}>Personal Settings</Text></Pressable>
         <Pressable accessibilityRole="button" onPress={() => void toggleHistory()} style={styles.menuRow}><Feather name={historyEnabled ? 'eye-off' : 'eye'} size={18} color={colors.primary} /><Text style={[styles.menuText, { color: colors.foreground }]}>{historyEnabled ? 'Turn history off' : 'Turn history on'}</Text></Pressable>
         <Pressable accessibilityRole="button" onPress={() => void clearChats()} style={styles.menuRow}><Feather name="trash-2" size={18} color={colors.destructive} /><Text style={[styles.menuText, { color: colors.destructive }]}>Clear Chats</Text></Pressable>
@@ -460,6 +494,7 @@ export default function NexusAssistantScreen() {
         ))}
       </View>
       <Text style={[styles.note, { color: colors.primary }]}>Selected: {assistantModel === 'anthropic' ? 'Claude' : assistantModel === 'openai' ? 'OpenAI' : 'Gemini'}</Text>
+      <Pressable accessibilityRole='button' onPress={() => void router.push('/nexus-ai-settings')} style={[styles.settingRow,{borderColor:colors.border}]}><View style={{flex:1}}><Text style={[styles.menuText,{color:colors.foreground}]}>Assistant voice</Text><Text style={[styles.note,{color:colors.mutedForeground}]}>{assistantVoiceMode==='device'?'Device TTS':selectedVoiceName}</Text></View><Feather name='chevron-right' size={18} color={colors.mutedForeground}/></Pressable>
       <Text style={[styles.note, { color: colors.mutedForeground }]}>Signed in: {auth.session?.user.email ?? 'Not signed in'}</Text>
       <Pressable accessibilityRole="switch" accessibilityState={{ checked: historyEnabled }} onPress={() => void toggleHistory()} style={[styles.settingRow, { borderColor: colors.border }]}>
         <View style={{ flex: 1 }}><Text style={[styles.menuText, { color: colors.foreground }]}>Save chat history</Text><Text style={[styles.note, { color: colors.mutedForeground }]}>When off, new conversations are not persisted.</Text></View>
@@ -571,7 +606,7 @@ export default function NexusAssistantScreen() {
       <View style={styles.actionRow}>
         <Pressable accessibilityRole="button" accessibilityLabel="Attach a Nexus tool" onPress={() => setShowTools((v) => !v)} style={[styles.secondaryButton, { borderColor: showTools ? colors.primary : colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>Attach</Text></Pressable>
         <Pressable accessibilityRole="button" onPress={toggleVoiceInput} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>{voiceState === 'listening' ? 'Stop voice' : 'Voice'}</Text></Pressable>
-        <Pressable accessibilityRole="button" onPress={() => void toggleLiveMode()} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>{liveMode ? 'End Live' : 'Live Mode'}</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => void (liveMode ? toggleLiveMode() : startAssistantLiveVoice()) style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>{liveMode ? 'End Live' : 'Live Mode'}</Text></Pressable>
         <Pressable accessibilityRole="button" disabled={!hasText || busy} onPress={() => void send()} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: !hasText || busy ? 0.5 : 1 }]}><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{busy ? 'Working…' : 'Send'}</Text></Pressable>
       </View>
     </View>
