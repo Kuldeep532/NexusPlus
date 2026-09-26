@@ -21,6 +21,7 @@ export async function requestDeviceIntegrityToken(requestHash: string): Promise<
 export async function submitIntegrityToken(token: string, requestHash: string): Promise<void> {
   const accessToken = await getSupabaseAccessToken();
   if (!accessToken || !APP_API_BASE_URL || !token) return;
+
   await fetch(APP_API_BASE_URL + '/security/attest-token', {
     method: 'POST',
     headers: {
