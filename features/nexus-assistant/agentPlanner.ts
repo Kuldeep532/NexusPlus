@@ -14,6 +14,25 @@ export type CapabilityProposal = {
   reason: string;
 };
 
+function parseClockTime(text: string): { hour: number; minute: number } | null {
+  const match = /(?:at|for|पर|को)\\s*(\\d{1,2})(?::(\\d{2}))?\\s*(a\\.?m\\.?|p\\.?m\\.?)?/i.exec(text);
+  if (!match) return null;
+  let hour = Number(match[1]);
+  const minute = Number(match[2] ?? 0);
+  const meridiem = match[3]?.toLowerCase().replace(/\\./g, '');
+  if (meridiem === 'pm' && hour < 12) hour += 12;
+  if (meridiem === 'am' && hour === 12) hour = 0;
+  if (hour > 23 || minute > 59) return null;
+  return { hour, minute };
+}
+
+function parseRelativeMinutes(text: string): number | null {
+  const match = /(?:in|after|में)\\s*(\\d+)\\s*(minute|minutes|min|मिनट|hour|hours|घंटे|घंटा)/i.exec(text);
+  if (!match) return null;
+  const value = Math.max(1, Number(match[1]));
+  return /hour|घंटे|घंटा/i.test(match[2]) ? value * 60 : value;
+}
+
 const COMMAND_PATTERNS: Array<{
   id: string;
   pattern: RegExp;
@@ -22,8 +41,22 @@ const COMMAND_PATTERNS: Array<{
 }> = [
   { id: 'battery-status', pattern: /(?:battery|बैटरी)/i, reason: 'The user appears to be asking for battery state.', args: () => ({}) },
   { id: 'device-info', pattern: /(?:device information|phone info|डिवाइस|फोन की जानकारी)/i, reason: 'The request appears to ask for basic device information.', args: () => ({}) },
-  { id: 'open-url', pattern: /(?:open|खोलो|खोलना)\s+(https?:\/\/\S+)/i, reason: 'The user requested opening a specific URL.', args: (match) => ({ url: match[1] }) },
-  { id: 'create-reminder', pattern: /(?:remind me|reminder|याद दिलाना|रिमाइंडर)/i, reason: 'The request appears to create a reminder.', args: () => ({}) },
+  { id: 'open-url', pattern: /(?:open|खोलो|खोलना)\\s+(https?:\\/\\/\\S+)/i, reason: 'The user requested opening a specific URL.', args: (match) => ({ url: match[1] }) },
+  { id: 'create-reminder', pattern: /(?:remind me|reminder|याद दिलाना|रिमाइंडर)/i, reason: 'The request appears to create a reminder.', args: (match) => {
+      const minutes = parseRelativeMinutes(match.input);
+      const clock = parseClockTime(match.input);
+      return {
+        ...(minutes ? { delayMinutes: String(minutes) } : {}),
+        ...(clock ? { hour: String(clock.hour), minute: String(clock.minute) } : {}),
+        message: match.input.trim(),
+      };
+    } },
+  { id: 'set-alarm', pattern: /(?:set|start|wake me|लगाओ|सेट करो|जगाना).*\\b(?:alarm|अलार्म)\\b/i, reason: 'The user requested a device alarm.', args: (match) => {
+      const clock = parseClockTime(match.input);
+      if (!clock) return {};
+      return { hour: String(clock.hour), minute: String(clock.minute) };
+    } },
+  { id: 'calendar-event', pattern: /(?:add|create|schedule|book|set).*\\b(?:calendar|event|meeting|appointment)\\b|कैलेंडर|मीटिंग|अपॉइंटमेंट/i, reason: 'The user requested a calendar event.', args: (match) => ({ title: match.input.trim() }) },
 ];
 
 export function planCapability(request: string): CapabilityProposal | null {
