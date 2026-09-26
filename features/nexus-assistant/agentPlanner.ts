@@ -8,6 +8,7 @@ import { searchAssistantTools } from './assistantToolAdapter';
 import { parseMusicIntent } from './musicIntent';
 import { parseNaturalCommand } from './naturalCommandParser';
 import { findNexusElizaAction } from './elizaAgentPlugin';
+import { extractCallTarget } from './contactCallIntent';
 
 export type CapabilityProposal = {
   capability: AssistantCapability;
@@ -182,6 +183,10 @@ export function planCapability(request: string): CapabilityProposal | null {
         return intent
           ? proposalForCapability('play-media', { action: intent.action, ...(intent.query ? { query: intent.query } : {}) }, 'ElizaOS action registry matched the music action.')
           : null;
+      }
+      case 'CALL_CONTACT': {
+        const target = extractCallTarget(text);
+        return target ? proposalForCapability('call-contact', { target }, 'ElizaOS action registry matched the contact calling intent.') : null;
       }
       case 'OPEN_APP':
         return null;
