@@ -262,7 +262,8 @@ export default function NexusAssistantScreen() {
             : routed.provider.text;
           await addMessage(SESSION_ID, 'assistant', responseText);
           await refreshMessages();
-          setStatus(routed.provider.provider === 'gemini' ? 'Gemini response received through Nexus Gateway.' : 'Response received through an optional cloud provider.');
+          const providerLabel = routed.provider.provider === 'anthropic' ? 'Claude (Anthropic)' : routed.provider.provider === 'openai' ? 'OpenAI' : 'Gemini';
+          setStatus(providerLabel + ' response received through Nexus Assistant.');
           await speakResponseForMode(responseText, fromLiveMode);
           return;
         }
@@ -271,7 +272,7 @@ export default function NexusAssistantScreen() {
       if (!engineReady) {
         const fallback = context.prompt
           ? 'Nexus Assistant could not reach an inference provider. Your selected context stays on this device.'
-          : 'Nexus Assistant could not reach Gemini and local inference is not available in this build. Your message is stored locally on this device.';
+          : 'Nexus Assistant could not reach the selected chat provider and local inference is not available in this build. Your message is stored locally on this device.';
         await addMessage(SESSION_ID, 'assistant', fallback);
         await refreshMessages();
         setStatus('No chat inference provider available; message remains local.');
