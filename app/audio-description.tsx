@@ -19,6 +19,7 @@ export default function AudioDescriptionScreen() {
   const [instruction, setInstruction] = useState('');
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
+  const [advancedNotice, setAdvancedNotice] = useState('');
 
   const credits = mode === 'advanced' ? 12 : 4;
   const modeText = useMemo(
@@ -56,6 +57,7 @@ export default function AudioDescriptionScreen() {
         customInstruction: instruction,
       });
       setDescription(result.description);
+      setAdvancedNotice(mode === 'advanced' ? 'Advanced description uses Premium AI processing.' : 'Basic description uses the free audio description mode.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to create the audio description right now.';
       Alert.alert('Audio description', message);
@@ -142,6 +144,7 @@ export default function AudioDescriptionScreen() {
           Premium plans and credit top-ups can be used for larger or more advanced jobs.
         </Text>
       </View>
+      {advancedNotice ? <Text style={[styles.notice, { color: colors.mutedForeground }]}>{advancedNotice}</Text> : null}
 
       <Pressable
         onPress={() => void generate()}
@@ -187,4 +190,5 @@ const styles = StyleSheet.create({
   resultCard: { borderWidth: 1, borderRadius: 17, padding: 14, marginTop: 16 },
   resultTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', marginBottom: 10 },
   resultText: { fontSize: 12.5, lineHeight: 20 },
+  notice: { fontSize: 11, lineHeight: 16, marginBottom: 12 },
 });
