@@ -9,6 +9,7 @@ export type AssistantCapabilityId =
   | 'read-local-file'
   | 'share-local-file'
   | 'play-media'
+  | 'music-apps'
   | 'pdf-lock'
   | 'pdf-unlock'
   | 'pdf-compress'
