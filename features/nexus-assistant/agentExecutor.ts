@@ -5,6 +5,9 @@ import { getAssistantCapability, type AssistantCapabilityId } from './agentCapab
 import { openAssistantTool, searchAssistantTools } from './assistantToolAdapter';
 import { executeNativeMusicIntent, type MusicAction } from './musicIntent';
 import type { CapabilityProposal } from './agentPlanner';
+import { setAssistantAlarm, openCalendarEventDraft } from './assistantNativeActions';
+import { scheduleReminder } from '@/features/reminders/reminderScheduler';
+import { registerReminder } from '@/features/reminders/reminderBackend';
 
 export type ExecutionContext = {
   confirmed: boolean;
@@ -78,6 +81,49 @@ export async function executeCapability(
                     : 'Music stopped.'
           : 'The selected music app does not support this Android music command.',
       };
+    }
+    case 'create-reminder': {
+      const minutes = Math.max(1, Number(proposal.args.delayMinutes ?? '5'));
+      const clockHour = proposal.args.hour ? Number(proposal.args.hour) : NaN;
+      const clockMinute = proposal.args.minute ? Number(proposal.args.minute) : NaN;
+      let scheduledFor: string | undefined;
+      let delayMinutes = minutes;
+      if (Number.isFinite(clockHour) && Number.isFinite(clockMinute)) {
+        const target = new Date();
+        target.setHours(clockHour, clockMinute, 0, 0);
+        if (target.getTime() <= Date.now()) target.setDate(target.getDate() + 1);
+        scheduledFor = target.toISOString();
+        delayMinutes = Math.max(1, Math.ceil((target.getTime() - Date.now()) / 60000));
+      }
+      const message = proposal.args.message || 'Nexus Assistant reminder';
+      const item = await scheduleReminder({
+        title: message.slice(0, 80),
+        body: message,
+        delayMinutes: String(delayMinutes),
+        language: /[\u0900-\u097F]/.test(message) ? 'hi-IN' : 'en-US',
+        scheduleKind: scheduledFor ? 'at' : 'delay',
+        scheduledFor,
+      });
+      await registerReminder(item);
+      return {
+        capabilityId: proposal.capability.id,
+        success: true,
+        message: scheduledFor ? `Reminder scheduled for ${item.scheduledAt}.` : `Reminder set for ${delayMinutes} minutes from now.`,
+      };
+    }
+    case 'set-alarm': {
+      const hour = Number(proposal.args.hour);
+      const minute = Number(proposal.args.minute ?? '0');
+      if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+        return { capabilityId: proposal.capability.id, success: false, message: 'Please include the alarm time, for example 5 PM.' };
+      }
+      const message = await setAssistantAlarm(hour, minute);
+      return { capabilityId: proposal.capability.id, success: /scheduled/i.test(message), message };
+    }
+    case 'calendar-event': {
+      const title = proposal.args.title || 'Nexus Assistant event';
+      const message = await openCalendarEventDraft({ title });
+      return { capabilityId: proposal.capability.id, success: /prepared/i.test(message), message };
     }
     case 'qr-generate': {
       const qr = searchAssistantTools('Generate QR Code').find((item) => item.id === 'qr-code');
