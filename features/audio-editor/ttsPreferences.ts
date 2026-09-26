@@ -17,8 +17,10 @@ export async function readTtsVoicePreferences(): Promise<TtsVoicePreferences> {
   if (!configured()) return local;
   const token = await getSupabaseAccessToken();
   if (!token) return local;
+  const session = await getStoredAuthSession();
+  if (!session?.user.uid) return local;
   try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/tts_voice_preferences?select=provider,voice_id,voice_name,language&limit=1`, { headers: headers(token) });
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/tts_voice_preferences?select=provider,voice_id,voice_name,language&user_id=eq.${encodeURIComponent(session.user.uid)}&limit=1`, { headers: headers(token) });
     if (!response.ok) return local;
     const rows = await response.json() as Array<{provider:TtsVoiceProvider;voice_id:string|null;voice_name:string|null;language:string|null}>;
     const row = rows[0];
