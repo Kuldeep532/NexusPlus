@@ -28,6 +28,7 @@
 # Explicit React Native native-module entry points.
 -keep class com.nexuswavetech.nexusplus.NexusVaultModule { *; }
 -keep class com.nexuswavetech.nexusplus.NexusMediaModule { *; }
+-keep class com.nexuswavetech.nexusplus.NexusMusicModule { *; }
 -keep class com.nexuswavetech.nexusplus.NexusFileUriModule { *; }
 -keep class com.nexuswavetech.nexusplus.NexusDocumentReaderModule { *; }
 -keep class com.nexuswavetech.nexusplus.NexusNativeSecurityModule { *; }
