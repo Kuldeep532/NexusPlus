@@ -110,6 +110,18 @@ export default function SettingsScreen(){
     </Pressable>
    </View>
    <View style={[styles.card,{backgroundColor:colors.card,borderColor:colors.border}]}>
+    <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Nexus Assistant AI</Text>
+    <Text style={[styles.body,{color:colors.mutedForeground}]}>Select which cloud model Nexus Assistant uses for chat. Gemini stays free; OpenAI and Claude (Anthropic) are Premium unless you add your own API key in API Studio.</Text>
+    <View style={styles.modeList}>
+      {([['gemini','Gemini','Free'],['openai','OpenAI','Premium'],['anthropic','Claude (Anthropic)','Premium']] as const).map(([value,title,badge])=><Pressable key={value} accessibilityRole="radio" accessibilityState={{selected:assistantModel===value}} onPress={()=>{setAssistantModel(value);void setAssistantModelPreference(value);}} style={[styles.modeItem,{borderColor:assistantModel===value?colors.primary:colors.border,backgroundColor:assistantModel===value?colors.secondary:colors.card}]}><View style={[styles.radio,{borderColor:assistantModel===value?colors.primary:colors.mutedForeground}]}>{assistantModel===value?<View style={[styles.radioDot,{backgroundColor:colors.primary}]} />:null}</View><View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>{title}</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>{badge}</Text></View></Pressable>)}
+    </View>
+    <Pressable accessibilityRole="button" onPress={()=>router.push('/api-studio' as never)} style={[styles.item,{marginTop:10,borderColor:colors.border,backgroundColor:colors.card}]}>
+      <View style={[styles.icon,{backgroundColor:colors.secondary}]}><Feather name="key" size={19} color={colors.primary}/></View>
+      <View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>API Studio</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>Add your own OpenAI or Anthropic API key to use those providers with your own account.</Text></View>
+      <Feather name="chevron-right" size={19} color={colors.mutedForeground}/>
+    </Pressable>
+   </View>
+   <View style={[styles.card,{backgroundColor:colors.card,borderColor:colors.border}]}>
     <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Geeta Nexus Messages</Text>
     <Text style={[styles.body,{color:colors.mutedForeground}]}>Receive optional local Gita/spiritual messages during the day. The app never requires you to read a verse to use Nexus Plus.</Text>
     <Pressable accessibilityRole="switch" accessibilityState={{checked:spiritualPrefs.enabled}} onPress={()=>{const next={...spiritualPrefs,enabled:!spiritualPrefs.enabled};setSpiritualPrefs(next);void writeSpiritualReminderPreferences(next).then(()=>next.enabled?scheduleSpiritualReminders():cancelSpiritualReminders());}} style={styles.modeItem}>
