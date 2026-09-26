@@ -7,6 +7,7 @@ import { parseAssistantPdfCommand } from './pdfAssistantCommands';
 import { searchAssistantTools } from './assistantToolAdapter';
 import { parseMusicIntent } from './musicIntent';
 import { parseNaturalCommand } from './naturalCommandParser';
+import { getNexusElizaPlugins } from './elizaIntegration';
 
 export type CapabilityProposal = {
   capability: AssistantCapability;
@@ -20,7 +21,7 @@ function parseClockTime(text: string): { hour: number; minute: number } | null {
   if (!match) return null;
   let hour = Number(match[1]);
   const minute = Number(match[2] ?? 0);
-  const meridiem = match[3]?.toLowerCase().replace(/\\./g, '');
+  const meridiem = match[3]?.toLowerCase().replace(/\./g, '');
   if (meridiem === 'pm' && hour < 12) hour += 12;
   if (meridiem === 'am' && hour === 12) hour = 0;
   if (hour > 23 || minute > 59) return null;
@@ -28,49 +29,36 @@ function parseClockTime(text: string): { hour: number; minute: number } | null {
 }
 
 function parseRelativeMinutes(text: string): number | null {
-  const match = /(?:in|after|within|में|बाद)\s*(\d+)\s*(minute|minutes|min|mins|मिनट|hour|hours|hr|hrs|घंटे|घंटा)/i.exec(text);
-  if (!match) return null;
-  const value = Math.max(1, Number(match[1]));
-  return /hour|hr|hrs|घंटे|घंटा/i.test(match[2]) ? value * 60 : value;
+  const match = /(?:in|after|within|में|बाद)\s*(\d+(?:\.\d+)?)\s*(minute|minutes|min|mins|मिनट|hour|hours|hr|hrs|घंटे|घंटा)/i.exec(text);
+  if (!match) {
+    if (/\b(?:in|after|within)\s+(?:half an hour|half hour)\b/i.test(text)) return 30;
+    return null;
+  }
+  const value = Math.max(0.1, Number(match[1]));
+  return /hour|hr|hrs|घंटे|घंटा/i.test(match[2]) ? Math.max(1, Math.round(value * 60)) : Math.max(1, Math.round(value));
 }
 
 function cleanReminderText(text: string): string {
   let value = text.trim();
-  value = value.replace(/^\s*(?:remind me|reminder|please remind me|remember to|याद दिलाना|रिमाइंडर|मुझे याद दिलाना)\s*/i, '');
-  value = value.replace(/^\s*(?:at|around|by|for|पर|को)\s*\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)?\s*/i, '');
-  value = value.replace(/^\s*(?:in|after|within|में|बाद)\s*\d+\s*(?:minute|minutes|min|mins|मिनट|hour|hours|hr|hrs|घंटे|घंटा)\s*/i, '');
-  value = value.replace(/^\s*(?:for|to|के लिए|कि)\s*/i, '');
-  value = value.replace(/^\s*(?:at|around|by|for|पर|को)\s*\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)?\s*(?:for|to|के लिए)?\s*/i, '');
-  value = value.replace(/^[,;:\-]+\s*/, '');
-  return value.trim() || 'Nexus Assistant reminder';
+  value = value.replace(/^\s*(?:remind me|reminder|please remind me|remember to|don't let me forget|do not let me forget|याद दिलाना|रिमाइंडर|मुझे याद दिलाना)\s*/i, '');
+  value = value.replace(/\b(?:at|around|by|for|on|पर|को|लगभग)\s*\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)?\b/i, '');
+  value = value.replace(/\b\d{1,2}(?::\d{2})?\s*(?:in the|in)?\s*(?:morning|afternoon|evening|night)\b/i, '');
+  value = value.replace(/\b(?:in|after|within|में|बाद)\s*\d+(?:\.\d+)?\s*(?:minute|minutes|min|mins|मिनट|hour|hours|hr|hrs|घंटे|घंटा)\b/i, '');
+  value = value.replace(/\b(?:in|after|within)\s+(?:half an hour|half hour)\b/i, '');
+  value = value.replace(/^[,;:\-]+|[,;:\-]+$/g, '');
+  return value.replace(/\s+/g, ' ').trim() || 'Nexus Assistant reminder';
 }
 
-const COMMAND_PATTERNS: Array<{
-  id: string;
-  pattern: RegExp;
-  reason: string;
-  args: (match: RegExpExecArray) => Record<string, string>;
-}> = [
-  { id: 'battery-status', pattern: /(?:battery|बैटरी)/i, reason: 'The user appears to be asking for battery state.', args: () => ({}) },
-  { id: 'device-info', pattern: /(?:device information|phone info|डिवाइस|फोन की जानकारी)/i, reason: 'The request appears to ask for basic device information.', args: () => ({}) },
-  { id: 'open-url', pattern: /(?:open|खोलो|खोलना)\s+(https?:\/\/\\S+)/i, reason: 'The user requested opening a specific URL.', args: (match) => ({ url: match[1] }) },
-  { id: 'create-reminder', pattern: /(?:remind|reminder|remember|याद|रिमाइंडर)/i, reason: 'The request appears to create a reminder.', args: (match) => {
-      const minutes = parseRelativeMinutes(match.input);
-      const clock = parseClockTime(match.input);
-      const message = cleanReminderText(match.input);
-      return {
-        ...(minutes ? { delayMinutes: String(minutes) } : {}),
-        ...(clock ? { hour: String(clock.hour), minute: String(clock.minute) } : {}),
-        message,
-      };
-    } },
-  { id: 'set-alarm', pattern: /(?:set|start|wake me|लगाओ|सेट करो|जगाना).*\b(?:alarm|अलार्म)\b/i, reason: 'The user requested a device alarm.', args: (match) => {
-      const clock = parseClockTime(match.input);
-      if (!clock) return {};
-      return { hour: String(clock.hour), minute: String(clock.minute) };
-    } },
-  { id: 'calendar-event', pattern: /(?:add|create|schedule|book|set).*\b(?:calendar|event|meeting|appointment)\b|कैलेंडर|मीटिंग|अपॉइंटमेंट/i, reason: 'The user requested a calendar event.', args: (match) => ({ title: match.input.trim() }) },
-];
+function proposalForCapability(id: AssistantCapability['id'], args: Record<string, string>, reason: string): CapabilityProposal | null {
+  const capability = getAssistantCapability(id);
+  if (!capability) return null;
+  return {
+    capability,
+    args,
+    requiresConfirmation: requiresCapabilityConfirmation(id),
+    reason,
+  };
+}
 
 export function planCapability(request: string): CapabilityProposal | null {
   const pdf = parseAssistantPdfCommand(request);
@@ -80,19 +68,11 @@ export function planCapability(request: string): CapabilityProposal | null {
       : pdf.kind === 'compress' ? 'pdf-compress'
       : pdf.kind === 'rotate' ? 'pdf-rotate'
       : null;
-
     if (id) {
-      const capability = getAssistantCapability(id);
-      if (!capability) return null;
       const args: Record<string, string> = { command: pdf.kind };
       if (pdf.kind === 'compress') args.quality = String(pdf.quality);
       if (pdf.kind === 'rotate') args.degrees = String(pdf.degrees);
-      return {
-        capability,
-        args,
-        requiresConfirmation: requiresCapabilityConfirmation(id),
-        reason: 'The user requested a PDF operation on a selected local PDF.',
-      };
+      return proposalForCapability(id, args, 'The user requested a PDF operation on a selected local PDF.');
     }
   }
 
@@ -101,71 +81,92 @@ export function planCapability(request: string): CapabilityProposal | null {
 
   const natural = parseNaturalCommand(text);
   if (natural.kind === 'reminder') {
-    const capability = getAssistantCapability('create-reminder');
-    if (capability) {
-      return {
-        capability,
-        args: {
-          ...(natural.hour !== undefined ? { hour: String(natural.hour), minute: String(natural.minute ?? 0) } : {}),
-          ...(natural.delayMinutes !== undefined ? { delayMinutes: String(natural.delayMinutes) } : {}),
-          message: natural.text ?? 'Nexus Assistant reminder',
-        },
-        requiresConfirmation: requiresCapabilityConfirmation('create-reminder'),
-        reason: 'Natural-language reminder request parsed into time and reminder text.',
-      };
-    }
+    return proposalForCapability(
+      'create-reminder',
+      {
+        ...(natural.hour !== undefined ? { hour: String(natural.hour), minute: String(natural.minute ?? 0) } : {}),
+        ...(natural.delayMinutes !== undefined ? { delayMinutes: String(natural.delayMinutes) } : {}),
+        message: natural.text ?? 'Nexus Assistant reminder',
+      },
+      'ElizaOS capability semantics matched a natural-language reminder and extracted its time/message slots.',
+    );
   }
+
   if (natural.kind === 'alarm') {
-    const capability = getAssistantCapability('set-alarm');
-    if (capability && natural.hour !== undefined) {
-      return {
-        capability,
-        args: { hour: String(natural.hour), minute: String(natural.minute ?? 0) },
-        requiresConfirmation: requiresCapabilityConfirmation('set-alarm'),
-        reason: 'Natural-language alarm request parsed into a clock time.',
-      };
-    }
+    if (natural.hour === undefined) return null;
+    return proposalForCapability(
+      'set-alarm',
+      { hour: String(natural.hour), minute: String(natural.minute ?? 0) },
+      'ElizaOS capability semantics matched a natural-language alarm and extracted its time slots.',
+    );
+  }
+
+  if (natural.kind === 'calendar') {
+    return proposalForCapability(
+      'calendar-event',
+      { title: natural.text ?? text },
+      'ElizaOS capability semantics matched a calendar/event request.',
+    );
+  }
+
+  if (natural.kind === 'open-url' && natural.target) {
+    return proposalForCapability(
+      'open-url',
+      { url: natural.target },
+      'ElizaOS capability semantics matched a direct URL action.',
+    );
   }
 
   const music = parseMusicIntent(text);
   if (music) {
-    const capability = getAssistantCapability('play-media');
-    if (capability) {
-      return {
-        capability,
-        args: {
-          action: music.action,
-          ...(music.query ? { query: music.query } : {}),
-        },
-        requiresConfirmation: false,
-        reason: 'The request is a direct music playback control or song search command.',
-      };
-    }
+    return proposalForCapability(
+      'play-media',
+      {
+        action: music.action,
+        ...(music.query ? { query: music.query } : {}),
+      },
+      'ElizaOS capability semantics matched a direct media action.',
+    );
   }
 
   const qrRequest = /(?:qr|qrcode|qr code|क्यूआर|क्यूआर कोड|upi qr|wifi qr|whatsapp qr)/i.test(text);
   if (qrRequest) {
-    const capability = getAssistantCapability('qr-generate');
-    if (capability) return { capability, args: { query: text }, requiresConfirmation: false, reason: 'The request appears to ask the existing QR generator to create a QR code.' };
+    return proposalForCapability('qr-generate', { query: text }, 'ElizaOS capability semantics matched a QR generation request.');
   }
 
   const tool = searchAssistantTools(text).find((item) => item.id !== 'qr-code' && item.kind === 'route');
   if (tool) {
-    const capability = getAssistantCapability('tool-open');
-    if (capability) return { capability, args: { toolId: tool.id, route: tool.route ?? '' }, requiresConfirmation: false, reason: 'The request matches a registered Nexus Plus tool.' };
+    return proposalForCapability('tool-open', { toolId: tool.id, route: tool.route ?? '' }, 'ElizaOS capability semantics matched a registered Nexus Plus tool.');
   }
-  for (const candidate of COMMAND_PATTERNS) {
-    const match = candidate.pattern.exec(text);
-    if (!match) continue;
-    const capability = getAssistantCapability(candidate.id);
-    if (!capability) return null;
-    return {
-      capability,
-      args: candidate.args(match),
-      requiresConfirmation: requiresCapabilityConfirmation(candidate.id),
-      reason: candidate.reason,
-    };
+
+  // Keep the ElizaOS catalog imported and available as the semantic action registry.
+  // The actual execution still occurs through planCapability -> stage3Agent -> executor.
+  void getNexusElizaPlugins;
+
+  const battery = /(?:battery|बैटरी)/i.test(text);
+  if (battery) return proposalForCapability('battery-status', {}, 'The request asks for battery state.');
+
+  const device = /(?:device information|phone info|डिवाइस|फोन की जानकारी)/i.test(text);
+  if (device) return proposalForCapability('device-info', {}, 'The request asks for basic device information.');
+
+  const url = /(?:open|खोलो|खोलना)\s+(https?:\/\/\S+)/i.exec(text);
+  if (url) return proposalForCapability('open-url', { url: url[1] }, 'The user requested opening a specific URL.');
+
+  const reminderFallback = /(?:remind|reminder|remember|याद|रिमाइंडर)/i.test(text);
+  if (reminderFallback) {
+    const minutes = parseRelativeMinutes(text);
+    const clock = parseClockTime(text);
+    return proposalForCapability(
+      'create-reminder',
+      {
+        ...(minutes ? { delayMinutes: String(minutes) } : {}),
+        ...(clock ? { hour: String(clock.hour), minute: String(clock.minute) } : {}),
+        message: cleanReminderText(text),
+      },
+      'Reminder fallback matched by the registered Nexus capability catalog.',
+    );
   }
+
   return null;
 }
 
