@@ -97,6 +97,19 @@ export default function SettingsScreen(){
     <Pressable accessibilityRole="switch" accessibilityState={{checked:launchPrefs.showGeetaNexusOnHome}} onPress={()=>updateLaunchPrefs({...launchPrefs,showGeetaNexusOnHome:!launchPrefs.showGeetaNexusOnHome})} style={styles.modeItem}><View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>Show Geeta Access on Home</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>Keep the Geeta Access shortcut visible on the selected Home screen.</Text></View><Text style={[styles.toggle,{color:colors.primary}]}>{launchPrefs.showGeetaNexusOnHome?'On':'Off'}</Text></Pressable>
    </View>
    <View style={[styles.card,{backgroundColor:colors.card,borderColor:colors.border}]}>
+    <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Personal AI & Voice</Text>
+    <Text style={[styles.body,{color:colors.mutedForeground}]}>Choose your Assistant model, voice provider, and voice from Personal Settings.</Text>
+    <Pressable accessibilityRole="button" onPress={()=>router.push('/tts-preferences' as never)} style={[styles.item,{marginTop:8,borderColor:colors.border,backgroundColor:colors.card}]}>
+      <View style={[styles.icon,{backgroundColor:colors.secondary}]}><Feather name="volume-2" size={19} color={colors.primary}/></View><View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>Reminder Voice & TTS</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>Choose Local TTS or ElevenLabs. Local voices and downloaded models stay free; ElevenLabs uses credits.</Text></View><Feather name="chevron-right" size={19} color={colors.mutedForeground}/>
+    </Pressable>
+    <Pressable accessibilityRole="button" onPress={()=>router.push('/nexus-ai-settings' as never)} style={[styles.item,{marginTop:10,borderColor:colors.border,backgroundColor:colors.card}]}>
+      <View style={[styles.icon,{backgroundColor:colors.secondary}]}><Feather name="cpu" size={19} color={colors.primary}/></View><View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>AI Settings</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>Select Gemini, OpenAI, or Claude for Nexus Assistant.</Text></View><Feather name="chevron-right" size={19} color={colors.mutedForeground}/>
+    </Pressable>
+    <Pressable accessibilityRole="button" onPress={()=>router.push('/my-history' as never)} style={[styles.item,{marginTop:10,borderColor:colors.border,backgroundColor:colors.card}]}>
+      <View style={[styles.icon,{backgroundColor:colors.secondary}]}><Feather name="clock" size={19} color={colors.primary}/></View><View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>My History</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>View and delete all saved Nexus Assistant conversations.</Text></View><Feather name="chevron-right" size={19} color={colors.mutedForeground}/>
+    </Pressable>
+   </View>
+   <View style={[styles.card,{backgroundColor:colors.card,borderColor:colors.border}]}>
     <Text style={[styles.sectionTitle,{color:colors.foreground}]}>Nexus Assistant</Text>
     <Text style={[styles.body,{color:colors.mutedForeground}]}>Voice controls and spoken reminder settings for Nexus Assistant.</Text>
     <Pressable accessibilityRole="switch" accessibilityState={{checked:voiceCommandsEnabled}} onPress={()=>{const next=!voiceCommandsEnabled;setVoiceCommandsEnabledState(next);void setVoiceCommandsEnabled(next);}} style={styles.modeItem}>
