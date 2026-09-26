@@ -13,7 +13,8 @@ export type NexusElizaActionId =
   | 'OPEN_URL'
   | 'OPEN_APP'
   | 'OPEN_TOOL'
-  | 'GENERATE_QR';
+  | 'GENERATE_QR'
+  | 'CALL_CONTACT';
 
 export type NexusElizaAction = {
   id: NexusElizaActionId;
@@ -37,6 +38,7 @@ const actions: NexusElizaAction[] = [
   { id: 'OPEN_APP', name: 'Open app', similes: ['LAUNCH_APP', 'START_APP', 'ऐप खोलो'], description: 'Open an installed app through an explicitly registered Android deep link or intent.', examples: ['open YouTube'] },
   { id: 'OPEN_TOOL', name: 'Open Nexus tool', similes: ['OPEN_FEATURE', 'OPEN_NEXUS_TOOL', 'टूल खोलो'], description: 'Open a registered Nexus Plus tool from the feature catalog.', examples: ['open PDF compressor'] },
   { id: 'GENERATE_QR', name: 'Generate QR', similes: ['MAKE_QR', 'QR_CODE', 'क्यूआर बनाओ'], description: 'Open the existing Nexus QR generator for the requested payload.', examples: ['make a QR code'] },
+  { id: 'CALL_CONTACT', name: 'Call contact', similes: ['CALL', 'CALL_PERSON', 'PHONE_CONTACT', 'कॉल करो', 'कॉल लगाओ'], description: 'Find a matching saved contact and place a phone call through the Android call capability.', examples: ['call father', 'call my sister', 'sister को कॉल करो'] },
 ];
 
 const pluginActions: Action[] = actions.map((action) => ({
