@@ -7,7 +7,7 @@ import { parseAssistantPdfCommand } from './pdfAssistantCommands';
 import { searchAssistantTools } from './assistantToolAdapter';
 import { parseMusicIntent } from './musicIntent';
 import { parseNaturalCommand } from './naturalCommandParser';
-import { getNexusElizaPlugins } from './elizaIntegration';
+import { findNexusElizaAction } from './elizaAgentPlugin';
 
 export type CapabilityProposal = {
   capability: AssistantCapability;
@@ -137,6 +137,57 @@ export function planCapability(request: string): CapabilityProposal | null {
   const tool = searchAssistantTools(text).find((item) => item.id !== 'qr-code' && item.kind === 'route');
   if (tool) {
     return proposalForCapability('tool-open', { toolId: tool.id, route: tool.route ?? '' }, 'ElizaOS capability semantics matched a registered Nexus Plus tool.');
+  }
+
+
+  const elizaAction = findNexusElizaAction(text);
+  if (elizaAction) {
+    switch (elizaAction.id) {
+      case 'CREATE_REMINDER': {
+        const minutes = parseRelativeMinutes(text);
+        const clock = parseClockTime(text);
+        return proposalForCapability('create-reminder', {
+          ...(minutes ? { delayMinutes: String(minutes) } : {}),
+          ...(clock ? { hour: String(clock.hour), minute: String(clock.minute) } : {}),
+          message: cleanReminderText(text),
+        }, 'ElizaOS action registry matched the reminder intent.');
+      }
+      case 'SET_ALARM': {
+        const clock = parseClockTime(text);
+        return clock
+          ? proposalForCapability('set-alarm', { hour: String(clock.hour), minute: String(clock.minute) }, 'ElizaOS action registry matched the alarm intent.')
+          : null;
+      }
+      case 'CREATE_CALENDAR_EVENT':
+        return proposalForCapability('calendar-event', { title: text }, 'ElizaOS action registry matched the calendar intent.');
+      case 'OPEN_URL': {
+        const url = /https?:\/\/\\S+/i.exec(text)?.[0];
+        return url ? proposalForCapability('open-url', { url }, 'ElizaOS action registry matched the URL action.') : null;
+      }
+      case 'GENERATE_QR':
+        return proposalForCapability('qr-generate', { query: text }, 'ElizaOS action registry matched the QR action.');
+      case 'OPEN_TOOL': {
+        const matchedTool = searchAssistantTools(text).find((item) => item.kind === 'route');
+        return matchedTool
+          ? proposalForCapability('tool-open', { toolId: matchedTool.id, route: matchedTool.route ?? '' }, 'ElizaOS action registry matched the Nexus tool action.')
+          : null;
+      }
+      case 'PLAY_MUSIC':
+      case 'PAUSE_MUSIC':
+      case 'RESUME_MUSIC':
+      case 'NEXT_MUSIC':
+      case 'PREVIOUS_MUSIC':
+      case 'STOP_MUSIC': {
+        const intent = parseMusicIntent(text);
+        return intent
+          ? proposalForCapability('play-media', { action: intent.action, ...(intent.query ? { query: intent.query } : {}) }, 'ElizaOS action registry matched the music action.')
+          : null;
+      }
+      case 'OPEN_APP':
+        return null;
+      default:
+        return null;
+    }
   }
 
   // Keep the ElizaOS catalog imported and available as the semantic action registry.
