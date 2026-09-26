@@ -11,6 +11,7 @@ import {
   getPaymentSettings,
   getActiveAiCreditPlans,
   createPaymentOrder,
+  createSubscriptionBundleOrder,
   canPurchaseCreditTopup,
   type PremiumCatalogPlan,
   type PremiumEntitlement,
@@ -54,17 +55,44 @@ export default function ManageSubscriptionScreen() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const start = async (type: 'PREMIUM' | 'AI_CREDITS', code: string) => {
+  const openUpi = async (
+    order: { upiId:string; receiverName:string; amountInr:number },
+    code: string,
+  ) => {
+    const url =
+      'upi://pay?pa=' + encodeURIComponent(order.upiId) +
+      '&pn=' + encodeURIComponent(order.receiverName) +
+      '&am=' + encodeURIComponent(String(order.amountInr)) +
+      '&cu=INR&tn=' + encodeURIComponent('Nexus Plus ' + code);
+    if (!(await Linking.canOpenURL(url))) throw new Error('UPI_NOT_AVAILABLE');
+    await Linking.openURL(url);
+    Alert.alert('Payment started', 'Complete the UPI payment. Access and credits are added only after payment verification.');
+  };
+
+  const start = async (plan: PremiumCatalogPlan | AiCreditPlan) => {
     try {
-      const order = await createPaymentOrder(type, code);
-      const url =
-        'upi://pay?pa=' + encodeURIComponent(order.upiId) +
-        '&pn=' + encodeURIComponent(order.receiverName) +
-        '&am=' + encodeURIComponent(String(order.amountInr)) +
-        '&cu=INR&tn=' + encodeURIComponent('Nexus Plus ' + code);
-      if (!(await Linking.canOpenURL(url))) throw new Error('UPI_NOT_AVAILABLE');
-      await Linking.openURL(url);
-      Alert.alert('Payment started', 'Complete the UPI payment. Access or credits are added only after payment verification.');
+      if (plan.id.startsWith('bundle:')) {
+        const order = await createSubscriptionBundleOrder(plan.code);
+        await openUpi(order, plan.code);
+        return;
+      }
+
+      const order = await createPaymentOrder('PREMIUM', plan.code);
+      await openUpi(order, plan.code);
+    } catch (error) {
+      Alert.alert(
+        'Payment',
+        error instanceof Error && error.message === 'UPI_NOT_AVAILABLE'
+          ? 'No UPI app is available on this device.'
+          : 'The payment request could not be created right now.',
+      );
+    }
+  };
+
+  const startTopup = async (plan: AiCreditPlan) => {
+    try {
+      const order = await createPaymentOrder('AI_CREDITS', plan.code);
+      await openUpi(order, plan.code);
     } catch (error) {
       Alert.alert(
         'Payment',
@@ -93,7 +121,7 @@ export default function ManageSubscriptionScreen() {
         </Pressable>
         <View style={styles.copy}>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Manage Subscription</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Membership, included credits and eligible top-ups.</Text>
+          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Memberships, included credits and optional top-ups.</Text>
         </View>
       </View>
 
@@ -105,7 +133,7 @@ export default function ManageSubscriptionScreen() {
           <Text style={[styles.label, { color: colors.mutedForeground }]}>Nexus Credits</Text>
           <Text style={[styles.balance, { color: colors.foreground }]}>{credits.toLocaleString()}</Text>
           <Text style={[styles.body, { color: colors.mutedForeground }]}>
-            {active ? 'Your credits can be used by supported AI features.' : 'An active membership is required before credits can be purchased.'}
+            {active ? 'Use these credits across supported AI features.' : 'Choose a membership to start using premium AI features and included credits.'}
           </Text>
         </View>
       </View>
@@ -115,14 +143,14 @@ export default function ManageSubscriptionScreen() {
           <Text style={[styles.section, { color: colors.foreground }]}>Current membership</Text>
           <Text style={[styles.name, { color: colors.foreground }]}>{entitlement.planName ?? entitlement.planCode ?? 'Nexus Plus'}</Text>
           <Text style={[styles.body, { color: colors.mutedForeground }]}>
-            Active until {entitlement.expiresAt ? new Date(entitlement.expiresAt).toLocaleDateString() : 'your current renewal date'}.
+            Active until {entitlement.expiresAt ? new Date(entitlement.expiresAt).toLocaleDateString() : 'your renewal date'}.
           </Text>
         </View>
       ) : (
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.section, { color: colors.foreground }]}>No active membership</Text>
+          <Text style={[styles.section, { color: colors.foreground }]}>Choose a membership</Text>
           <Text style={[styles.body, { color: colors.mutedForeground }]}>
-            Choose a monthly membership to unlock Premium features and receive the plan's monthly credits.
+            Every membership includes monthly credits. You only need a top-up when your included balance is not enough.
           </Text>
         </View>
       )}
@@ -135,7 +163,7 @@ export default function ManageSubscriptionScreen() {
         </View>
       ) : null}
 
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Monthly memberships</Text>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Memberships with included credits</Text>
       {plans.map(plan => (
         <View key={plan.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.row}>
@@ -145,14 +173,12 @@ export default function ManageSubscriptionScreen() {
             </View>
             <Text style={[styles.price, { color: colors.primary }]}>₹{plan.amount}</Text>
           </View>
-          <Text style={[styles.meta, { color: colors.mutedForeground }]}>Monthly • Tier {plan.tierLevel} • Includes plan credits</Text>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => void start('PREMIUM', plan.code)}
-            style={[styles.button, { backgroundColor: colors.primary }]}
-          >
+          <Text style={[styles.meta, { color: colors.mutedForeground }]}>
+            Monthly • {plan.includedCredits.toLocaleString()} included credits • Ad-free
+          </Text>
+          <Pressable accessibilityRole="button" onPress={() => void start(plan)} style={[styles.button, { backgroundColor: colors.primary }]}>
             <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>
-              {active && plan.code === entitlement?.planCode ? 'Manage current plan' : 'Choose ' + plan.name}
+              {active && plan.code === entitlement?.planCode ? 'Renew or continue' : 'Choose ' + plan.name}
             </Text>
           </Pressable>
         </View>
@@ -162,9 +188,9 @@ export default function ManageSubscriptionScreen() {
       {!active ? (
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Feather name="lock" size={19} color={colors.primary} />
-          <Text style={[styles.name, { color: colors.foreground, marginTop: 8 }]}>Subscription required</Text>
+          <Text style={[styles.name, { color: colors.foreground, marginTop: 8 }]}>Available after subscription</Text>
           <Text style={[styles.body, { color: colors.mutedForeground }]}>
-            Credit top-ups become available after your Nexus Plus membership is active.
+            You receive included credits with your membership first. Top-ups become available only while that membership is active.
           </Text>
         </View>
       ) : (
@@ -181,7 +207,7 @@ export default function ManageSubscriptionScreen() {
             <Pressable
               accessibilityRole="button"
               disabled={!canTopup}
-              onPress={() => void start('AI_CREDITS', plan.code)}
+              onPress={() => void startTopup(plan)}
               style={[styles.button, { backgroundColor: colors.secondary, borderColor: colors.border, borderWidth: 1, opacity: canTopup ? 1 : 0.5 }]}
             >
               <Text style={[styles.buttonText, { color: colors.foreground }]}>Add credits</Text>
