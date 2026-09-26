@@ -12,6 +12,7 @@ export type AssistantCapabilityId =
   | 'share-local-file'
   | 'play-media'
   | 'music-apps'
+  | 'call-contact'
   | 'pdf-lock'
   | 'pdf-unlock'
   | 'pdf-compress'
@@ -40,6 +41,7 @@ export const ASSISTANT_CAPABILITIES: readonly AssistantCapability[] = [
   { id: 'share-local-file', title: 'Share a local file', description: 'Open the system share sheet for a user-selected local file.', risk: 'confirm', requiresConfirmation: true, offline: true },
   { id: 'play-media', title: 'Play media', description: 'Start playback through an existing Nexus media action.', risk: 'safe', requiresConfirmation: false, offline: true },
   { id: 'music-apps', title: 'Music apps', description: 'Choose an installed music app and control compatible playback through Android media intents.', risk: 'safe', requiresConfirmation: false, offline: true },
+  { id: 'call-contact', title: 'Call a contact', description: 'Find a matching saved contact and place a phone call using the Android call capability.', risk: 'safe', requiresConfirmation: false, offline: true },
   { id: 'pdf-lock', title: 'Lock PDF', description: 'Password-protect a selected local PDF using the existing native PDF engine.', risk: 'confirm', requiresConfirmation: true, offline: true },
   { id: 'pdf-unlock', title: 'Unlock PDF', description: 'Remove protection from a selected local PDF using its password and the existing native engine.', risk: 'confirm', requiresConfirmation: true, offline: true },
   { id: 'pdf-compress', title: 'Compress PDF', description: 'Compress a selected local PDF with the existing native PDF engine.', risk: 'confirm', requiresConfirmation: true, offline: true },
