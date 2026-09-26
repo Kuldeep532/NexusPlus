@@ -1,6 +1,6 @@
 import { getSupabaseAccessToken } from '@/features/auth/supabaseAuthAdapter';
 
-const GATEWAY_BASE_URL = 'https://apigateway.kuldeepky538.workers.dev';
+export const APP_API_BASE_URL = process.env.EXPO_PUBLIC_NEXUS_API_BASE_URL?.replace(/\/$/, '') ?? '';
 const DISCOVERY_TTL_MS = 5 * 60 * 1000;
 
 export type GatewayEndpoint = {
@@ -17,18 +17,15 @@ type DiscoveryPayload = {
   routes?: unknown;
 };
 
-let cachedEndpoints: GatewayEndpoint[] | null = null;
-let discoveryExpiresAt = 0;
-let discoveryPromise: Promise<GatewayEndpoint[]> | null = null;
+function assertGatewayConfigured(): void {
+  if (!APP_API_BASE_URL) throw new Error('API_SERVICE_NOT_CONFIGURED');
+}
 
 function normalizeEndpoints(payload: DiscoveryPayload): GatewayEndpoint[] {
   const source = payload?.endpoints ?? payload?.apis ?? payload?.routes;
   if (!Array.isArray(source)) return [];
-
   return source.flatMap((item, index) => {
-    if (typeof item === 'string') {
-      return [{ id: `endpoint-${index}`, path: item, method: 'GET' }];
-    }
+    if (typeof item === 'string') return [{ id: `endpoint-${index}`, path: item, method: 'GET' }];
     if (!item || typeof item !== 'object') return [];
     const value = item as Record<string, unknown>;
     const path = typeof value.path === 'string' ? value.path : typeof value.url === 'string' ? value.url : '';
@@ -45,26 +42,26 @@ function normalizeEndpoints(payload: DiscoveryPayload): GatewayEndpoint[] {
   });
 }
 
+let cachedEndpoints: GatewayEndpoint[] | null = null;
+let discoveryExpiresAt = 0;
+let discoveryPromise: Promise<GatewayEndpoint[]> | null = null;
+
 export async function discoverGatewayEndpoints(force = false): Promise<GatewayEndpoint[]> {
+  assertGatewayConfigured();
   if (!force && cachedEndpoints && discoveryExpiresAt > Date.now()) return cachedEndpoints;
   if (discoveryPromise) return discoveryPromise;
 
   discoveryPromise = (async () => {
     const token = await getSupabaseAccessToken();
-    const response = await fetch(`${GATEWAY_BASE_URL}/`, {
+    const response = await fetch(APP_API_BASE_URL + '/', {
       method: 'GET',
       headers: {
         Accept: 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     });
-
-    if (!response.ok) {
-      throw new Error(`GATEWAY_DISCOVERY_FAILED_${response.status}`);
-    }
-
-    const payload = await response.json() as DiscoveryPayload;
-    const endpoints = normalizeEndpoints(payload);
+    if (!response.ok) throw new Error(`GATEWAY_DISCOVERY_FAILED_${response.status}`);
+    const endpoints = normalizeEndpoints(await response.json() as DiscoveryPayload);
     cachedEndpoints = endpoints;
     discoveryExpiresAt = Date.now() + DISCOVERY_TTL_MS;
     return endpoints;
@@ -83,13 +80,13 @@ export async function callGateway<T = unknown>(
     query?: Record<string, string | number | boolean | null | undefined>;
   } = {},
 ): Promise<T> {
+  assertGatewayConfigured();
   if (!path.startsWith('/') || path.startsWith('//') || path.includes('://')) {
     throw new Error('GATEWAY_PATH_MUST_BE_RELATIVE');
   }
 
   const token = await getSupabaseAccessToken();
-  const url = new URL(`${GATEWAY_BASE_URL}${path}`);
-
+  const url = new URL(APP_API_BASE_URL + path);
   for (const [key, value] of Object.entries(options.query ?? {})) {
     if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
   }
@@ -109,12 +106,9 @@ export async function callGateway<T = unknown>(
     try {
       const payload = await response.json();
       message = String(payload?.error ?? payload?.message ?? message);
-    } catch {
-      // Keep status-based error.
-    }
+    } catch {}
     throw new Error(message);
   }
-
   return response.json() as Promise<T>;
 }
 
@@ -123,4 +117,4 @@ export function clearGatewayEndpointCache(): void {
   discoveryExpiresAt = 0;
 }
 
-export { GATEWAY_BASE_URL };
+export { APP_API_BASE_URL as GATEWAY_BASE_URL };
