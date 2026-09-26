@@ -84,6 +84,14 @@ const AUDIO_EDITOR_TOOLS: AudioEditorToolDefinition[] = [
     icon: 'volume-2',
     order: 60,
   },
+  {
+    id: 'audio-description',
+    title: 'Audio Description',
+    description: 'Create spoken accessibility descriptions from video with AI-powered visual understanding.',
+    route: '/audio-description',
+    icon: 'volume-2',
+    order: 70,
+  },
 ];
 
 export function getAudioEditorTools(): AudioEditorToolDefinition[] {
