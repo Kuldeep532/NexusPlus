@@ -1,52 +1,38 @@
 import React from 'react';
-import { Button, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Button, StyleSheet, Text, View } from 'react-native';
 
 type Props = { children: React.ReactNode };
-type State = { hasError: boolean; error: Error | null };
+type State = { hasError: boolean };
 
-/**
- * Crash diagnostics for JavaScript/render errors.
- * Release builds keep the app usable by showing a recoverable fallback instead of a blank screen.
- */
 export default class DebugErrorBoundary extends React.Component<Props, State> {
-  state: State = { hasError: false, error: null };
+  state: State = { hasError: false };
 
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+  static getDerivedStateFromError(): State {
+    return { hasError: true };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('[Nexus Plus] Crash Details:', error, errorInfo);
+    // Keep diagnostics out of the user-facing UI.
+    console.error('[Nexus Plus] Render error', { message: error.message, componentStack: errorInfo.componentStack });
   }
 
   render() {
-    if (this.state.hasError) {
-      const message = this.state.error?.stack || this.state.error?.toString() || 'Unknown JavaScript error';
+    if (!this.state.hasError) return this.props.children;
 
-      return (
-        <View style={styles.container}>
-          <Text style={styles.title}>Nexus Plus recovered from an app error</Text>
-          <ScrollView style={styles.box} contentContainerStyle={styles.boxContent}>
-            <Text selectable style={styles.errorText}>
-              {message}
-            </Text>
-          </ScrollView>
-          <Button
-            title="Try Again"
-            onPress={() => this.setState({ hasError: false, error: null })}
-          />
-        </View>
-      );
-    }
-
-    return this.props.children;
+    return (
+      <View style={styles.container}>
+        <Text accessibilityRole="header" style={styles.title}>Nexus Plus needs to refresh</Text>
+        <Text style={styles.message}>
+          Something went wrong on this screen. Your saved data is kept safe. Please try again.
+        </Text>
+        <Button title="Try Again" onPress={() => this.setState({ hasError: false })} />
+      </View>
+    );
   }
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, paddingTop: 50, backgroundColor: '#fff' },
-  title: { fontSize: 20, fontWeight: 'bold', color: 'red', marginBottom: 10 },
-  box: { flex: 1, backgroundColor: '#eee', borderRadius: 5, marginBottom: 10 },
-  boxContent: { padding: 10 },
-  errorText: { color: '#333', fontFamily: 'monospace' },
+  container: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#fff' },
+  title: { fontSize: 22, fontWeight: '700', marginBottom: 10, color: '#111' },
+  message: { fontSize: 15, lineHeight: 22, marginBottom: 20, color: '#444' },
 });
