@@ -119,6 +119,7 @@ export async function runStage3Agent(input: Stage3AgentInput): Promise<Execution
     input.onStatus?.('No registered action matched. Gemini or local assistant inference can handle the question.');
     return null;
   }
+
   if (proposal.requiresConfirmation && !input.confirmed) {
     const confirmation = formatCapabilityConfirmation(proposal);
     input.onProposal?.(confirmation);
