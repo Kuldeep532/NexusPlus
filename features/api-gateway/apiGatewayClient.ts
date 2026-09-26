@@ -72,6 +72,17 @@ export async function discoverGatewayEndpoints(force = false): Promise<GatewayEn
   return discoveryPromise;
 }
 
+function mapGatewayPathToSupabase(path: string): string {
+  const normalized = path.replace(/^\/+/, '');
+  if (normalized.startsWith('functions/')) return normalized.replace(/^functions\//, '/functions/');
+  if (normalized.startsWith('rest/')) return normalized.replace(/^rest\//, '/rest/');
+  if (normalized.startsWith('storage/')) return normalized.replace(/^storage\//, '/storage/');
+  if (normalized.startsWith('auth/')) return normalized.replace(/^auth\//, '/auth/');
+  if (normalized.startsWith('v1/functions/')) return normalized.replace(/^v1\//, '/');
+  if (normalized.startsWith('v1/')) return normalized.replace(/^v1\//, '/');
+  return '/' + normalized;
+}
+
 export async function callGateway<T = unknown>(
   path: string,
   options: {
@@ -86,7 +97,8 @@ export async function callGateway<T = unknown>(
   }
 
   const token = await getSupabaseAccessToken();
-  const url = new URL(APP_API_BASE_URL + path);
+  const url = new URL(APP_API_BASE_URL + mapGatewayPathToSupabase(path));
+
   for (const [key, value] of Object.entries(options.query ?? {})) {
     if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
   }
