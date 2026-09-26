@@ -120,7 +120,7 @@ export default function SettingsScreen(){
     </Pressable>
     <Pressable accessibilityRole="button" onPress={()=>router.push('/reminders' as never)} style={[styles.item,{marginTop:10,borderColor:colors.border,backgroundColor:colors.card}]}>
       <View style={[styles.icon,{backgroundColor:colors.secondary}]}><Feather name="bell" size={19} color={colors.primary}/></View>
-      <View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>Voice Reminder</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>Manage spoken reminder language and the selected voice. Current: {voicePreferenceLabel}.</Text></View>
+      <View style={styles.copy}><Text style={[styles.rowTitle,{color:colors.foreground}]}>Voice Reminder</Text><Text style={[styles.body,{color:colors.mutedForeground}]}>Manage spoken reminder language and the selected voice. Current: {' + voicePreferenceLabel + '}.</Text></View>
       <Feather name="chevron-right" size={19} color={colors.mutedForeground}/>
     </Pressable>
    </View>
