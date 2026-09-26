@@ -5,7 +5,7 @@ import { getInstalledVoices, type InstalledVoice } from '@/features/voice-librar
 import * as Speech from 'expo-speech';
 import { AudioEditorNative } from '@/features/audio-editor/audioEditorNative';
 
-export type TtsProvider = 'piper' | 'clone' | 'system';
+export type TtsProvider = 'piper' | 'clone' | 'system' | 'elevenlabs';
 export type TtsEmotion = 'neutral' | 'happy' | 'sad' | 'laughing' | 'crying' | 'excited' | 'calm' | 'angry';
 export type TtsSettings = { speed: number; pitch: number; autoTune: boolean };
 export type TtsAnalysis = { emotion: TtsEmotion; speed: number; pitch: number };
