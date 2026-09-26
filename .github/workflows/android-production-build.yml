@@ -41,11 +41,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_NEXUS_API_BASE_URL: ${{ secrets.NEXUS_API_BASE_URL }}
+      EXPO_PUBLIC_GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
+      EXPO_PUBLIC_GOOGLE_DRIVE_ENABLED: ${{ secrets.GOOGLE_DRIVE_ENABLED }}
       EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
     steps:
       - name: Checkout
@@ -63,6 +61,14 @@ jobs:
         run: |
           set -euo pipefail
           pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false --reporter=append-only
+      - name: Validate API build configuration
+        run: |
+          set -euo pipefail
+          test -n "$EXPO_PUBLIC_NEXUS_API_BASE_URL"
+          case "$EXPO_PUBLIC_NEXUS_API_BASE_URL" in
+            https://*) ;;
+            *) echo "NEXUS_API_BASE_URL must use HTTPS." >&2; exit 1 ;;
+          esac
       - name: Validate Expo configuration
         run: pnpm exec expo config --type public
       - name: Validate EAS token
@@ -83,10 +89,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      NEXUS_API_BASE_URL: ${{ secrets.NEXUS_API_BASE_URL }}
+      EXPO_PUBLIC_NEXUS_API_BASE_URL: ${{ secrets.NEXUS_API_BASE_URL }}
       FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
       FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
       FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
@@ -118,7 +122,9 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
           run_install: false
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false --reporter=append-only
+        run: |
+          set -euo pipefail
+          pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false --reporter=append-only
       - name: Validate required files
         shell: bash
         run: |
@@ -137,6 +143,15 @@ jobs:
           test -f android/app/src/main/cpp/nexus_filter_core_jni.cpp
           test -f android/app/src/main/cpp/nexus_filter_trie.cpp
           test -f android/app/src/main/cpp/nexus_docs_engine_jni.cpp
+      - name: Validate API build configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NEXUS_API_BASE_URL"
+          case "$NEXUS_API_BASE_URL" in
+            https://*) ;;
+            *) echo "NEXUS_API_BASE_URL must use HTTPS." >&2; exit 1 ;;
+          esac
       - name: Materialize Firebase configuration
         shell: bash
         env:
@@ -170,9 +185,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$SUPABASE_URL"
-          test -n "$SUPABASE_ANON_KEY"
-          test -n "${EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-$SUPABASE_ANON_KEY}"
           test -n "$FIREBASE_API_KEY"
           test -n "$FIREBASE_AUTH_DOMAIN"
           test -n "$FIREBASE_PROJECT_ID"
