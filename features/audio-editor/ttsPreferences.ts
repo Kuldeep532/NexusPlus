@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSupabaseAccessToken } from '@/features/auth/supabaseAuthAdapter';
 import { SUPABASE_URL } from '@/features/auth/authConfig';
+import { getStoredAuthSession } from '@/features/auth/supabaseAuthAdapter';
 
 export type TtsVoiceProvider = 'system' | 'piper' | 'clone' | 'elevenlabs';
 export type TtsVoicePreferences = { provider: TtsVoiceProvider; voiceId: string; voiceName: string; language: string; };
@@ -34,10 +35,12 @@ export async function saveTtsVoicePreferences(next: TtsVoicePreferences): Promis
   if (!configured()) return;
   const token = await getSupabaseAccessToken();
   if (!token) return;
+  const session = await getStoredAuthSession();
+  if (!session?.user.uid) throw new Error('AUTH_REQUIRED');
   const response = await fetch(`${SUPABASE_URL}/rest/v1/tts_voice_preferences`, {
     method: 'POST',
     headers: { ...headers(token), Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify({ user_id: (await import('@/features/auth/supabaseAuthAdapter')).getStoredAuthSession ? undefined : undefined, provider: next.provider, voice_id: next.voiceId || null, voice_name: next.voiceName || null, language: next.language || null })
+    body: JSON.stringify({ user_id: session.user.uid, provider: next.provider, voice_id: next.voiceId || null, voice_name: next.voiceName || null, language: next.language || null })
   });
   if (!response.ok) throw new Error('TTS_PREFERENCE_SAVE_FAILED');
 }
