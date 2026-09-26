@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system';
 import { getSupabaseAccessToken } from '@/features/auth/supabaseAuthAdapter';
 import { SUPABASE_URL } from '@/features/auth/authConfig';
+import { getCustomElevenLabsApiKey } from '@/features/nexus-assistant/aiProviderPreferences';
 import { File, Directory, Paths } from 'expo-file-system';
 
 export type ElevenLabsVoice = {
@@ -31,6 +32,42 @@ function assertConfigured() {
 }
 
 async function request<T extends TtsApiResponse>(body: Record<string, unknown>): Promise<T> {
+  const personalKey = await getCustomElevenLabsApiKey();
+  if (personalKey) {
+    const response = await fetch('https://api.elevenlabs.io/v1/' + (body.action === 'list-voices' ? 'voices' : 'text-to-speech/' + encodeURIComponent(String(body.voiceId ?? ''))), {
+      method: 'POST',
+      headers: {
+        'xi-api-key': personalKey,
+        'Content-Type': 'application/json',
+        Accept: body.action === 'list-voices' ? 'application/json' : 'audio/mpeg',
+      },
+      body: JSON.stringify(body.action === 'list-voices' ? {} : {
+        text: body.text,
+        model_id: body.modelId ?? 'eleven_multilingual_v2',
+        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+        ...(body.languageCode ? { language_code: body.languageCode } : {}),
+      }),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(String(payload?.detail?.message ?? payload?.detail ?? 'ElevenLabs request failed.'));
+    }
+    if (body.action === 'list-voices') {
+      const payload = await response.json();
+      return { voices: (payload.voices ?? []).map((voice: any) => ({
+        id: String(voice.voice_id),
+        name: String(voice.name),
+        category: String(voice.category ?? ''),
+        description: String(voice.description ?? ''),
+        language: String(voice.labels?.language ?? ''),
+        gender: String(voice.labels?.gender ?? ''),
+        previewUrl: voice.preview_url ?? null,
+      })) } as T;
+    }
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const audioUrl = 'data:audio/mpeg;base64,' + bytesToBase64(bytes);
+    return { audioUrl, balance: 0, characters: String(body.text ?? '').length, creditsCharged: 0, cached: false } as T;
+  }
   assertConfigured();
   const token = await getSupabaseAccessToken();
   if (!token) throw new Error('AUTH_REQUIRED');
