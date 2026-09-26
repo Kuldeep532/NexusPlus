@@ -6,6 +6,8 @@ export type AssistantCapabilityId =
   | 'open-app'
   | 'open-url'
   | 'create-reminder'
+  | 'set-alarm'
+  | 'calendar-event'
   | 'read-local-file'
   | 'share-local-file'
   | 'play-media'
@@ -32,6 +34,8 @@ export const ASSISTANT_CAPABILITIES: readonly AssistantCapability[] = [
   { id: 'open-app', title: 'Open an app', description: 'Launch an installed application through its supported deep link.', risk: 'confirm', requiresConfirmation: true, offline: true },
   { id: 'open-url', title: 'Open a link', description: 'Open a user-requested URL in the system browser.', risk: 'confirm', requiresConfirmation: true, offline: true },
   { id: 'create-reminder', title: 'Create a reminder', description: 'Create a reminder after the user confirms the exact details.', risk: 'confirm', requiresConfirmation: true, offline: true },
+  { id: 'set-alarm', title: 'Set an alarm', description: 'Schedule a user-requested alarm at a specific time.', risk: 'confirm', requiresConfirmation: true, offline: true },
+  { id: 'calendar-event', title: 'Add a calendar event', description: 'Open the Android calendar event flow with the details the user requested.', risk: 'confirm', requiresConfirmation: true, offline: true },
   { id: 'read-local-file', title: 'Read a local file', description: 'Read a file that the user explicitly selected for the assistant.', risk: 'confirm', requiresConfirmation: true, offline: true },
   { id: 'share-local-file', title: 'Share a local file', description: 'Open the system share sheet for a user-selected local file.', risk: 'confirm', requiresConfirmation: true, offline: true },
   { id: 'play-media', title: 'Play media', description: 'Start playback through an existing Nexus media action.', risk: 'confirm', requiresConfirmation: true, offline: true },
