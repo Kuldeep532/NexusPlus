@@ -89,6 +89,8 @@ jobs:
     env:
       NEXUS_API_BASE_URL: ${{ secrets.NEXUS_API_BASE_URL }}
       EXPO_PUBLIC_NEXUS_API_BASE_URL: ${{ secrets.NEXUS_API_BASE_URL }}
+      PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER: ${{ secrets.PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER }}
+      NEXUS_RELEASE_CERT_SHA256: ${{ secrets.NEXUS_RELEASE_CERT_SHA256 }}
       FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
       FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
       FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
@@ -147,6 +149,22 @@ jobs:
             https://*) ;;
             *) echo "NEXUS_API_BASE_URL must use HTTPS." >&2; exit 1 ;;
           esac
+      - name: Validate Play Integrity configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
+          case "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER" in
+            ''|*[!0-9]*) echo "PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER must be numeric." >&2; exit 1 ;;
+          esac
+      - name: Validate release certificate configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NEXUS_RELEASE_CERT_SHA256"
+          case "$NEXUS_RELEASE_CERT_SHA256" in
+            ''|*[!0-9A-Fa-f:]*) echo "NEXUS_RELEASE_CERT_SHA256 contains invalid characters." >&2; exit 1 ;;
+          esac
       - name: Materialize Firebase configuration
         shell: bash
         env:
@@ -174,7 +192,7 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nexusplus-release.jks"
           test -s "$RUNNER_TEMP/nexusplus-release.jks"
           chmod 600 "$RUNNER_TEMP/nexusplus-release.jks"
-          printf '%s\n'             "storeFile=$RUNNER_TEMP/nexusplus-release.jks"             "storePassword=$ANDROID_KEYSTORE_PASSWORD"             "keyAlias=$ANDROID_KEY_ALIAS"             "keyPassword=$ANDROID_KEY_PASSWORD"             > android/key.properties
+          printf '%s\n' "storeFile=$RUNNER_TEMP/nexusplus-release.jks" "storePassword=$ANDROID_KEYSTORE_PASSWORD" "keyAlias=$ANDROID_KEY_ALIAS" "keyPassword=$ANDROID_KEY_PASSWORD" > android/key.properties
           chmod 600 android/key.properties
       - name: Validate build secrets
         shell: bash
@@ -211,11 +229,11 @@ jobs:
       - name: Build release APK
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         working-directory: android
-        run: gradle assembleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a
+        run: gradle assembleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER -PNEXUS_RELEASE_CERT_SHA256=$NEXUS_RELEASE_CERT_SHA256
       - name: Build release AAB
         if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
         working-directory: android
-        run: gradle bundleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a
+        run: gradle bundleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER -PNEXUS_RELEASE_CERT_SHA256=$NEXUS_RELEASE_CERT_SHA256
       - name: Verify APK output
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         shell: bash
