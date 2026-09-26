@@ -20,8 +20,10 @@ const SETTINGS = [
   { title:'Biometric Vault',description:'Manage secure biometric protection.',route:'/biometric-vault',icon:'shield' as const },
   { title:'Payment Announcer',description:'Configure secure payment announcements.',route:'/payment-announcer',icon:'volume-2' as const },
   { title:'Media Player Settings',description:'Advanced video, audio, subtitles, playback and live video-description controls.',route:'/media-player-settings',icon:'play-circle' as const },
+  { title:'Video Generator',description:'Create AI videos and manage generated-video settings and history.',route:'/video-generator',icon:'video' as const },
+  { title:'Video Generator Settings',description:'Manage saved video history and Video Generator preferences.',route:'/video-generator-settings',icon:'settings' as const },
+  { title:'History Settings',description:'Manage saved histories from one place.',route:'/history-settings',icon:'clock' as const },
   { title:'Expense Tracker',description:'Manage expense detection and financial privacy.',route:'/expense-tracker',icon:'credit-card' as const },
-
 ];
 const LEGAL_SETTINGS = [
   {title:'Privacy Policy',description:'How Nexus Plus handles data, permissions, analytics, APIs and security.',route:'/privacy-policy',icon:'lock' as const},
