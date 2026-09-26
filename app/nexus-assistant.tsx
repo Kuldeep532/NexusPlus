@@ -63,7 +63,6 @@ export default function NexusAssistantScreen() {
   const [showTools, setShowTools] = useState(false);
   const [generatedResult, setGeneratedResult] = useState<{ title: string; message: string } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [selectedMusicPackage, setSelectedMusicPackage] = useState<string | undefined>();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyEnabled, setHistoryEnabledState] = useState(true);
   const [sessionList, setSessionList] = useState<Array<{ id: string; title: string; createdAt: number; messageCount: number }>>([]);
@@ -174,7 +173,6 @@ export default function NexusAssistantScreen() {
     if (!text || busy) return;
 
     const musicIntent = parseMusicIntent(text);
-    if (musicIntent) musicIntent.appPackage = selectedMusicPackage;
     const pdfCommand = parseAssistantPdfCommand(text);
     const identity = answerNexusIdentityQuestion(text);
 
