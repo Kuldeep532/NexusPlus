@@ -15,7 +15,7 @@ export type CapabilityProposal = {
 };
 
 function parseClockTime(text: string): { hour: number; minute: number } | null {
-  const match = /(?:at|for|पर|को)\s*(\d{1,2})(?::(\d{2}))?\s*(a\\.?m\\.?|p\\.?m\\.?)?/i.exec(text);
+  const match = /(?:at|for|पर|को)\s*(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?/i.exec(text);
   if (!match) return null;
   let hour = Number(match[1]);
   const minute = Number(match[2] ?? 0);
