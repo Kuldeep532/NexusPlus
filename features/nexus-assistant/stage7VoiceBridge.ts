@@ -21,7 +21,7 @@ async function ensureMicrophonePermission(): Promise<boolean> {
 }
 async function resolveSpokenVoice(role: VoiceRole, locale: string) { const preference = await getAssistantVoicePreference(); const profile = role === 'live-call' ? getAssistantVoiceProfile(role, locale) : getAssistantVoiceProfile(role, locale); const installed = await getInstalledVoices().catch(() => []); const preferredId = preference.voiceId || profile.id; return { profile, preference, voice: installed.find((item) => item.id === preferredId) }; }
 export function createStage7VoiceBridge(onStatus?: (status: VoiceRuntimeStatus) => void, onTranscript?: (text: string) => void): { bridge: Stage6VoiceBridge; dispose: () => void } {
-  if (!nativeVoice) return { bridge: { async isAvailable() { return false; }, async startListening() { throw new Error('VOICE_NATIVE_MODULE_UNAVAILABLE'); }, async stopListening() {}, async stopOutput() { await Speech.stop(); }, async speak(text: string) { await Speech.speak(text, { language: 'en-IN' }); } }, dispose() {} };
+  if (!nativeVoice) return { bridge: { async isAvailable() { return false; }, async startListening() { throw new Error('Voice calling is not available on this device.'); }, async stopListening() {}, async stopOutput() { await Speech.stop(); }, async speak(text: string) { await Speech.speak(text, { language: 'en-IN' }); } }, dispose() {} };
   const emitter = new NativeEventEmitter(NativeModules.NexusAssistantVoice);
   const subscription = emitter.addListener('NexusAssistantVoiceState', (payload: VoiceRuntimeStatus & { transcript?: string }) => { onStatus?.(payload); if (payload.transcript) onTranscript?.(payload.transcript); });
   return { bridge: {
