@@ -2,6 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
+import { getAssistantModelPreference, setAssistantModelPreference, type AssistantModelId } from '@/features/nexus-assistant/aiModelPreferences';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -65,6 +66,7 @@ export default function NexusAssistantScreen() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyEnabled, setHistoryEnabledState] = useState(true);
   const [sessionList, setSessionList] = useState<Array<{ id: string; title: string; createdAt: number; messageCount: number }>>([]);
+  const [assistantModel, setAssistantModel] = useState<AssistantModelId>('gemini');
   const toolCatalog = useMemo(() => getAssistantToolCatalog(), []);
   const pinnedTools = useMemo(() => toolCatalog.filter((tool) => ['file','qr-code','pdf-lock','pdf-unlock','pdf-compress'].includes(tool.id) || /PDF|File|QR/i.test(tool.title)).slice(0, 10), [toolCatalog]);
   const hasText = input.trim().length > 0;
@@ -97,11 +99,13 @@ export default function NexusAssistantScreen() {
       await ensureSession(SESSION_ID, 'Nexus Assistant');
       setMessages(retention ? await listMessages(SESSION_ID) : []);
       const context = await getResolvedAssistantContext();
+      const modelPreference = await getAssistantModelPreference();
+      setAssistantModel(modelPreference.selectedModel);
       setActiveContextLabel(context.book?.title ?? context.file?.name ?? null);
       const engine = await getLocalInferenceEngine();
       const available = await engine.isAvailable();
       setEngineReady(available);
-      setStatus(available ? 'Local assistant ready. Gemini chat and Nexus agent actions are ready.' : 'Assistant ready. Gemini chat is available through the Gateway when configured.');
+      setStatus(available ? 'Local assistant ready. Cloud model and Nexus agent actions are ready.' : 'Assistant ready. The selected cloud model is available through Supabase when configured.');
       if (calculatorContext) setInput('Explain and analyze the calculator context I just opened.');
     })().catch(() => setStatus('Local chat storage could not be opened.'));
   }, []);
@@ -122,6 +126,13 @@ export default function NexusAssistantScreen() {
     setMessages(next ? await listMessages(SESSION_ID) : []);
     setStatus(next ? 'Chat history is enabled and linked to your signed-in account.' : 'Chat history is off. New chats will not be saved.');
   };
+  const changeAssistantModel = async (model: AssistantModelId) => {
+    setAssistantModel(model);
+    await setAssistantModelPreference(model);
+    const label = model === 'anthropic' ? 'Claude' : model === 'openai' ? 'OpenAI' : 'Gemini';
+    setStatus(label + ' selected for Nexus Assistant.');
+  };
+
   const clearChats = async () => {
     await clearAllAssistantData();
     await ensureSession(SESSION_ID, 'Nexus Assistant');
@@ -253,7 +264,7 @@ export default function NexusAssistantScreen() {
       }
 
       try {
-        setStatus(calculatorContext ? 'Processing calculator context through Gemini routing…' : 'Checking Gemini and optional web search through Nexus Gateway…');
+        setStatus(calculatorContext ? 'Processing calculator context through ' + (assistantModel === 'anthropic' ? 'Claude' : assistantModel === 'openai' ? 'OpenAI' : 'Gemini') + '…' : 'Checking the selected AI model and optional web search…');
         const routed = await routeAssistantRequest({ message: text, history, bookContext: context.book, fileContext: context.file });
         setWebResults(routed.web);
         if (routed.provider) {
@@ -437,6 +448,16 @@ export default function NexusAssistantScreen() {
 
     <View style={[styles.settingsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <Text style={[styles.statusTitle, { color: colors.foreground }]}>Assistant Settings</Text>
+      <Text style={[styles.note, { color: colors.mutedForeground }]}>Choose the model directly inside Nexus Assistant. Gemini is free; OpenAI and Claude use Premium access or your own API key.</Text>
+      <View style={styles.modelPickerRow}>
+        {([['gemini','Gemini','Free'],['openai','OpenAI','Premium'],['anthropic','Claude','Premium']] as const).map(([value,title,badge]) => (
+          <Pressable key={value} accessibilityRole="radio" accessibilityState={{ selected: assistantModel === value }} onPress={() => void changeAssistantModel(value)} style={[styles.modelChip, { borderColor: assistantModel === value ? colors.primary : colors.border, backgroundColor: assistantModel === value ? colors.secondary : colors.background }]}>
+            <Text style={[styles.modelChipTitle, { color: colors.foreground }]}>{title}</Text>
+            <Text style={[styles.modelChipBadge, { color: assistantModel === value ? colors.primary : colors.mutedForeground }]}>{badge}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={[styles.note, { color: colors.primary }]}>Selected: {assistantModel === 'anthropic' ? 'Claude' : assistantModel === 'openai' ? 'OpenAI' : 'Gemini'}</Text>
       <Text style={[styles.note, { color: colors.mutedForeground }]}>Signed in: {auth.session?.user.email ?? 'Not signed in'}</Text>
       <Pressable accessibilityRole="switch" accessibilityState={{ checked: historyEnabled }} onPress={() => void toggleHistory()} style={[styles.settingRow, { borderColor: colors.border }]}>
         <View style={{ flex: 1 }}><Text style={[styles.menuText, { color: colors.foreground }]}>Save chat history</Text><Text style={[styles.note, { color: colors.mutedForeground }]}>When off, new conversations are not persisted.</Text></View>
@@ -566,6 +587,10 @@ const styles = StyleSheet.create({
   menuRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8 },
   menuText: { fontSize: 12, fontFamily: 'Inter_700Bold' },
   settingsCard: { borderWidth: 1, borderRadius: 18, padding: 13, marginBottom: 12, gap: 8 },
+  modelPickerRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  modelChip: { flex: 1, minHeight: 62, borderRadius: 13, borderWidth: 1, padding: 9, justifyContent: 'center' },
+  modelChipTitle: { fontSize: 11, fontFamily: 'Inter_700Bold' },
+  modelChipBadge: { fontSize: 9, marginTop: 4, fontFamily: 'Inter_700Bold' },
   settingRow: { minHeight: 48, borderTopWidth: 1, flexDirection: 'row', alignItems: 'center', paddingVertical: 9 },
   historyCard: { borderWidth: 1, borderRadius: 18, padding: 13, marginBottom: 12 },
   historyRow: { borderTopWidth: 1, paddingVertical: 9 },
