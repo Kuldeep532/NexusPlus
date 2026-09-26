@@ -3,6 +3,7 @@ import { openURL } from 'expo-linking';
 import * as Battery from 'expo-battery';
 import { getAssistantCapability, type AssistantCapabilityId } from './agentCapabilities';
 import { openAssistantTool, searchAssistantTools } from './assistantToolAdapter';
+import { executeNativeMusicIntent, type MusicAction } from './musicIntent';
 import type { CapabilityProposal } from './agentPlanner';
 
 export type ExecutionContext = {
@@ -52,6 +53,31 @@ export async function executeCapability(
       if (!/^https?:\/\//i.test(url)) throw new Error('Only HTTP(S) URLs are allowed.');
       await openURL(url);
       return { capabilityId: proposal.capability.id, success: true, message: 'The link was opened.' };
+    }
+    case 'play-media': {
+      const action = proposal.args.action as MusicAction | undefined;
+      if (!action) throw new Error('Music action is missing.');
+      const success = await executeNativeMusicIntent({
+        action,
+        query: proposal.args.query,
+      });
+      return {
+        capabilityId: proposal.capability.id,
+        success,
+        message: success
+          ? action === 'play'
+            ? 'Music playback started.'
+            : action === 'next'
+              ? 'Moved to the next track.'
+              : action === 'previous'
+                ? 'Moved to the previous track.'
+                : action === 'pause'
+                  ? 'Music paused.'
+                  : action === 'resume'
+                    ? 'Music resumed.'
+                    : 'Music stopped.'
+          : 'The selected music app does not support this Android music command.',
+      };
     }
     case 'qr-generate': {
       const qr = searchAssistantTools('Generate QR Code').find((item) => item.id === 'qr-code');
