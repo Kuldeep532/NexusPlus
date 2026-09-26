@@ -49,7 +49,7 @@ export default function NexusAssistantScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState('Checking Nexus Assistant…');
+  const [status, setStatus] = useState('Nexus Assistant is getting ready…');
   const [assetBusy, setAssetBusy] = useState<string | null>(null);
   const [streaming, setStreaming] = useState('');
   const [engineReady, setEngineReady] = useState(false);
