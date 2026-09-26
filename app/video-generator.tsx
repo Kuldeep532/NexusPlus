@@ -23,14 +23,10 @@ export default function VideoGeneratorScreen() {
   const insets = useSafeAreaInsets();
   const [prompt, setPrompt] = useState('');
   const [videoUrl, setVideoUrl] = useState<string|null>(null);
-  const [history, setHistory] = useState<VideoHistoryItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
-  useEffect(() => {
-    // History is intentionally local to this device.
-  }, []);
-
+  void useEffect;
   const generate = async () => {
     const text = prompt.trim();
     if (!text) {
@@ -41,7 +37,6 @@ export default function VideoGeneratorScreen() {
     try {
       const uri = await generateRunwayVideo({ prompt:text });
       setVideoUrl(uri);
-      await saveVideoHistory(text, uri);
     } catch (error) {
       const code = error instanceof Error ? error.message : '';
       const message =
@@ -70,11 +65,7 @@ export default function VideoGeneratorScreen() {
   };
 
   const goBack = () => {
-    if (videoUrl) {
-      void saveVideoHistory(prompt.trim(), videoUrl);
-      router.back();
-      return;
-    }
+    if (videoUrl) void saveVideoHistory(prompt.trim(), videoUrl);
     router.back();
   };
 
@@ -130,7 +121,6 @@ export default function VideoGeneratorScreen() {
       <Text style={[styles.hint,{color:colors.mutedForeground}]}>Going back saves this video in your local Video Generator history.</Text>
     </View> : null}
 
-    {history.length ? null : null}
   </ScrollView>;
 }
 
