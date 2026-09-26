@@ -20,9 +20,9 @@ select
   true
 from (
   values
-    ('lifeline_monthly','Lifeline',1,'Essential Nexus Plus membership with monthly AI credits and ad-free access.',49.00,100),
-    ('super_monthly','Super',2,'Expanded Nexus Plus membership with more monthly AI credits and premium tools.',149.00,350),
-    ('pro_monthly','Pro',3,'Full Nexus Plus membership with the highest monthly AI credit allowance and premium tools.',399.00,1000)
+    ('lifeline_monthly','Lifeline',1,'Essential Nexus Plus membership with monthly AI credits and ad-free access.',99.00,150),
+    ('super_monthly','Super',2,'Expanded Nexus Plus membership with more monthly AI credits and premium tools.',249.00,500),
+    ('pro_monthly','Pro',3,'Full Nexus Plus membership with the highest monthly AI credit allowance and premium tools.',599.00,1400)
 ) as v(plan_code,plan_name,tier_level,description,price_inr,included_credits)
 on conflict (plan_code) do update
 set
@@ -49,9 +49,9 @@ where plan_name in ('Starter Credits','Creator Credits','Studio Credits');
 insert into public.credit_plans(plan_name,credits_offered,price_inr,tagline,is_active)
 select * from (
   values
-    ('Credit Top-up 100',100,49.00,'Add 100 credits while your Nexus Plus subscription is active.',true),
-    ('Credit Top-up 300',300,99.00,'Add 300 credits while your Nexus Plus subscription is active.',true),
-    ('Credit Top-up 750',750,199.00,'Add 750 credits while your Nexus Plus subscription is active.',true)
+    ('Credit Top-up 100',100,79.00,'Add 100 credits while your Nexus Plus subscription is active.',true),
+    ('Credit Top-up 300',300,199.00,'Add 300 credits while your Nexus Plus subscription is active.',true),
+    ('Credit Top-up 750',750,449.00,'Add 750 credits while your Nexus Plus subscription is active.',true)
 ) as v(plan_name,credits_offered,price_inr,tagline,is_active)
 where not exists (
   select 1 from public.credit_plans p where p.plan_name = v.plan_name
@@ -65,11 +65,11 @@ insert into public.ai_features(feature_code,feature_name,access_type,credit_cost
 values
   ('nexus_assistant_gemini','Nexus Assistant • Gemini','CREDIT_BASED',1,true),
   ('nexus_assistant_openai','Nexus Assistant • OpenAI','CREDIT_BASED',4,true),
-  ('nexus_assistant_anthropic','Nexus Assistant • Claude','CREDIT_BASED',6,true),
-  ('elevenlabs_tts','ElevenLabs Text to Speech','CREDIT_BASED',1,true),
-  ('music_generator','Music Generator','CREDIT_BASED',25,true),
-  ('video_generator','Video Generator','CREDIT_BASED',40,true),
-  ('vocal_remover','Vocal Remover','CREDIT_BASED',10,true)
+  ('nexus_assistant_anthropic','Nexus Assistant • Claude','CREDIT_BASED',5,true),
+  ('elevenlabs_tts','ElevenLabs Text to Speech','CREDIT_BASED',40,true),
+  ('music_generator','Music Generator','CREDIT_BASED',30,true),
+  ('video_generator','Video Generator','CREDIT_BASED',100,true),
+  ('vocal_remover','Vocal Remover','CREDIT_BASED',15,true)
 on conflict(feature_code) do update
 set
   feature_name = excluded.feature_name,
