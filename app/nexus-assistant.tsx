@@ -23,7 +23,6 @@ import { routeAssistantRequest } from '@/features/nexus-assistant/stage9Assistan
 import { getResolvedAssistantContext } from '@/features/nexus-assistant/assistantContextService';
 import { getAssetStatus } from '@/features/nexus-assistant/stage8AssetManager';
 import { MusicAppsPanel } from '@/features/nexus-assistant/musicApps';
-import { executeNativeMusicIntent, parseMusicIntent } from '@/features/nexus-assistant/musicIntent';
 import { usePersistentMedia } from '@/media-player/PersistentMediaController';
 
 const SESSION_ID = 'default';
@@ -69,7 +68,6 @@ export default function NexusAssistantScreen() {
   const toolCatalog = useMemo(() => getAssistantToolCatalog(), []);
   const pinnedTools = useMemo(() => toolCatalog.filter((tool) => ['file','qr-code','pdf-lock','pdf-unlock','pdf-compress'].includes(tool.id) || /PDF|File|QR/i.test(tool.title)).slice(0, 10), [toolCatalog]);
   const hasText = input.trim().length > 0;
-  const persistentMedia = usePersistentMedia();
 
   useEffect(() => {
     const created = createStage7VoiceBridge(
@@ -103,7 +101,7 @@ export default function NexusAssistantScreen() {
       const engine = await getLocalInferenceEngine();
       const available = await engine.isAvailable();
       setEngineReady(available);
-      setStatus(available ? 'Local assistant ready. Cloud providers and web search are optional through the Gateway.' : 'Assistant ready. Local inference engine is not available in this build.');
+      setStatus(available ? 'Local assistant ready. Gemini chat and Nexus agent actions are ready.' : 'Assistant ready. Gemini chat is available through the Gateway when configured.');
       if (calculatorContext) setInput('Explain and analyze the calculator context I just opened.');
     })().catch(() => setStatus('Local chat storage could not be opened.'));
   }, []);
@@ -172,7 +170,6 @@ export default function NexusAssistantScreen() {
     }
     if (!text || busy) return;
 
-    const musicIntent = parseMusicIntent(text);
     const pdfCommand = parseAssistantPdfCommand(text);
     const identity = answerNexusIdentityQuestion(text);
 
@@ -213,25 +210,26 @@ export default function NexusAssistantScreen() {
         }
       }
 
-      if (musicIntent) {
-        const handled = await executeNativeMusicIntent(musicIntent);
-        const musicMessage = handled
-          ? musicIntent.action === 'play' ? 'Music playback command sent.' : 'Music control sent.'
-          : 'This music app does not accept the requested Android music command.';
-        await addMessage(SESSION_ID, 'assistant', musicMessage);
-        await refreshMessages();
-        setStatus(musicMessage);
-        return;
-      }
-
       const proposal = planCapability(text);
       if (proposal) {
         if (proposal.capability.id === 'qr-generate' || proposal.capability.id === 'tool-open') {
           const result = await runStage3Agent({ sessionId: SESSION_ID, userText: text, confirmed: true, proposal, onStatus: setStatus });
           if (result?.success) setGeneratedResult({ title: 'Tool action ready', message: result.message });
           await refreshMessages();
+          await speakResponseForMode(result?.message ?? '', fromLiveMode);
           return;
         }
+
+        if (!proposal.requiresConfirmation) {
+          const result = await runStage3Agent({ sessionId: SESSION_ID, userText: text, confirmed: false, proposal, onStatus: setStatus });
+          if (result?.success) {
+            setGeneratedResult({ title: 'Nexus Assistant action', message: result.message });
+          }
+          await refreshMessages();
+          await speakResponseForMode(result?.message ?? '', fromLiveMode);
+          return;
+        }
+
         setPendingProposal(proposal);
         const confirmation = formatCapabilityConfirmation(proposal);
         await addMessage(SESSION_ID, 'assistant', confirmation);
@@ -255,7 +253,7 @@ export default function NexusAssistantScreen() {
       }
 
       try {
-        setStatus(calculatorContext ? 'Processing calculator context through Nexus AI routing…' : 'Checking web search and optional cloud providers through Nexus Gateway…');
+        setStatus(calculatorContext ? 'Processing calculator context through Gemini routing…' : 'Checking Gemini and optional web search through Nexus Gateway…');
         const routed = await routeAssistantRequest({ message: text, history, bookContext: context.book, fileContext: context.file });
         setWebResults(routed.web);
         if (routed.provider) {
@@ -264,7 +262,7 @@ export default function NexusAssistantScreen() {
             : routed.provider.text;
           await addMessage(SESSION_ID, 'assistant', responseText);
           await refreshMessages();
-          setStatus((routed.provider.provider === 'openai' ? 'OpenAI' : 'Gemini') + ' response received through Nexus Gateway.');
+          setStatus(routed.provider.provider === 'gemini' ? 'Gemini response received through Nexus Gateway.' : 'Response received through an optional cloud provider.');
           await speakResponseForMode(responseText, fromLiveMode);
           return;
         }
@@ -273,10 +271,10 @@ export default function NexusAssistantScreen() {
       if (!engineReady) {
         const fallback = context.prompt
           ? 'Nexus Assistant could not reach an inference provider. Your selected context stays on this device.'
-          : 'Nexus Assistant could not reach the available cloud provider and local inference is not available in this build. Your message is stored locally on this device.';
+          : 'Nexus Assistant could not reach Gemini and local inference is not available in this build. Your message is stored locally on this device.';
         await addMessage(SESSION_ID, 'assistant', fallback);
         await refreshMessages();
-        setStatus('No inference provider available; message remains local.');
+        setStatus('No chat inference provider available; message remains local.');
         await speakResponseForMode(fallback, fromLiveMode);
         return;
       }
@@ -488,8 +486,8 @@ export default function NexusAssistantScreen() {
       <Text style={[styles.statusTitle, { color: colors.foreground }]}>Confirmation required</Text>
       <Text style={[styles.body, { color: colors.mutedForeground }]}>{formatCapabilityConfirmation(pendingProposal)}</Text>
       <View style={styles.actionRow}>
-        <Pressable accessibilityRole="button" onPress={cancelPendingAction} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>Cancel</Text></Pressable>
-        <Pressable accessibilityRole="button" onPress={confirmPendingAction} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Confirm</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => { setPendingProposal(null); setStatus('Action cancelled.'); }} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>Cancel</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => { const proposal = pendingProposal; setPendingProposal(null); void runStage3Agent({ sessionId: SESSION_ID, userText: proposal.capability.id === 'open-url' ? 'open ' + (proposal.args.url ?? '') : proposal.capability.title, confirmed: true, proposal, onStatus: setStatus }).then(() => refreshMessages()).catch(() => undefined); }} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Confirm</Text></Pressable>
       </View>
     </View> : null}
 
@@ -502,10 +500,7 @@ export default function NexusAssistantScreen() {
         <View style={styles.toolGrid}>
           <MusicAppsPanel />
           {pinnedTools.filter((tool) => !['file', 'qr-code'].includes(tool.id)).map((tool) => (
-            <Pressable key={tool.id} accessibilityRole="button" accessibilityLabel={tool.title} onPress={() => {
-              openAssistantTool(tool);
-              setStatus(tool.title + ' opened through the existing Nexus Plus tool.');
-            }} style={[styles.toolChip, { borderColor: colors.border, backgroundColor: colors.background }]}>
+            <Pressable key={tool.id} accessibilityRole="button" accessibilityLabel={tool.title} onPress={() => { openAssistantTool(tool); setStatus(tool.title + ' opened through the existing Nexus Plus tool.'); }} style={[styles.toolChip, { borderColor: colors.border, backgroundColor: colors.background }]}>
               <Feather name="tool" size={16} color={colors.primary} />
               <Text style={[styles.toolChipText, { color: colors.foreground }]}>{tool.title}</Text>
             </Pressable>
@@ -551,7 +546,7 @@ export default function NexusAssistantScreen() {
 
 const styles = StyleSheet.create({
   backgroundMusicCard: { marginHorizontal: 12, marginBottom: 8, borderWidth: 1, borderRadius: 16, padding: 12, flexDirection: 'row', alignItems: 'center' },
-  backgroundMusicCopy: { flex: 1 }, musicTitle: { fontSize: 15, fontWeight: '800', marginTop: 3 }, musicArtist: { fontSize: 12, marginTop: 2 }, musicActions: { flexDirection: 'row', gap: 4 }, iconButton: { minWidth: 42, minHeight: 42, alignItems: 'center', justifyContent: 'center' },
+  backgroundMusicCopy: { flex: 1 }, musicTitle: { fontSize: 15, fontWeight: '800', marginTop: 3 }, musicArtist: { fontSize: 12, marginTop: 2 }, musicActions: { flexDirection: 'row', gap: 4 },
   root: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
