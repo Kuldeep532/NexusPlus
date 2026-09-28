@@ -1,6 +1,7 @@
 import { getSupabaseAccessToken } from '@/features/auth/supabaseAuthAdapter';
 import { APP_API_BASE_URL } from '@/features/api-gateway/apiGatewayClient';
 import type { PremiumPlan } from './premiumPlans';
+import { PREMIUM_FEATURES_ENABLED } from './premiumAvailability';
 
 function assertConfigured() {
   if (!APP_API_BASE_URL) throw new Error('SUPABASE_PREMIUM_NOT_CONFIGURED');
@@ -44,6 +45,7 @@ export async function getActivePremiumPlans():Promise<PremiumCatalogPlan[]>{
 }
 
 export async function createSubscriptionBundleOrder(bundleCode:string){
+  if (!PREMIUM_FEATURES_ENABLED) throw new Error('PREMIUM_TEMPORARILY_UNAVAILABLE');
   return rpc<{orderId:string;productType:string;planCode:string;amountInr:number;includedCredits:number;durationDays:number;upiId:string;receiverName:string;provider:string;status:string}>(
     'create_subscription_bundle_order',
     {p_bundle_code:bundleCode},
@@ -57,10 +59,10 @@ export async function getMyPremiumEntitlement():Promise<PremiumEntitlement>{
 }
 export async function getMyAiCreditBalance():Promise<number>{return rpc<number>('get_my_ai_credit_balance',{});}
 export type AiCreditPlan={id:string;code:string;name:string;credits:number;amount:number;tagline:string;};
-export async function getActiveAiCreditPlans():Promise<AiCreditPlan[]>{return request<AiCreditPlan[]>('/premium/credit-plans',undefined,false);}
+export async function getActiveAiCreditPlans():Promise<AiCreditPlan[]>{if (!PREMIUM_FEATURES_ENABLED) return []; return request<AiCreditPlan[]>('/premium/credit-plans',undefined,false);}
 export type PaymentSettings={upiId:string;receiverName:string;instructions:string;provider:string;};
-export async function getPaymentSettings():Promise<PaymentSettings>{return request<PaymentSettings>('/premium/payment-settings');}
-export async function createPaymentOrder(productType:'PREMIUM'|'AI_CREDITS',planCode:string){return rpc<{orderId:string;amountInr:number;upiId:string;receiverName:string;provider:string;status:string}>('create_payment_order',{p_product_type:productType,p_plan_code:planCode});}
+export async function getPaymentSettings():Promise<PaymentSettings>{if (!PREMIUM_FEATURES_ENABLED) throw new Error('PREMIUM_TEMPORARILY_UNAVAILABLE'); return request<PaymentSettings>('/premium/payment-settings');}
+export async function createPaymentOrder(productType:'PREMIUM'|'AI_CREDITS',planCode:string){if (!PREMIUM_FEATURES_ENABLED) throw new Error('PREMIUM_TEMPORARILY_UNAVAILABLE'); return rpc<{orderId:string;amountInr:number;upiId:string;receiverName:string;provider:string;status:string}>('create_payment_order',{p_product_type:productType,p_plan_code:planCode});}
 export async function submitPaymentReference(_orderId:string,_reference:string){throw new Error('MANUAL_UTR_NOT_REQUIRED');}
 export type PremiumFeatureCatalogRow={feature_code:string;feature_name:string;access_type:'FREE'|'CREDIT_BASED'|'PREMIUM_ONLY';min_tier:number;credit_cost:number;is_active:boolean;description:string|null;};
 export async function getPremiumFeatureCatalog():Promise<PremiumFeatureCatalogRow[]>{return request<PremiumFeatureCatalogRow[]>('/premium/feature-catalog');}
