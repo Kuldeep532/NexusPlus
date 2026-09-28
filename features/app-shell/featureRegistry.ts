@@ -33,7 +33,7 @@ const registry: HomeFeatureDefinition[] = [
   { id: 'nexus-ai-workflow', title: 'Nexus AI Workflow', description: 'Draft bilingual messages and plan email, meeting and calendar workflows.', route: '/productivity-ai', icon: 'zap', category: 'productivity' },
 ];
 export function registerFeature(feature: HomeFeatureDefinition): void { const existingIndex = registry.findIndex((item) => item.id === feature.id); if (existingIndex >= 0) registry[existingIndex] = feature; else registry.push(feature); }
-export function getHomeFeatures(): HomeFeatureDefinition[] { return [...registry].sort((a, b) => (a.order ?? 1000) - (b.order ?? 1000)); }
+export function getHomeFeatures(): HomeFeatureDefinition[] { return [...registry].filter((feature) => PREMIUM_FEATURES_ENABLED || !['video-generator'].includes(feature.id)).sort((a, b) => (a.order ?? 1000) - (b.order ?? 1000)); }
 export function getFeaturedHomeFeatures(): HomeFeatureDefinition[] { return getHomeFeatures().filter((feature) => feature.featured); }
 export function getCategoryTools(category: FeatureCategory): HomeFeatureDefinition[] { return getHomeFeatures().filter((feature) => feature.category === category && !feature.featured && feature.id !== 'pdf-tools'); }
 export function getUtilityTools(): HomeFeatureDefinition[] { return getHomeFeatures().filter((feature) => feature.category === 'utility'); }
