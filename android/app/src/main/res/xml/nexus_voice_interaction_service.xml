@@ -1,0 +1,6 @@
+<voice-interaction-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:sessionService="com.nexuswavetech.nexusplus.NexusAssistantVoiceInteractionService"
+    android:supportsAssist="true"
+    android:supportsLaunchFromKeyguard="false"
+    android:recognitionService=""
+    android:settingsActivity="com.nexuswavetech.nexusplus.MainActivity" />
