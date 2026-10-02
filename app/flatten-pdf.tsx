@@ -46,7 +46,7 @@ export default function FlattenPdfScreen() {
       setResult(uri);
       setStatus('Flattening completed. The output PDF is ready to save/share.');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'PDF flattening could not be completed.');
+      setStatus(getUserFriendlyMessage(error, 'PDF flattening could not be completed.'));
     } finally {
       setBusy(false);
     }
