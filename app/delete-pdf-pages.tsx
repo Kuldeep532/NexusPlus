@@ -31,7 +31,7 @@ export default function DeletePdfPagesScreen() {
       setPdf({ uri: asset.uri, name: asset.name || 'document.pdf', pageCount });
       setSelection(''); setResult(null);
       setStatus(`${pageCount} pages loaded. Valid page numbers are 1 to ${pageCount}.`);
-    } catch (error) { setPdf(null); setStatus(error instanceof Error ? error.message : 'Could not read the PDF page count.'); }
+    } catch (error) { setPdf(null); setStatus(getUserFriendlyMessage(error, 'Could not read the PDF page count.')); }
   }
 
   function updateSelection(value: string) { if (pdf) setSelection(sanitizePageRangeInput(value, pdf.pageCount)); }
@@ -52,7 +52,7 @@ export default function DeletePdfPagesScreen() {
       const output = `${FileSystem.cacheDirectory || ''}nexus-pdf-${Date.now()}-pages-deleted.pdf`;
       const uri = await PdfNativeBridge.reorder(pdf.uri, output, keep, pdf.pageCount);
       setResult(uri); setStatus(`${deleteSet.size} page${deleteSet.size === 1 ? '' : 's'} removed successfully.`);
-    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not delete the selected pages.'); }
+    } catch (error) { setStatus(getUserFriendlyMessage(error, 'Could not delete the selected pages.')); }
     finally { setBusy(false); }
   }
 
