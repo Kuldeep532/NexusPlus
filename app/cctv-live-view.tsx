@@ -8,6 +8,7 @@ import { useCctvCameras } from '@/features/cctv/useCctvCameras';
 import { executeCctvLiveControl } from '@/features/cctv/cctvControls';
 import { getActiveCctvSession, closeCctvSession } from '@/features/cctv/cctvSession';
 import { CctvBackendError, type CctvCameraRecord } from '@/features/cctv/cctvBackend';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 
 type Control = { id: 'start' | 'stop' | 'playback' | 'ptz'; label: string; icon: string; capability?: keyof CctvCameraRecord['capabilities'] };
 const CONTROLS: readonly Control[] = [
@@ -48,7 +49,7 @@ export default function CctvLiveViewScreen() {
       if (control === 'stop') { setRunning(false); setStreamUri(null); }
       if (control === 'playback') router.push({ pathname: '/cctv-playback', params: { cameraId: camera.id } });
     } catch (error) {
-      setMessage(error instanceof CctvBackendError ? error.message : error instanceof Error ? error.message : 'Camera control failed.');
+      setMessage(error instanceof CctvBackendError ? getUserFriendlyMessage(error, 'Camera control failed.') : getUserFriendlyMessage(error, 'Camera control failed.'));
     }
   };
 
