@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { createAudioEditorOutputPath } from '@/features/audio-editor/audioEditorExport';
 import { discoverLocalAudio, pickAudioFromFileManager } from '@/features/audio-editor/audioEditorSource';
 import { mixAudioProject } from '@/features/audio-editor/audioMixProcessing';
@@ -74,7 +75,7 @@ export default function MixAudioScreen() {
         setMessage(`Track added: ${source.name}.`);
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to inspect this audio file.');
+      setMessage(getUserFriendlyMessage(error, 'Unable to inspect this audio file.'));
     } finally {
       setLoading(false);
     }
