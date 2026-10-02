@@ -63,17 +63,18 @@ export async function downloadOnnxModel(modelId: string): Promise<string> {
   const dir = modelDir(model);
   dir.create({ idempotent: true, intermediates: true });
 
-  const base = 'https://huggingface.co/webai-community/ai-models/resolve/main/SmolLM2-135M-Instruct/onnx-webgpu/';
+  const hfBase = 'https://huggingface.co/onnx-community/SmolLM2-135M-Instruct-ONNX/resolve/main/';
+  const genaiBase = 'https://huggingface.co/webai-community/ai-models/resolve/main/SmolLM2-135M-Instruct/onnx-webgpu/';
   for (const name of hfFiles) {
     const existing = new File(dir, name);
     if (existing.exists && existing.size > 0) continue;
     if (name.includes('/')) existing.parentDirectory?.create({ idempotent: true, intermediates: true });
-    await downloadFile(base + name, existing);
+    await downloadFile(hfBase + name, existing);
   }
   for (const name of genaiFiles) {
     const existing = new File(dir, name);
     if (existing.exists && existing.size > 0) continue;
-    await downloadFile(base + name, existing);
+    await downloadFile(genaiBase + name, existing);
   }
   return dir.uri;
 }
