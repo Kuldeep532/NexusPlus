@@ -9,7 +9,7 @@ import { getAssistantVoicePreference, setAssistantVoicePreference, type Assistan
 import { getInstalledVoices, downloadVoice, type InstalledVoice } from '@/features/voice-library/voiceStore';
 import { ASSISTANT_MODELS, NEXUS_CORE_MODEL_ID } from '@/features/nexus-assistant/assistantConfig';
 import { downloadAssistantModel } from '@/features/nexus-assistant/modelManager';
-import { getAssetStatus } from '@/features/nexus-assistant/stage8AssetManager';
+import { isOnnxModelDownloaded } from '@/features/nexus-assistant/onnxRuntimeManager';
 import { UNIQUE_VOICE_CATALOG } from '@/features/voice-library/voiceCatalog';
 import { getHistoryEnabled, setHistoryEnabled } from '@/features/nexus-assistant/assistantStore';
 import { NativeModules } from 'react-native';
@@ -45,7 +45,7 @@ export default function NexusAiSettingsScreen(){
  const toggleHistory=async()=>{const next=!historyEnabled;setHistoryEnabledState(next);await setHistoryEnabled(next);};
  const requestDefaultAssistant=async()=>{if(!assistantRole?.requestDefaultAssistant){Alert.alert('Default Assistant','This Android version does not provide the system assistant setting.');return;}await assistantRole.requestDefaultAssistant();setTimeout(()=>{void assistantRole.isDefaultAssistant?.().then(value=>setDefaultAssistant(Boolean(value)));},700);};
  const localModel=ASSISTANT_MODELS.find(m=>m.id===NEXUS_CORE_MODEL_ID) ?? ASSISTANT_MODELS.find(m=>m.kind==='chat');
- const localModelReady=localModel ? getAssetStatus(localModel.id)==='ready' : false;
+ const localModelReady=localModel ? isOnnxModelDownloaded(localModel.id) : false;
  const downloadLocalModel=async()=>{if(!localModel)return;setModelBusy(true);try{await downloadAssistantModel(localModel.id);Alert.alert('Local AI ready','The local AI model is now downloaded. You can use it without cloud access.');}catch{Alert.alert('Local AI','The local AI model could not be downloaded right now. Please try again later.');}finally{setModelBusy(false);}};
 
  return <ScrollView style={[styles.root,{backgroundColor:colors.background}]} contentContainerStyle={{padding:18,paddingTop:insets.top+10,paddingBottom:insets.bottom+30}}>
