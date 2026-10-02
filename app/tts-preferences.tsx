@@ -29,7 +29,7 @@ export default function TtsPreferencesScreen() {
  const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [status,setStatus]=useState('');
 
  useEffect(()=>{void (async()=>{try{const prefs=await readTtsVoicePreferences();setProvider(prefs.provider);setVoiceId(prefs.voiceId);setVoiceName(prefs.voiceName);setLanguage(prefs.language);setLanguageFilter(prefs.language||'All');const voices=await listTtsVoices();setLocalVoices(voices);if(prefs.provider==='elevenlabs'){try{setElevenVoices(await listElevenLabsVoices());}catch(error){setStatus(getUserFriendlyMessage(error, 'ElevenLabs voices could not be loaded.'));}}}catch(error){setStatus(getUserFriendlyMessage(error, 'Voice preferences could not be loaded.'));}finally{setLoading(false);}})();},[]);
- useEffect(()=>{if(provider==='elevenlabs'&&elevenVoices.length===0){void listElevenLabsVoices().then(setElevenVoices).catch(error=>setStatus(error instanceof Error?error.message:'ElevenLabs voices could not be loaded.'));}},[provider,elevenVoices.length]);
+ useEffect(()=>{if(provider==='elevenlabs'&&elevenVoices.length===0){void listElevenLabsVoices().then(setElevenVoices).catch(error=>setStatus(getUserFriendlyMessage(error,'ElevenLabs voices could not be loaded.')));}},[provider,elevenVoices.length]);
  const choices=useMemo(()=>provider==='elevenlabs'?elevenVoices:localChoices(provider,localVoices),[provider,localVoices,elevenVoices]);
  const languages=useMemo(()=>['All',...Array.from(new Set(choices.map((item:any)=>String(item.language||'').trim()).filter(Boolean)))],[choices]);
  const filteredChoices=useMemo(()=>languageFilter==='All'?choices:choices.filter((item:any)=>String(item.language||'')===languageFilter),[choices,languageFilter]);
