@@ -16,14 +16,15 @@ type NativeOnnxModule = {
 const nativeOnnx = NativeModules.NexusAssistantOnnx as NativeOnnxModule | undefined;
 const root = new Directory(Paths.document, 'nexus-assistant', 'onnx');
 
-const hfFiles = ['config.json', 'generation_config.json', 'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json', 'merges.txt', 'vocab.json', 'onnx/model_q4f16.onnx'];
+const hfFiles = ['config.json', 'generation_config.json', 'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json', 'merges.txt', 'vocab.json'];
+const genaiFiles = ['genai_config.json', 'model.onnx', 'model.onnx.data'];
 
 function modelDir(model: OnnxModel): Directory {
   return new Directory(root, model.id);
 }
 
 function modelFile(model: OnnxModel): File {
-  return new File(modelDir(model), 'onnx/model_q4f16.onnx');
+  return new File(modelDir(model), 'model.onnx');
 }
 
 function ensureRoot(): void {
@@ -46,7 +47,7 @@ export function isOnnxModelDownloaded(modelId: string): boolean {
   const model = getOnnxModel(modelId);
   if (!model) return false;
   const dir = modelDir(model);
-  const files = [...hfFiles, 'genai_config.json', ...(model.requiredFiles ?? [])];
+  const files = [...hfFiles, ...genaiFiles, ...(model.requiredFiles ?? [])];
   return files.every((name) => fileExists(dir, name));
 }
 
@@ -62,21 +63,17 @@ export async function downloadOnnxModel(modelId: string): Promise<string> {
   const dir = modelDir(model);
   dir.create({ idempotent: true, intermediates: true });
 
-  if (!modelFile(model).exists || modelFile(model).size <= 0) {
-    const base = 'https://huggingface.co/onnx-community/SmolLM2-135M-Instruct-ONNX/resolve/main/';
-    await downloadFile(base + 'onnx/model_q4f16.onnx', modelFile(model));
-  }
-
-  const base = 'https://huggingface.co/onnx-community/SmolLM2-135M-Instruct-ONNX/resolve/main/';
+  const base = 'https://huggingface.co/webai-community/ai-models/resolve/main/SmolLM2-135M-Instruct/onnx-webgpu/';
   for (const name of hfFiles) {
     const existing = new File(dir, name);
     if (existing.exists && existing.size > 0) continue;
     if (name.includes('/')) existing.parentDirectory?.create({ idempotent: true, intermediates: true });
     await downloadFile(base + name, existing);
   }
-  const genai = new File(dir, 'genai_config.json');
-  if (!genai.exists || genai.size <= 0) {
-    await downloadFile('https://huggingface.co/webai-community/ai-models/resolve/main/SmolLM2-135M-Instruct/onnx-webgpu/genai_config.json', genai);
+  for (const name of genaiFiles) {
+    const existing = new File(dir, name);
+    if (existing.exists && existing.size > 0) continue;
+    await downloadFile(base + name, existing);
   }
   return dir.uri;
 }
