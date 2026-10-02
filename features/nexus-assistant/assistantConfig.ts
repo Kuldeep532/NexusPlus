@@ -17,7 +17,7 @@ export type AssistantModel = {
  * Speech recognition remains a separate small model because ASR and text
  * generation are different inference tasks.
  */
-export const NEXUS_CORE_MODEL_ID = 'smollm2-360m-q4km';
+export const NEXUS_CORE_MODEL_ID = 'smollm2-135m-q4f16-onnx';
 export const NEXUS_LOCAL_MODEL_MODE = 'on-demand';
 
 export type LocalModelRecommendationTier = 'light' | 'standard';
@@ -32,10 +32,10 @@ export const ASSISTANT_MODELS: AssistantModel[] = [
   {
     id: NEXUS_CORE_MODEL_ID,
     title: 'Nexus Core AI',
-    description: 'Lightweight local chat model for Assistant, summaries, explanations and basic document tasks.',
-    sizeMb: 271,
-    url: 'https://huggingface.co/QuantFactory/SmolLM2-360M-Instruct-GGUF/resolve/main/SmolLM2-360M-Instruct.Q4_K_M.gguf',
-    format: 'gguf',
+    description: 'Lightweight local AI for chat, summaries, explanations and basic document tasks.',
+    sizeMb: 117,
+    url: 'https://huggingface.co/onnx-community/SmolLM2-135M-Instruct-ONNX/resolve/main/onnx/model_q4f16.onnx',
+    format: 'onnx',
     kind: 'chat',
   },
   {
