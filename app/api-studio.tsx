@@ -65,7 +65,7 @@ export default function ApiStudioScreen() {
       </View>
 
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Anthropic / Claude API</Text>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Claude (Anthropic)</Text>
         <Text style={[styles.body, { color: colors.mutedForeground }]}>Add your personal Anthropic API key when you want to use Claude with your own billing.</Text>
         <TextInput
           accessibilityLabel="Anthropic API key"
