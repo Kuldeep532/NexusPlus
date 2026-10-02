@@ -1,8 +1,8 @@
-import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
+import Svg, { Circle, Ellipse, Path, Text } from 'react-native-svg';
 
 export function RadhaKrishnaWelcomeArt({ width = 320, height = 260, showWordmark = true }: { width?: number; height?: number; showWordmark?: boolean }) {
   return (
-    <Svg width={width} height={height} viewBox="0 0 320 320" accessibilityRole="image" accessibilityLabel="Radha and Krishna devotional logo with Nexus Web Technologies wordmark">
+    <Svg width={width} height={height} viewBox="0 0 320 320" accessibilityRole="image" accessibilityLabel="Radha and Krishna devotional logo with Nexus Wave Technologies wordmark">
       <Circle cx="160" cy="128" r="118" fill="#FEF3C7" opacity={0.42} />
       <Path d="M42 214c30-22 55-32 89-32 34 0 57 10 88 32H42Z" fill="#86EFAC" opacity={0.75} />
       <Path d="M178 214c29-22 58-33 93-33 12 0 22 2 31 5v28h-124Z" fill="#4ADE80" opacity={0.72} />
@@ -28,6 +28,9 @@ export function RadhaKrishnaWelcomeArt({ width = 320, height = 260, showWordmark
           <Path d="M62 236h196" stroke="#F59E0B" strokeWidth="1.5" strokeLinecap="round" opacity="0.65" />
           <Path d="M94 246c10-8 19-12 29-12 10 0 19 4 29 12" fill="none" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" />
           <Path d="M168 246c10-8 19-12 29-12 10 0 19 4 29 12" fill="none" stroke="#EC4899" strokeWidth="2" strokeLinecap="round" />
+          <Text x="160" y="272" textAnchor="middle" fontSize="13" fontWeight="700" fill="#1F2937">
+            Nexus Wave Technologies
+          </Text>
         </>
       )}
     </Svg>
