@@ -30,7 +30,7 @@ export default function NexusAiWorkflowScreen() {
         );
       })
       .catch(() => {
-        if (!cancelled) setGatewayStatus('Productivity services are not connected yet.');
+        if (!cancelled) setGatewayStatus('AI services are temporarily unavailable. Please try again later.');
       });
     return () => { cancelled = true; };
   }, []);
