@@ -80,6 +80,36 @@ export function planCapability(request: string): CapabilityProposal | null {
   const text = request.trim();
   if (!text) return null;
 
+  const lower = text.toLowerCase();
+
+  if (/\\b(read|describe|what(?:'s| is) on)\\b.*\\b(screen|page|display)\\b|स्क्रीन.*(पढ़|बताओ)/i.test(text)) {
+    return proposalForCapability('read-screen', {}, 'The request asks Nexus Assist to describe accessible screen content.');
+  }
+
+  if (/\\b(search|find|look up)\\b.*\\b(web|online|internet|latest|today|current)\\b|वेब.*(खोज|ढूंढ)|ऑनलाइन.*(खोज|ढूंढ)/i.test(text)) {
+    return proposalForCapability('search-web', { query: text }, 'The request asks for current information from the web.');
+  }
+
+  if (/\\b(summarize|summary|tldr|shorten)\\b|सारांश|संक्षेप/i.test(text)) {
+    return proposalForCapability('summarize-text', { text }, 'The request asks for a concise summary.');
+  }
+
+  if (/\\b(translate|translation)\\b|अनुवाद|भाषा में बदल/i.test(text)) {
+    const match = /\\b(?:to|into|in)\\s+([A-Za-z][A-Za-z -]{1,30})$/i.exec(text);
+    return proposalForCapability('translate-text', {
+      text,
+      ...(match ? { language: match[1].trim() } : {}),
+    }, 'The request asks for translation.');
+  }
+
+  if (/\\b(read|open|explain|summarize)\\b.*\\b(document|pdf|file)\\b|दस्तावेज|पीडीएफ.*(पढ़|समझ)/i.test(text)) {
+    return proposalForCapability('read-document', { query: text }, 'The request asks to read or explain a selected document.');
+  }
+
+  if (/\\b(draft|write|compose)\\b.*\\b(message|reply|text|email)\\b|मैसेज.*(लिख|ड्राफ्ट)|जवाब.*लिख/i.test(text)) {
+    return proposalForCapability('draft-message', { text }, 'The request asks for a message draft without sending it.');
+  }
+
   const natural = parseNaturalCommand(text);
   if (natural.kind === 'reminder') {
     return proposalForCapability(
