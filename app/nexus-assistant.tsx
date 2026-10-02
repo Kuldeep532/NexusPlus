@@ -500,6 +500,10 @@ export default function NexusAssistantScreen() {
 
   const selectedVoiceName = UNIQUE_VOICE_CATALOG.find((voice) => voice.id === assistantVoiceId)?.name ?? 'Device voice';
 
+  const openLocalAiDownload = () => {
+    void router.push('/nexus-ai-settings');
+  };
+
   return <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 18, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 28 }}>
     <View style={styles.header}>
       <View style={styles.headerLeft}>
@@ -556,6 +560,14 @@ export default function NexusAssistantScreen() {
       {activeContextLabel ? <Text style={[styles.note, { color: colors.primary }]}>Active context: {activeContextLabel}</Text> : null}
       {pdfAttachment ? <Text style={[styles.note, { color: colors.primary }]}>Local PDF attached: {pdfAttachment.name}</Text> : null}
     </View>
+
+    {status.includes('daily cloud limit') ? (
+      <View style={[styles.resultCard, { backgroundColor: colors.card, borderColor: colors.border }]} accessibilityLiveRegion="assertive">
+        <Text accessibilityRole="header" style={[styles.statusTitle, { color: colors.foreground }]}>Daily limit reached</Text>
+        <Text style={[styles.body, { color: colors.mutedForeground }]}>You can continue using Nexus Assistant with a local AI model. Download one from Assistant Settings.</Text>
+        <Pressable accessibilityRole="button" onPress={openLocalAiDownload} style={[styles.primaryButton, { backgroundColor: colors.primary, marginTop: 10 }]}><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Download local AI</Text></Pressable>
+      </View>
+    ) : null}
 
     {pdfAttachment ? (
       <View style={[styles.pdfCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
