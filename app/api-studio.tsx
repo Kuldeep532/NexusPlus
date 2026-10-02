@@ -81,10 +81,10 @@ export default function ApiStudioScreen() {
       </View>
 
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>ElevenLabs API</Text>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>ElevenLabs</Text>
         <Text style={[styles.body, { color: colors.mutedForeground }]}>Add your personal ElevenLabs key to use your own ElevenLabs account. Your key is stored securely on this device.</Text>
         <TextInput
-          accessibilityLabel="ElevenLabs API key"
+          accessibilityLabel="ElevenLabs key"
           value={elevenLabsKey}
           onChangeText={setElevenLabsKey}
           autoCapitalize="none"
