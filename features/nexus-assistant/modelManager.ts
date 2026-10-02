@@ -1,14 +1,8 @@
-import { Directory, File, Paths } from 'expo-file-system';
 import { ASSISTANT_MODELS, ASSISTANT_VOICES, type AssistantModel, type AssistantVoice } from './assistantConfig';
+import { downloadOnnxModel, deleteOnnxModel, resolveOnnxModelPath } from './onnxRuntimeManager';
 import { downloadAssistantAsset, deleteAssistantAsset } from './stage8AssetManager';
 import { downloadVoice, removeVoice } from '../voice-library/voiceStore';
 import { UNIQUE_VOICE_CATALOG } from '../voice-library/voiceCatalog';
-
-const modelsDir = new Directory(Paths.document, 'nexus-assistant', 'models');
-
-function ensureDir(directory: Directory): void {
-  directory.create({ idempotent: true, intermediates: true });
-}
 
 export function getAssistantModels(): AssistantModel[] {
   return [...ASSISTANT_MODELS];
@@ -22,16 +16,24 @@ export async function downloadAssistantModel(modelId: string): Promise<string> {
   const model = ASSISTANT_MODELS.find((item) => item.id === modelId);
   if (!model) throw new Error('Unknown Nexus Assistant model.');
   if (model.kind !== 'chat') throw new Error('Requested asset is not a chat model.');
-  return downloadAssistantAsset(model.id);
+  return model.format === 'onnx'
+    ? downloadOnnxModel(model.id)
+    : downloadAssistantAsset(model.id);
+}
+
+export function getAssistantModelPath(modelId: string): string | null {
+  const model = ASSISTANT_MODELS.find((item) => item.id === modelId);
+  if (!model) return null;
+  return model.format === 'onnx' ? resolveOnnxModelPath(modelId) : null;
 }
 
 export async function deleteAssistantModel(modelId: string): Promise<void> {
-  ensureDir(modelsDir);
-  for (const name of [`${modelId}.gguf`, `${modelId}.tar.bz2`, `${modelId}.onnx`]) {
-    const file = new File(modelsDir, name);
-    if (file.exists) file.delete();
+  const model = ASSISTANT_MODELS.find((item) => item.id === modelId);
+  if (model?.format === 'onnx') {
+    deleteOnnxModel(modelId);
+    return;
   }
-  try { deleteAssistantAsset(modelId); } catch { /* no canonical asset to remove */ }
+  try { deleteAssistantAsset(modelId); } catch {}
 }
 
 export async function downloadAssistantVoice(voiceId: string): Promise<string> {
