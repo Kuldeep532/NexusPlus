@@ -64,16 +64,13 @@ export default function SendFeedbackScreen() {
     try {
       // Android store installs can use the public listing directly.
       // Outside the store, the user gets the same feedback form with a mail handoff.
-      if (Platform.OS === 'android') {
-        const canOpenStore = await Linking.canOpenURL(APP_STORE_ANDROID_URL);
-        if (canOpenStore) {
-          await Linking.openURL(APP_STORE_ANDROID_URL);
-          return;
-        }
+      if (Platform.OS === 'android' && (await Linking.canOpenURL(APP_STORE_ANDROID_URL))) {
+        await Linking.openURL(APP_STORE_ANDROID_URL);
+        return;
       }
-      throw new Error('STORE_NOT_AVAILABLE');
-    } catch {
       await sendFeedbackEmail({ title, name, message, email: user?.email });
+    } catch (error) {
+      Alert.alert('Could not open feedback', getUserFriendlyMessage(error, 'Please try again later.'));
     } finally {
       setBusy(false);
     }
