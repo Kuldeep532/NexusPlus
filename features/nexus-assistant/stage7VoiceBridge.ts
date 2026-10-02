@@ -2,6 +2,7 @@ import { NativeEventEmitter, NativeModules, PermissionsAndroid, Platform } from 
 import * as Speech from 'expo-speech';
 import type { Stage6VoiceBridge } from './stage6Voice';
 import { getInstalledVoices } from '@/features/voice-library/voiceStore';
+import { getLocalTtsEngine, type LocalTtsEngine } from '@/features/voice-library/voiceCatalog';
 import { getAssistantVoiceProfile } from './voicePolicy';
 import { getVoiceCommandsEnabled } from './voiceCommandSettings';
 import { getAssistantVoicePreference } from './assistantVoicePreferences';
@@ -9,7 +10,8 @@ import { executeSystemMediaVoiceCommand, parseMediaVoiceCommand } from './mediaV
 
 type VoiceRole = 'live-call' | 'assistant';
 export type VoiceRuntimeStatus = { state: 'idle' | 'listening' | 'processing' | 'error'; error?: string | null };
-type NativeVoiceModule = { isAvailable(): Promise<boolean>; startListening(options?: { locales?: string[] }): Promise<void>; stopListening(): Promise<void>; stopOutput(): Promise<void>; speak(text: string, options?: { modelPath?: string; configPath?: string }): Promise<void>; };
+type NativeVoiceModule = { isAvailable(): Promise<boolean>; startListening(options?: { locales?: string[] }): Promise<void>; stopListening(): Promise<void>; stopOutput(): Promise<void>; speak(text: string, options?: { modelPath?: string; configPath?: string; engine?: LocalTtsEngine }): Promise<void>; };
+
 const nativeVoice = NativeModules.NexusAssistantVoice as NativeVoiceModule | undefined;
 
 async function ensureMicrophonePermission(): Promise<boolean> {
@@ -33,4 +35,6 @@ export function createStage7VoiceBridge(onStatus?: (status: VoiceRuntimeStatus) 
   }, dispose() { subscription.remove(); void Speech.stop().catch(() => undefined); } };
 }
 export async function handleVoiceTranscriptCommand(text: string): Promise<boolean> { if (!(await getVoiceCommandsEnabled())) return false; const action = parseMediaVoiceCommand(text); if (!action) return false; return executeSystemMediaVoiceCommand(action); }
-export async function speakAssistant(text: string, locale = 'en-US', role: VoiceRole = 'assistant'): Promise<'piper' | 'system'> { const normalized = text.trim(); if (!normalized) return 'system'; const { preference, voice } = await resolveSpokenVoice(role, locale); if (preference.mode === 'local' && nativeVoice && voice) { try { await nativeVoice.speak(normalized, { modelPath: voice.modelPath, configPath: voice.configPath }); return 'piper'; } catch { } } try { await Speech.stop().catch(() => undefined); await Speech.speak(normalized, { language: locale }); } catch { } return 'system'; }
+export async function speakAssistant(text: string, locale = 'en-US', role: VoiceRole = 'assistant'): Promise<'kokoro' | 'piper' | 'system'> { const normalized = text.trim(); if (!normalized) return 'system'; const { preference, voice } = await resolveSpokenVoice(role, locale); if (preference.mode === 'local' && nativeVoice && voice) { try { await nativeVoice.speak(normalized, { modelPath: voice.modelPath, configPath: voice.configPath, engine: preference.engine }); return preference.engine; } catch { } } try { await Speech.stop().catch(() => undefined); await Speech.speak(normalized, { language: locale }); } catch { } return 'system'; }
+
+export function getConfiguredLocalVoiceEngine(engine: LocalTtsEngine) { return getLocalTtsEngine(engine); }
