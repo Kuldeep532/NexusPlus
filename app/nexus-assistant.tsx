@@ -9,7 +9,7 @@ import { useColors } from '@/hooks/useColors';
 import { ASSISTANT_LIMITS, ASSISTANT_MODELS, ASSISTANT_VOICES, NEXUS_CORE_MODEL_ID } from '@/features/nexus-assistant/assistantConfig';
 import { addMessage, clearAllAssistantData, ensureSession, getHistoryEnabled, initAssistantStore, listMessages, listSessions, setHistoryEnabled, type ChatMessage } from '@/features/nexus-assistant/assistantStore';
 import { useAuth } from '@/features/auth/useAuth';
-import { downloadAssistantModel, downloadAssistantVoice } from '@/features/nexus-assistant/modelManager';
+import { downloadAssistantModel, downloadAssistantVoice, getAssistantModelPath } from '@/features/nexus-assistant/modelManager';
 import { getLocalInferenceEngine } from '@/features/nexus-assistant/localInference';
 import { streamAssistantReply } from '@/features/nexus-assistant/stage2Agent';
 import { planCapability, formatCapabilityConfirmation, type CapabilityProposal } from '@/features/nexus-assistant/agentPlanner';
@@ -112,7 +112,8 @@ export default function NexusAssistantScreen() {
       setActiveContextLabel(context.book?.title ?? context.file?.name ?? null);
       const engine = await getLocalInferenceEngine();
       const available = await engine.isAvailable();
-      setEngineReady(available);
+      const localPath = getAssistantModelPath(NEXUS_CORE_MODEL_ID);
+      setEngineReady(Boolean(available && localPath));
       setStatus(available ? 'Nexus Assistant is ready.' : 'Nexus Assistant is ready to use the selected online model.');
       if (calculatorContext) setInput('Explain and analyze the calculator context I just opened.');
     })().catch(() => setStatus('Nexus Assistant could not open your chat history. Please try again.'));
@@ -383,7 +384,7 @@ export default function NexusAssistantScreen() {
       const localReply = await streamAssistantReply({
         sessionId: SESSION_ID,
         modelId: model.id,
-        modelPath: model.url,
+        modelPath: getAssistantModelPath(NEXUS_CORE_MODEL_ID) ?? '',
         userText: base,
         onStatus: setStatus,
         onToken: (chunk) => setStreaming((value) => value + chunk),
