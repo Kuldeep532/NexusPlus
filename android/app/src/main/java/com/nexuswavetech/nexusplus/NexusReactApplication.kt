@@ -20,6 +20,7 @@ class NexusReactApplication : Application(), ReactApplication {
                 PackageList(this).packages.toMutableList().apply {
                     add(NexusAssistantVoicePackage())
                     add(NexusAssistantRolePackage())
+                    add(NexusAssistantOnnxPackage())
                     add(NexusNativeSecurityPackage())
                     add(NexusIntegrityPackage())
                     add(NexusAlarmPackage())
