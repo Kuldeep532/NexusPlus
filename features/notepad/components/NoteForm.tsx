@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -78,7 +79,7 @@ export function NoteForm({ categories, initial, saving, onSave, onDraftChange, o
       setKind(kind==='TEXT'?'AUDIO':'MIXED');
       setRecording(true);
     }catch(error){
-      Alert.alert('Recording failed',error instanceof Error?error.message:'Unable to start audio recording.');
+      Alert.alert('Recording failed',getUserFriendlyMessage(error,'Unable to start audio recording.'));
     }
   };
 
