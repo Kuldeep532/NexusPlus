@@ -83,3 +83,43 @@ export const VOICE_CATALOG: VoiceCatalogItem[] = [
 
 export const UNIQUE_VOICE_CATALOG = Array.from(new Map(VOICE_CATALOG.map((item) => [item.id, item])).values());
 export const VOICE_CATALOG_COUNT = UNIQUE_VOICE_CATALOG.length;
+
+export type LocalTtsEngine = 'kokoro' | 'piper';
+
+export type LocalTtsEngineConfig = {
+  id: LocalTtsEngine;
+  name: string;
+  description: string;
+  language: string;
+  modelUrl: string;
+  modelSizeMb: number;
+  license: string;
+  downloadable: boolean;
+};
+
+export const LOCAL_TTS_ENGINES: readonly LocalTtsEngineConfig[] = [
+  {
+    id: 'kokoro',
+    name: 'Kokoro',
+    description: 'High-quality natural neural voice. Runs locally after the model is downloaded.',
+    language: 'en-US',
+    modelUrl: 'https://huggingface.co/onnx-community/Kokoro-82M-ONNX/resolve/main/onnx/model_quantized.onnx?download=true',
+    modelSizeMb: 93,
+    license: 'Apache-2.0',
+    downloadable: true,
+  },
+  {
+    id: 'piper',
+    name: 'Piper',
+    description: 'Fast offline voices with many languages. Voice models are downloaded separately.',
+    language: 'multi',
+    modelUrl: '',
+    modelSizeMb: 0,
+    license: 'Per-voice model license',
+    downloadable: true,
+  },
+];
+
+export function getLocalTtsEngine(id: LocalTtsEngine): LocalTtsEngineConfig {
+  return LOCAL_TTS_ENGINES.find((engine) => engine.id === id) ?? LOCAL_TTS_ENGINES[0];
+}
