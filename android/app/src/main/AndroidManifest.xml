@@ -37,6 +37,9 @@
                 android:name="android.voice_interaction"
                 android:resource="@xml/nexus_voice_interaction_service" />
         </service>
+        <service android:name=".NexusAssistantSessionService" android:enabled="true" android:exported="true" android:permission="android.permission.BIND_VOICE_INTERACTION" android:label="Nexus Assistant Session">
+            <intent-filter><action android:name="android.service.voice.VoiceInteractionSessionService" /></intent-filter>
+        </service>
         <service android:name=".NexusVisionAccessibilityService" android:enabled="true" android:exported="false" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
             <meta-data android:name="android.accessibilityservice" android:resource="@xml/nexus_safety_accessibility_service" />
