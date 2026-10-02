@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { preparePdfOutputPath } from '@/features/pdf-native/pdfPageOperations';
 import { readPdfMetadataWithGotenberg, writePdfMetadataWithGotenberg } from '@/features/pdf-gotenberg/metadataApi';
 import { PdfToolResultPanel } from '@/features/pdf-native/PdfToolResultPanel';
@@ -35,7 +36,7 @@ export default function PdfMetadataScreen() {
       setMeta({ Author: String(current.Author ?? ''), Title: String(current.Title ?? ''), Subject: String(current.Subject ?? ''), Keywords: Array.isArray(current.Keywords) ? current.Keywords.join(', ') : String(current.Keywords ?? '') });
       setStatus('PDF selected. Existing metadata loaded.');
     } catch (error) {
-      setStatus(error instanceof Error ? `PDF selected. Metadata could not be read: ${error.message}` : 'PDF selected. Metadata could not be read.');
+      setStatus(`PDF selected. Metadata could not be read: ${getUserFriendlyMessage(error, 'Please try again.')}`);
       setMeta(initialMeta());
     }
   }
@@ -55,7 +56,7 @@ export default function PdfMetadataScreen() {
       const uri = await writePdfMetadataWithGotenberg(file.uri, outputName, metadata);
       setResult(uri); setStatus('Metadata updated successfully.');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'PDF metadata update could not be completed.');
+      setStatus(getUserFriendlyMessage(error, 'PDF metadata update could not be completed.'));
     } finally { setBusy(false); }
   }
 
