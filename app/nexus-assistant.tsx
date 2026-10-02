@@ -677,7 +677,7 @@ export default function NexusAssistantScreen() {
       <View style={styles.actionRow}>
         <Pressable accessibilityRole="button" accessibilityLabel="Attach a Nexus tool" onPress={() => setShowTools((v) => !v)} style={[styles.secondaryButton, { borderColor: showTools ? colors.primary : colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>Attach</Text></Pressable>
         <Pressable accessibilityRole="button" onPress={toggleVoiceInput} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>{voiceState === 'listening' ? 'Stop voice' : 'Voice'}</Text></Pressable>
-        <Pressable accessibilityRole="button" onPress={() => void (liveMode ? toggleLiveMode() : startAssistantLiveVoice()) style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>{liveMode ? 'End Live' : 'Live Mode'}</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => void (liveMode ? toggleLiveMode() : startAssistantLiveVoice())} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>{liveMode ? 'End Live' : 'Live Mode'}</Text></Pressable>
         <Pressable accessibilityRole="button" disabled={!hasText || busy} onPress={() => void send()} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: !hasText || busy ? 0.5 : 1 }]}><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{busy ? 'Working…' : 'Send'}</Text></Pressable>
       </View>
     </View>
