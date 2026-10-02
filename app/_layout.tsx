@@ -1,7 +1,7 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, StyleSheet, Text } from 'react-native';
 import { useAuth } from '@/features/auth/useAuth';
 import { useColors } from '@/hooks/useColors';
 import { hasCompletedWelcome } from '@/features/app-shell/onboardingPreferences';
@@ -14,6 +14,7 @@ import { refreshNexusFeatureFlags } from '@/features/remote-config/featureFlags'
 import { readSpiritualReminderPreferences, scheduleSpiritualReminders } from '@/features/spiritual/spiritualReminder';
 import { readLaunchPreferences } from '@/features/app-shell/launchPreferences';
 import { requestDeviceIntegrityToken, submitIntegrityToken } from '@/features/security/deviceSecurityGate';
+import { RadhaKrishnaWelcomeArt } from '@/features/branding/RadhaKrishnaWelcomeArt';
 import DebugErrorBoundary from '../DebugErrorBoundary';
 
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -26,6 +27,12 @@ function RootLayoutContent() {
   const colors = useColors();
   const router = useRouter();
   const segments = useSegments();
+  const [startupBrandingVisible, setStartupBrandingVisible] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setStartupBrandingVisible(false), 650);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (auth.loading) return;
@@ -98,7 +105,7 @@ function RootLayoutContent() {
     const inHome = firstSegment === 'home';
     const inGeetaNexus = firstSegment === 'geeta-nexus';
     const inSpiritual = firstSegment === 'spiritual' || firstSegment === '(tabs)' && segments[1] === 'spiritual';
-    const inLegal = firstSegment === 'privacy-policy' || firstSegment === 'terms-and-conditions' || firstSegment === 'about-us';
+    const inLegal = firstSegment === 'privacy-policy' || firstSegment === 'terms-and-conditions' || firstSegment === 'about-us' || firstSegment === 'contact';
 
     if (!auth.session) {
       if (inWelcome || inLegal) return;
@@ -127,6 +134,12 @@ function RootLayoutContent() {
         <View style={[styles.root, { backgroundColor: colors.background }]}>
           <Stack screenOptions={{ headerShown: false }} />
           <GlobalMiniPlayer />
+          {startupBrandingVisible && (
+            <View style={[styles.startupOverlay, { backgroundColor: colors.background }]} pointerEvents="none" accessibilityRole="summary" accessibilityLabel="Nexus Wave Technologies. Radha and Krishna devotional welcome.">
+              <RadhaKrishnaWelcomeArt width={290} height={290} showWordmark />
+              <Text style={[styles.startupTitle, { color: colors.foreground }]}>Nexus Plus</Text>
+            </View>
+          )}
         </View>
       </RemoteConfigOverlay>
     </PersistentMediaProvider>
@@ -137,4 +150,8 @@ export default function RootLayout() {
   return <DebugErrorBoundary><RootLayoutContent /></DebugErrorBoundary>;
 }
 
-const styles = StyleSheet.create({ root: { flex: 1 } });
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  startupOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', zIndex: 9999 },
+  startupTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', marginTop: -26 },
+});
