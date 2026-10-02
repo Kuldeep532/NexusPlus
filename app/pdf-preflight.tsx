@@ -43,7 +43,7 @@ export default function PdfPreflightScreen() {
       setResult(uri);
       setStatus('PDF normalization completed.');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'PDF preflight could not be completed.');
+      setStatus(getUserFriendlyMessage(error, 'PDF preflight could not be completed.'));
     } finally { setBusy(false); }
   }
 
