@@ -179,10 +179,10 @@ export default function NexusAssistantScreen() {
 
     const voiceId = await new Promise<string | null>(resolve => Alert.alert(
       'Choose a voice',
-      availableVoices.map((voice, index) => `${index + 1}. ${voice.name} — ${voice.languageName}`).join('\n'),
+      'Select a voice below. A voice marked as ready is already on your phone. Other voices will be downloaded now.',
       [
         ...availableVoices.slice(0, 3).map((voice) => ({
-          text: installed.some((item) => item.id === voice.id) ? `${voice.name} (ready)` : `Download ${voice.name}`,
+          text: installed.some((item) => item.id === voice.id) ? `${voice.name} — ready` : `${voice.name} — download`,
           onPress: () => resolve(voice.id),
         })),
         { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
