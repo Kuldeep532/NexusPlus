@@ -121,7 +121,7 @@ export default function SendFileScreen() {
           <View style={[styles.status, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.statusTitle, { color: colors.foreground }]}>{state.status.replaceAll('_', ' ')}</Text>
             {progressText ? <Text style={[styles.cardText, { color: colors.mutedForeground }]}>{progressText}</Text> : null}
-            {state.error ? <Text style={[styles.error, { color: colors.destructive ?? colors.foreground }]}>{state.error}</Text> : null}
+            {state.error ? <Text style={[styles.error, { color: colors.destructive ?? colors.foreground }]}>{getUserFriendlyMessage(state.error, 'File sharing could not be completed. Please try again.')}</Text> : null}
           </View>
         )}
 
