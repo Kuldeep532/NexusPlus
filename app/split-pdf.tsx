@@ -31,7 +31,7 @@ export default function SplitPdfScreen() {
       const pageCount = assertValidPageCount((await getPdfInfo(asset.uri)).pageCount);
       setPdf({ uri: asset.uri, name: asset.name || 'document.pdf', pageCount });
       setRanges(''); setStatus(`${pageCount} pages loaded. Valid page numbers are 1 to ${pageCount}.`);
-    } catch (error) { setPdf(null); setRanges(''); setStatus(error instanceof Error ? error.message : 'Could not read the PDF page count.'); }
+    } catch (error) { setPdf(null); setRanges(''); setStatus(getUserFriendlyMessage(error, 'Could not read the PDF page count.')); }
   }
 
   function updateRanges(value: string) { setRanges(pdf ? sanitizePageRangeInput(value, pdf.pageCount) : value); }
@@ -56,7 +56,7 @@ export default function SplitPdfScreen() {
       }
       await deleteAsync(tempDirectory, { idempotent: true });
       setOutputs(persisted); setStatus(`PDF split into ${persisted.length} file${persisted.length === 1 ? '' : 's'} successfully.`);
-    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not split this PDF.'); }
+    } catch (error) { setStatus(getUserFriendlyMessage(error, 'Could not split this PDF.')); }
     finally { setBusy(false); }
   }
 
