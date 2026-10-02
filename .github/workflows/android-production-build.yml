@@ -48,17 +48,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
           version: ${{ env.PNPM_VERSION }}
           run_install: false
+
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false --reporter=append-only
+
       - name: Validate API build configuration
         run: |
           set -euo pipefail
@@ -67,16 +71,21 @@ jobs:
             https://*) ;;
             *) echo "NEXUS_API_BASE_URL must use HTTPS." >&2; exit 1 ;;
           esac
+
       - name: Validate Expo configuration
         run: pnpm exec expo config --type public
+
       - name: Validate EAS token
         run: test -n "$EAS_TOKEN"
+
       - name: Build Android Development APK with Expo EAS
         if: ${{ inputs.build_type == 'development' }}
         run: pnpm dlx eas-cli@latest build --platform android --profile development --non-interactive --wait --clear-cache
+
       - name: Build Android APK with Expo EAS
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         run: pnpm dlx eas-cli@latest build --platform android --profile preview --non-interactive --wait --clear-cache
+
       - name: Build Android AAB with Expo EAS
         if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
         run: pnpm dlx eas-cli@latest build --platform android --profile production --non-interactive --wait --clear-cache
@@ -106,22 +115,27 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
+
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
           version: ${{ env.PNPM_VERSION }}
           run_install: false
+
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false --reporter=append-only
+
       - name: Validate required files
         shell: bash
         run: |
@@ -140,6 +154,7 @@ jobs:
           test -f android/app/src/main/cpp/nexus_filter_core_jni.cpp
           test -f android/app/src/main/cpp/nexus_filter_trie.cpp
           test -f android/app/src/main/cpp/nexus_docs_engine_jni.cpp
+
       - name: Validate API build configuration
         shell: bash
         run: |
@@ -149,16 +164,20 @@ jobs:
             https://*) ;;
             *) echo "NEXUS_API_BASE_URL must use HTTPS." >&2; exit 1 ;;
           esac
+
       - name: Validate optional Play Integrity configuration
         shell: bash
         run: |
           set -euo pipefail
           if [ -z "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER" ]; then
-            echo "Play Integrity is not configured. The app will build without Play Integrity checks."
-          elif ! printf '%s' "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER" | grep -Eq '^[0-9]+$'; then
-            echo "Play Integrity configuration is invalid. The app will build without Play Integrity checks."
+            echo "Play Integrity is optional and is not configured. Continuing without it."
+          elif ! [[ "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "Play Integrity value is invalid. Clearing it and continuing without Play Integrity."
             echo "PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=" >> "$GITHUB_ENV"
+          else
+            echo "Play Integrity configuration accepted."
           fi
+
       - name: Validate release certificate configuration
         shell: bash
         run: |
@@ -167,6 +186,7 @@ jobs:
           case "$NEXUS_RELEASE_CERT_SHA256" in
             ''|*[!0-9A-Fa-f:]*) echo "NEXUS_RELEASE_CERT_SHA256 contains invalid characters." >&2; exit 1 ;;
           esac
+
       - name: Materialize Firebase configuration
         shell: bash
         env:
@@ -178,6 +198,7 @@ jobs:
           printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
           test -s android/app/google-services.json
           chmod 600 android/app/google-services.json
+
       - name: Materialize Android signing configuration
         shell: bash
         env:
@@ -196,6 +217,7 @@ jobs:
           chmod 600 "$RUNNER_TEMP/nexusplus-release.jks"
           printf '%s\n' "storeFile=$RUNNER_TEMP/nexusplus-release.jks" "storePassword=$ANDROID_KEYSTORE_PASSWORD" "keyAlias=$ANDROID_KEY_ALIAS" "keyPassword=$ANDROID_KEY_PASSWORD" > android/key.properties
           chmod 600 android/key.properties
+
       - name: Validate build secrets
         shell: bash
         run: |
@@ -206,6 +228,7 @@ jobs:
           test -n "$FIREBASE_STORAGE_BUCKET"
           test -n "$FIREBASE_MESSAGING_SENDER_ID"
           test -n "$FIREBASE_APP_ID"
+
       - name: Validate stable Android baseline
         shell: bash
         run: |
@@ -217,13 +240,16 @@ jobs:
           if (app.expo?.newArchEnabled !== true) throw new Error("newArchEnabled must remain true.");
           if (pkg.devDependencies?.["react-native"] !== "0.81.5") throw new Error("Unexpected React Native version.");
           NODE
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: ${{ env.GRADLE_VERSION }}
           cache-disabled: true
+
       - name: Make Gradle wrapper executable
         run: chmod +x android/gradlew
+
       - name: Validate Nexus Assistant GenAI dependency
         shell: bash
         run: |
@@ -232,6 +258,7 @@ jobs:
           grep -q "ai.onnxruntime.genai" android/app/src/main/java/com/nexuswavetech/nexusplus/NexusAssistantOnnxModule.kt
           grep -q "genai_config.json" features/nexus-assistant/onnxRuntimeManager.ts
           grep -q "model.onnx.data" features/nexus-assistant/onnxRuntimeManager.ts
+
       - name: Validate Nexus Assistant offline runtime source
         shell: bash
         run: |
@@ -240,16 +267,27 @@ jobs:
           grep -q 'NexusAssistantOnnx' android/app/src/main/java/com/nexuswavetech/nexusplus/NexusAssistantOnnxModule.kt
           grep -q 'onnxruntime-android' android/app/build.gradle
           grep -q 'smollm2-135m-instruct-onnx' features/nexus-assistant/assistantConfig.ts
+
       - name: Build Debug/Development APK
         if: ${{ inputs.build_type == 'development' }}
         working-directory: android
         run: gradle assembleDebug --no-daemon --no-build-cache --stacktrace --info
+
       - name: Build release APK
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         working-directory: android
+        shell: bash
         run: |
           set -euo pipefail
-          args=(assembleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PNEXUS_RELEASE_CERT_SHA256="$NEXUS_RELEASE_CERT_SHA256")
+          args=(
+            assembleRelease
+            --no-daemon
+            --no-build-cache
+            --stacktrace
+            --info
+            -PnexusReleaseAbi=arm64-v8a
+            -PNEXUS_RELEASE_CERT_SHA256="$NEXUS_RELEASE_CERT_SHA256"
+          )
           if [ -n "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER" ]; then
             args+=("-PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER")
           fi
@@ -258,21 +296,33 @@ jobs:
       - name: Build release AAB
         if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
         working-directory: android
+        shell: bash
         run: |
           set -euo pipefail
-          args=(bundleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PNEXUS_RELEASE_CERT_SHA256="$NEXUS_RELEASE_CERT_SHA256")
+          args=(
+            bundleRelease
+            --no-daemon
+            --no-build-cache
+            --stacktrace
+            --info
+            -PnexusReleaseAbi=arm64-v8a
+            -PNEXUS_RELEASE_CERT_SHA256="$NEXUS_RELEASE_CERT_SHA256"
+          )
           if [ -n "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER" ]; then
             args+=("-PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER")
           fi
           gradle "${args[@]}"
+
       - name: Verify APK output
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         shell: bash
         run: test -s android/app/build/outputs/apk/release/*.apk
+
       - name: Verify AAB output
         if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
         shell: bash
         run: test -s android/app/build/outputs/bundle/release/*.aab
+
       - name: Upload Development APK
         if: ${{ inputs.build_type == 'development' }}
         uses: actions/upload-artifact@v4
@@ -280,6 +330,7 @@ jobs:
           name: nexusplus-android-dev-apk
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
       - name: Upload APK
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         uses: actions/upload-artifact@v4
@@ -287,6 +338,7 @@ jobs:
           name: nexusplus-android-apk
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
       - name: Upload AAB
         if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
         uses: actions/upload-artifact@v4
@@ -294,662 +346,7 @@ jobs:
           name: nexusplus-android-aab
           path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
-      - name: Cleanup credentials
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          rm -f android/app/google-services.json
-          rm -f android/key.properties
-          rm -f "$RUNNER_TEMP/nexusplus-release.jks"
-; then
-            echo "Play Integrity configuration is invalid. The app will build without Play Integrity checks."
-          fi
-      - name: Validate release certificate configuration
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$NEXUS_RELEASE_CERT_SHA256"
-          case "$NEXUS_RELEASE_CERT_SHA256" in
-            ''|*[!0-9A-Fa-f:]*) echo "NEXUS_RELEASE_CERT_SHA256 contains invalid characters." >&2; exit 1 ;;
-          esac
-      - name: Materialize Firebase configuration
-        shell: bash
-        env:
-          FIREBASE_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
-        run: |
-          set -euo pipefail
-          test -n "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64"
-          mkdir -p android/app
-          printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
-          test -s android/app/google-services.json
-          chmod 600 android/app/google-services.json
-      - name: Materialize Android signing configuration
-        shell: bash
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          test -n "$ANDROID_KEYSTORE_BASE64"
-          test -n "$ANDROID_KEYSTORE_PASSWORD"
-          test -n "$ANDROID_KEY_ALIAS"
-          test -n "$ANDROID_KEY_PASSWORD"
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nexusplus-release.jks"
-          test -s "$RUNNER_TEMP/nexusplus-release.jks"
-          chmod 600 "$RUNNER_TEMP/nexusplus-release.jks"
-          printf '%s\n' "storeFile=$RUNNER_TEMP/nexusplus-release.jks" "storePassword=$ANDROID_KEYSTORE_PASSWORD" "keyAlias=$ANDROID_KEY_ALIAS" "keyPassword=$ANDROID_KEY_PASSWORD" > android/key.properties
-          chmod 600 android/key.properties
-      - name: Validate build secrets
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$FIREBASE_API_KEY"
-          test -n "$FIREBASE_AUTH_DOMAIN"
-          test -n "$FIREBASE_PROJECT_ID"
-          test -n "$FIREBASE_STORAGE_BUCKET"
-          test -n "$FIREBASE_MESSAGING_SENDER_ID"
-          test -n "$FIREBASE_APP_ID"
-      - name: Validate stable Android baseline
-        shell: bash
-        run: |
-          set -euo pipefail
-          node - <<'NODE'
-          const fs = require("fs");
-          const app = JSON.parse(fs.readFileSync("app.json", "utf8"));
-          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-          if (app.expo?.newArchEnabled !== true) throw new Error("newArchEnabled must remain true.");
-          if (pkg.devDependencies?.["react-native"] !== "0.81.5") throw new Error("Unexpected React Native version.");
-          NODE
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: ${{ env.GRADLE_VERSION }}
-          cache-disabled: true
-      - name: Make Gradle wrapper executable
-        run: chmod +x android/gradlew
-      - name: Validate Nexus Assistant GenAI dependency
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep -q "io.github.inference4j:onnxruntime-genai:0.15.2" android/app/build.gradle
-          grep -q "ai.onnxruntime.genai" android/app/src/main/java/com/nexuswavetech/nexusplus/NexusAssistantOnnxModule.kt
-          grep -q "genai_config.json" features/nexus-assistant/onnxRuntimeManager.ts
-          grep -q "model.onnx.data" features/nexus-assistant/onnxRuntimeManager.ts
-      - name: Validate Nexus Assistant offline runtime source
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f android/app/src/main/java/com/nexuswavetech/nexusplus/NexusAssistantOnnxModule.kt
-          grep -q 'NexusAssistantOnnx' android/app/src/main/java/com/nexuswavetech/nexusplus/NexusAssistantOnnxModule.kt
-          grep -q 'onnxruntime-android' android/app/build.gradle
-          grep -q 'smollm2-135m-instruct-onnx' features/nexus-assistant/assistantConfig.ts
-      - name: Build Debug/Development APK
-        if: ${{ inputs.build_type == 'development' }}
-        working-directory: android
-        run: gradle assembleDebug --no-daemon --no-build-cache --stacktrace --info
-      - name: Build release APK
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        working-directory: android
-        run: gradle assembleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER -PNEXUS_RELEASE_CERT_SHA256=$NEXUS_RELEASE_CERT_SHA256
-      - name: Build release AAB
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        working-directory: android
-        run: gradle bundleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER -PNEXUS_RELEASE_CERT_SHA256=$NEXUS_RELEASE_CERT_SHA256
-      - name: Verify APK output
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        shell: bash
-        run: test -s android/app/build/outputs/apk/release/*.apk
-      - name: Verify AAB output
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        shell: bash
-        run: test -s android/app/build/outputs/bundle/release/*.aab
-      - name: Upload Development APK
-        if: ${{ inputs.build_type == 'development' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-dev-apk
-          path: android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-      - name: Upload APK
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-apk
-          path: android/app/build/outputs/apk/release/*.apk
-          if-no-files-found: error
-      - name: Upload AAB
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-aab
-          path: android/app/build/outputs/bundle/release/*.aab
-          if-no-files-found: error
-      - name: Cleanup credentials
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          rm -f android/app/google-services.json
-          rm -f android/key.properties
-          rm -f "$RUNNER_TEMP/nexusplus-release.jks"
-; then
-            args+=("-PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER")
-          fi
-          gradle "${args[@]}"
-      - name: Build release AAB
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        working-directory: android
-        run: gradle bundleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER -PNEXUS_RELEASE_CERT_SHA256=$NEXUS_RELEASE_CERT_SHA256
-      - name: Verify APK output
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        shell: bash
-        run: test -s android/app/build/outputs/apk/release/*.apk
-      - name: Verify AAB output
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        shell: bash
-        run: test -s android/app/build/outputs/bundle/release/*.aab
-      - name: Upload Development APK
-        if: ${{ inputs.build_type == 'development' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-dev-apk
-          path: android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-      - name: Upload APK
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-apk
-          path: android/app/build/outputs/apk/release/*.apk
-          if-no-files-found: error
-      - name: Upload AAB
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-aab
-          path: android/app/build/outputs/bundle/release/*.aab
-          if-no-files-found: error
-      - name: Cleanup credentials
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          rm -f android/app/google-services.json
-          rm -f android/key.properties
-          rm -f "$RUNNER_TEMP/nexusplus-release.jks"
-; then
-            echo "Play Integrity configuration is invalid. The app will build without Play Integrity checks."
-          fi
-      - name: Validate release certificate configuration
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$NEXUS_RELEASE_CERT_SHA256"
-          case "$NEXUS_RELEASE_CERT_SHA256" in
-            ''|*[!0-9A-Fa-f:]*) echo "NEXUS_RELEASE_CERT_SHA256 contains invalid characters." >&2; exit 1 ;;
-          esac
-      - name: Materialize Firebase configuration
-        shell: bash
-        env:
-          FIREBASE_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
-        run: |
-          set -euo pipefail
-          test -n "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64"
-          mkdir -p android/app
-          printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
-          test -s android/app/google-services.json
-          chmod 600 android/app/google-services.json
-      - name: Materialize Android signing configuration
-        shell: bash
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          test -n "$ANDROID_KEYSTORE_BASE64"
-          test -n "$ANDROID_KEYSTORE_PASSWORD"
-          test -n "$ANDROID_KEY_ALIAS"
-          test -n "$ANDROID_KEY_PASSWORD"
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nexusplus-release.jks"
-          test -s "$RUNNER_TEMP/nexusplus-release.jks"
-          chmod 600 "$RUNNER_TEMP/nexusplus-release.jks"
-          printf '%s\n' "storeFile=$RUNNER_TEMP/nexusplus-release.jks" "storePassword=$ANDROID_KEYSTORE_PASSWORD" "keyAlias=$ANDROID_KEY_ALIAS" "keyPassword=$ANDROID_KEY_PASSWORD" > android/key.properties
-          chmod 600 android/key.properties
-      - name: Validate build secrets
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$FIREBASE_API_KEY"
-          test -n "$FIREBASE_AUTH_DOMAIN"
-          test -n "$FIREBASE_PROJECT_ID"
-          test -n "$FIREBASE_STORAGE_BUCKET"
-          test -n "$FIREBASE_MESSAGING_SENDER_ID"
-          test -n "$FIREBASE_APP_ID"
-      - name: Validate stable Android baseline
-        shell: bash
-        run: |
-          set -euo pipefail
-          node - <<'NODE'
-          const fs = require("fs");
-          const app = JSON.parse(fs.readFileSync("app.json", "utf8"));
-          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-          if (app.expo?.newArchEnabled !== true) throw new Error("newArchEnabled must remain true.");
-          if (pkg.devDependencies?.["react-native"] !== "0.81.5") throw new Error("Unexpected React Native version.");
-          NODE
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: ${{ env.GRADLE_VERSION }}
-          cache-disabled: true
-      - name: Make Gradle wrapper executable
-        run: chmod +x android/gradlew
-      - name: Validate Nexus Assistant GenAI dependency
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep -q "io.github.inference4j:onnxruntime-genai:0.15.2" android/app/build.gradle
-          grep -q "ai.onnxruntime.genai" android/app/src/main/java/com/nexuswavetech/nexusplus/NexusAssistantOnnxModule.kt
-          grep -q "genai_config.json" features/nexus-assistant/onnxRuntimeManager.ts
-          grep -q "model.onnx.data" features/nexus-assistant/onnxRuntimeManager.ts
-      - name: Validate Nexus Assistant offline runtime source
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f android/app/src/main/java/com/nexuswavetech/nexusplus/NexusAssistantOnnxModule.kt
-          grep -q 'NexusAssistantOnnx' android/app/src/main/java/com/nexuswavetech/nexusplus/NexusAssistantOnnxModule.kt
-          grep -q 'onnxruntime-android' android/app/build.gradle
-          grep -q 'smollm2-135m-instruct-onnx' features/nexus-assistant/assistantConfig.ts
-      - name: Build Debug/Development APK
-        if: ${{ inputs.build_type == 'development' }}
-        working-directory: android
-        run: gradle assembleDebug --no-daemon --no-build-cache --stacktrace --info
-      - name: Build release APK
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        working-directory: android
-        run: gradle assembleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER -PNEXUS_RELEASE_CERT_SHA256=$NEXUS_RELEASE_CERT_SHA256
-      - name: Build release AAB
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        working-directory: android
-        run: gradle bundleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER -PNEXUS_RELEASE_CERT_SHA256=$NEXUS_RELEASE_CERT_SHA256
-      - name: Verify APK output
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        shell: bash
-        run: test -s android/app/build/outputs/apk/release/*.apk
-      - name: Verify AAB output
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        shell: bash
-        run: test -s android/app/build/outputs/bundle/release/*.aab
-      - name: Upload Development APK
-        if: ${{ inputs.build_type == 'development' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-dev-apk
-          path: android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-      - name: Upload APK
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-apk
-          path: android/app/build/outputs/apk/release/*.apk
-          if-no-files-found: error
-      - name: Upload AAB
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-aab
-          path: android/app/build/outputs/bundle/release/*.aab
-          if-no-files-found: error
-      - name: Cleanup credentials
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          rm -f android/app/google-services.json
-          rm -f android/key.properties
-          rm -f "$RUNNER_TEMP/nexusplus-release.jks"
-; then
-            args+=("-PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER")
-          fi
-          gradle "${args[@]}"
-      - name: Verify APK output
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        shell: bash
-        run: test -s android/app/build/outputs/apk/release/*.apk
-      - name: Verify AAB output
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        shell: bash
-        run: test -s android/app/build/outputs/bundle/release/*.aab
-      - name: Upload Development APK
-        if: ${{ inputs.build_type == 'development' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-dev-apk
-          path: android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-      - name: Upload APK
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-apk
-          path: android/app/build/outputs/apk/release/*.apk
-          if-no-files-found: error
-      - name: Upload AAB
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-aab
-          path: android/app/build/outputs/bundle/release/*.aab
-          if-no-files-found: error
-      - name: Cleanup credentials
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          rm -f android/app/google-services.json
-          rm -f android/key.properties
-          rm -f "$RUNNER_TEMP/nexusplus-release.jks"
-; then
-            echo "Play Integrity configuration is invalid. The app will build without Play Integrity checks."
-          fi
-      - name: Validate release certificate configuration
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$NEXUS_RELEASE_CERT_SHA256"
-          case "$NEXUS_RELEASE_CERT_SHA256" in
-            ''|*[!0-9A-Fa-f:]*) echo "NEXUS_RELEASE_CERT_SHA256 contains invalid characters." >&2; exit 1 ;;
-          esac
-      - name: Materialize Firebase configuration
-        shell: bash
-        env:
-          FIREBASE_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
-        run: |
-          set -euo pipefail
-          test -n "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64"
-          mkdir -p android/app
-          printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
-          test -s android/app/google-services.json
-          chmod 600 android/app/google-services.json
-      - name: Materialize Android signing configuration
-        shell: bash
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          test -n "$ANDROID_KEYSTORE_BASE64"
-          test -n "$ANDROID_KEYSTORE_PASSWORD"
-          test -n "$ANDROID_KEY_ALIAS"
-          test -n "$ANDROID_KEY_PASSWORD"
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nexusplus-release.jks"
-          test -s "$RUNNER_TEMP/nexusplus-release.jks"
-          chmod 600 "$RUNNER_TEMP/nexusplus-release.jks"
-          printf '%s\n' "storeFile=$RUNNER_TEMP/nexusplus-release.jks" "storePassword=$ANDROID_KEYSTORE_PASSWORD" "keyAlias=$ANDROID_KEY_ALIAS" "keyPassword=$ANDROID_KEY_PASSWORD" > android/key.properties
-          chmod 600 android/key.properties
-      - name: Validate build secrets
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$FIREBASE_API_KEY"
-          test -n "$FIREBASE_AUTH_DOMAIN"
-          test -n "$FIREBASE_PROJECT_ID"
-          test -n "$FIREBASE_STORAGE_BUCKET"
-          test -n "$FIREBASE_MESSAGING_SENDER_ID"
-          test -n "$FIREBASE_APP_ID"
-      - name: Validate stable Android baseline
-        shell: bash
-        run: |
-          set -euo pipefail
-          node - <<'NODE'
-          const fs = require("fs");
-          const app = JSON.parse(fs.readFileSync("app.json", "utf8"));
-          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-          if (app.expo?.newArchEnabled !== true) throw new Error("newArchEnabled must remain true.");
-          if (pkg.devDependencies?.["react-native"] !== "0.81.5") throw new Error("Unexpected React Native version.");
-          NODE
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: ${{ env.GRADLE_VERSION }}
-          cache-disabled: true
-      - name: Make Gradle wrapper executable
-        run: chmod +x android/gradlew
-      - name: Validate Nexus Assistant GenAI dependency
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep -q "io.github.inference4j:onnxruntime-genai:0.15.2" android/app/build.gradle
-          grep -q "ai.onnxruntime.genai" android/app/src/main/java/com/nexuswavetech/nexusplus/NexusAssistantOnnxModule.kt
-          grep -q "genai_config.json" features/nexus-assistant/onnxRuntimeManager.ts
-          grep -q "model.onnx.data" features/nexus-assistant/onnxRuntimeManager.ts
-      - name: Validate Nexus Assistant offline runtime source
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f android/app/src/main/java/com/nexuswavetech/nexusplus/NexusAssistantOnnxModule.kt
-          grep -q 'NexusAssistantOnnx' android/app/src/main/java/com/nexuswavetech/nexusplus/NexusAssistantOnnxModule.kt
-          grep -q 'onnxruntime-android' android/app/build.gradle
-          grep -q 'smollm2-135m-instruct-onnx' features/nexus-assistant/assistantConfig.ts
-      - name: Build Debug/Development APK
-        if: ${{ inputs.build_type == 'development' }}
-        working-directory: android
-        run: gradle assembleDebug --no-daemon --no-build-cache --stacktrace --info
-      - name: Build release APK
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        working-directory: android
-        run: gradle assembleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER -PNEXUS_RELEASE_CERT_SHA256=$NEXUS_RELEASE_CERT_SHA256
-      - name: Build release AAB
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        working-directory: android
-        run: gradle bundleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER -PNEXUS_RELEASE_CERT_SHA256=$NEXUS_RELEASE_CERT_SHA256
-      - name: Verify APK output
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        shell: bash
-        run: test -s android/app/build/outputs/apk/release/*.apk
-      - name: Verify AAB output
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        shell: bash
-        run: test -s android/app/build/outputs/bundle/release/*.aab
-      - name: Upload Development APK
-        if: ${{ inputs.build_type == 'development' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-dev-apk
-          path: android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-      - name: Upload APK
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-apk
-          path: android/app/build/outputs/apk/release/*.apk
-          if-no-files-found: error
-      - name: Upload AAB
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-aab
-          path: android/app/build/outputs/bundle/release/*.aab
-          if-no-files-found: error
-      - name: Cleanup credentials
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          rm -f android/app/google-services.json
-          rm -f android/key.properties
-          rm -f "$RUNNER_TEMP/nexusplus-release.jks"
-; then
-            args+=("-PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER")
-          fi
-          gradle "${args[@]}"
-      - name: Build release AAB
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        working-directory: android
-        run: gradle bundleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER -PNEXUS_RELEASE_CERT_SHA256=$NEXUS_RELEASE_CERT_SHA256
-      - name: Verify APK output
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        shell: bash
-        run: test -s android/app/build/outputs/apk/release/*.apk
-      - name: Verify AAB output
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        shell: bash
-        run: test -s android/app/build/outputs/bundle/release/*.aab
-      - name: Upload Development APK
-        if: ${{ inputs.build_type == 'development' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-dev-apk
-          path: android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-      - name: Upload APK
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-apk
-          path: android/app/build/outputs/apk/release/*.apk
-          if-no-files-found: error
-      - name: Upload AAB
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-aab
-          path: android/app/build/outputs/bundle/release/*.aab
-          if-no-files-found: error
-      - name: Cleanup credentials
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          rm -f android/app/google-services.json
-          rm -f android/key.properties
-          rm -f "$RUNNER_TEMP/nexusplus-release.jks"
-; then
-            echo "Play Integrity configuration is invalid. The app will build without Play Integrity checks."
-          fi
-      - name: Validate release certificate configuration
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$NEXUS_RELEASE_CERT_SHA256"
-          case "$NEXUS_RELEASE_CERT_SHA256" in
-            ''|*[!0-9A-Fa-f:]*) echo "NEXUS_RELEASE_CERT_SHA256 contains invalid characters." >&2; exit 1 ;;
-          esac
-      - name: Materialize Firebase configuration
-        shell: bash
-        env:
-          FIREBASE_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
-        run: |
-          set -euo pipefail
-          test -n "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64"
-          mkdir -p android/app
-          printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
-          test -s android/app/google-services.json
-          chmod 600 android/app/google-services.json
-      - name: Materialize Android signing configuration
-        shell: bash
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          test -n "$ANDROID_KEYSTORE_BASE64"
-          test -n "$ANDROID_KEYSTORE_PASSWORD"
-          test -n "$ANDROID_KEY_ALIAS"
-          test -n "$ANDROID_KEY_PASSWORD"
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nexusplus-release.jks"
-          test -s "$RUNNER_TEMP/nexusplus-release.jks"
-          chmod 600 "$RUNNER_TEMP/nexusplus-release.jks"
-          printf '%s\n' "storeFile=$RUNNER_TEMP/nexusplus-release.jks" "storePassword=$ANDROID_KEYSTORE_PASSWORD" "keyAlias=$ANDROID_KEY_ALIAS" "keyPassword=$ANDROID_KEY_PASSWORD" > android/key.properties
-          chmod 600 android/key.properties
-      - name: Validate build secrets
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$FIREBASE_API_KEY"
-          test -n "$FIREBASE_AUTH_DOMAIN"
-          test -n "$FIREBASE_PROJECT_ID"
-          test -n "$FIREBASE_STORAGE_BUCKET"
-          test -n "$FIREBASE_MESSAGING_SENDER_ID"
-          test -n "$FIREBASE_APP_ID"
-      - name: Validate stable Android baseline
-        shell: bash
-        run: |
-          set -euo pipefail
-          node - <<'NODE'
-          const fs = require("fs");
-          const app = JSON.parse(fs.readFileSync("app.json", "utf8"));
-          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-          if (app.expo?.newArchEnabled !== true) throw new Error("newArchEnabled must remain true.");
-          if (pkg.devDependencies?.["react-native"] !== "0.81.5") throw new Error("Unexpected React Native version.");
-          NODE
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: ${{ env.GRADLE_VERSION }}
-          cache-disabled: true
-      - name: Make Gradle wrapper executable
-        run: chmod +x android/gradlew
-      - name: Validate Nexus Assistant GenAI dependency
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep -q "io.github.inference4j:onnxruntime-genai:0.15.2" android/app/build.gradle
-          grep -q "ai.onnxruntime.genai" android/app/src/main/java/com/nexuswavetech/nexusplus/NexusAssistantOnnxModule.kt
-          grep -q "genai_config.json" features/nexus-assistant/onnxRuntimeManager.ts
-          grep -q "model.onnx.data" features/nexus-assistant/onnxRuntimeManager.ts
-      - name: Validate Nexus Assistant offline runtime source
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f android/app/src/main/java/com/nexuswavetech/nexusplus/NexusAssistantOnnxModule.kt
-          grep -q 'NexusAssistantOnnx' android/app/src/main/java/com/nexuswavetech/nexusplus/NexusAssistantOnnxModule.kt
-          grep -q 'onnxruntime-android' android/app/build.gradle
-          grep -q 'smollm2-135m-instruct-onnx' features/nexus-assistant/assistantConfig.ts
-      - name: Build Debug/Development APK
-        if: ${{ inputs.build_type == 'development' }}
-        working-directory: android
-        run: gradle assembleDebug --no-daemon --no-build-cache --stacktrace --info
-      - name: Build release APK
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        working-directory: android
-        run: gradle assembleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER -PNEXUS_RELEASE_CERT_SHA256=$NEXUS_RELEASE_CERT_SHA256
-      - name: Build release AAB
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        working-directory: android
-        run: gradle bundleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER -PNEXUS_RELEASE_CERT_SHA256=$NEXUS_RELEASE_CERT_SHA256
-      - name: Verify APK output
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        shell: bash
-        run: test -s android/app/build/outputs/apk/release/*.apk
-      - name: Verify AAB output
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        shell: bash
-        run: test -s android/app/build/outputs/bundle/release/*.aab
-      - name: Upload Development APK
-        if: ${{ inputs.build_type == 'development' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-dev-apk
-          path: android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-      - name: Upload APK
-        if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-apk
-          path: android/app/build/outputs/apk/release/*.apk
-          if-no-files-found: error
-      - name: Upload AAB
-        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexusplus-android-aab
-          path: android/app/build/outputs/bundle/release/*.aab
-          if-no-files-found: error
+
       - name: Cleanup credentials
         if: ${{ always() }}
         shell: bash
