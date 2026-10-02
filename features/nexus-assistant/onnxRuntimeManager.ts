@@ -16,7 +16,8 @@ type NativeOnnxModule = {
 const nativeOnnx = NativeModules.NexusAssistantOnnx as NativeOnnxModule | undefined;
 const root = new Directory(Paths.document, 'nexus-assistant', 'onnx');
 
-const requiredBase = ['config.json', 'generation_config.json', 'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json', 'merges.txt', 'vocab.json'];
+const requiredBase = ['genai_config.json'];
+const hfFiles = ['config.json', 'generation_config.json', 'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json', 'merges.txt', 'vocab.json'];
 
 function modelDir(model: OnnxModel): Directory {
   return new Directory(root, model.id);
@@ -46,7 +47,7 @@ export function isOnnxModelDownloaded(modelId: string): boolean {
   const model = getOnnxModel(modelId);
   if (!model) return false;
   const dir = modelDir(model);
-  const files = [...requiredBase, ...(model.requiredFiles ?? [])];
+  const files = [...requiredBase, ...hfFiles, ...(model.requiredFiles ?? [])];
   return modelFile(model).exists && files.every((name) => fileExists(dir, name));
 }
 
@@ -65,10 +66,23 @@ export async function downloadOnnxModel(modelId: string): Promise<string> {
   await downloadFile(model.url, modelFile(model));
 
   const base = 'https://huggingface.co/onnx-community/SmolLM2-135M-Instruct-ONNX/resolve/main/';
-  for (const name of requiredBase) {
+  for (const name of hfFiles) {
     const existing = new File(dir, name);
     if (existing.exists && existing.size > 0) continue;
     await downloadFile(base + name, existing);
+  }
+  const genai = new File(dir, 'genai_config.json');
+  if (!genai.exists || genai.size <= 0) {
+    const config = JSON.stringify({
+      model: {
+        type: 'plugin',
+        architecture: 'LlamaForCausalLM',
+        filename: 'model_q4f16.onnx'
+      },
+      tokenizer: { tokenizer_type: 'bpe', vocab_file: 'vocab.json', merges_file: 'merges.txt' },
+      search: { max_length: 1024, eos_token_id: 2, pad_token_id: 2 }
+    });
+    genai.write(config);
   }
   return dir.uri;
 }
