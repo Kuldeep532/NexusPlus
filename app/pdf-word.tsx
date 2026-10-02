@@ -50,7 +50,7 @@ export default function PdfWordScreen() {
       setResult(uri);
       setStatus(`Conversion completed. ${outputLabel} saved.`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Conversion could not be completed.');
+      setStatus(getUserFriendlyMessage(error, 'Conversion could not be completed.'));
     } finally {
       setBusy(false);
     }
