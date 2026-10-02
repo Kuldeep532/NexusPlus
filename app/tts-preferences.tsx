@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { listTtsVoices, type TtsVoiceOption } from '@/features/audio-editor/ttsEngine';
 import { listElevenLabsVoices, type ElevenLabsVoice } from '@/features/audio-editor/elevenLabsTts';
 import { readTtsVoicePreferences, saveTtsVoicePreferences, type TtsVoiceProvider } from '@/features/audio-editor/ttsPreferences';
@@ -27,13 +28,13 @@ export default function TtsPreferencesScreen() {
  const [localVoices,setLocalVoices]=useState<TtsVoiceOption[]>([]); const [elevenVoices,setElevenVoices]=useState<ElevenLabsVoice[]>([]);
  const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [status,setStatus]=useState('');
 
- useEffect(()=>{void (async()=>{try{const prefs=await readTtsVoicePreferences();setProvider(prefs.provider);setVoiceId(prefs.voiceId);setVoiceName(prefs.voiceName);setLanguage(prefs.language);setLanguageFilter(prefs.language||'All');const voices=await listTtsVoices();setLocalVoices(voices);if(prefs.provider==='elevenlabs'){try{setElevenVoices(await listElevenLabsVoices());}catch(error){setStatus(error instanceof Error?error.message:'ElevenLabs voices could not be loaded.');}}}catch(error){setStatus(error instanceof Error?error.message:'Voice preferences could not be loaded.');}finally{setLoading(false);}})();},[]);
+ useEffect(()=>{void (async()=>{try{const prefs=await readTtsVoicePreferences();setProvider(prefs.provider);setVoiceId(prefs.voiceId);setVoiceName(prefs.voiceName);setLanguage(prefs.language);setLanguageFilter(prefs.language||'All');const voices=await listTtsVoices();setLocalVoices(voices);if(prefs.provider==='elevenlabs'){try{setElevenVoices(await listElevenLabsVoices());}catch(error){setStatus(getUserFriendlyMessage(error, 'ElevenLabs voices could not be loaded.'));}}}catch(error){setStatus(getUserFriendlyMessage(error, 'Voice preferences could not be loaded.'));}finally{setLoading(false);}})();},[]);
  useEffect(()=>{if(provider==='elevenlabs'&&elevenVoices.length===0){void listElevenLabsVoices().then(setElevenVoices).catch(error=>setStatus(error instanceof Error?error.message:'ElevenLabs voices could not be loaded.'));}},[provider,elevenVoices.length]);
  const choices=useMemo(()=>provider==='elevenlabs'?elevenVoices:localChoices(provider,localVoices),[provider,localVoices,elevenVoices]);
  const languages=useMemo(()=>['All',...Array.from(new Set(choices.map((item:any)=>String(item.language||'').trim()).filter(Boolean)))],[choices]);
  const filteredChoices=useMemo(()=>languageFilter==='All'?choices:choices.filter((item:any)=>String(item.language||'')===languageFilter),[choices,languageFilter]);
  const selectVoice=(item:any)=>{setVoiceId(item.id);setVoiceName(String(item.name||item.id));setLanguage(String(item.language||''));};
- const save=async()=>{if(provider!=='system'&&!voiceId){setStatus('Select a voice before saving.');return;}setSaving(true);try{await saveTtsVoicePreferences({provider,voiceId,voiceName,language});router.back();}catch(error){setStatus(error instanceof Error?error.message:'Voice preferences could not be saved.');}finally{setSaving(false);}};
+ const save=async()=>{if(provider!=='system'&&!voiceId){setStatus('Select a voice before saving.');return;}setSaving(true);try{await saveTtsVoicePreferences({provider,voiceId,voiceName,language});router.back();}catch(error){setStatus(getUserFriendlyMessage(error, 'Voice preferences could not be saved.'));}finally{setSaving(false);}};
 
  return <ScrollView style={[styles.root,{backgroundColor:colors.background}]} contentContainerStyle={{padding:18,paddingTop:insets.top+12,paddingBottom:insets.bottom+32}}>
   <Stack.Screen options={{title:'Voice Preferences'}}/>
