@@ -46,7 +46,7 @@ export default function EPaperGeneratorScreen() {
       setBody(result);
       setStatus('AI result is ready. Review it before publishing.');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'AI could not complete this request.');
+      setStatus(getUserFriendlyMessage(error, 'AI could not complete this request.'));
     } finally {
       setBusy(false);
     }
