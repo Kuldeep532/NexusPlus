@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { pickAudioFromFileManager, discoverLocalAudio } from '@/features/audio-editor/audioEditorSource';
 import { createAudioEditorOutputPath } from '@/features/audio-editor/audioEditorExport';
 import { assertAudioEditorNative, type VocalRemovalNativeResult } from '@/modules/audio-editor-native';
@@ -38,7 +39,7 @@ export default function VocalRemoverScreen() {
       const item = await pickAudioFromFileManager();
       if (item) await load(item);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Unable to select audio.');
+      setStatus(getUserFriendlyMessage(error, 'Unable to select audio.'));
     }
   }, [load]);
 
