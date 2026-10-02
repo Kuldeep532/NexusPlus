@@ -63,7 +63,7 @@ export default function PdfToImagesScreen() {
       setStatus(`${pageCount} pages detected. Valid page numbers are 1 to ${pageCount}.`);
     } catch (error) {
       setPdf(null); setSelection('');
-      setStatus(error instanceof Error ? error.message : 'Could not read the PDF page count.');
+      setStatus(getUserFriendlyMessage(error, 'Could not read the PDF page count.'));
     }
   }
 
