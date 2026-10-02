@@ -38,7 +38,7 @@ export default function LockUnlockPdfScreen() {
         output = { uri: tempOutput, name: `${safeBaseName(pdf.name)}-unlocked.pdf` };
       }
       setResult(output); setPassword(''); setConfirmPassword(''); setStatus(tab === 'lock' ? 'PDF locked and saved successfully.' : 'PDF unlocked and saved successfully.');
-    } catch (error) { setPassword(''); setConfirmPassword(''); setStatus(error instanceof Error ? error.message : `Could not ${tab} this PDF.`); }
+    } catch (error) { setPassword(''); setConfirmPassword(''); setStatus(getUserFriendlyMessage(error, `Could not ${tab} this PDF.`)); }
     finally { setBusy(false); }
   }
   function reset() { setPdf(null); setPassword(''); setConfirmPassword(''); setResult(null); setStatus(''); }
