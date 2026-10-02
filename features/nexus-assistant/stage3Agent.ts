@@ -1,3 +1,4 @@
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { addMessage } from './assistantStore';
 import { executeCapability, type ExecutionResult } from './agentExecutor';
 import { formatCapabilityConfirmation, planCapability, type CapabilityProposal } from './agentPlanner';
@@ -61,7 +62,7 @@ export async function runStage3Agent(input: Stage3AgentInput): Promise<Execution
         : 'pdf-rotate';
       return { capabilityId, success: true, message: result.message };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'PDF operation failed.';
+      const message = getUserFriendlyMessage(error, 'The PDF operation could not be completed. Please try again.');
       await addMessage(input.sessionId, 'assistant', message);
       input.onStatus?.(message);
       throw error;
