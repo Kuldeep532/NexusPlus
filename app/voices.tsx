@@ -1,3 +1,4 @@
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -14,10 +15,9 @@ function userSafeError(error: unknown, action: 'download' | 'remove'): string {
   if (error instanceof VoiceDownloadRateLimitError) {
     return 'Voice downloads are temporarily busy. Please wait a moment and try again.';
   }
-  const suffix = error instanceof Error && error.message ? ` ${error.message}` : '';
   return action === 'download'
-    ? `Voice download could not be completed.${suffix}`
-    : `Voice removal could not be completed.${suffix}`;
+    ? getUserFriendlyMessage(error, 'Voice download could not be completed.')
+    : getUserFriendlyMessage(error, 'Voice removal could not be completed.');
 }
 
 export default function VoicesScreen() {
