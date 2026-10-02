@@ -1,10 +1,5 @@
 package com.nexuswavetech.nexusplus
 
-import ai.onnxruntime.genai.Config
-import ai.onnxruntime.genai.Generator
-import ai.onnxruntime.genai.GeneratorParams
-import ai.onnxruntime.genai.Model
-import ai.onnxruntime.genai.Tokenizer
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -17,8 +12,7 @@ import java.io.File
 class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
     override fun getName(): String = "NexusAssistantOnnx"
 
-    private var model: Model? = null
-    private var tokenizer: Tokenizer? = null
+    private var session: ai.onnxruntime.OrtSession? = null
     private var loadedModelId: String? = null
 
     @ReactMethod
@@ -26,7 +20,7 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
         promise.resolve(
             mapOf(
                 "available" to true,
-                "version" to "ONNX Runtime GenAI",
+                "version" to ai.onnxruntime.OrtVersion.VERSION,
             ),
         )
     }
@@ -38,75 +32,47 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
             return
         }
         val dir = File(modelPath)
-        if (!dir.exists() || !dir.isDirectory || !File(dir, "genai_config.json").exists()) {
+        if (!dir.exists() || !dir.isDirectory) {
             promise.reject("LOCAL_MODEL_NOT_READY", "Download the local AI model before using offline chat.")
             return
         }
-
+        val modelFile = File(dir, "onnx/model_q4f16.onnx")
+        if (!modelFile.exists() || modelFile.length() == 0L) {
+            promise.reject("LOCAL_MODEL_NOT_READY", "Download the local AI model before using offline chat.")
+            return
+        }
         try {
-            closeRuntime()
-            val config = Config(dir.absolutePath)
-            model = Model(config)
-            tokenizer = Tokenizer(model)
+            session?.close()
+            val opts = ai.onnxruntime.OrtSession.SessionOptions()
+            session = ai.onnxruntime.OrtEnvironment.getEnvironment().createSession(modelFile.absolutePath, opts)
             loadedModelId = modelId
-
             promise.resolve(
                 Arguments.createMap().apply {
                     putString("modelId", modelId)
                     putString("path", dir.absolutePath)
+                    putInt("inputCount", session?.inputNames?.size ?: 0)
+                    putInt("outputCount", session?.outputNames?.size ?: 0)
                 },
             )
         } catch (error: Throwable) {
-            closeRuntime()
+            session = null
+            loadedModelId = null
             promise.reject("LOCAL_MODEL_LOAD_FAILED", "The local AI model could not be prepared on this device.", error)
         }
     }
 
     @ReactMethod
     fun generate(modelId: String, messages: ReadableArray, options: ReadableMap, promise: Promise) {
-        val activeModel = model
-        val activeTokenizer = tokenizer
-        if (activeModel == null || activeTokenizer == null || loadedModelId != modelId) {
+        if (session == null || loadedModelId != modelId) {
             promise.reject("LOCAL_MODEL_NOT_READY", "The local AI model is not ready.")
             return
         }
-
-        val prompt = buildPrompt(messages)
-        val maxTokens = if (options.hasKey("maxTokens") && !options.isNull("maxTokens")) {
-            options.getInt("maxTokens").coerceIn(16, 256)
-        } else 160
-
-        try {
-            val params = GeneratorParams(activeModel)
-            params.setSearchOption("max_length", maxTokens.toLong())
-            params.setSearchOption("temperature", 0.35f)
-            val generator = Generator(activeModel, params)
-            val encoded = activeTokenizer.encode(prompt)
-            generator.appendTokens(encoded)
-
-            val stream = activeTokenizer.createStream()
-            val output = StringBuilder()
-            while (!generator.isDone()) {
-                generator.generateNextToken()
-                val tokens = generator.getNextTokens()
-                if (tokens.isNotEmpty()) {
-                    output.append(stream.decode(tokens[0]))
-                }
-            }
-
-            generator.close()
-            params.close()
-            stream.close()
-
-            val answer = cleanGeneratedText(output.toString())
-            if (answer.isBlank()) {
-                promise.reject("LOCAL_EMPTY_RESPONSE", "The local assistant did not return an answer.")
-                return
-            }
-            promise.resolve(answer)
-        } catch (error: Throwable) {
-            promise.reject("LOCAL_GENERATION_FAILED", "The local assistant could not generate a response.", error)
-        }
+        // This graph needs a tokenizer + generation loop. Keep the native module honest
+        // rather than returning a fabricated response.
+        promise.reject(
+            "LOCAL_TEXT_GENERATION_UNAVAILABLE",
+            "The local AI model is downloaded, but this build does not yet include its text-generation tokenizer.",
+        )
     }
 
     @ReactMethod
@@ -135,10 +101,8 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
     }
 
     private fun closeRuntime() {
-        try { tokenizer?.close() } catch (_: Throwable) {}
-        try { model?.close() } catch (_: Throwable) {}
-        tokenizer = null
-        model = null
+        try { session?.close() } catch (_: Throwable) {}
+        session = null
         loadedModelId = null
     }
 }
