@@ -17,14 +17,14 @@ const nativeOnnx = NativeModules.NexusAssistantOnnx as NativeOnnxModule | undefi
 const root = new Directory(Paths.document, 'nexus-assistant', 'onnx');
 
 const requiredBase = ['genai_config.json'];
-const hfFiles = ['config.json', 'generation_config.json', 'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json', 'merges.txt', 'vocab.json'];
+const hfFiles = ['config.json', 'generation_config.json', 'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json', 'merges.txt', 'vocab.json', 'onnx/model_q4f16.onnx'];
 
 function modelDir(model: OnnxModel): Directory {
   return new Directory(root, model.id);
 }
 
 function modelFile(model: OnnxModel): File {
-  return new File(modelDir(model), 'model_q4f16.onnx');
+  return new File(modelDir(model), 'onnx/model_q4f16.onnx');
 }
 
 function ensureRoot(): void {
@@ -69,6 +69,7 @@ export async function downloadOnnxModel(modelId: string): Promise<string> {
   for (const name of hfFiles) {
     const existing = new File(dir, name);
     if (existing.exists && existing.size > 0) continue;
+    if (name.includes('/')) existing.parentDirectory?.create({ idempotent: true, intermediates: true });
     await downloadFile(base + name, existing);
   }
   const genai = new File(dir, 'genai_config.json');
@@ -77,7 +78,7 @@ export async function downloadOnnxModel(modelId: string): Promise<string> {
       model: {
         type: 'plugin',
         architecture: 'LlamaForCausalLM',
-        filename: 'model_q4f16.onnx'
+        filename: 'onnx/model_q4f16.onnx'
       },
       tokenizer: { tokenizer_type: 'bpe', vocab_file: 'vocab.json', merges_file: 'merges.txt' },
       search: { max_length: 1024, eos_token_id: 2, pad_token_id: 2 }
