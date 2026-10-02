@@ -57,3 +57,10 @@
     public static *** d(...);
     public static *** v(...);
 }
+
+# ONNX Runtime GenAI Java bridge.
+-keep class ai.onnxruntime.genai.** { *; }
+-keep class com.nexuswavetech.nexusplus.NexusAssistantOnnxModule { *; }
+-keep class com.nexuswavetech.nexusplus.NexusAssistantRoleModule { *; }
+-keep class com.nexuswavetech.nexusplus.NexusAssistantVoiceInteractionService { *; }
+-keep class com.nexuswavetech.nexusplus.NexusAssistantSessionService { *; }
