@@ -16,9 +16,10 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
 
     @ReactMethod
     fun getStatus(promise: Promise) {
-        // The native runtime is enabled by the Android build profile. The module
-        // reports a conservative status until a valid model session is loaded.
-        promise.resolve(mapOf("available" to true, "version" to "onnx-runtime-mobile"))
+        // Report the bridge as unavailable until the Android build links a real
+        // ONNX Runtime implementation. This prevents the UI from claiming that
+        // offline AI is ready when only the bridge is present.
+        promise.resolve(mapOf("available" to false, "version" to "onnx-runtime-bridge"))
     }
 
     @ReactMethod
@@ -27,9 +28,8 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
             promise.reject("ONNX_MODEL_INVALID", "The selected local AI model is not available.")
             return
         }
-        // Session creation is intentionally delegated to the packaged ONNX
-        // runtime adapter. This bridge validates the model path and keeps the
-        // JS/native API stable for the Assistant.
+        // Validate the downloaded model path here. A concrete ONNX Runtime
+        // session is enabled only when the Android dependency is linked.
         val file = java.io.File(modelPath)
         if (!file.exists() || file.length() <= 0L) {
             promise.reject("ONNX_MODEL_NOT_FOUND", "The local AI model could not be found on this device.")
