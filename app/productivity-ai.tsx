@@ -80,7 +80,7 @@ export default function NexusAiWorkflowScreen() {
     {preview ? <View accessibilityLiveRegion="polite" style={[styles.preview, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <Text style={[styles.previewTitle, { color: colors.foreground }]}>{preview.subject}</Text>
       <Text selectable style={[styles.body, { color: colors.foreground }]}>{preview.body}</Text>
-      <Text style={[styles.note, { color: colors.mutedForeground }]}>Message engine: {preview.source === 'gemini' ? 'Gemini via Nexus Gateway' : 'local safe fallback'}.</Text>
+      <Text style={[styles.note, { color: colors.mutedForeground }]}>Created with: Nexus AI or local safe mode.</Text>
       <Text style={[styles.note, { color: colors.mutedForeground }]}>External sending and calendar changes use the authenticated gateway provider.</Text>
     </View> : null}
 
