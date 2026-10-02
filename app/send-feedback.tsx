@@ -13,28 +13,26 @@ import { useAuth } from '@/features/auth/useAuth';
 const APP_STORE_ANDROID_URL = 'https://play.google.com/store/apps/details?id=com.nexuswavetech.nexusplus';
 const CONTACT_EMAIL = 'info@nexusweb.co.in';
 
-async function sendFeedbackToSupabase(input: { title: string; name: string; message: string; email?: string | null }) {
+async function sendFeedbackToSupabase(input: { title: string; name: string; message: string }) {
   const token = await getSupabaseAccessToken();
   const key = (process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY)?.trim() ?? '';
   if (!token || !SUPABASE_URL || !key) throw new Error('SUPABASE_AUTH_NOT_CONFIGURED');
 
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/user_feedback`, {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/send-feedback`, {
     method: 'POST',
     headers: {
       apikey: key,
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-      Prefer: 'return=minimal',
     },
     body: JSON.stringify({
       title: input.title.trim(),
       name: input.name.trim(),
       message: input.message.trim(),
-      email: input.email?.trim() || null,
     }),
   });
 
-  if (!response.ok) throw new Error(`FEEDBACK_SUBMIT_FAILED_${response.status}`);
+  if (!response.ok) throw new Error('FEEDBACK_SUBMIT_FAILED');
 }
 
 async function sendFeedbackEmail(input: { title: string; name: string; message: string; email?: string | null }) {
@@ -93,7 +91,7 @@ export default function SendFeedbackScreen() {
 
     setBusy(true);
     try {
-      await sendFeedbackToSupabase({ title: cleanTitle, name: cleanName, message: cleanMessage, email: user?.email });
+      await sendFeedbackToSupabase({ title: cleanTitle, name: cleanName, message: cleanMessage });
       Alert.alert('Feedback sent', 'Thank you. Your feedback has been received.');
       setTitle('');
       setMessage('');
