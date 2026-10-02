@@ -18,13 +18,21 @@ export type AssistantModel = {
  * generation are different inference tasks.
  */
 export const NEXUS_CORE_MODEL_ID = 'smollm2-360m-q4km';
+export const NEXUS_LOCAL_MODEL_MODE = 'on-demand';
+
+export type LocalModelRecommendationTier = 'light' | 'standard';
+
+export type LocalModelRecommendation = AssistantModel & {
+  recommendation: LocalModelRecommendationTier;
+  recommendedReason: string;
+};
 export const NEXUS_ASR_MODEL_ID = 'moonshine-tiny-en-quantized-2026-02-27';
 
 export const ASSISTANT_MODELS: AssistantModel[] = [
   {
     id: NEXUS_CORE_MODEL_ID,
     title: 'Nexus Core AI',
-    description: 'Primary local chat model for Assistant, books, files, summaries, explanations and general AI tasks.',
+    description: 'Lightweight local chat model for Assistant, summaries, explanations and basic document tasks.',
     sizeMb: 271,
     url: 'https://huggingface.co/QuantFactory/SmolLM2-360M-Instruct-GGUF/resolve/main/SmolLM2-360M-Instruct.Q4_K_M.gguf',
     format: 'gguf',
