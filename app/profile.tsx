@@ -37,7 +37,7 @@ export default function ProfileScreen() {
       await auth.signOut();
       Alert.alert('Account deleted', 'Your Nexus Plus account has been permanently deleted.', [{ text: 'OK', onPress: () => router.replace('/login-plus-register') }]);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'We could not delete your account.';
+      const message = getUserFriendlyMessage(error, 'We could not delete your account.');
       Alert.alert('Account deletion failed', `Your account was not deleted. ${message}`);
     }
   };
