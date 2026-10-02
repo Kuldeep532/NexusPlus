@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { FileEncryptionNative } from '@/features/file-encryption/FileEncryptionNative';
 
 export default function FileEncryptionScreen() {
@@ -37,7 +38,7 @@ export default function FileEncryptionScreen() {
         Alert.alert('File unlocked', `Recovered file: ${result.split('/').pop()}`);
       }
     } catch (error) {
-      Alert.alert('Operation failed', error instanceof Error ? error.message : String(error));
+      Alert.alert('Operation failed', getUserFriendlyMessage(error, 'The operation could not be completed. Please try again.'));
     } finally {
       setBusy(false);
     }
