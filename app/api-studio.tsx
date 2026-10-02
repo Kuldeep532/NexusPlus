@@ -30,7 +30,7 @@ export default function ApiStudioScreen() {
       setCustomProviderApiKey('anthropic', anthropicKey),
       setCustomElevenLabsApiKey(elevenLabsKey),
     ]);
-    Alert.alert('API Studio', 'Your API keys were saved securely on this device.');
+    Alert.alert('AI Provider Settings', 'Your API keys were saved securely on this device.');
   };
 
   return (
@@ -41,7 +41,7 @@ export default function ApiStudioScreen() {
       <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={[styles.icon, { backgroundColor: colors.secondary }]}><Feather name="key" size={23} color={colors.primary} /></View>
         <View style={styles.copy}>
-          <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>API Studio</Text>
+          <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>AI Provider Settings</Text>
           <Text style={[styles.body, { color: colors.mutedForeground }]}>
             Add your own provider keys when you want to use your own accounts and billing.
           </Text>
