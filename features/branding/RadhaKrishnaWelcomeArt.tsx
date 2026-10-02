@@ -1,8 +1,8 @@
 import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
 
-export function RadhaKrishnaWelcomeArt({ width = 320, height = 260 }: { width?: number; height?: number }) {
+export function RadhaKrishnaWelcomeArt({ width = 320, height = 260, showWordmark = true }: { width?: number; height?: number; showWordmark?: boolean }) {
   return (
-    <Svg width={width} height={height} viewBox="0 0 320 260" accessibilityRole="image" accessibilityLabel="Stylized Radha and Krishna devotional artwork">
+    <Svg width={width} height={height} viewBox="0 0 320 320" accessibilityRole="image" accessibilityLabel="Radha and Krishna devotional logo with Nexus Web Technologies wordmark">
       <Circle cx="160" cy="128" r="118" fill="#FEF3C7" opacity={0.42} />
       <Path d="M42 214c30-22 55-32 89-32 34 0 57 10 88 32H42Z" fill="#86EFAC" opacity={0.75} />
       <Path d="M178 214c29-22 58-33 93-33 12 0 22 2 31 5v28h-124Z" fill="#4ADE80" opacity={0.72} />
@@ -23,6 +23,13 @@ export function RadhaKrishnaWelcomeArt({ width = 320, height = 260 }: { width?: 
       <Path d="M218 172c13-14 24-21 39-27 3 13 10 24 19 34-20 2-38 0-58-7Z" fill="#7C3AED" opacity={0.76} />
       <Circle cx="275" cy="53" r="3" fill="#FDE68A" />
       <Circle cx="55" cy="68" r="4" fill="#FDE68A" />
+      {showWordmark && (
+        <>
+          <Path d="M62 236h196" stroke="#F59E0B" strokeWidth="1.5" strokeLinecap="round" opacity="0.65" />
+          <Path d="M94 246c10-8 19-12 29-12 10 0 19 4 29 12" fill="none" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" />
+          <Path d="M168 246c10-8 19-12 29-12 10 0 19 4 29 12" fill="none" stroke="#EC4899" strokeWidth="2" strokeLinecap="round" />
+        </>
+      )}
     </Svg>
   );
 }
