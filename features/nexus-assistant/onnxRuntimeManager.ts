@@ -47,7 +47,7 @@ export function isOnnxModelDownloaded(modelId: string): boolean {
   const model = getOnnxModel(modelId);
   if (!model) return false;
   const dir = modelDir(model);
-  const files = [...hfFiles, ...genaiFiles, ...(model.requiredFiles ?? [])];
+  const files = [...hfFiles, ...genaiFiles.filter((name) => !['model.onnx'].includes(name)), ...(model.requiredFiles ?? [])];
   return files.every((name) => fileExists(dir, name));
 }
 
