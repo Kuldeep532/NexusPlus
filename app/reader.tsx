@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { getInstalledVoices, type InstalledVoice } from '@/features/voice-library/voiceStore';
 import { playGeneratedAudio } from '@/features/audio-editor/ttsEngine';
 import { synthesizeReaderText } from '@/features/document-reader/readerSpeech';
@@ -88,7 +89,7 @@ export default function ReaderScreen() {
       setPlaying(true);
     } catch (error) {
       setPlaying(false);
-      setReadingError(error instanceof Error ? error.message : 'Reader voice generation failed.');
+      setReadingError(getUserFriendlyMessage(error, 'Reader voice generation failed.'));
     }
   };
 
