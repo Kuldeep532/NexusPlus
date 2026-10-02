@@ -39,7 +39,7 @@ export default function CctvCamerasScreen() {
           <View style={[styles.empty, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="shield" size={42} color={colors.primary} />
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No authorized CCTV camera</Text>
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Discover a compatible ONVIF camera on the local network or enter its verified secure endpoint. The camera is saved only after native authentication and device-identity verification.</Text>
+            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Find a compatible camera on your local network or add it manually. The camera is saved only after secure verification.</Text>
             <Pressable accessibilityRole="button" accessibilityLabel="Add CCTV camera using secure setup" onPress={() => router.push('/cctv-add')} style={[styles.primaryButton, { backgroundColor: colors.primary }]}>
               <Feather name="plus" size={18} color={colors.primaryForeground} />
               <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Discover / Add CCTV</Text>
