@@ -34,7 +34,7 @@ export default function ExtractPdfPagesScreen() {
       setPdf({ uri: asset.uri, name: asset.name || 'document.pdf', pageCount });
       setSelection(''); setResult(null);
       setStatus(`${pageCount} pages loaded. Valid page numbers are 1 to ${pageCount}.`);
-    } catch (error) { setPdf(null); setResult(null); setStatus(error instanceof Error ? error.message : 'Could not read the PDF page count.'); }
+    } catch (error) { setPdf(null); setResult(null); setStatus(getUserFriendlyMessage(error, 'Could not read the PDF page count.')); }
   }
 
   function updateSelection(value: string) { if (pdf) setSelection(sanitizePageRangeInput(value, pdf.pageCount)); }
@@ -57,7 +57,7 @@ export default function ExtractPdfPagesScreen() {
       await deleteAsync(tempDirectory, { idempotent: true });
       await deleteAsync(temporary, { idempotent: true });
       setResult(output); setStatus('Pages cut and extracted successfully.');
-    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not cut and extract the selected pages.'); }
+    } catch (error) { setStatus(getUserFriendlyMessage(error, 'Could not cut and extract the selected pages.')); }
     finally { setBusy(false); }
   }
 
