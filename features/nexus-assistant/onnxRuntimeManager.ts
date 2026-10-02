@@ -16,7 +16,7 @@ type NativeOnnxModule = {
 const nativeOnnx = NativeModules.NexusAssistantOnnx as NativeOnnxModule | undefined;
 const root = new Directory(Paths.document, 'nexus-assistant', 'onnx');
 
-const hfFiles = ['config.json', 'generation_config.json', 'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json', 'merges.txt', 'vocab.json', 'onnx/model_q4f16.onnx'];
+const hfFiles = ['config.json', 'generation_config.json', 'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json', 'merges.txt', 'vocab.json', 'onnx/model_q4f16.onnx', 'genai_config.json'];
 
 function modelDir(model: OnnxModel): Directory {
   return new Directory(root, model.id);
@@ -72,7 +72,8 @@ export async function downloadOnnxModel(modelId: string): Promise<string> {
     const existing = new File(dir, name);
     if (existing.exists && existing.size > 0) continue;
     if (name.includes('/')) existing.parentDirectory?.create({ idempotent: true, intermediates: true });
-    await downloadFile(base + name, existing);
+    const url = name === 'genai_config.json' ? 'https://huggingface.co/webai-community/ai-models/resolve/main/SmolLM2-135M-Instruct/onnx-webgpu/genai_config.json' : base + name;
+    await downloadFile(url, existing);
   }
   return dir.uri;
 }
