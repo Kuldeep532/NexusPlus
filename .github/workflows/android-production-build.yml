@@ -155,7 +155,11 @@ jobs:
           set -euo pipefail
           if [ -z "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER" ]; then
             echo "Play Integrity is not configured. The app will build without Play Integrity checks."
-          elif ! printf '%s' "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER" | grep -Eq '^[0-9]+      - name: Validate release certificate configuration
+          elif ! printf '%s' "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER" | grep -Eq '^[0-9]+$'; then
+            echo "Play Integrity configuration is invalid. The app will build without Play Integrity checks."
+            echo "PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=" >> "$GITHUB_ENV"
+          fi
+      - name: Validate release certificate configuration
         shell: bash
         run: |
           set -euo pipefail
