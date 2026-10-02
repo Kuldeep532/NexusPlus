@@ -1,14 +1,7 @@
-import {
-  addMessage,
-  listMessages,
-  type ChatMessage,
-} from './assistantStore';
+import { addMessage, listMessages, type ChatMessage } from './assistantStore';
 import { getLocalInferenceEngine, type LocalInferenceChunk } from './localInference';
 
-export type NexusAssistantReply = {
-  messageId: number | null;
-  text: string;
-};
+export type NexusAssistantReply = { messageId: number | null; text: string };
 
 const DEFAULT_SYSTEM_PROMPT = [
   'You are Nexus Assistant, a private on-device assistant.',
@@ -31,31 +24,23 @@ export async function streamAssistantReply(params: {
 }): Promise<NexusAssistantReply> {
   const existing = await listMessages(params.sessionId);
   const inference = await getLocalInferenceEngine();
-
-  if (!(await inference.isAvailable())) {
-    const message = 'The local Nexus Assistant engine is not installed on this build yet.';
-    params.onStatus?.('Local inference engine unavailable.');
-    await addMessage(params.sessionId, 'assistant', message);
-    return { messageId: null, text: message };
-  }
+  if (!(await inference.isAvailable())) throw new Error('Local AI is not available on this device.');
 
   const prompt: ChatMessage[] = [
     { id: -1, sessionId: params.sessionId, role: 'system', content: DEFAULT_SYSTEM_PROMPT, createdAt: 0 },
-    ...existing,
+    ...existing.slice(-12),
     { id: -1, sessionId: params.sessionId, role: 'user', content: params.userText, createdAt: Date.now() },
   ];
 
   let output = '';
   await inference.loadModel(params.modelPath, params.modelId);
   try {
-    await inference.stream(toInferenceMessages(prompt), { modelId: params.modelId, maxTokens: 192, temperature: 0.2, contextSize: 1024 }, (chunk: LocalInferenceChunk) => {
+    await inference.stream(toInferenceMessages(prompt), { modelId: params.modelId, maxTokens: 160, temperature: 0.35, contextSize: 1024 }, (chunk: LocalInferenceChunk) => {
       if (chunk.type === 'token') {
         output += chunk.text;
         params.onToken?.(chunk.text);
       } else if (chunk.type === 'status') {
         params.onStatus?.(chunk.text);
-      } else if (chunk.type === 'error') {
-        params.onStatus?.(chunk.message);
       }
     });
   } finally {
@@ -63,11 +48,8 @@ export async function streamAssistantReply(params: {
   }
 
   const text = output.trim();
-  if (!text) {
-    throw new Error('Local inference returned an empty response.');
-  }
+  if (!text) throw new Error('The local assistant returned no answer.');
   await addMessage(params.sessionId, 'assistant', text);
   const saved = await listMessages(params.sessionId);
-  const last = saved.at(-1);
-  return { messageId: last?.id ?? null, text };
+  return { messageId: saved.at(-1)?.id ?? null, text };
 }
