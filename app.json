@@ -27,25 +27,68 @@
         {
           "action": "VIEW",
           "autoVerify": false,
-          "data": [{"scheme": "nexus-plus","host": "auth","pathPrefix": "/callback"}],
-          "category": ["BROWSABLE","DEFAULT"]
+          "data": [
+            {
+              "scheme": "nexus-plus",
+              "host": "auth",
+              "pathPrefix": "/callback"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
-    "ios": {"supportsTablet": false},
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nexuswavetech.nexusplus",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Nexus Plus uses the camera only when you start a camera feature such as scanning, recording or taking a photo.",
+        "NSMicrophoneUsageDescription": "Nexus Plus uses the microphone only when you start a recording or voice feature.",
+        "NSPhotoLibraryUsageDescription": "Nexus Plus accesses your photos only when you choose a photo or media feature.",
+        "NSPhotoLibraryAddUsageDescription": "Nexus Plus saves media to your photo library only when you choose to save it.",
+        "NSLocalNetworkUsageDescription": "Nexus Plus uses the local network only when you choose a device connection feature.",
+        "UIBackgroundModes": [
+          "audio"
+        ]
+      }
+    },
     "web": {},
     "plugins": [
-      ["expo-router",{"origin":"https://replit.com/"}],
+      [
+        "expo-router",
+        {
+          "origin": "https://replit.com/"
+        }
+      ],
       "./plugins/withNexusNative",
       "expo-font",
       "expo-document-picker",
       "expo-web-browser",
-      ["expo-camera",{"cameraPermission":"Allow Nexus Plus to use your camera for selfies, QR scanning, and other user-started camera features."}],
-      ["expo-notifications",{"defaultChannel":"nexus-alarm"}],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Nexus Plus to use your camera for selfies, QR scanning, and other user-started camera features."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "nexus-alarm"
+        }
+      ],
       "expo-local-authentication",
       "expo-secure-store",
-      ["./plugins/withUpiSmsVerification",{}]
+      [
+        "./plugins/withUpiSmsVerification",
+        {}
+      ]
     ],
-    "experiments": {"typedRoutes": true,"reactCompiler": true}
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
   }
 }
