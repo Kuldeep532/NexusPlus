@@ -250,14 +250,21 @@ jobs:
         run: |
           set -euo pipefail
           args=(assembleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PNEXUS_RELEASE_CERT_SHA256="$NEXUS_RELEASE_CERT_SHA256")
-          if printf '%s' "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER" | grep -Eq '^[0-9]+
+          if [ -n "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER" ]; then
+            args+=("-PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER")
+          fi
+          gradle "${args[@]}"
+
       - name: Build release AAB
         if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'both' }}
         working-directory: android
         run: |
           set -euo pipefail
           args=(bundleRelease --no-daemon --no-build-cache --stacktrace --info -PnexusReleaseAbi=arm64-v8a -PNEXUS_RELEASE_CERT_SHA256="$NEXUS_RELEASE_CERT_SHA256")
-          if printf '%s' "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER" | grep -Eq '^[0-9]+
+          if [ -n "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER" ]; then
+            args+=("-PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER")
+          fi
+          gradle "${args[@]}"
       - name: Verify APK output
         if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
         shell: bash
