@@ -16,7 +16,7 @@ const FRIENDLY_MESSAGES: Record<string, string> = {
   INSUFFICIENT_CREDITS: 'You do not have enough AI credits for this request.',
   FREE_BASIC_QUOTA_EXCEEDED: 'Your free basic audio description limit has been reached for this month.',
   APP_VERIFICATION_REQUIRED: 'This app installation could not be verified. Please install the official Nexus Plus build and try again.',
-  FEEDBACK_SUBMIT_FAILED_4 'We could not send your feedback. Please try again.',
+  FEEDBACK_SUBMIT_FAILED: 'We could not send your feedback. Please try again.',
   FEEDBACK_SUBMIT_FAILED_5: 'We could not send your feedback right now. Please try again later.',
   STORE_NOT_AVAILABLE: 'The app store is not available on this device.' ,
 };
