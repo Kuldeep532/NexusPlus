@@ -99,7 +99,6 @@ jobs:
       NEXUS_API_BASE_URL: ${{ secrets.NEXUS_API_BASE_URL }}
       EXPO_PUBLIC_NEXUS_API_BASE_URL: ${{ secrets.NEXUS_API_BASE_URL }}
       PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER: ${{ secrets.PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER }}
-      NEXUS_RELEASE_CERT_SHA256: ${{ secrets.NEXUS_RELEASE_CERT_SHA256 }}
       FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
       FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
       FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
@@ -177,15 +176,6 @@ jobs:
           else
             echo "Play Integrity configuration accepted."
           fi
-
-      - name: Validate release certificate configuration
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$NEXUS_RELEASE_CERT_SHA256"
-          case "$NEXUS_RELEASE_CERT_SHA256" in
-            ''|*[!0-9A-Fa-f:]*) echo "NEXUS_RELEASE_CERT_SHA256 contains invalid characters." >&2; exit 1 ;;
-          esac
 
       - name: Materialize Firebase configuration
         shell: bash
@@ -286,7 +276,6 @@ jobs:
             --stacktrace
             --info
             -PnexusReleaseAbi=arm64-v8a
-            -PNEXUS_RELEASE_CERT_SHA256="$NEXUS_RELEASE_CERT_SHA256"
           )
           if [ -n "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER" ]; then
             args+=("-PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER")
@@ -306,7 +295,6 @@ jobs:
             --stacktrace
             --info
             -PnexusReleaseAbi=arm64-v8a
-            -PNEXUS_RELEASE_CERT_SHA256="$NEXUS_RELEASE_CERT_SHA256"
           )
           if [ -n "$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER" ]; then
             args+=("-PPLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=$PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER")
