@@ -48,7 +48,7 @@ export default function CctvAddScreen() {
     const normalizedModel = model.trim();
     const normalizedUsername = username.trim();
     const numericPort = Number(port.trim());
-    if (!normalizedHost || !Number.isInteger(numericPort) || numericPort < 1 || numericPort > 65535) return Alert.alert('Secure endpoint required', 'Enter a valid local HTTPS camera endpoint.');
+    if (!normalizedHost || !Number.isInteger(numericPort) || numericPort < 1 || numericPort > 65535) return Alert.alert('Camera connection required', 'Enter a valid secure camera connection.');
     if (!normalizedUsername || !password) return Alert.alert('Camera credentials required', 'Enter the camera username and password.');
     if (!normalizedSerial && (!normalizedManufacturer || !normalizedModel)) return Alert.alert('Camera identity required', 'Provide the camera serial number, or both manufacturer and model.');
     setBusy(true);
