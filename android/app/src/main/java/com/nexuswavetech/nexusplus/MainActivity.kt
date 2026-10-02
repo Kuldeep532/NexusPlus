@@ -46,6 +46,10 @@ class MainActivity : ReactActivity() {
     }
 
     private fun publishIncomingIntent(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_ASSIST || intent?.getBooleanExtra("nexus_assistant_default_role", false) == true) {
+            AssistantLaunchStore.setPending()
+            return
+        }
         if (intent?.action != Intent.ACTION_VIEW) return
         val uri: Uri = intent.data ?: return
         val scheme = uri.scheme?.lowercase() ?: return
@@ -86,5 +90,16 @@ object MediaLaunchStore {
         pendingUri = null
         pendingMime = null
         return uri to mime
+    }
+}
+
+
+object AssistantLaunchStore {
+    @Volatile private var pending = false
+    @Synchronized fun setPending() { pending = true }
+    @Synchronized fun consume(): Boolean {
+        val value = pending
+        pending = false
+        return value
     }
 }
