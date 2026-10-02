@@ -3,6 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { DEFAULT_FILE_SORT } from '../FileManagerConfig';
 import type { FileManagerEntry, FileManagerSelectionAction, FileManagerViewMode, FileSortMode } from '../FileManagerTypes';
 import { getStorageStats, refreshDirectory } from '../FileManagerStorage';
@@ -14,7 +15,7 @@ function formatSize(bytes: number): string { if (!bytes) return '0 B'; const uni
 
 export function FileManagerBrowser({ initialUri = FileSystem.documentDirectory ?? '', onFileAction }: { initialUri?: string; onFileAction?: (action: FileManagerSelectionAction, entry: FileManagerEntry) => void }) {
   const colors=useColors(); const [currentUri,setCurrentUri]=useState(initialUri); const [entries,setEntries]=useState<FileManagerEntry[]>([]); const [sortMode,setSortMode]=useState<FileSortMode>(DEFAULT_FILE_SORT); const [viewMode,setViewMode]=useState<FileManagerViewMode>('list'); const [searchQuery,setSearchQuery]=useState(''); const [showSearch,setShowSearch]=useState(false); const [selectedIds,setSelectedIds]=useState<string[]>([]); const [loading,setLoading]=useState(true); const [error,setError]=useState<string|null>(null); const [stats,setStats]=useState({ total:1, free:0, used:0, ratio:0 });
-  const load=useCallback(async()=>{setLoading(true);setError(null);try{setEntries(await refreshDirectory(currentUri,sortMode));setStats(await getStorageStats());}catch(err){setEntries([]);setError(err instanceof Error?err.message:'Unable to browse this folder.');}finally{setLoading(false);}},[currentUri,sortMode]);
+  const load=useCallback(async()=>{setLoading(true);setError(null);try{setEntries(await refreshDirectory(currentUri,sortMode));setStats(await getStorageStats());}catch(err){setEntries([]);setError(getUserFriendlyMessage(err,'Unable to browse this folder.'));}finally{setLoading(false);}},[currentUri,sortMode]);
   useEffect(()=>{void load();},[load]);
   const visibleEntries=useMemo(()=>{const query=searchQuery.trim().toLocaleLowerCase();if(!query)return entries;return entries.filter((entry)=>entry.name.toLocaleLowerCase().includes(query));},[entries,searchQuery]);
   const breadcrumbs=useMemo<BreadcrumbItem[]>(()=>{const parts=currentUri.split('/').filter(Boolean);const items:BreadcrumbItem[]=[];let uri=currentUri.startsWith('file://')?'file://':'/';parts.forEach((part,index)=>{uri=uri.endsWith('/')?`${uri}${part}`:`${uri}/${part}`;items.push({id:`${index}-${uri}`,title:part,uri});});if(!items.length)items.push({id:'root',title:'Files',uri:currentUri});return items;},[currentUri]);
