@@ -28,7 +28,6 @@ if (keystorePropertiesFile.exists()) {
 def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBuilds') ?: true).toBoolean()
 def enableShrinkResourcesInReleaseBuilds = (findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: true).toBoolean()
 def enablePngCrunchInReleaseBuilds = (findProperty('android.enablePngCrunchInReleaseBuilds') ?: true).toBoolean()
-def requiredReleaseCertSha256 = (findProperty('NEXUS_RELEASE_CERT_SHA256') ?: '').toString().trim().replace(':', '').toLowerCase()
 
 android {
     namespace 'com.nexuswavetech.nexusplus'
@@ -53,7 +52,7 @@ android {
     signingConfigs {
         release {
             if (!keystorePropertiesFile.exists()) {
-                throw new GradleException("Release signing is required. Provide android/key.properties (CI creates it from the protected release keystore). Do not install unsigned/debug APKs for Play Protect testing.")
+                throw new GradleException("Release signing is required. Provide android/key.properties (CI creates it from the protected release keystore).")
             }
             storeFile rootProject.file(keystoreProperties['storeFile'])
             storePassword keystoreProperties['storePassword']
@@ -73,7 +72,6 @@ android {
             crunchPngs enablePngCrunchInReleaseBuilds
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
-            buildConfigField 'String', 'EXPECTED_RELEASE_CERT_SHA256', '"' + requiredReleaseCertSha256 + '"'
         }
     }
 }
