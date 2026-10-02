@@ -667,7 +667,7 @@ export default function NexusAssistantScreen() {
         <Text selectable style={[styles.body, { color: colors.mutedForeground }]}>{generatedResult.message}</Text>
         <View style={styles.actionRow}>
           <Pressable accessibilityRole="button" onPress={() => setGeneratedResult(null)} style={[styles.secondaryButton, { borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>Close</Text></Pressable>
-          <Pressable accessibilityRole="button" onPress={() => void send('regenerate')} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Regenerate</Text></Pressable>
+          <Pressable accessibilityRole="button" onPress={() => void send("regenerate")} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Regenerate</Text></Pressable>
         </View>
       </View>
     ) : null}
