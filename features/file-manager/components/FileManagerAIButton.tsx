@@ -1,3 +1,4 @@
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { Feather } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -41,7 +42,7 @@ export function FileManagerAIButton({ entry }: { entry: FileManagerEntry }) {
       await ensureLocalFileModel((progress) => setDownloadProgress(progress));
       setModelReady(true);
     } catch (error) {
-      Alert.alert('Local AI model', error instanceof Error ? error.message : String(error));
+      Alert.alert('Local AI model', getUserFriendlyMessage(error, 'The local AI model could not be prepared. Please try again.'));
     } finally {
       setPreparing(false);
     }
@@ -53,7 +54,7 @@ export function FileManagerAIButton({ entry }: { entry: FileManagerEntry }) {
       const next = await runLocalFileAI(entry, action);
       setResult(next);
     } catch (error) {
-      Alert.alert('Local AI failed', error instanceof Error ? error.message : String(error));
+      Alert.alert('Local AI', getUserFriendlyMessage(error, 'The AI action could not be completed. Please try again.'));
     } finally {
       setBusy(null);
     }
