@@ -27,6 +27,8 @@ const SETTINGS = [
   { title:'Expense Tracker',description:'Manage expense detection and financial privacy.',route:'/expense-tracker',icon:'credit-card' as const },
 ];
 const LEGAL_SETTINGS = [
+  {title:'Send Feedback',description:'Tell us what you like, report a problem, or suggest an improvement.',route:'/send-feedback',icon:'message-square' as const},
+  {title:'Contact Us',description:'Contact the Nexus Wave Technologies team for help or general questions.',route:'/contact',icon:'mail' as const},
   {title:'Privacy Policy',description:'How Nexus Plus handles data, permissions, analytics, APIs and security.',route:'/privacy-policy',icon:'lock' as const},
   {title:'Terms & Conditions',description:'Rules for safe, lawful and responsible use of Nexus Plus.',route:'/terms-and-conditions',icon:'file-text' as const},
   {title:'About Nexus Wave Technologies',description:'Our mission, accessibility vision and the story behind Nexus Plus.',route:'/about-us',icon:'info' as const},
