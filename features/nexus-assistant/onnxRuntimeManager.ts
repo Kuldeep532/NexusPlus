@@ -48,7 +48,7 @@ export function isOnnxModelDownloaded(modelId: string): boolean {
   if (!model) return false;
   const dir = modelDir(model);
   const files = [...requiredBase, ...hfFiles, ...(model.requiredFiles ?? [])];
-  return modelFile(model).exists && files.every((name) => fileExists(dir, name));
+  return files.every((name) => fileExists(dir, name));
 }
 
 async function downloadFile(url: string, target: File): Promise<void> {
