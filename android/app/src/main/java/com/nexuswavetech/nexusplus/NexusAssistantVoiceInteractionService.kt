@@ -1,7 +1,6 @@
 package com.nexuswavetech.nexusplus
 
 import android.content.Intent
-import android.os.Bundle
 import android.service.voice.VoiceInteractionService
 
 class NexusAssistantVoiceInteractionService : VoiceInteractionService() {
@@ -11,10 +10,6 @@ class NexusAssistantVoiceInteractionService : VoiceInteractionService() {
 
     override fun onLaunchVoiceAssistFromKeyguard() {
         launchAssistant()
-    }
-
-    override fun onGetSupportedVoiceActions(voiceActions: MutableSet<String>) {
-        super.onGetSupportedVoiceActions(voiceActions)
     }
 
     private fun launchAssistant() {
