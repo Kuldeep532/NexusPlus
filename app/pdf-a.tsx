@@ -36,7 +36,7 @@ export default function PdfAScreen() {
       const outputName = `${safeBaseName(file.name)}-${conformance.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`;
       const uri = await convertPdfToPdfAWithGotenberg(file.uri, outputName, conformance);
       setResult(uri); setStatus('Conversion completed. PDF/A file is ready to save/share.');
-    } catch (error) { setStatus(error instanceof Error ? error.message : 'PDF/A conversion could not be completed.'); }
+    } catch (error) { setStatus(getUserFriendlyMessage(error, 'PDF/A conversion could not be completed.')); }
     finally { setBusy(false); }
   }
 
