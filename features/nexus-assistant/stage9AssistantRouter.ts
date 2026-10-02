@@ -44,6 +44,6 @@ export async function routeAssistantRequest(input: {
     ...(webContextMessage ? [webContextMessage] : []),
   ];
 
-  const provider = await askCloudWithFallback({ message: input.message, history: enrichedHistory });
+  const provider = await askCloudWithFallback({ message: input.message, history: enrichedHistory, fileContext: input.fileContext ? { name: input.fileContext.name, format: input.fileContext.format, text: input.fileContext.text, truncated: input.fileContext.truncated } : undefined });
   return { provider, web };
 }
