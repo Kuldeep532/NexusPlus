@@ -81,7 +81,7 @@ export default function PdfImageScreen() {
       setResult(null);
       setStatus(`${info.pageCount} pages detected.`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not read this PDF.');
+      setStatus(getUserFriendlyMessage(error, 'Could not read this PDF.'));
     }
   }
 
@@ -129,7 +129,7 @@ export default function PdfImageScreen() {
         setStatus(`One-image output was not safe on this device, so Nexus Plus automatically created ${fallbackPaths.length} separate images instead.`);
       }
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not convert this PDF to images. Try a lower DPI.');
+      setStatus(getUserFriendlyMessage(error, 'Could not convert this PDF to images. Try a lower DPI.'));
     } finally { setBusy(false); }
   }
 
@@ -143,7 +143,7 @@ export default function PdfImageScreen() {
       setResult({ uri, mime: 'application/pdf', filename: uri.split('/').pop() || 'images-to-pdf.pdf' });
       setStatus(images.length === 1 ? 'Single-page PDF created and saved.' : `${images.length}-page PDF created and saved.`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not create the PDF.');
+      setStatus(getUserFriendlyMessage(error, 'Could not create the PDF.'));
     } finally { setBusy(false); }
   }
 
