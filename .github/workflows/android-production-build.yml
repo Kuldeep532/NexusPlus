@@ -222,6 +222,14 @@ jobs:
           cache-disabled: true
       - name: Make Gradle wrapper executable
         run: chmod +x android/gradlew
+      - name: Validate Nexus Assistant offline runtime source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f android/app/src/main/java/com/nexuswavetech/nexusplus/NexusAssistantOnnxModule.kt
+          grep -q 'NexusAssistantOnnx' android/app/src/main/java/com/nexuswavetech/nexusplus/NexusAssistantOnnxModule.kt
+          grep -q 'onnxruntime-android' android/app/build.gradle
+          grep -q 'smollm2-135m-instruct-onnx' features/nexus-assistant/assistantConfig.ts
       - name: Build Debug/Development APK
         if: ${{ inputs.build_type == 'development' }}
         working-directory: android
