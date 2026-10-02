@@ -18,7 +18,13 @@ export type AssistantCapabilityId =
   | 'pdf-compress'
   | 'pdf-rotate'
   | 'qr-generate'
-  | 'tool-open'\n  | 'read-screen'\n  | 'search-web'\n  | 'summarize-text'\n  | 'translate-text'\n  | 'read-document'\n  | 'draft-message';
+  | 'tool-open'
+  | 'read-screen'
+  | 'search-web'
+  | 'summarize-text'
+  | 'translate-text'
+  | 'read-document'
+  | 'draft-message';
 
 export type AssistantCapability = {
   id: AssistantCapabilityId;
@@ -47,7 +53,13 @@ export const ASSISTANT_CAPABILITIES: readonly AssistantCapability[] = [
   { id: 'pdf-compress', title: 'Compress PDF', description: 'Compress a selected local PDF with the existing native PDF engine.', risk: 'confirm', requiresConfirmation: true, offline: true },
   { id: 'pdf-rotate', title: 'Rotate PDF', description: 'Rotate a selected local PDF with the existing native PDF engine.', risk: 'confirm', requiresConfirmation: true, offline: true },
   { id: 'qr-generate', title: 'Generate QR Code', description: 'Generate a QR code using the existing QR generator and its supported payload types.', risk: 'safe', requiresConfirmation: false, offline: true },
-  { id: 'tool-open', title: 'Open Nexus Tool', description: 'Open a registered Nexus Plus tool from the shared feature registry.', risk: 'safe', requiresConfirmation: false, offline: true },\n  { id: 'read-screen', title: 'Read screen', description: 'Describe the accessible content currently visible on screen.', risk: 'safe', requiresConfirmation: false, offline: true },\n  { id: 'search-web', title: 'Search the web', description: 'Find current information when an internet search is needed.', risk: 'safe', requiresConfirmation: false, offline: false },\n  { id: 'summarize-text', title: 'Summarize text', description: 'Create a concise summary from selected or provided text.', risk: 'safe', requiresConfirmation: false, offline: true },\n  { id: 'translate-text', title: 'Translate text', description: 'Translate provided text into a requested language.', risk: 'safe', requiresConfirmation: false, offline: true },\n  { id: 'read-document', title: 'Read document', description: 'Read and explain a user-selected local document.', risk: 'confirm', requiresConfirmation: true, offline: true },\n  { id: 'draft-message', title: 'Draft a message', description: 'Write a message for the user without sending it.', risk: 'safe', requiresConfirmation: false, offline: true },
+  { id: 'tool-open', title: 'Open Nexus Tool', description: 'Open a registered Nexus Plus tool from the shared feature registry.', risk: 'safe', requiresConfirmation: false, offline: true },
+  { id: 'read-screen', title: 'Read screen', description: 'Describe the accessible content currently visible on screen.', risk: 'safe', requiresConfirmation: false, offline: true },
+  { id: 'search-web', title: 'Search the web', description: 'Find current information when an internet search is needed.', risk: 'safe', requiresConfirmation: false, offline: false },
+  { id: 'summarize-text', title: 'Summarize text', description: 'Create a concise summary from selected or provided text.', risk: 'safe', requiresConfirmation: false, offline: true },
+  { id: 'translate-text', title: 'Translate text', description: 'Translate provided text into a requested language.', risk: 'safe', requiresConfirmation: false, offline: true },
+  { id: 'read-document', title: 'Read document', description: 'Read and explain a user-selected local document.', risk: 'confirm', requiresConfirmation: true, offline: true },
+  { id: 'draft-message', title: 'Draft a message', description: 'Write a message for the user without sending it.', risk: 'safe', requiresConfirmation: false, offline: true },
 ];
 
 const capabilityMap = new Map(ASSISTANT_CAPABILITIES.map((capability) => [capability.id, capability]));
