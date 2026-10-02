@@ -3,6 +3,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { useCctvCameras } from '@/features/cctv/useCctvCameras';
 import { loadCctvPlaybackPage } from '@/features/cctv/cctvPlayback';
 import type { CctvRecordingItem } from '@/features/cctv/cctvBackend';
@@ -35,7 +36,7 @@ export default function CctvRecordingsScreen() {
       setItems(page.items);
     } catch (cause: unknown) {
       setItems([]);
-      setError(cause instanceof Error ? cause.message : 'Recording service is unavailable.');
+      setError(getUserFriendlyMessage(cause, 'Recording service is unavailable.'));
     } finally {
       setLoading(false);
     }
