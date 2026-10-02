@@ -93,5 +93,5 @@ dependencies {
     implementation 'com.tom-roush:pdfbox-android:2.0.27.0'
     implementation 'com.facebook.react:react-android'
     implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.20.1'
-    // ORT GenAI Java bindings are packaged from the lightweight Android native layer below.
+    implementation files('libs/onnxruntime-genai.jar')
 }
