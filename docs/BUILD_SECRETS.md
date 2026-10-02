@@ -84,6 +84,20 @@ The Google Play service-account key is for trusted CI/EAS submission operations 
 - `IOS_DISTRIBUTION_CERT_PASSWORD`
 - `IOS_PROVISIONING_PROFILE_BASE64`
 
+
+## Feedback email delivery
+
+The Send Feedback Edge Function can save feedback to Supabase and send an email to the support inbox.
+Create these Supabase Edge Function secrets:
+
+- `RESEND_API_KEY` — API key created in your Resend account.
+- `FEEDBACK_EMAIL` — recipient inbox, for example `info@nexusweb.co.in`.
+- `FEEDBACK_FROM_EMAIL` — verified sender address, for example `Nexus Plus <feedback@nexusweb.co.in>`.
+
+Keep these secrets only in Supabase Edge Function secrets. Do not put the Resend API key in `EXPO_PUBLIC_*` variables or the app source.
+
+The Supabase project already provides `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to Edge Functions; do not copy or expose either value in the mobile app.
+
 ## Manual-only policy
 
 The native mobile CD workflow is intentionally manual-only. It does not run on push, pull request, schedule, or release events.
