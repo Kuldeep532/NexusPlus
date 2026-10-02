@@ -75,19 +75,6 @@ export async function downloadOnnxModel(modelId: string): Promise<string> {
     if (name.includes('/')) existing.parentDirectory?.create({ idempotent: true, intermediates: true });
     await downloadFile(base + name, existing);
   }
-  const genai = new File(dir, 'genai_config.json');
-  if (!genai.exists || genai.size <= 0) {
-    const config = JSON.stringify({
-      model: {
-        type: 'plugin',
-        architecture: 'LlamaForCausalLM',
-        filename: 'onnx/model_q4f16.onnx'
-      },
-      tokenizer: { tokenizer_type: 'bpe', vocab_file: 'vocab.json', merges_file: 'merges.txt' },
-      search: { max_length: 1024, eos_token_id: 2, pad_token_id: 2 }
-    });
-    genai.write(config);
-  }
   return dir.uri;
 }
 
