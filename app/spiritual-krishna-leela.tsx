@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useEffect, useState } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { KRISHNA_LEELA_STORIES, type KrishnaLeelaStory } from '@/features/spiritual/krishnaLeelaCatalog';
 import { loadOnlineKrishnaLeelaStories } from '@/features/spiritual/krishnaLeelaOnline';
 
@@ -46,7 +47,7 @@ export default function KrishnaLeelaScreen() {
     } catch (error) {
       setStories(KRISHNA_LEELA_STORIES);
       setSelected(KRISHNA_LEELA_STORIES[0]);
-      setStatus(error instanceof Error ? error.message : 'ऑनलाइन stories लोड नहीं हो सकीं; local stories दिखाई जा रही हैं।');
+      setStatus(getUserFriendlyMessage(error, 'ऑनलाइन stories लोड नहीं हो सकीं; local stories दिखाई जा रही हैं।'));
     }
   };
 
