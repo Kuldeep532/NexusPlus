@@ -49,10 +49,10 @@ export default function ApiStudioScreen() {
       </View>
 
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>OpenAI API</Text>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>OpenAI</Text>
         <Text style={[styles.body, { color: colors.mutedForeground }]}>Your personal key is stored locally and is not written to the Nexus Assistant source code.</Text>
         <TextInput
-          accessibilityLabel="OpenAI API key"
+          accessibilityLabel="OpenAI key"
           value={openAiKey}
           onChangeText={setOpenAiKey}
           autoCapitalize="none"
