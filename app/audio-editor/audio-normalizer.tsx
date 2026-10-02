@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { AudioEditorResultPanel } from '@/features/audio-editor/AudioEditorResultPanel';
 import { createAudioEditorOutputPath } from '@/features/audio-editor/audioEditorExport';
 import { pickAudioFromFileManager } from '@/features/audio-editor/audioEditorSource';
@@ -45,7 +46,7 @@ export default function AudioNormalizerScreen() {
       setOutput({ path: result.outputPath, uri: `file://${result.outputPath}` });
       setMessage('Normalized audio saved as a new copy.');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to normalize the selected audio.');
+      setMessage(getUserFriendlyMessage(error, 'Unable to normalize the selected audio.'));
     } finally {
       setWorking(false);
     }
