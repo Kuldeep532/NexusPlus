@@ -25,7 +25,7 @@ export default function ReorderPdfScreen() {
     const picked = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', multiple: false, copyToCacheDirectory: true });
     if (picked.canceled || !picked.assets?.[0]) return;
     try { const asset = picked.assets[0]; const pageCount = assertValidPageCount((await getPdfInfo(asset.uri)).pageCount); setPdf({ uri: asset.uri, name: asset.name || 'document.pdf', pageCount }); setPageOrder(Array.from({ length: pageCount }, (_, i) => i + 1)); setStatus(`${pageCount} pages loaded. Valid page numbers are 1 to ${pageCount}.`); }
-    catch (error) { setPdf(null); setPageOrder([]); setStatus(error instanceof Error ? error.message : 'Could not read the PDF page count.'); }
+    catch (error) { setPdf(null); setPageOrder([]); setStatus(getUserFriendlyMessage(error, 'Could not read the PDF page count.')); }
   }
   function move(index: number, direction: -1 | 1) { setPageOrder((current) => { const nextIndex = index + direction; if (nextIndex < 0 || nextIndex >= current.length) return current; const next = [...current]; [next[index], next[nextIndex]] = [next[nextIndex], next[index]]; return next; }); setResult(null); setStatus('Page order updated.'); }
   function resetOrder() { if (!pdf) return; setPageOrder(Array.from({ length: pdf.pageCount }, (_, i) => i + 1)); setResult(null); setStatus('Original page order restored.'); }
@@ -33,7 +33,7 @@ export default function ReorderPdfScreen() {
   async function saveReorderedPdf() {
     if (!pdf) { setStatus('Select a PDF before reordering pages.'); return; }
     try { const safeOrder = buildPageOrder(pdf.pageCount, pageOrder); setBusy(true); setResult(null); setStatus('Reordering PDF pages…'); const output = await preparePdfOutputPath('Reordered PDFs', `${safeBaseName(pdf.name)}-reordered.pdf`); const uri = await PdfNativeBridge.reorder(pdf.uri, output, safeOrder, pdf.pageCount); setResult(uri); setStatus('PDF reordered successfully.'); }
-    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not reorder this PDF.'); } finally { setBusy(false); }
+    catch (error) { setStatus(getUserFriendlyMessage(error, 'Could not reorder this PDF.')); } finally { setBusy(false); }
   }
   useFocusEffect(useCallback(() => { const sub = BackHandler.addEventListener('hardwareBackPress', () => { if (!pdf && !result && !pageOrder.length && !busy) return false; resetTool(); return false; }); return () => sub.remove(); }, [busy, pageOrder.length, pdf, result]));
 
