@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { createAudioEditorOutputPath } from '@/features/audio-editor/audioEditorExport';
 import { pickAudioFromFileManager } from '@/features/audio-editor/audioEditorSource';
 import { processSpeedAndPitch, type SpeedPitchSettings } from '@/features/audio-editor/speedPitchEngine';
@@ -55,7 +56,7 @@ export default function SpeedPitchScreen() {
       setOutput({ path: result.outputPath, uri: `file://${result.outputPath}` });
       setMessage(`Done. Speed ${result.speed}× • Pitch ${result.pitchSemitones >= 0 ? '+' : ''}${result.pitchSemitones} semitones.`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to process this audio.');
+      setMessage(getUserFriendlyMessage(error, 'Unable to process this audio.'));
     } finally {
       setWorking(false);
     }
