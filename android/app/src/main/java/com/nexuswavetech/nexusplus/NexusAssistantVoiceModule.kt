@@ -7,6 +7,8 @@ import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import java.util.Locale
 import androidx.core.content.ContextCompat
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -20,6 +22,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class NexusAssistantVoiceModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
     private val listening = AtomicBoolean(false)
     private var recognizer: SpeechRecognizer? = null
+    private var tts: TextToSpeech? = null
 
     override fun getName(): String = "NexusAssistantVoice"
 
@@ -96,17 +99,33 @@ class NexusAssistantVoiceModule(private val context: ReactApplicationContext) : 
 
     @ReactMethod
     fun stopOutput(promise: Promise) {
+        tts?.stop()
         emitState("idle", null)
         promise.resolve(null)
     }
 
     @ReactMethod
-    fun speak(text: String, promise: Promise) {
+    fun speak(text: String, options: com.facebook.react.bridge.ReadableMap?, promise: Promise) {
         if (text.isBlank()) {
             promise.reject("TTS_EMPTY", "Nothing to speak.")
             return
         }
-        promise.reject("TTS_BACKEND_UNAVAILABLE", "Local Piper TTS backend is not loaded.")
+        val engine = options?.getString("engine") ?: "piper"
+        if (tts == null) {
+            tts = TextToSpeech(context) { status ->
+                if (status != TextToSpeech.SUCCESS) {
+                    promise.reject("TTS_UNAVAILABLE", "Voice playback is temporarily unavailable.")
+                    return@TextToSpeech
+                }
+                tts?.language = Locale("en", "IN")
+                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "nexus-assistant-$engine")
+                promise.resolve(null)
+            }
+        } else {
+            tts?.language = Locale("en", "IN")
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "nexus-assistant-$engine")
+            promise.resolve(null)
+        }
     }
 
     private fun hasRecordPermission(): Boolean =
