@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { addLinkShortcut, deleteLinkShortcut, listLinkShortcuts, type LinkShortcut } from '@/features/link-shortcuts/linkShortcutsRepository';
 
 export default function LinkShortcutsScreen() {
@@ -27,7 +28,7 @@ export default function LinkShortcutsScreen() {
       setUrl('');
       await load();
     } catch (error) {
-      Alert.alert('Could not save shortcut', error instanceof Error ? error.message : 'Please check the shortcut details.');
+      Alert.alert('Could not save shortcut', getUserFriendlyMessage(error, 'Please check the shortcut details.'));
     } finally {
       setSaving(false);
     }
