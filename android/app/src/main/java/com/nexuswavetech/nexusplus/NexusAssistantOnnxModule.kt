@@ -21,6 +21,8 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
     private var tokenizer: Tokenizer? = null
     private var loadedModelId: String? = null
 
+    private fun firstString(map: ReadableMap, key: String): String? = if (map.hasKey(key) && !map.isNull(key)) map.getString(key) else null
+
     @ReactMethod
     fun getStatus(promise: Promise) {
         try {
@@ -67,6 +69,7 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
         try {
             val prompt = buildPrompt(messages)
             val params = GeneratorParams(activeModel)
+            firstString(options, "seed")?.toLongOrNull()?.let { params.setSearchOption("random_seed", it) }
             val maxTokens = if (options.hasKey("maxTokens") && !options.isNull("maxTokens")) {
                 options.getInt("maxTokens").coerceIn(32, 192)
             } else 128
