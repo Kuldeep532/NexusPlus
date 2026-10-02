@@ -142,6 +142,49 @@ export async function executeCapability(
       const result = await callContact(target);
       return { capabilityId: proposal.capability.id, success: result.success, message: result.message };
     }
+    case 'read-screen': {
+      const { describeCurrentScreen } = await import('@/features/nexus-vision-assist/visionAssistScreen');
+      const result = await describeCurrentScreen();
+      return { capabilityId: proposal.capability.id, success: result.available, message: result.description };
+    }
+    case 'search-web': {
+      const query = proposal.args.query?.trim();
+      if (!query) return { capabilityId: proposal.capability.id, success: false, message: 'Tell me what you want me to search for.' };
+      const { webSearchThroughGateway } = await import('./stage9WebSearch');
+      const results = await webSearchThroughGateway(query);
+      if (!results.length) return { capabilityId: proposal.capability.id, success: false, message: 'I could not find current results for that search.' };
+      const summary = results.slice(0, 5).map((item) => item.title + (item.snippet ? ': ' + item.snippet : '')).join('\n');
+      return { capabilityId: proposal.capability.id, success: true, message: summary };
+    }
+    case 'summarize-text': {
+      const text = proposal.args.text?.trim();
+      if (!text) return { capabilityId: proposal.capability.id, success: false, message: 'Please provide the text you want summarized.' };
+      const { routeAssistantRequest } = await import('./stage9AssistantRouter');
+      const routed = await routeAssistantRequest({ message: 'Summarize the following text clearly and briefly:\n\n' + text });
+      return { capabilityId: proposal.capability.id, success: Boolean(routed.provider), message: routed.provider?.text ?? 'I could not create the summary right now.' };
+    }
+    case 'translate-text': {
+      const text = proposal.args.text?.trim();
+      const language = proposal.args.language?.trim() || 'English';
+      if (!text) return { capabilityId: proposal.capability.id, success: false, message: 'Please provide the text you want translated.' };
+      const { routeAssistantRequest } = await import('./stage9AssistantRouter');
+      const routed = await routeAssistantRequest({ message: 'Translate the following text to ' + language + '. Keep the meaning and formatting:\n\n' + text });
+      return { capabilityId: proposal.capability.id, success: Boolean(routed.provider), message: routed.provider?.text ?? 'I could not translate this text right now.' };
+    }
+    case 'read-document': {
+      const { searchAssistantTools } = await import('./assistantToolAdapter');
+      const reader = searchAssistantTools('document reader').find((item) => item.kind === 'route' && /reader/i.test(item.title));
+      if (!reader?.route) return { capabilityId: proposal.capability.id, success: false, message: 'Document Reader is not available in this build yet.' };
+      openAssistantTool(reader);
+      return { capabilityId: proposal.capability.id, success: true, message: 'Document Reader opened.' };
+    }
+    case 'draft-message': {
+      const text = proposal.args.text?.trim();
+      if (!text) return { capabilityId: proposal.capability.id, success: false, message: 'Tell me what message you want drafted.' };
+      const { routeAssistantRequest } = await import('./stage9AssistantRouter');
+      const routed = await routeAssistantRequest({ message: 'Draft a natural, clear message based on this request. Do not send it. Return only the draft:\n\n' + text });
+      return { capabilityId: proposal.capability.id, success: Boolean(routed.provider), message: routed.provider?.text ?? 'I could not draft the message right now.' };
+    }
     case 'tool-open': {
       const toolId = proposal.args.toolId ?? '';
       const tool = searchAssistantTools(toolId).find((item) => item.id === toolId) ?? searchAssistantTools(proposal.args.route ?? '').find((item) => item.route === proposal.args.route);
