@@ -5,6 +5,7 @@ import { Alert, PermissionsAndroid, Platform, Pressable, ScrollView, StyleSheet,
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { NexusFileTransfer, type FileTransferState } from '@/modules/nexus-file-transfer';
 
 const EMPTY: FileTransferState = { mode: 'idle', status: 'idle', devices: [], pending: [], connected: false, progress: 0, total: 0, received: [] };
@@ -46,7 +47,7 @@ export default function SendFileScreen() {
       if (!granted) throw new Error('Nearby device permissions are required to send or receive files.');
       await NexusFileTransfer.start(role);
     } catch (error) {
-      Alert.alert('Send File', error instanceof Error ? error.message : 'Unable to start file sharing.');
+      Alert.alert('Send File', getUserFriendlyMessage(error, 'Unable to start file sharing.'));
     } finally { setBusy(false); }
   };
 
@@ -58,7 +59,7 @@ export default function SendFileScreen() {
       await NexusFileTransfer.queueFile(file.uri, file.name, file.mimeType ?? 'application/octet-stream');
       await start('send');
     } catch (error) {
-      Alert.alert('File blocked', error instanceof Error ? error.message : 'This file could not be selected.');
+      Alert.alert('File blocked', getUserFriendlyMessage(error, 'This file could not be selected.'));
     }
   };
 
