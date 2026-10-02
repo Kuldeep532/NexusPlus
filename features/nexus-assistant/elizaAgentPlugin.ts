@@ -14,7 +14,7 @@ export type NexusElizaActionId =
   | 'OPEN_APP'
   | 'OPEN_TOOL'
   | 'GENERATE_QR'
-  | 'CALL_CONTACT';
+  | 'CALL_CONTACT'\n  | 'READ_SCREEN'\n  | 'SEARCH_WEB'\n  | 'SUMMARIZE_TEXT'\n  | 'TRANSLATE_TEXT'\n  | 'READ_DOCUMENT'\n  | 'DRAFT_MESSAGE';
 
 export type NexusElizaAction = {
   id: NexusElizaActionId;
@@ -38,7 +38,7 @@ const actions: NexusElizaAction[] = [
   { id: 'OPEN_APP', name: 'Open app', similes: ['LAUNCH_APP', 'START_APP', 'ऐप खोलो'], description: 'Open an installed app through an explicitly registered Android deep link or intent.', examples: ['open YouTube'] },
   { id: 'OPEN_TOOL', name: 'Open Nexus tool', similes: ['OPEN_FEATURE', 'OPEN_NEXUS_TOOL', 'टूल खोलो'], description: 'Open a registered Nexus Plus tool from the feature catalog.', examples: ['open PDF compressor'] },
   { id: 'GENERATE_QR', name: 'Generate QR', similes: ['MAKE_QR', 'QR_CODE', 'क्यूआर बनाओ'], description: 'Open the existing Nexus QR generator for the requested payload.', examples: ['make a QR code'] },
-  { id: 'CALL_CONTACT', name: 'Call contact', similes: ['CALL', 'CALL_PERSON', 'PHONE_CONTACT', 'कॉल करो', 'कॉल लगाओ'], description: 'Find a matching saved contact and place a phone call through the Android call capability.', examples: ['call father', 'call my sister', 'sister को कॉल करो'] },
+  { id: 'CALL_CONTACT', name: 'Call contact', similes: ['CALL', 'CALL_PERSON', 'PHONE_CONTACT', 'कॉल करो', 'कॉल लगाओ'], description: 'Find a matching saved contact and place a phone call through the Android call capability.', examples: ['call father', 'call my sister', 'sister को कॉल करो'] },\n  { id: 'READ_SCREEN', name: 'Read screen', similes: ['READ_SCREEN', 'DESCRIBE_SCREEN', 'WHAT_IS_ON_SCREEN', 'स्क्रीन पढ़ो', 'स्क्रीन बताओ'], description: 'Describe the currently accessible screen using Nexus accessibility services.', examples: ['read the screen', 'what is on my screen'] },\n  { id: 'SEARCH_WEB', name: 'Search the web', similes: ['SEARCH_WEB', 'WEB_SEARCH', 'FIND_ON_WEB', 'वेब पर खोजो'], description: 'Find current information through Nexus web search when internet access is needed.', examples: ['search the web for today weather', 'find current information about this'] },\n  { id: 'SUMMARIZE_TEXT', name: 'Summarize text', similes: ['SUMMARIZE', 'TLDR', 'संक्षेप में बताओ', 'सारांश बनाओ'], description: 'Turn selected or provided text into a concise summary.', examples: ['summarize this', 'give me a short summary'] },\n  { id: 'TRANSLATE_TEXT', name: 'Translate text', similes: ['TRANSLATE', 'अनुवाद करो', 'हिंदी में बदलो', 'अंग्रेजी में बदलो'], description: 'Translate selected or provided text into the requested language.', examples: ['translate this to Hindi', 'translate this to English'] },\n  { id: 'READ_DOCUMENT', name: 'Read document', similes: ['READ_DOCUMENT', 'DOCUMENT_READER', 'READ_PDF', 'दस्तावेज पढ़ो'], description: 'Read and explain a user-selected local document.', examples: ['read this document', 'explain this PDF'] },\n  { id: 'DRAFT_MESSAGE', name: 'Draft a message', similes: ['DRAFT_MESSAGE', 'WRITE_MESSAGE', 'MESSAGE_DRAFT', 'मैसेज लिखो'], description: 'Draft a message without sending it.', examples: ['write a message to my friend', 'draft a reply'] },
 ];
 
 const pluginActions: Action[] = actions.map((action) => ({
