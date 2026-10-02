@@ -5,6 +5,7 @@ import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-nativ
 import { useColors } from '@/hooks/useColors';
 import { verifyAndSaveCctvCamera } from '@/features/cctv/cctvController';
 import type { CctvCameraRecord } from '@/features/cctv/cctvBackend';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 
 /** Stage 3 security gate: discovery/enrollment UI never persists a camera without a verified endpoint. */
 export default function CctvAddScreen() {
@@ -27,7 +28,7 @@ export default function CctvAddScreen() {
       const result = await discoverCctvCameras({ source: 'lan', timeoutMs: 7000 });
       setDiscovered(result.cameras);
       if (!result.cameras.length) Alert.alert('No compatible camera found', 'No secure ONVIF HTTPS camera was discovered on the current local network. You can still enter a verified endpoint manually.');
-    } catch (error) { Alert.alert('Discovery failed', error instanceof Error ? error.message : 'Secure camera discovery failed.'); }
+    } catch (error) { Alert.alert('Camera discovery', getUserFriendlyMessage(error, 'Secure camera discovery could not be completed.')); }
     finally { setDiscovering(false); }
   };
 
@@ -73,7 +74,7 @@ export default function CctvAddScreen() {
       await verifyAndSaveCctvCamera({ camera: candidate, username: normalizedUsername, password, authorizedIdentity: candidate });
       Alert.alert('Camera verified', 'The camera passed native authenticated verification and was saved securely.');
     } catch (error) {
-      Alert.alert('Camera not saved', error instanceof Error ? error.message : 'Secure camera verification failed.');
+      Alert.alert('Camera not saved', getUserFriendlyMessage(error, 'Camera verification could not be completed.'));
     } finally {
       setPassword('');
       setBusy(false);
