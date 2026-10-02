@@ -50,7 +50,7 @@ export default function NexusAiSettingsScreen(){
  const localModel=ASSISTANT_MODELS.find(m=>m.id===NEXUS_CORE_MODEL_ID) ?? ASSISTANT_MODELS.find(m=>m.kind==='chat');
  const localModelDownloaded=localModel ? isOnnxModelDownloaded(localModel.id) : false;
  const localModelReady=localModelDownloaded && localRuntimeReady;
- const downloadLocalModel=async()=>{if(!localModel)return;setModelBusy(true);try{await downloadAssistantModel(localModel.id);Alert.alert('Local AI ready','The local AI model package is downloaded. Offline chat will be enabled when this build provides the matching local generation engine.');}catch{Alert.alert('Local AI','The local AI model could not be downloaded right now. Please try again later.');}finally{setModelBusy(false);}};
+ const downloadLocalModel=async()=>{if(!localModel)return;setModelBusy(true);try{await downloadAssistantModel(localModel.id);await refreshLocalRuntime(); Alert.alert('Local AI ready','The local AI model is downloaded and ready for offline chat.');}catch{Alert.alert('Local AI','The local AI model could not be downloaded right now. Please try again later.');}finally{setModelBusy(false);}};
 
  return <ScrollView style={[styles.root,{backgroundColor:colors.background}]} contentContainerStyle={{padding:18,paddingTop:insets.top+10,paddingBottom:insets.bottom+30}}>
   <Stack.Screen options={{title:'Nexus Assistant Settings'}}/>
