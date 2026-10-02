@@ -26,7 +26,7 @@ export default function NexusAiWorkflowScreen() {
     discoverGatewayEndpoints()
       .then((endpoints) => {
         if (!cancelled) setGatewayStatus(
-          endpoints.length ? `${endpoints.length} connected API endpoint${endpoints.length === 1 ? '' : 's'} available.` : 'Gateway connected; no productivity endpoints are published yet.',
+          endpoints.length ? 'AI services are connected and ready to use.' : 'AI services are temporarily unavailable. Please try again later.',
         );
       })
       .catch(() => {
