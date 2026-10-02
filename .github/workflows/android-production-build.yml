@@ -222,6 +222,14 @@ jobs:
           cache-disabled: true
       - name: Make Gradle wrapper executable
         run: chmod +x android/gradlew
+      - name: Validate Nexus Assistant GenAI dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "io.github.inference4j:onnxruntime-genai:0.15.2" android/app/build.gradle
+          grep -q "ai.onnxruntime.genai" android/app/src/main/java/com/nexuswavetech/nexusplus/NexusAssistantOnnxModule.kt
+          grep -q "genai_config.json" features/nexus-assistant/onnxRuntimeManager.ts
+          grep -q "model.onnx.data" features/nexus-assistant/onnxRuntimeManager.ts
       - name: Validate Nexus Assistant offline runtime source
         shell: bash
         run: |
