@@ -65,7 +65,7 @@ export default function TextToSpeechScreen() {
         if (!local.length) setStatus('No downloaded Nexus voices are available. Download a voice from the Voice Library first.');
       }
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Unable to load available voices.');
+      setStatus(getUserFriendlyMessage(error, 'Unable to load available voices.'));
     }
   }, []);
 
