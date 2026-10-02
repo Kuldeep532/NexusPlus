@@ -543,6 +543,27 @@ export default function NexusAssistantScreen() {
       </View>
     ) : null}
 
+    <View style={[styles.promptCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={styles.toolsHeader}>
+        <Text style={[styles.statusTitle, { color: colors.foreground }]}>Try a prompt</Text>
+        <Text style={[styles.note, { color: colors.mutedForeground }]}>Free features</Text>
+      </View>
+      <View style={styles.promptGrid}>
+        {[
+          'Read my screen and tell me what is important.',
+          'Summarize this clearly in five points.',
+          'Translate this into Hindi.',
+          'Search the web for the latest information.',
+          'Set a reminder for me tomorrow at 9 AM.',
+          'Draft a polite reply to this message.',
+        ].map((prompt) => (
+          <Pressable key={prompt} accessibilityRole="button" accessibilityLabel={prompt} onPress={() => setInput(prompt)} style={[styles.promptChip, { borderColor: colors.border, backgroundColor: colors.background }]}>
+            <Text style={[styles.promptText, { color: colors.foreground }]}>{prompt}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+
     <View style={styles.chat} accessibilityLiveRegion="polite">
       {messages.map((message) => <View key={message.id} style={[styles.message, { backgroundColor: message.role === 'user' ? colors.secondary : colors.card, borderColor: colors.border }]}>
         <Text style={[styles.role, { color: colors.foreground }]}>{message.role === 'user' ? 'You' : message.role === 'system' ? 'System' : 'Nexus Assistant'}</Text>
@@ -650,6 +671,10 @@ const styles = StyleSheet.create({
   toolGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   toolChip: { minHeight: 48, borderRadius: 13, borderWidth: 1, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 7, width: '48%' },
   toolChipText: { flex: 1, fontSize: 10.5, fontFamily: 'Inter_700Bold' },
+  promptCard: { borderWidth: 1, borderRadius: 18, padding: 12, marginBottom: 12 },
+  promptGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  promptChip: { width: '48%', minHeight: 56, borderWidth: 1, borderRadius: 13, padding: 10, justifyContent: 'center' },
+  promptText: { fontSize: 10.5, lineHeight: 15, fontFamily: 'Inter_700Bold' },
   resultCard: { borderWidth: 1, borderRadius: 18, padding: 14, marginTop: 12 },
   input: { minHeight: 48, maxHeight: 150, fontSize: 12, lineHeight: 18, borderWidth: 1, borderRadius: 13, paddingHorizontal: 12, marginTop: 8 },
   actionRow: { flexDirection: 'row', gap: 8, marginTop: 9 },
