@@ -16,7 +16,6 @@ type NativeOnnxModule = {
 const nativeOnnx = NativeModules.NexusAssistantOnnx as NativeOnnxModule | undefined;
 const root = new Directory(Paths.document, 'nexus-assistant', 'onnx');
 
-const requiredBase: string[] = [];
 const hfFiles = ['config.json', 'generation_config.json', 'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json', 'merges.txt', 'vocab.json', 'onnx/model_q4f16.onnx'];
 
 function modelDir(model: OnnxModel): Directory {
@@ -47,8 +46,8 @@ export function isOnnxModelDownloaded(modelId: string): boolean {
   const model = getOnnxModel(modelId);
   if (!model) return false;
   const dir = modelDir(model);
-  const files = [...requiredBase, ...hfFiles, ...(model.requiredFiles ?? [])];
-  return false;
+  const files = [...hfFiles, ...(model.requiredFiles ?? [])];
+  return files.every((name) => fileExists(dir, name));
 }
 
 async function downloadFile(url: string, target: File): Promise<void> {
