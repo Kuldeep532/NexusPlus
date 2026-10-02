@@ -85,7 +85,7 @@ export default function NexusAiWorkflowScreen() {
     </View> : null}
 
     <View style={styles.features}>
-      <Feature title="Email Assistant" text="Gemini writes the message from only the facts you provide; no Gemini model is bundled in the APK." colors={colors} />
+      <Feature title="Email Assistant" text="Nexus AI creates the message using only the information you provide." colors={colors} />
       <Feature title="Meeting Scheduler" text="Build meeting actions with attendees, time and agenda through the authenticated gateway." colors={colors} />
       <Feature title="Calendar Manager" text="Read, create and cancel calendar actions through published provider endpoints." colors={colors} />
       <Feature title="Voice-first" text="Uses the app voice service when available; otherwise uses the device's installed speech services." colors={colors} />
