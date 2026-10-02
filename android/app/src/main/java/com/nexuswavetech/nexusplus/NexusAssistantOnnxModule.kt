@@ -31,21 +31,24 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
             promise.reject("LOCAL_MODEL_INVALID", "The selected local AI model is not available.")
             return
         }
+
         val dir = File(modelPath)
-        if (!dir.exists() || !dir.isDirectory) {
-            promise.reject("LOCAL_MODEL_NOT_READY", "Download the local AI model before using offline chat.")
-            return
-        }
         val modelFile = File(dir, "onnx/model_q4f16.onnx")
-        if (!modelFile.exists() || modelFile.length() == 0L) {
+        val tokenizer = File(dir, "tokenizer.json")
+        if (!dir.isDirectory || !modelFile.isFile || modelFile.length() <= 0L || !tokenizer.isFile) {
             promise.reject("LOCAL_MODEL_NOT_READY", "Download the local AI model before using offline chat.")
             return
         }
+
         try {
             session?.close()
-            val opts = ai.onnxruntime.OrtSession.SessionOptions()
-            session = ai.onnxruntime.OrtEnvironment.getEnvironment().createSession(modelFile.absolutePath, opts)
+            val options = ai.onnxruntime.OrtSession.SessionOptions().apply {
+                setIntraOpNumThreads(2)
+                setInterOpNumThreads(1)
+            }
+            session = ai.onnxruntime.OrtEnvironment.getEnvironment().createSession(modelFile.absolutePath, options)
             loadedModelId = modelId
+
             promise.resolve(
                 Arguments.createMap().apply {
                     putString("modelId", modelId)
@@ -67,11 +70,13 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
             promise.reject("LOCAL_MODEL_NOT_READY", "The local AI model is not ready.")
             return
         }
-        // This graph needs a tokenizer + generation loop. Keep the native module honest
-        // rather than returning a fabricated response.
+
+        // The downloaded SmolLM2 ONNX file is a model graph, not a complete
+        // text-generation runtime by itself. A compatible tokenizer + autoregressive
+        // generation bridge is required before arbitrary text can be generated safely.
         promise.reject(
             "LOCAL_TEXT_GENERATION_UNAVAILABLE",
-            "The local AI model is downloaded, but this build does not yet include its text-generation tokenizer.",
+            "Offline chat is not available on this build yet.",
         )
     }
 
@@ -79,25 +84,6 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
     fun unload(modelId: String, promise: Promise) {
         if (loadedModelId == modelId) closeRuntime()
         promise.resolve(null)
-    }
-
-    private fun buildPrompt(messages: ReadableArray): String {
-        val out = StringBuilder()
-        for (index in 0 until messages.size()) {
-            val item = messages.getMap(index) ?: continue
-            val role = item.getString("role") ?: "user"
-            val content = item.getString("content") ?: continue
-            out.append("<|im_start|>").append(role).append("\n").append(content).append("<|im_end|>\n")
-        }
-        out.append("<|im_start|>assistant\n")
-        return out.toString()
-    }
-
-    private fun cleanGeneratedText(value: String): String {
-        return value
-            .substringBefore("<|im_end|>")
-            .replace("<|im_start|>assistant", "")
-            .trim()
     }
 
     private fun closeRuntime() {
