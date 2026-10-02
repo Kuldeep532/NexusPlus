@@ -1,0 +1,8 @@
+plugins {
+    id 'com.android.library'
+}
+android {
+    namespace 'ai.onnxruntime.genai.local'
+    compileSdk 35
+    defaultConfig { minSdk 26 }
+}
