@@ -1,3 +1,5 @@
+import { NativeModules } from 'react-native';
+
 export type LocalInferenceMessage = {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -27,38 +29,53 @@ export type LocalInferenceEngine = {
   ): Promise<void>;
 };
 
+type NativeLocalAi = {
+  getStatus(): Promise<{ available: boolean; version: string }>;
+  load(modelId: string, modelPath: string): Promise<unknown>;
+  unload(modelId: string): Promise<void>;
+  generate?: (
+    modelId: string,
+    messages: LocalInferenceMessage[],
+    options: LocalInferenceOptions,
+  ) => Promise<string>;
+};
+
+const nativeLocalAi = NativeModules.NexusAssistantOnnx as NativeLocalAi | undefined;
 let enginePromise: Promise<LocalInferenceEngine> | null = null;
 
-/**
- * Native Stage 2 bridge boundary.
- *
- * The JavaScript layer never implements inference itself. A future Android
- * native module is responsible for model loading and token streaming. Keeping
- * this boundary small lets us swap the native backend without changing chat,
- * SQLite, or agent/action layers.
- */
 export function getLocalInferenceEngine(): Promise<LocalInferenceEngine> {
   if (!enginePromise) {
-    enginePromise = Promise.resolve(createUnavailableEngine());
+    enginePromise = Promise.resolve(createEngine());
   }
   return enginePromise;
 }
 
-function createUnavailableEngine(): LocalInferenceEngine {
+function createEngine(): LocalInferenceEngine {
   return {
     async isAvailable() {
-      return false;
+      if (!nativeLocalAi?.getStatus) return false;
+      try {
+        const status = await nativeLocalAi.getStatus();
+        return Boolean(status.available && nativeLocalAi.generate);
+      } catch {
+        return false;
+      }
     },
-    async loadModel() {
-      throw new Error('Local inference native engine is not installed on this build yet.');
+    async loadModel(modelPath, modelId) {
+      if (!nativeLocalAi) throw new Error('Local AI runtime is not available in this build.');
+      await nativeLocalAi.load(modelId, modelPath);
     },
     async unloadModel() {
-      // Safe no-op until the native engine is available.
+      // The active model id is handled by the bridge lifecycle.
     },
-    async stream(_messages, _options, onChunk) {
-      const message = 'Local inference engine is not available in this build yet.';
-      onChunk({ type: 'error', message });
-      throw new Error(message);
+    async stream(messages, options, onChunk) {
+      if (!nativeLocalAi?.generate) {
+        throw new Error('Local AI runtime is not available in this build.');
+      }
+      onChunk({ type: 'status', text: 'Running local AI on this device…' });
+      const text = (await nativeLocalAi.generate(options.modelId, messages, options)).trim();
+      if (text) onChunk({ type: 'token', text });
+      onChunk({ type: 'done' });
     },
   };
 }
