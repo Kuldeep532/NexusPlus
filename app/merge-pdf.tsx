@@ -32,7 +32,7 @@ export default function MergePdfScreen() {
     try {
       const uri = await mergePdfsWithGotenberg(items.map((item) => item.uri), `merged-${Date.now()}.pdf`);
       setResult(uri); setStatus('PDFs merged successfully.');
-    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not merge these PDFs.'); }
+    } catch (error) { setStatus(getUserFriendlyMessage(error, 'Could not merge these PDFs.')); }
     finally { setBusy(false); }
   }
 
