@@ -63,7 +63,10 @@ export async function downloadOnnxModel(modelId: string): Promise<string> {
   const dir = modelDir(model);
   dir.create({ idempotent: true, intermediates: true });
 
-  await downloadFile(model.url, modelFile(model));
+  if (!modelFile(model).exists || modelFile(model).size <= 0) {
+    const base = 'https://huggingface.co/onnx-community/SmolLM2-135M-Instruct-ONNX/resolve/main/';
+    await downloadFile(base + 'onnx/model_q4f16.onnx', modelFile(model));
+  }
 
   const base = 'https://huggingface.co/onnx-community/SmolLM2-135M-Instruct-ONNX/resolve/main/';
   for (const name of hfFiles) {
