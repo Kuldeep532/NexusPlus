@@ -18,22 +18,11 @@ export type LocalInferenceChunk =
   | { type: 'done' }
   | { type: 'error'; message: string };
 
-export type LocalInferenceEngine = {
-  isAvailable(): Promise<boolean>;
-  loadModel(modelPath: string, modelId: string): Promise<void>;
-  unloadModel(): Promise<void>;
-  stream(
-    messages: LocalInferenceMessage[],
-    options: LocalInferenceOptions,
-    onChunk: (chunk: LocalInferenceChunk) => void,
-  ): Promise<void>;
-};
-
 type NativeLocalAi = {
   getStatus(): Promise<{ available: boolean; version: string }>;
   load(modelId: string, modelPath: string): Promise<unknown>;
   unload(modelId: string): Promise<void>;
-  generate?: (
+  generate: (
     modelId: string,
     messages: LocalInferenceMessage[],
     options: LocalInferenceOptions,
@@ -43,20 +32,25 @@ type NativeLocalAi = {
 const nativeLocalAi = NativeModules.NexusAssistantOnnx as NativeLocalAi | undefined;
 let enginePromise: Promise<LocalInferenceEngine> | null = null;
 
+export type LocalInferenceEngine = {
+  isAvailable(): Promise<boolean>;
+  loadModel(modelPath: string, modelId: string): Promise<void>;
+  unloadModel(): Promise<void>;
+  stream(messages: LocalInferenceMessage[], options: LocalInferenceOptions, onChunk: (chunk: LocalInferenceChunk) => void): Promise<void>;
+};
+
 export function getLocalInferenceEngine(): Promise<LocalInferenceEngine> {
-  if (!enginePromise) {
-    enginePromise = Promise.resolve(createEngine());
-  }
+  if (!enginePromise) enginePromise = Promise.resolve(createEngine());
   return enginePromise;
 }
 
 function createEngine(): LocalInferenceEngine {
   return {
     async isAvailable() {
-      if (!nativeLocalAi?.getStatus) return false;
+      if (!nativeLocalAi) return false;
       try {
         const status = await nativeLocalAi.getStatus();
-        return Boolean(status.available && nativeLocalAi.generate);
+        return Boolean(status.available);
       } catch {
         return false;
       }
@@ -65,13 +59,9 @@ function createEngine(): LocalInferenceEngine {
       if (!nativeLocalAi) throw new Error('Local AI runtime is not available in this build.');
       await nativeLocalAi.load(modelId, modelPath);
     },
-    async unloadModel() {
-      // The active model id is handled by the bridge lifecycle.
-    },
+    async unloadModel() {},
     async stream(messages, options, onChunk) {
-      if (!nativeLocalAi?.generate) {
-        throw new Error('Local AI runtime is not available in this build.');
-      }
+      if (!nativeLocalAi) throw new Error('Local AI runtime is not available in this build.');
       onChunk({ type: 'status', text: 'Running local AI on this device…' });
       const text = (await nativeLocalAi.generate(options.modelId, messages, options)).trim();
       if (text) onChunk({ type: 'token', text });
