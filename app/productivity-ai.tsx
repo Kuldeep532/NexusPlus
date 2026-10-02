@@ -87,7 +87,7 @@ export default function NexusAiWorkflowScreen() {
     <View style={styles.features}>
       <Feature title="Email Assistant" text="Nexus AI creates the message using only the information you provide." colors={colors} />
       <Feature title="Meeting Scheduler" text="Create meeting details with attendees, time and agenda." colors={colors} />
-      <Feature title="Calendar Manager" text="Read, create and cancel calendar actions through published provider endpoints." colors={colors} />
+      <Feature title="Calendar Manager" text="Read, create and cancel calendar events through your connected account." colors={colors} />
       <Feature title="Voice-first" text="Uses the app voice service when available; otherwise uses the device's installed speech services." colors={colors} />
     </View>
   </ScrollView>;
