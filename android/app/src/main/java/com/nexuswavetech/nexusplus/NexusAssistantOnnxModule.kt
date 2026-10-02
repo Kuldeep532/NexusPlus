@@ -1,31 +1,24 @@
 package com.nexuswavetech.nexusplus
 
-import ai.onnxruntime.OnnxTensor
-import ai.onnxruntime.OrtEnvironment
-import ai.onnxruntime.OrtSession
+import ai.onnxruntime.genai.Config
+import ai.onnxruntime.genai.Generator
+import ai.onnxruntime.genai.GeneratorParams
+import ai.onnxruntime.genai.Model
+import ai.onnxruntime.genai.Tokenizer
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
+import com.facebook.react.bridge.ReadableArray
+import com.facebook.react.bridge.ReadableMap
 import java.io.File
-import java.nio.LongBuffer
 
-/**
- * Android ONNX Runtime bridge for the optional local Assistant model.
- *
- * The model is downloaded to app-private storage. The APK contains only the
- * ONNX Runtime library; model weights are not bundled.
- *
- * NOTE: the current downloadable model must expose a compatible token-input
- * graph. The bridge intentionally fails closed when the graph contract cannot
- * be met instead of returning a fake response.
- */
 class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
     override fun getName(): String = "NexusAssistantOnnx"
 
-    private val environment: OrtEnvironment by lazy { OrtEnvironment.getEnvironment() }
-    private var session: OrtSession? = null
+    private var model: Model? = null
+    private var tokenizer: Tokenizer? = null
     private var loadedModelId: String? = null
 
     @ReactMethod
@@ -33,7 +26,7 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
         promise.resolve(
             mapOf(
                 "available" to true,
-                "version" to ai.onnxruntime.OrtVersion.VERSION,
+                "version" to "ONNX Runtime GenAI",
             ),
         )
     }
@@ -41,57 +34,111 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
     @ReactMethod
     fun load(modelId: String, modelPath: String, promise: Promise) {
         if (modelId.isBlank() || modelPath.isBlank()) {
-            promise.reject("ONNX_MODEL_INVALID", "The selected local AI model is not available.")
+            promise.reject("LOCAL_MODEL_INVALID", "The selected local AI model is not available.")
             return
         }
-        val file = File(modelPath)
-        if (!file.exists() || file.length() <= 0L) {
-            promise.reject("ONNX_MODEL_NOT_FOUND", "The local AI model could not be found on this device.")
+        val dir = File(modelPath)
+        if (!dir.exists() || !dir.isDirectory || !File(dir, "genai_config.json").exists()) {
+            promise.reject("LOCAL_MODEL_NOT_READY", "Download the local AI model before using offline chat.")
             return
         }
+
         try {
-            session?.close()
-            val options = OrtSession.SessionOptions()
-            session = environment.createSession(file.absolutePath, options)
+            closeRuntime()
+            val config = Config(dir.absolutePath)
+            model = Model(config)
+            tokenizer = Tokenizer(model)
             loadedModelId = modelId
-            val result = Arguments.createMap().apply {
-                putString("modelId", modelId)
-                putString("path", file.absolutePath)
-                putInt("inputCount", session?.inputNames?.size ?: 0)
-                putInt("outputCount", session?.outputNames?.size ?: 0)
-            }
-            promise.resolve(result)
+
+            promise.resolve(
+                Arguments.createMap().apply {
+                    putString("modelId", modelId)
+                    putString("path", dir.absolutePath)
+                },
+            )
         } catch (error: Throwable) {
-            session = null
-            loadedModelId = null
-            promise.reject("ONNX_MODEL_LOAD_FAILED", "The local AI model could not be loaded.", error)
+            closeRuntime()
+            promise.reject("LOCAL_MODEL_LOAD_FAILED", "The local AI model could not be prepared on this device.", error)
         }
     }
 
     @ReactMethod
-    fun generate(modelId: String, messages: com.facebook.react.bridge.ReadableArray, options: com.facebook.react.bridge.ReadableMap, promise: Promise) {
-        val activeSession = session
-        if (activeSession == null || loadedModelId != modelId) {
-            promise.reject("ONNX_MODEL_NOT_LOADED", "The local AI model is not ready.")
+    fun generate(modelId: String, messages: ReadableArray, options: ReadableMap, promise: Promise) {
+        val activeModel = model
+        val activeTokenizer = tokenizer
+        if (activeModel == null || activeTokenizer == null || loadedModelId != modelId) {
+            promise.reject("LOCAL_MODEL_NOT_READY", "The local AI model is not ready.")
             return
         }
 
-        // A generic text-generation ONNX model needs a tokenizer and graph
-        // contract. We do not have a tokenizer runtime bundled in this app yet,
-        // so fail clearly instead of pretending to generate text.
-        promise.reject(
-            "ONNX_TOKENIZER_UNAVAILABLE",
-            "The local AI model is downloaded, but its text tokenizer is not available in this build.",
-        )
+        val prompt = buildPrompt(messages)
+        val maxTokens = if (options.hasKey("maxTokens") && !options.isNull("maxTokens")) {
+            options.getInt("maxTokens").coerceIn(16, 256)
+        } else 160
+
+        try {
+            val params = GeneratorParams(activeModel)
+            params.setSearchOption("max_length", maxTokens.toLong())
+            params.setSearchOption("temperature", 0.35f)
+            val generator = Generator(activeModel, params)
+            val encoded = activeTokenizer.encode(prompt)
+            generator.appendTokens(encoded)
+
+            val stream = activeTokenizer.createStream()
+            val output = StringBuilder()
+            while (!generator.isDone()) {
+                generator.generateNextToken()
+                val tokens = generator.getNextTokens()
+                if (tokens.isNotEmpty()) {
+                    output.append(stream.decode(tokens[0]))
+                }
+            }
+
+            generator.close()
+            params.close()
+            stream.close()
+
+            val answer = cleanGeneratedText(output.toString())
+            if (answer.isBlank()) {
+                promise.reject("LOCAL_EMPTY_RESPONSE", "The local assistant did not return an answer.")
+                return
+            }
+            promise.resolve(answer)
+        } catch (error: Throwable) {
+            promise.reject("LOCAL_GENERATION_FAILED", "The local assistant could not generate a response.", error)
+        }
     }
 
     @ReactMethod
     fun unload(modelId: String, promise: Promise) {
-        if (loadedModelId == modelId) {
-            session?.close()
-            session = null
-            loadedModelId = null
-        }
+        if (loadedModelId == modelId) closeRuntime()
         promise.resolve(null)
+    }
+
+    private fun buildPrompt(messages: ReadableArray): String {
+        val out = StringBuilder()
+        for (index in 0 until messages.size()) {
+            val item = messages.getMap(index) ?: continue
+            val role = item.getString("role") ?: "user"
+            val content = item.getString("content") ?: continue
+            out.append("<|im_start|>").append(role).append("\n").append(content).append("<|im_end|>\n")
+        }
+        out.append("<|im_start|>assistant\n")
+        return out.toString()
+    }
+
+    private fun cleanGeneratedText(value: String): String {
+        return value
+            .substringBefore("<|im_end|>")
+            .replace("<|im_start|>assistant", "")
+            .trim()
+    }
+
+    private fun closeRuntime() {
+        try { tokenizer?.close() } catch (_: Throwable) {}
+        try { model?.close() } catch (_: Throwable) {}
+        tokenizer = null
+        model = null
+        loadedModelId = null
     }
 }
