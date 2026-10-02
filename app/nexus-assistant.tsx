@@ -152,23 +152,60 @@ export default function NexusAssistantScreen() {
     const preference = await getAssistantVoicePreference();
     setAssistantVoiceId(preference.voiceId);
     setAssistantVoiceMode(preference.mode);
-    if (preference.mode === 'local') {
-      const installed = await getInstalledVoices();
-      if (!installed.some((voice) => voice.id === preference.voiceId)) {
-        const item = UNIQUE_VOICE_CATALOG.find((voice) => voice.id === preference.voiceId);
-        if (item) {
-          const choice = await new Promise<'download'|'device'|'cancel'>(resolve => Alert.alert('Voice ready to use', 'Download the selected Nexus voice for offline voice calls, or use your Android device voice instead.', [{text:'Not now',style:'cancel',onPress:()=>resolve('cancel')},{text:'Use Device Voice',onPress:()=>resolve('device')},{text:'Download Voice',onPress:()=>resolve('download')}],{cancelable:true,onDismiss:()=>resolve('cancel')}));
-          if (choice === 'download') {
-            setStatus('Downloading the selected voice…');
-            try { await downloadVoice(item); await setAssistantVoicePreference({voiceId: preference.voiceId, mode:'local'}); setAssistantVoiceMode('local'); setStatus('Voice ready. Starting Live Voice Call.'); }
-            catch { setStatus('The voice could not be downloaded. You can use your device voice instead.'); return; }
-          } else if (choice === 'device') {
-            await setAssistantVoicePreference({voiceId: preference.voiceId, mode:'device'});
-            setAssistantVoiceMode('device');
-          } else return;
-        }
+
+    const choice = await new Promise<'device'|'download'|'cancel'>(resolve => Alert.alert(
+      'Choose your voice',
+      'You can use the voice already installed on your Android phone, or download a high-quality offline voice for Nexus Assistant.\n\nIf you use a screen reader at the same time, voice playback and screen-reader speech can overlap or interfere with each other.',
+      [
+        { text: 'Cancel', style: 'cancel', onPress: () => resolve('cancel') },
+        { text: 'Use my device voice', onPress: () => resolve('device') },
+        { text: 'Download high-quality voice', onPress: () => resolve('download') },
+      ],
+      { cancelable: true, onDismiss: () => resolve('cancel') },
+    ));
+    if (choice === 'cancel') return;
+
+    if (choice === 'device') {
+      await setAssistantVoicePreference({ voiceId: preference.voiceId, mode: 'device', engine: preference.engine });
+      setAssistantVoiceMode('device');
+      setLiveMode(true);
+      setStatus('Live chat started with your Android device voice.');
+      return;
+    }
+
+    const installed = await getInstalledVoices();
+    const availableVoices = UNIQUE_VOICE_CATALOG.filter((voice) => voice.roles?.includes('live-call') || voice.roles?.includes('assistant'));
+    setStatus(installed.length ? 'Choose a voice to use for Live Chat.' : 'Choose a voice to download for Live Chat.');
+
+    const voiceId = await new Promise<string | null>(resolve => Alert.alert(
+      'Choose a voice',
+      availableVoices.map((voice, index) => `${index + 1}. ${voice.name} — ${voice.languageName}`).join('\n'),
+      [
+        ...availableVoices.slice(0, 3).map((voice) => ({
+          text: installed.some((item) => item.id === voice.id) ? `${voice.name} (ready)` : `Download ${voice.name}`,
+          onPress: () => resolve(voice.id),
+        })),
+        { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
+      ],
+      { cancelable: true, onDismiss: () => resolve(null) },
+    ));
+    if (!voiceId) return;
+
+    const selected = availableVoices.find((voice) => voice.id === voiceId);
+    if (!selected) return;
+    if (!installed.some((voice) => voice.id === selected.id)) {
+      setStatus(`Downloading ${selected.name}…`);
+      try {
+        await downloadVoice(selected);
+      } catch {
+        setStatus('This voice could not be downloaded right now. You can use your Android device voice instead.');
+        return;
       }
     }
+    await setAssistantVoicePreference({ voiceId: selected.id, mode: 'local', engine: preference.engine });
+    setAssistantVoiceId(selected.id);
+    setAssistantVoiceMode('local');
+    setStatus('Voice is ready. Starting Live Chat.');
     setLiveMode(true);
   };
 
