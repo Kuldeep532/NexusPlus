@@ -63,7 +63,12 @@ function createEngine(): LocalInferenceEngine {
     async stream(messages, options, onChunk) {
       if (!nativeLocalAi) throw new Error('Local AI runtime is not available in this build.');
       onChunk({ type: 'status', text: 'Running local AI on this device…' });
-      const text = (await nativeLocalAi.generate(options.modelId, messages, options)).trim();
+      let text: string;
+      try {
+        text = (await nativeLocalAi.generate(options.modelId, messages, options)).trim();
+      } catch (error) {
+        throw error instanceof Error ? error : new Error('Local AI could not generate a response.');
+      }
       if (text) onChunk({ type: 'token', text });
       onChunk({ type: 'done' });
     },
