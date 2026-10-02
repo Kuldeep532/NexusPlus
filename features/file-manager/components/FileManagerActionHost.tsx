@@ -1,4 +1,6 @@
 import { Alert } from 'react-native';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { useState } from 'react';
 import type { FileManagerEntry, FileManagerSelectionAction } from '../FileManagerTypes';
 import { FileManagerActionSheet } from './FileManagerActionSheet';
@@ -57,7 +59,7 @@ export function FileManagerActionHost({
         });
         onAskAboutFile?.(target);
       } catch (error) {
-        Alert.alert('Unable to read file', error instanceof Error ? error.message : String(error));
+        Alert.alert('Unable to read file', getUserFriendlyMessage(error, 'The file could not be read. Please try again.'));
       }
       return;
     }
@@ -66,7 +68,7 @@ export function FileManagerActionHost({
         await shareEntry(target);
         close();
       } catch (error) {
-        Alert.alert('Share failed', error instanceof Error ? error.message : String(error));
+        Alert.alert('Share failed', getUserFriendlyMessage(error, 'The file could not be shared. Please try again.'));
       }
       return;
     }
