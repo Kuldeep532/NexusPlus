@@ -7,6 +7,7 @@ import { useColors } from '@/hooks/useColors';
 import { REMOTE_MANTRA_AUDIO, type RemoteMantraAudio } from '@/features/spiritual/mantraAudioCatalog';
 import { getCachedMantraAudio } from '@/features/spiritual/mantraAudioCache';
 import { resolveMantraAudioUrl } from '@/features/spiritual/mantraAudioUrl';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 
 const DEFAULT='ॐ नमः शिवाय';
 export default function MantraScreen(){
@@ -35,7 +36,7 @@ export default function MantraScreen(){
      player.play();
      setSelected(item);
      setMessage('Audio is downloaded to this device and reused from local cache next time.');
-   }catch(error){setMessage(error instanceof Error?error.message:'Unable to play mantra audio.')}
+   }catch(error){setMessage(getUserFriendlyMessage(error,'Unable to play mantra audio.'))}
    finally{setLoading(null)}
  };
  return <View style={[s.root,{backgroundColor:c.background}]}>
