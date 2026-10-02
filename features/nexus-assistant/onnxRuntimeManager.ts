@@ -16,7 +16,7 @@ type NativeOnnxModule = {
 const nativeOnnx = NativeModules.NexusAssistantOnnx as NativeOnnxModule | undefined;
 const root = new Directory(Paths.document, 'nexus-assistant', 'onnx');
 
-const requiredBase = ['genai_config.json'];
+const requiredBase: string[] = [];
 const hfFiles = ['config.json', 'generation_config.json', 'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json', 'merges.txt', 'vocab.json', 'onnx/model_q4f16.onnx'];
 
 function modelDir(model: OnnxModel): Directory {
