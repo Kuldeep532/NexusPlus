@@ -43,4 +43,6 @@ expoAutolinking.useExpoVersionCatalog()
 
 rootProject.name = "NexusPlus"
 include(":app")
+include(":onnxruntime-genai-android")
+project(":onnxruntime-genai-android").projectDir = file("${rootDir}/onnxruntime-genai-android")
 includeBuild(expoAutolinking.reactNativeGradlePlugin)
