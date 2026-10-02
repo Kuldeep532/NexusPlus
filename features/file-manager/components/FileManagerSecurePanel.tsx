@@ -2,6 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import type { FileManagerEntry } from '../FileManagerTypes';
 import { decryptFile, encryptFile } from '../FileManagerSecureService';
 
@@ -28,7 +29,7 @@ export function FileManagerSecurePanel({ onEncrypt, onDecrypt }: { onEncrypt?: (
       Alert.alert(mode === 'encrypt' ? 'File encrypted' : 'File decrypted', output.split('/').pop() ?? output);
       setPassword('');
     } catch (error) {
-      Alert.alert('Operation failed', error instanceof Error ? error.message : String(error));
+      Alert.alert('Operation failed', getUserFriendlyMessage(error, 'The operation could not be completed. Please try again.'));
     } finally {
       setBusy(false);
     }
