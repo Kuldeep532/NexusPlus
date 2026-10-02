@@ -18,7 +18,15 @@
       "android": {
         "buildType": "app-bundle",
         "credentialsSource": "remote"
+      },
+      "ios": {
+        "buildConfiguration": "Release"
       }
+    },
+    "development": {
+      "environment": "development",
+      "developmentClient": true,
+      "distribution": "internal"
     }
   },
   "submit": {
