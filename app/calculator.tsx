@@ -52,7 +52,7 @@ export default function CalculatorScreen() {
       }
       setAnalysis(primary ? buildAnalysisRows({ result: primary, principal: mode === 'fixed-deposit' ? Number(value('principal')) : undefined, years: mode === 'fixed-deposit' ? Number(value('years')) : undefined, annualInflationPercent: mode === 'fixed-deposit' ? Number(value('inflation') || '6') : undefined }) : []);
       speak(spoken);
-    } catch (error) { const message = error instanceof Error ? error.message : 'Check your values.'; Alert.alert('AI Calculator', message); announce(message); }
+    } catch (error) { const message = getUserFriendlyMessage(error, 'Please check your values.'); Alert.alert('AI Calculator', message); announce(message); }
   };
 
   const runAdvanced = () => {
