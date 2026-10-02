@@ -81,7 +81,7 @@ export default function NexusAiWorkflowScreen() {
       <Text style={[styles.previewTitle, { color: colors.foreground }]}>{preview.subject}</Text>
       <Text selectable style={[styles.body, { color: colors.foreground }]}>{preview.body}</Text>
       <Text style={[styles.note, { color: colors.mutedForeground }]}>Created with: Nexus AI or local safe mode.</Text>
-      <Text style={[styles.note, { color: colors.mutedForeground }]}>External sending and calendar changes use the authenticated gateway provider.</Text>
+      <Text style={[styles.note, { color: colors.mutedForeground }]}>Sending messages and changing calendar events require your connected account.</Text>
     </View> : null}
 
     <View style={styles.features}>
