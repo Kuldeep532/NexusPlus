@@ -29,7 +29,7 @@ export function LegalDocumentScreen({ title, subtitle, sections }: Props) {
           <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>{subtitle}</Text>
             <Text style={[styles.updated, { color: colors.primary }]}>
-              {language === 'en' ? 'Last updated: 25 September 2026' : 'अंतिम अपडेट: 25 सितंबर 2026'}
+              {language === 'en' ? 'Last updated: 2 October 2026' : 'अंतिम अपडेट: 2 अक्टूबर 2026'}
             </Text>
           </View>
           <View style={[styles.languageCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
