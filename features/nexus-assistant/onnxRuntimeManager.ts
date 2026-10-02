@@ -10,17 +10,28 @@ type NativeOnnxModule = {
   getStatus(): Promise<{ available: boolean; version: string }>;
   load(modelId: string, modelPath: string): Promise<{ modelId: string; path: string; inputCount: number; outputCount: number }>;
   unload(modelId: string): Promise<void>;
+  generate(modelId: string, messages: Array<{ role: string; content: string }>, options: { maxTokens?: number; temperature?: number; contextSize?: number }): Promise<string>;
 };
 
 const nativeOnnx = NativeModules.NexusAssistantOnnx as NativeOnnxModule | undefined;
 const root = new Directory(Paths.document, 'nexus-assistant', 'onnx');
 
+const requiredBase = ['config.json', 'generation_config.json', 'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json', 'merges.txt', 'vocab.json'];
+
+function modelDir(model: OnnxModel): Directory {
+  return new Directory(root, model.id);
+}
+
 function modelFile(model: OnnxModel): File {
-  return new File(root, `${model.id}.onnx`);
+  return new File(modelDir(model), 'model_q4f16.onnx');
 }
 
 function ensureRoot(): void {
   root.create({ idempotent: true, intermediates: true });
+}
+
+function fileExists(dir: Directory, name: string): boolean {
+  try { return new File(dir, name).exists; } catch { return false; }
 }
 
 export function getOnnxModels(kind?: OnnxAssetKind): OnnxModel[] {
@@ -33,29 +44,46 @@ export function getOnnxModel(modelId: string): OnnxModel | null {
 
 export function isOnnxModelDownloaded(modelId: string): boolean {
   const model = getOnnxModel(modelId);
-  return !!model && modelFile(model).exists;
+  if (!model) return false;
+  const dir = modelDir(model);
+  const files = [...requiredBase, ...(model.requiredFiles ?? [])];
+  return modelFile(model).exists && files.every((name) => fileExists(dir, name));
+}
+
+async function downloadFile(url: string, target: File): Promise<void> {
+  await File.downloadFileAsync(url, target, { idempotent: true });
+  if (!target.exists || target.size <= 0) throw new Error('MODEL_FILE_INVALID');
 }
 
 export async function downloadOnnxModel(modelId: string): Promise<string> {
   const model = getOnnxModel(modelId);
   if (!model) throw new Error('UNKNOWN_ONNX_MODEL');
   ensureRoot();
-  const file = await File.downloadFileAsync(model.url, modelFile(model), { idempotent: true });
-  return file.uri;
+  const dir = modelDir(model);
+  dir.create({ idempotent: true, intermediates: true });
+
+  await downloadFile(model.url, modelFile(model));
+
+  const base = 'https://huggingface.co/onnx-community/SmolLM2-135M-Instruct-ONNX/resolve/main/';
+  for (const name of requiredBase) {
+    const existing = new File(dir, name);
+    if (existing.exists && existing.size > 0) continue;
+    await downloadFile(base + name, existing);
+  }
+  return dir.uri;
 }
 
 export function deleteOnnxModel(modelId: string): void {
   const model = getOnnxModel(modelId);
   if (!model) throw new Error('UNKNOWN_ONNX_MODEL');
-  const file = modelFile(model);
-  if (file.exists) file.delete();
+  const dir = modelDir(model);
+  if (dir.exists) dir.delete();
 }
 
 export function resolveOnnxModelPath(modelId: string): string | null {
   const model = getOnnxModel(modelId);
-  if (!model) return null;
-  const file = modelFile(model);
-  return file.exists ? file.uri : null;
+  if (!model || !isOnnxModelDownloaded(modelId)) return null;
+  return modelDir(model).uri;
 }
 
 export async function getOnnxRuntimeStatus(): Promise<OnnxRuntimeStatus> {
