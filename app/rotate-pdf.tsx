@@ -48,7 +48,7 @@ export default function RotatePdfScreen() {
       setSelection(`1-${pageCount}`);
       setStatus(`${pageCount} pages loaded. Valid page numbers are 1 to ${pageCount}.`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not read the PDF page count.');
+      setStatus(getUserFriendlyMessage(error, 'Could not read the PDF page count.'));
     }
   }
 
@@ -72,7 +72,7 @@ export default function RotatePdfScreen() {
       setResult(uri);
       setStatus(`PDF rotated ${rotation}° and saved successfully.`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not rotate this PDF.');
+      setStatus(getUserFriendlyMessage(error, 'Could not rotate this PDF.'));
     } finally {
       setBusy(false);
     }
