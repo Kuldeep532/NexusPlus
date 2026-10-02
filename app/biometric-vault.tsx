@@ -50,12 +50,12 @@ export default function BiometricVaultRoute() {
       onEnroll={async () => {
         const success = await vault.enrollBiometric();
         if (!success) return;
-        Alert.alert('Vault biometric ready', 'The Android biometric is now verified for this Vault. Nexus Plus does not store your fingerprint or face template.');
+        Alert.alert('Vault biometric ready', 'Biometric protection is ready for your Vault. Nexus Plus does not store your fingerprint or face data.');
       }}
       onCredentialSetup={async () => {
         const success = await vault.setDeviceAuthMode();
         if (success) {
-          Alert.alert('Credential mode', 'Device authentication mode is selected. A separate Vault password must only be implemented with a vetted password KDF before it can protect vault data.');
+          Alert.alert('Credential mode', 'Device authentication mode is selected. A separate Vault password is not available yet, so please use your Android device authentication for now.');
         }
       }}
     />
