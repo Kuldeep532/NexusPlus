@@ -70,7 +70,7 @@ export default function AudioDescriptionScreen() {
       setDescription(result.description);
       setAdvancedNotice(mode === 'advanced' ? 'Advanced description uses Premium AI processing.' : 'Basic description uses the free audio description mode.');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to create the audio description right now.';
+      const message = getUserFriendlyMessage(error, 'Unable to create the audio description right now.');
       Alert.alert('Audio description', message);
     } finally {
       setBusy(false);
