@@ -67,7 +67,7 @@ export default function AudioTrimmerScreen() {
       const picked = await pickAudioFromFileManager();
       if (picked) await loadSource(picked);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to choose an audio file.');
+      setMessage(getUserFriendlyMessage(error, 'We could not choose that audio file. Please try again.'));
     }
   }, [loadSource]);
 
@@ -80,7 +80,7 @@ export default function AudioTrimmerScreen() {
       if (!result.permissionGranted) setMessage('Music and audio permission is required to scan local audio.');
       else setMessage(`${result.audio.length} audio file${result.audio.length === 1 ? '' : 's'} found.`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to scan local audio.');
+      setMessage(getUserFriendlyMessage(error, 'We could not scan your audio library. Please check media access and try again.'));
     } finally {
       setLoading(false);
     }
@@ -158,7 +158,7 @@ export default function AudioTrimmerScreen() {
       const outputUri = result.outputPath || outputPath;
       setMessage(`Audio trimmed and saved successfully to ${outputUri}`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to export the trimmed audio.');
+      setMessage(getUserFriendlyMessage(error, 'We could not export the trimmed audio. Please try again.'));
     } finally {
       setLoading(false);
     }
