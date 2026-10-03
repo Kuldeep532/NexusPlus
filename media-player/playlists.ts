@@ -16,7 +16,7 @@ export async function loadDevicePlaylists(): Promise<MediaPlaylist[]> {
 
 export async function createPlaylist(name: string, items: MediaItemModel[] = []): Promise<MediaPlaylist> {
   const cleanName = name.trim();
-  if (!cleanName) throw new Error('Playlist name is required.');
+  if (!cleanName) throw new Error('Enter a name for the playlist.');
   const itemIds = items.map((item) => item.id);
   const native = await bridge()?.createDevicePlaylist?.(cleanName, itemIds);
   return native ?? { id: `nexus-${Date.now()}`, name: cleanName, itemIds, isDevicePlaylist: false };
