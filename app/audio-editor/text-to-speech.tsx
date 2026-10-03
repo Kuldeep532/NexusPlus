@@ -105,7 +105,7 @@ export default function TextToSpeechScreen() {
       }
     } catch (error) {
       setGeneratedUri('');
-      setStatus(error instanceof Error ? error.message : 'Speech generation failed.');
+      setStatus(getUserFriendlyMessage(error, 'We could not generate the speech. Please try again.'));
     } finally {
       setBusy(false);
     }
@@ -120,7 +120,7 @@ export default function TextToSpeechScreen() {
       setTimeout(() => { try { stop(); } finally { setPlaying(false); } }, 60000);
     } catch (error) {
       setPlaying(false);
-      setStatus(error instanceof Error ? error.message : 'Unable to play generated speech.');
+      setStatus(getUserFriendlyMessage(error, 'We could not play the generated speech. Please try again.'));
     }
   }, [generatedUri, playing]);
 
