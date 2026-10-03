@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { askEraAI, getEraHabitRecommendations } from '@/features/era-ai/eraAiService';
+import { askAira, getAiraHabitRecommendations } from '@/features/era-ai/eraAiService';
 import { type EraLanguage, type EraRecommendation } from '@/features/era-ai/eraAiTypes';
 import { scheduleEraRecommendationReminder } from '@/features/era-ai/eraAiReminder';
 
@@ -16,25 +16,25 @@ export default function EraAIScreen() {
   const [answer, setAnswer] = useState('');
   const [busy, setBusy] = useState(false);
   const [recommendations, setRecommendations] = useState<EraRecommendation[]>([]);
-  const [status, setStatus] = useState('Era AI केवल आध्यात्मिक प्रश्नों के लिए है।');
+  const [status, setStatus] = useState('Aira केवल आध्यात्मिक प्रश्नों के लिए है।');
 
   useEffect(() => {
-    void getEraHabitRecommendations().then(setRecommendations).catch(() => setRecommendations([]));
+    void getAiraHabitRecommendations().then(setRecommendations).catch(() => setRecommendations([]));
   }, []);
 
   const ask = async () => {
     const question = input.trim();
     if (!question || busy) return;
     setBusy(true);
-    setStatus(language === 'hi' ? 'Era AI उत्तर तैयार कर रहा है…' : 'Era AI is preparing a spiritual answer…');
+    setStatus(language === 'hi' ? 'Aira उत्तर तैयार कर रहा है…' : 'Aira is preparing a spiritual answer…');
     try {
-      const result = await askEraAI({ message: question, language });
+      const result = await askAira({ message: question, language });
       setAnswer(result.text);
       setRecommendations(result.suggestions ?? []);
       setStatus(language === 'hi' ? 'आध्यात्मिक उत्तर तैयार है।' : 'Spiritual answer ready.');
       setInput('');
     } catch {
-      setStatus(language === 'hi' ? 'अभी Era AI से उत्तर नहीं मिल पाया।' : 'Era AI could not answer right now.');
+      setStatus(language === 'hi' ? 'अभी Aira से उत्तर नहीं मिल पाया।' : 'Aira could not answer right now.');
     } finally {
       setBusy(false);
     }
@@ -48,7 +48,7 @@ export default function EraAIScreen() {
     if (item.action === 'reminder' && item.reminderText) {
       try {
         await scheduleEraRecommendationReminder(item.reminderText);
-        setStatus(language === 'hi' ? 'Era AI ने 5 मिनट का reminder लगा दिया है।' : 'Era AI scheduled a 5-minute reminder.');
+        setStatus(language === 'hi' ? 'Aira ने 5 मिनट का reminder लगा दिया है।' : 'Aira scheduled a 5-minute reminder.');
       } catch {
         setStatus(language === 'hi' ? 'Reminder सेट नहीं हो पाया।' : 'The reminder could not be scheduled.');
       }
@@ -64,7 +64,7 @@ export default function EraAIScreen() {
             <Feather name="arrow-left" size={20} color={colors.foreground} />
           </Pressable>
           <View style={styles.headerCopy}>
-            <Text style={[styles.kicker, { color: colors.primary }]}>ERA AI</Text>
+            <Text style={[styles.kicker, { color: colors.primary }]}>AIRA</Text>
             <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Spiritual AI</Text>
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
               {language === 'hi' ? 'केवल आध्यात्मिक जीवन-चिंतन, गीता और आदत सुधार के लिए।' : 'For spiritual reflection, Bhagavad Gita and habit improvement only.'}
@@ -94,7 +94,7 @@ export default function EraAIScreen() {
 
         <View style={[styles.questionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <TextInput
-            accessibilityLabel={language === 'hi' ? 'Era AI आध्यात्मिक प्रश्न' : 'Era AI spiritual question'}
+            accessibilityLabel={language === 'hi' ? 'Aira आध्यात्मिक प्रश्न' : 'Aira spiritual question'}
             value={input}
             onChangeText={setInput}
             multiline
@@ -103,18 +103,18 @@ export default function EraAIScreen() {
             style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
           />
           <Pressable accessibilityRole="button" disabled={!input.trim() || busy} onPress={() => void ask()} style={[styles.askButton, { backgroundColor: colors.primary, opacity: !input.trim() || busy ? 0.5 : 1 }]}>
-            {busy ? <ActivityIndicator color={colors.primaryForeground} /> : <><Feather name="send" size={16} color={colors.primaryForeground} /><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Ask Era AI</Text></>}
+            {busy ? <ActivityIndicator color={colors.primaryForeground} /> : <><Feather name="send" size={16} color={colors.primaryForeground} /><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Ask Aira</Text></>}
           </Pressable>
         </View>
 
         <View accessibilityLiveRegion="polite" style={[styles.statusCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.label, { color: colors.primary }]}>ERA AI</Text>
+          <Text style={[styles.label, { color: colors.primary }]}>AIRA</Text>
           <Text style={[styles.statusText, { color: colors.mutedForeground }]}>{status}</Text>
         </View>
 
         {answer ? (
           <View style={[styles.answerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.answerTitle, { color: colors.foreground }]}>Era AI</Text>
+            <Text style={[styles.answerTitle, { color: colors.foreground }]}>Aira</Text>
             <Text selectable style={[styles.answerText, { color: colors.foreground }]}>{answer}</Text>
           </View>
         ) : null}
@@ -141,7 +141,7 @@ export default function EraAIScreen() {
 
         <View style={[styles.footerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.footerTitle, { color: colors.foreground }]}>Bhagavad Gita access</Text>
-          <Text style={[styles.footerText, { color: colors.mutedForeground }]}>Era AI can be opened alongside the Gita experience, including from chapter and verse context.</Text>
+          <Text style={[styles.footerText, { color: colors.mutedForeground }]}>Aira can be opened alongside the Gita experience, including from chapter and verse context.</Text>
           <Pressable accessibilityRole="button" onPress={() => router.push('/geeta-nexus/read?chapter=1&verse=1' as never)} style={[styles.smallButton, { alignSelf: 'flex-start', backgroundColor: colors.primary }]}>
             <Text style={[styles.smallButtonText, { color: colors.primaryForeground }]}>Open Bhagavad Gita</Text>
           </Pressable>
