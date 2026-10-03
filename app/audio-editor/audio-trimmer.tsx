@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState , useEffect} from 'react';
+import { BackHandler, ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
@@ -23,10 +23,16 @@ function parseTime(value: string): number | null {
   if (/^\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed) * 1000;
   const parts = trimmed.split(':').map(Number);
   if (parts.length !== 2 || parts.some((part) => !Number.isFinite(part))) return null;
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { router.replace('/audio-editor'); return true; });
+    return () => subscription.remove();
+  }, [router]);
+
   return (parts[0] * 60 + parts[1]) * 1000;
 }
 
 export default function AudioTrimmerScreen() {
+  const router = useRouter();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [source, setSource] = useState<AudioEditorSource | null>(null);
