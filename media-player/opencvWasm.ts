@@ -70,22 +70,22 @@ export async function ensureOpenCvWasm():Promise<OpenCvLoadState>{
       }
 
       const {scriptUrl,wasmUrl}=await getOpenCvWasmConfig();
-      if(!/^https:\/\//i.test(scriptUrl)) throw new Error('OpenCV.js URL must use HTTPS.');
+      if(!/^https:\/\//i.test(scriptUrl)) throw new Error('The visual description service needs a secure download link.');
       CACHE_DIR.create({intermediates:true,idempotent:true});
 
       const scriptFile=new File(CACHE_DIR,'opencv.js');
       if(!scriptFile.exists || scriptFile.size<=1024){
         const downloaded=await File.downloadFileAsync(scriptUrl,scriptFile);
-        if(!downloaded.exists || downloaded.size<=1024) throw new Error('OpenCV.js download was incomplete.');
+        if(!downloaded.exists || downloaded.size<=1024) throw new Error('The visual description component could not finish downloading.');
       }
 
       let wasmUri:string|undefined;
       if(wasmUrl){
-        if(!/^https:\/\//i.test(wasmUrl)) throw new Error('OpenCV WASM URL must use HTTPS.');
+        if(!/^https:\/\//i.test(wasmUrl)) throw new Error('The visual description service needs a secure component link.');
         const wasmFile=new File(CACHE_DIR,'opencv_js.wasm');
         if(!wasmFile.exists || wasmFile.size<=1024){
           const downloaded=await File.downloadFileAsync(wasmUrl,wasmFile);
-          if(!downloaded.exists || downloaded.size<=1024) throw new Error('OpenCV WASM download was incomplete.');
+          if(!downloaded.exists || downloaded.size<=1024) throw new Error('The visual description component could not finish downloading.');
         }
         wasmUri=wasmFile.uri;
       }
@@ -95,7 +95,7 @@ export async function ensureOpenCvWasm():Promise<OpenCvLoadState>{
       state={status:'ready',version:CACHE_VERSION,scriptUri:scriptFile.uri,wasmUri,downloadedNow:true};
       return state;
     }catch(error){
-      state={status:'error',version:CACHE_VERSION,error:error instanceof Error?error.message:'OpenCV.js unavailable'};
+      state={status:'error',version:CACHE_VERSION,error:error instanceof Error?error.message:'Live video description is unavailable right now.'};
       return state;
     }finally{inFlight=null;}
   })();
