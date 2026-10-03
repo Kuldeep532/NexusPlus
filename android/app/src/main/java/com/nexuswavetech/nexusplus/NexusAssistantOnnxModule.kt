@@ -100,6 +100,7 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
             val tokenizerStream = activeTokenizer.createStream()
             stream = tokenizerStream
 
+            val answerBuffer = StringBuilder()
             while (!activeGenerator.isDone()) {
                 activeGenerator.generateNextToken()
                 val generatedTokens = activeGenerator.getSequence(0)
@@ -107,7 +108,7 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
                     val nextToken = generatedTokens[generatedTokens.lastIndex]
                     val chunk = tokenizerStream.decode(nextToken)
                     if (chunk.isNotEmpty()) {
-                        answerAppend(answer = answerBuffer, chunk = chunk)
+                        answerBuffer.append(chunk)
                     }
                 }
             }
@@ -127,11 +128,6 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
         }
     }
 
-    private val answerBuffer = StringBuilder()
-
-    private fun answerAppend(answer: StringBuilder, chunk: String) {
-        answer.append(chunk)
-    }
 
     @ReactMethod
     fun unload(modelId: String, promise: Promise) {
