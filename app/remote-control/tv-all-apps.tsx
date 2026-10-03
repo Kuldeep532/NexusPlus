@@ -1,4 +1,5 @@
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useFocusEffect } from 'expo-router';
+import { BackHandler } from 'react-native';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { launchTvApp } from '@/features/remote-control/tvAppLaunch';
@@ -59,6 +60,11 @@ export default function TvAllAppsScreen() {
       }
     }
   };
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { router.replace('/remote-control/tv'); return true; });
+    return () => subscription.remove();
+  }, [router]);
 
   return <View style={[styles.root,{backgroundColor:colors.background}]}>
     <Stack.Screen options={{title:'All TV Apps'}}/>
