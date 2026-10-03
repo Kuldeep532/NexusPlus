@@ -6,6 +6,7 @@ import { getAssistantModelPreference, setAssistantModelPreference, type Assistan
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { ASSISTANT_LIMITS, ASSISTANT_MODELS, ASSISTANT_VOICES, NEXUS_CORE_MODEL_ID } from '@/features/nexus-assistant/assistantConfig';
 import { addMessage, clearAllAssistantData, ensureSession, getHistoryEnabled, initAssistantStore, listMessages, listSessions, setHistoryEnabled, type ChatMessage } from '@/features/nexus-assistant/assistantStore';
 import { useAuth } from '@/features/auth/useAuth';
@@ -366,14 +367,14 @@ export default function NexusAssistantScreen() {
           : 'Nexus Assistant could not reach the selected chat provider and local inference is not available in this build. Your message is stored locally on this device.';
         await addMessage(SESSION_ID, 'assistant', fallback);
         await refreshMessages();
-        setStatus('No chat inference provider available; message remains local.');
+        setStatus('No online model is available right now. Your message stays on this device.');
         await speakResponseForMode(fallback, fromLiveMode);
         return;
       }
 
       const model = ASSISTANT_MODELS.find((item) => item.id === NEXUS_CORE_MODEL_ID) ?? ASSISTANT_MODELS.find((item) => item.kind === 'chat');
       if (!model) throw new Error('NEXUS_CORE_MODEL_UNAVAILABLE');
-      if (getAssetStatus(model.id) !== 'ready') setStatus('Nexus Core AI is still downloading in the background.');
+      if (getAssetStatus(model.id) !== 'ready') setStatus('Your on-device assistant is still getting ready.');
 
       const base = calculatorContext
         ? CALCULATOR_SYSTEM_CONTRACT + '\n\nCALCULATOR CONTEXT:\n' + calculatorContext + '\n\nUSER REQUEST:\n' + text
@@ -391,10 +392,10 @@ export default function NexusAssistantScreen() {
       });
       await refreshMessages();
       setStreaming('');
-      setStatus('Local response complete.');
+      setStatus('Response ready.');
       await speakResponseForMode(localReply.text, fromLiveMode);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Assistant request failed.');
+      setStatus(getUserFriendlyMessage(error, 'Nexus Assistant could not complete that request. Please try again.'));
       await refreshMessages();
       setStreaming('');
     } finally {
@@ -403,7 +404,7 @@ export default function NexusAssistantScreen() {
   };
 
   const toggleVoiceInput = async () => {
-    if (!voiceBridge) { setStatus('Voice bridge is still initializing.'); return; }
+    if (!voiceBridge) { setStatus('Voice controls are still getting ready.'); return; }
     if (voiceState === 'listening') {
       await voiceBridge.stopListening().catch(() => undefined);
       setVoiceState('idle');
@@ -414,7 +415,7 @@ export default function NexusAssistantScreen() {
     const available = await voiceBridge.isAvailable();
     if (!available) {
       setVoiceInput(true);
-      setStatus('Microphone access is unavailable on this device or build.');
+      setStatus('Microphone access is unavailable on this device. Please check your permission settings.');
       return;
     }
     setVoiceInput(true);
@@ -422,12 +423,12 @@ export default function NexusAssistantScreen() {
     setStatus('Listening…');
     await voiceBridge.startListening().catch((error) => {
       setVoiceState('idle');
-      setStatus(error instanceof Error ? error.message : 'Voice input failed.');
+      setStatus(getUserFriendlyMessage(error, 'Voice input could not be completed. Please try again.'));
     });
   };
 
   const toggleLiveMode = async () => {
-    if (!voiceBridge) { setStatus('Voice bridge is still initializing.'); return; }
+    if (!voiceBridge) { setStatus('Voice controls are still getting ready.'); return; }
     const next = !liveMode;
     setLiveMode(next);
     if (!next) {
@@ -449,7 +450,7 @@ export default function NexusAssistantScreen() {
     await voiceBridge.startListening().catch((error) => {
       setLiveMode(false);
       setVoiceState('idle');
-      setStatus(error instanceof Error ? error.message : 'Live Mode could not start.');
+      setStatus(getUserFriendlyMessage(error, 'Live Mode could not start. Please try again.'));
     });
   };
 
@@ -466,7 +467,7 @@ export default function NexusAssistantScreen() {
       setPendingProposal(null);
       await refreshMessages();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Action failed.');
+      setStatus(getUserFriendlyMessage(error, 'That action could not be completed. Please try again.'));
     } finally {
       setBusy(false);
     }
@@ -484,18 +485,18 @@ export default function NexusAssistantScreen() {
     const model = ASSISTANT_MODELS.find((item) => item.id === NEXUS_CORE_MODEL_ID);
     if (!model) return;
     setAssetBusy(model.id);
-    setStatus('Preparing the local chat model download…');
-    try { await downloadAssistantModel(model.id); setStatus('Local Nexus Core AI downloaded. It remains outside the APK.'); }
-    catch { setStatus('Model download failed. Background retry will continue automatically.'); }
+    setStatus('Preparing the on-device assistant…');
+    try { await downloadAssistantModel(model.id); setStatus('The on-device assistant is ready.'); }
+    catch { setStatus('The on-device assistant could not be downloaded. Please try again later.'); }
     finally { setAssetBusy(null); }
   };
 
   const downloadVoice = async () => {
     const voice = ASSISTANT_VOICES[0];
     setAssetBusy(voice.id);
-    setStatus('Preparing the local Piper voice download…');
-    try { await downloadAssistantVoice(voice.id); setStatus('Piper voice downloaded.'); }
-    catch { setStatus('Voice download failed. Check your connection and try again.'); }
+    setStatus('Preparing the voice download…');
+    try { await downloadAssistantVoice(voice.id); setStatus('Voice downloaded and ready.'); }
+    catch { setStatus('The voice could not be downloaded. Check your connection and try again.'); }
     finally { setAssetBusy(null); }
   };
 
@@ -653,7 +654,7 @@ export default function NexusAssistantScreen() {
             <Feather name="grid" size={16} color={colors.primary} />
             <Text style={[styles.toolChipText, { color: colors.foreground }]}>QR Code</Text>
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Document reader" onPress={() => { const reader = toolCatalog.find((tool) => /document reader|book reader|reader/i.test(tool.title)); if (reader) openAssistantTool(reader); else setStatus('Document Reader is not registered on this build.'); }} style={[styles.toolChip, { borderColor: colors.border, backgroundColor: colors.background }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Document reader" onPress={() => { const reader = toolCatalog.find((tool) => /document reader|book reader|reader/i.test(tool.title)); if (reader) openAssistantTool(reader); else setStatus('Document Reader is not available right now.'); }} style={[styles.toolChip, { borderColor: colors.border, backgroundColor: colors.background }]}>
             <Feather name="book-open" size={16} color={colors.primary} />
             <Text style={[styles.toolChipText, { color: colors.foreground }]}>Document Reader</Text>
           </Pressable>
