@@ -1,4 +1,5 @@
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useFocusEffect } from 'expo-router';
+import { BackHandler } from 'react-native';
 import { Alert, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useCallback, useMemo, useState } from 'react';
 import { useColors } from '@/hooks/useColors';
@@ -34,6 +35,11 @@ export default function TvRemoteScreen(){
       else void send(g.dy > 0 ? 'DOWN' : 'UP');
     },
   }), [send]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { router.replace('/remote-control'); return true; });
+    return () => subscription.remove();
+  }, [router]);
 
   return <View style={[styles.root,{backgroundColor:colors.background}]}>
    <Stack.Screen options={{title:'TV Remote'}}/>
