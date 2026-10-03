@@ -17,7 +17,10 @@ function friendlyAuthError(error: string | null): string | null {
   if (/GOOGLE_SIGN_IN_STATE_MISMATCH|GOOGLE_SIGN_IN_VERIFIER_MISSING|GOOGLE_SIGN_IN_CODE_MISSING/i.test(error)) return 'We could not verify the Google sign-in. Please try again.';
   if (/INVALID_LOGIN_CREDENTIALS|invalid login credentials|invalid_credentials/i.test(error)) return 'The email or password is incorrect.';
   if (/EMAIL_NOT_CONFIRMED|email not confirmed/i.test(error)) return 'Please verify your email before logging in.';
-  if (/USER_ALREADY_EXISTS|already registered|user already registered/i.test(error)) return 'An account with this email already exists. Please log in instead.';
+  if (/EMAIL_ALREADY_EXISTS|USER_ALREADY_EXISTS|already registered|user already registered/i.test(error)) return 'An account with this email already exists. Please log in instead.';
+  if (/DEVICE_ALREADY_LINKED/i.test(error)) return 'This phone is already linked to another account.';
+  if (/ACCOUNT_ALREADY_LINKED/i.test(error)) return 'This account is already linked to another phone.';
+  if (/DELETION_COOLDOWN/i.test(error)) return 'This phone is still reserved for the deleted account. Please wait until the security period ends.';
   if (/RATE_LIMIT|too many requests/i.test(error)) return 'Too many sign-in attempts. Please wait a moment and try again.';
   if (/SUPABASE_AUTH_ERROR_5\d\d/i.test(error)) return 'The account service is temporarily unavailable. Please try again later.';
   if (/PASSWORD_RESET_SENT/i.test(error)) return 'We sent a password reset link to your email.';
