@@ -47,7 +47,7 @@ export default function AiraScreen() {
     }
     if (item.action === 'reminder' && item.reminderText) {
       try {
-        await scheduleEraRecommendationReminder(item.reminderText);
+        await scheduleAiraRecommendationReminder(item.reminderText);
         setStatus(language === 'hi' ? 'Aira ने 5 मिनट का reminder लगा दिया है।' : 'Aira scheduled a 5-minute reminder.');
       } catch {
         setStatus(language === 'hi' ? 'Reminder सेट नहीं हो पाया।' : 'The reminder could not be scheduled.');
