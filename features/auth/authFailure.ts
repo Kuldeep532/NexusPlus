@@ -9,7 +9,8 @@ export type AuthFailureCode =
   | 'AUTH_CANCELLED'
   | 'AUTH_INVALID_CREDENTIALS'
   | 'AUTH_NETWORK'
-  | 'AUTH_UNKNOWN';
+  | 'AUTH_UNKNOWN'
+  | 'EMAIL_ALREADY_EXISTS';
 
 const MESSAGES: Record<AuthFailureCode, string> = {
   DEVICE_INTEGRITY_FAILED: 'This device could not pass the security check. Please use a certified, secure device.',
@@ -23,6 +24,7 @@ const MESSAGES: Record<AuthFailureCode, string> = {
   AUTH_INVALID_CREDENTIALS: 'The email or password is incorrect. Please check your details and try again.',
   AUTH_NETWORK: 'We could not reach the secure sign-in service. Check your internet connection and try again.',
   AUTH_UNKNOWN: 'We could not complete sign-in securely. Please try again.',
+  EMAIL_ALREADY_EXISTS: 'An account with this email already exists. Please log in instead.',
 };
 
 export function getAuthFailureMessage(code: AuthFailureCode): string {
