@@ -135,8 +135,8 @@ function RootLayoutContent() {
           <Stack screenOptions={{ headerShown: false }} />
           <GlobalMiniPlayer />
           {startupBrandingVisible && (
-            <View style={[styles.startupOverlay, { backgroundColor: colors.background }]} pointerEvents="none" accessibilityRole="summary" accessibilityLabel="Nexus Plus welcome screen. Radha and Krishna devotional artwork.">
-              <RadhaKrishnaWelcomeArt width={290} height={290} showWordmark={false} />
+            <View style={[styles.startupOverlay, { backgroundColor: colors.background }]} pointerEvents="none" accessibilityRole="summary" accessibilityLabel="Nexus Plus">
+              <RadhaKrishnaWelcomeArt width={290} height={290} />
               <Text style={[styles.startupTitle, { color: colors.foreground }]}>Nexus Plus</Text>
             </View>
           )}
