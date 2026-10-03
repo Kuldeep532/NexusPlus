@@ -4,10 +4,10 @@ import { removeCctvCamera, listCctvCameraRecords, upsertCctvCamera } from './cct
 import type { CctvCamera } from './cctvTypes';
 
 export async function addCctvCamera(input: CctvDetectionInput): Promise<CctvCamera> {
-  if (input.mode === 'qr' && !input.qrPayload) throw new CctvBackendError({ code: 'INVALID_INPUT', message: 'CCTV authorization QR is required.', retryable: false });
+  if (input.mode === 'qr' && !input.qrPayload) throw new CctvBackendError({ code: 'INVALID_INPUT', message: 'Please provide the camera authorization QR code.', retryable: false });
   const camera = await detectCctvCamera(input);
-  if (camera.protocol !== 'onvif') throw new CctvBackendError({ code: 'NOT_IMPLEMENTED', message: 'Only authenticated ONVIF cameras can be enrolled.', retryable: false });
-  throw new CctvBackendError({ code: 'INVALID_INPUT', message: 'Camera enrollment requires a matched secure network endpoint before it can be stored.', retryable: false });
+  if (camera.protocol !== 'onvif') throw new CctvBackendError({ code: 'NOT_IMPLEMENTED', message: 'Only supported secure cameras can be added.', retryable: false });
+  throw new CctvBackendError({ code: 'INVALID_INPUT', message: 'The camera must be securely verified before it can be saved.', retryable: false });
 }
 
 export async function verifyAndSaveCctvCamera(input: {
@@ -20,11 +20,11 @@ export async function verifyAndSaveCctvCamera(input: {
     ...input.camera,
     username: input.username.trim(),
     capabilities: input.camera.capabilities,
-    securityProfile: { secureTransport: true, authenticated: false, protocolFamily: 'onvif' as const, securityLevel: 'detected' as const, reason: 'Awaiting authenticated native verification.' },
+    securityProfile: { secureTransport: true, authenticated: false, protocolFamily: 'onvif' as const, securityLevel: 'detected' as const, reason: 'Waiting for secure camera verification.' },
   } as CctvCameraRecord;
-  if (!base.host || !base.port || base.protocol !== 'onvif') throw new CctvBackendError({ code: 'INVALID_INPUT', message: 'A secure ONVIF endpoint is required.', retryable: false });
-  if (!input.username.trim() || !input.password) throw new CctvBackendError({ code: 'AUTH_REQUIRED', message: 'Camera credentials are required.', retryable: false });
-  if (input.authorizedIdentity?.serialNumber && base.serialNumber && input.authorizedIdentity.serialNumber.trim().toLowerCase() !== base.serialNumber.trim().toLowerCase()) throw new CctvBackendError({ code: 'AUTH_FAILED', message: 'Camera identity mismatch.', retryable: false });
+  if (!base.host || !base.port || base.protocol !== 'onvif') throw new CctvBackendError({ code: 'INVALID_INPUT', message: 'A secure camera connection is required.', retryable: false });
+  if (!input.username.trim() || !input.password) throw new CctvBackendError({ code: 'AUTH_REQUIRED', message: 'Enter the camera username and password.', retryable: false });
+  if (input.authorizedIdentity?.serialNumber && base.serialNumber && input.authorizedIdentity.serialNumber.trim().toLowerCase() !== base.serialNumber.trim().toLowerCase()) throw new CctvBackendError({ code: 'AUTH_FAILED', message: 'The camera details do not match the selected device.', retryable: false });
   await cctvCredentialStore.save(base.id, input.username.trim(), input.password);
   try {
     const adapter = getCctvAdapter('onvif');
@@ -49,7 +49,7 @@ export async function verifyAndSaveCctvCamera(input: {
   } catch (error) {
     await cctvCredentialStore.remove(base.id);
     if (error instanceof CctvBackendError) throw error;
-    throw new CctvBackendError({ code: 'AUTH_FAILED', message: 'Camera native authorization failed.', retryable: false });
+    throw new CctvBackendError({ code: 'AUTH_FAILED', message: 'The camera could not be securely verified.', retryable: false });
   }
 }
 
