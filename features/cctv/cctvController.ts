@@ -55,7 +55,7 @@ export async function verifyAndSaveCctvCamera(input: {
 
 export async function removeCctvCameraSecurely(cameraId: string): Promise<void> {
   const normalized = cameraId.trim();
-  if (!normalized) throw new CctvBackendError({ code: 'INVALID_INPUT', message: 'Camera ID is required.', retryable: false });
+  if (!normalized) throw new CctvBackendError({ code: 'INVALID_INPUT', message: 'Please select a camera first.', retryable: false });
   await cctvCredentialStore.remove(normalized);
   await removeCctvCamera(normalized);
 }
