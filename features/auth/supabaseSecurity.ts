@@ -13,7 +13,8 @@ export type SupabaseSecurityErrorCode =
   | 'DELETION_COOLDOWN'
   | 'AUTH_REQUIRED'
   | 'SERVER_REJECTED'
-  | 'NOT_CONFIGURED';
+  | 'NOT_CONFIGURED'
+  | 'EMAIL_ALREADY_EXISTS';
 
 export class SupabaseSecurityError extends Error {
   constructor(public readonly code: SupabaseSecurityErrorCode, message: string) {
@@ -63,6 +64,9 @@ export async function linkAuthenticatedDevice(
     }
     if (text.includes('cooldown')) {
       throw new SupabaseSecurityError('DELETION_COOLDOWN', message);
+    }
+    if (text.includes('email already exists')) {
+      throw new SupabaseSecurityError('EMAIL_ALREADY_EXISTS', message);
     }
     if (text.includes('blocked')) {
       throw new SupabaseSecurityError('ACCOUNT_BLOCKED', message);
