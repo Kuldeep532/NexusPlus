@@ -5,6 +5,7 @@ export interface SupabaseAuthAdapter {
   signInWithGoogleWeb(): Promise<unknown>;
   signInWithEmailPassword(email: string, password: string): Promise<unknown>;
   registerWithEmailPassword(input: EmailPasswordInput): Promise<unknown>;
+  sendPasswordResetEmail(email: string): Promise<void>;
   upsertProfile(profile: AuthUserProfile): Promise<unknown>;
   signOut(): Promise<void>;
 }
