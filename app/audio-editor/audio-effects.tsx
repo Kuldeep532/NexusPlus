@@ -181,7 +181,7 @@ export default function AudioEffectsScreen() {
         amount: Number(amount),
       };
       const result = await assertAudioEffectsNative().apply(input);
-      setMessage(`Audio effect applied and saved successfully to ${result.outputPath}`);
+      setMessage('Audio effect applied and saved successfully.');
     } catch (error) {
       setMessage(getUserFriendlyMessage(error, 'We could not apply this audio effect. Please try again.'));
     } finally {
