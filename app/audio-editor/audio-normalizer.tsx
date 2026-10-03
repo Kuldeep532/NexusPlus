@@ -46,7 +46,7 @@ export default function AudioNormalizerScreen() {
       setOutput({ path: result.outputPath, uri: `file://${result.outputPath}` });
       setMessage('Normalized audio saved as a new copy.');
     } catch (error) {
-      setMessage(getUserFriendlyMessage(error, 'Unable to normalize the selected audio.'));
+      setMessage(getUserFriendlyMessage(error, 'We could not normalize the selected audio. Please try again.'));
     } finally {
       setWorking(false);
     }
