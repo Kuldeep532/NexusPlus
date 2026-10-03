@@ -6,7 +6,7 @@ import { createRemoteConnection, getDefaultCapabilities, saveRemoteConnection, t
 
 export default function ConnectComputerScreen(){
  const colors=useColors(); const router=useRouter(); const [name,setName]=useState(''); const [code,setCode]=useState(''); const [transport,setTransport]=useState<RemoteTransport>('wifi');
- const pair=async()=>{ Alert.alert('Computer Remote', 'Computer control is not available yet.'); };
+ const pair=async()=>{ Alert.alert('Computer Remote', 'Computer control is not available with this setup yet.'); };
  return <View style={[styles.root,{backgroundColor:colors.background}]}>
    <Stack.Screen options={{title:'Connect to Computer'}}/>
    <Text style={[styles.title,{color:colors.foreground}]}>Connect to Computer</Text>
