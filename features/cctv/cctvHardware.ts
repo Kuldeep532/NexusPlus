@@ -25,7 +25,7 @@ function requireHardwareControl(camera: CctvCameraRecord): void {
 export async function authorizeHardwareAction(camera: CctvCameraRecord, password: string): Promise<CctvHardwareControlContext> {
   requireHardwareControl(camera);
   const supplied = password.trim();
-  if (!supplied) throw new CctvBackendError({ code: 'AUTH_REQUIRED', message: 'Camera password is required for hard-disk management.', retryable: false });
+  if (!supplied) throw new CctvBackendError({ code: 'AUTH_REQUIRED', message: 'Enter the camera password to manage storage.', retryable: false });
   await cctvCredentialStore.withCredentials(camera.id, async (credentials) => {
     if (credentials.password !== supplied) {
       throw new CctvBackendError({ code: 'AUTH_FAILED', message: 'Camera password is incorrect.', retryable: false });
@@ -37,7 +37,7 @@ export async function authorizeHardwareAction(camera: CctvCameraRecord, password
 export async function manageCctvHardDisk(camera: CctvCameraRecord, password: string, action: CctvHardDiskAction): Promise<CctvHardDiskInfo[]> {
   const context = await authorizeHardwareAction(camera, password);
   if (action !== 'status') {
-    throw new CctvBackendError({ code: 'NOT_IMPLEMENTED', message: 'This hard-disk operation requires a verified DVR/NVR hardware adapter.', retryable: false });
+    throw new CctvBackendError({ code: 'NOT_IMPLEMENTED', message: 'This storage action is not available for this camera yet.', retryable: false });
   }
   void context;
   return [];
