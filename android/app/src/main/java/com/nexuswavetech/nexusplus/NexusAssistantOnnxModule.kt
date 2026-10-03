@@ -90,7 +90,7 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
             generator = activeGenerator
 
             val promptTokens = activeTokenizer.encode(prompt)
-            activeGenerator.appendTokens(promptTokens.toArray())
+            activeGenerator.appendTokens(promptTokens)
 
             val tokenizerStream = activeTokenizer.createStream()
             stream = tokenizerStream
@@ -98,10 +98,9 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
             val answerBuffer = StringBuilder()
             while (!activeGenerator.isDone()) {
                 activeGenerator.generateNextToken()
-                val generatedSequence = activeGenerator.getSequence(0)
-                val generatedTokens = generatedSequence.toArray()
-                if (generatedTokens.isNotEmpty()) {
-                    val nextToken = generatedTokens[generatedTokens.lastIndex]
+                val generatedTokens = activeGenerator.getSequence(0)
+                if (generatedTokens.size > 0) {
+                    val nextToken = generatedTokens[generatedTokens.size - 1]
                     val chunk = tokenizerStream.decode(nextToken)
                     if (chunk.isNotEmpty()) {
                         answerBuffer.append(chunk)
