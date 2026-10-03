@@ -4,6 +4,7 @@ import ai.onnxruntime.genai.Config
 import ai.onnxruntime.genai.Generator
 import ai.onnxruntime.genai.GeneratorParams
 import ai.onnxruntime.genai.Model
+import ai.onnxruntime.genai.Sequences
 import ai.onnxruntime.genai.Tokenizer
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -21,7 +22,8 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
     private var tokenizer: Tokenizer? = null
     private var loadedModelId: String? = null
 
-    private fun firstString(map: ReadableMap, key: String): String? = if (map.hasKey(key) && !map.isNull(key)) map.getString(key) else null
+    private fun firstString(map: ReadableMap, key: String): String? =
+        if (map.hasKey(key) && !map.isNull(key)) map.getString(key) else null
 
     @ReactMethod
     fun getStatus(promise: Promise) {
@@ -66,35 +68,51 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
             return
         }
 
+        var generator: Generator? = null
+        var params: GeneratorParams? = null
+        var stream: ai.onnxruntime.genai.TokenizerStream? = null
+
         try {
             val prompt = buildPrompt(messages)
-            val params = GeneratorParams(activeModel)
-            firstString(options, "seed")?.toLongOrNull()?.let { params.setSearchOption("random_seed", it) }
+
+            val generatorParams = GeneratorParams(activeModel)
+            params = generatorParams
+
+            firstString(options, "seed")?.toDoubleOrNull()?.let {
+                generatorParams.setSearchOption("random_seed", it)
+            }
+
             val maxTokens = if (options.hasKey("maxTokens") && !options.isNull("maxTokens")) {
                 options.getInt("maxTokens").coerceIn(32, 192)
-            } else 128
-            params.setSearchOption("max_length", maxTokens.toLong())
-            params.setSearchOption("temperature", 0.35f)
+            } else {
+                128
+            }
 
-            val generator = Generator(activeModel, params)
-            val promptTokens = activeTokenizer.encode(prompt)
-            generator.appendTokens(promptTokens)
+            generatorParams.setSearchOption("max_length", maxTokens.toDouble())
+            generatorParams.setSearchOption("temperature", 0.35)
 
-            val stream = activeTokenizer.createStream()
-            val answer = StringBuilder()
-            while (!generator.isDone()) {
-                generator.generateNextToken()
-                val tokens = generator.getNextTokens()
-                if (tokens.isNotEmpty()) {
-                    answer.append(stream.decode(tokens[0]))
+            val activeGenerator = Generator(activeModel, generatorParams)
+            generator = activeGenerator
+
+            val promptTokens: Sequences = activeTokenizer.encode(prompt)
+            activeGenerator.appendTokens(promptTokens)
+
+            val tokenizerStream = activeTokenizer.createStream()
+            stream = tokenizerStream
+
+            while (!activeGenerator.isDone()) {
+                activeGenerator.generateNextToken()
+                val generatedTokens = activeGenerator.getSequence(0)
+                if (generatedTokens.isNotEmpty()) {
+                    val nextToken = generatedTokens[generatedTokens.lastIndex]
+                    val chunk = tokenizerStream.decode(nextToken)
+                    if (chunk.isNotEmpty()) {
+                        answerAppend(answer = answerBuffer, chunk = chunk)
+                    }
                 }
             }
 
-            stream.close()
-            generator.close()
-            params.close()
-
-            val text = cleanGeneratedText(answer.toString())
+            val text = cleanGeneratedText(answerBuffer.toString())
             if (text.isBlank()) {
                 promise.reject("LOCAL_EMPTY_RESPONSE", "The local assistant did not return an answer.")
                 return
@@ -102,7 +120,17 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
             promise.resolve(text)
         } catch (error: Throwable) {
             promise.reject("LOCAL_GENERATION_FAILED", "The local assistant could not generate a response.", error)
+        } finally {
+            try { stream?.close() } catch (_: Throwable) {}
+            try { generator?.close() } catch (_: Throwable) {}
+            try { params?.close() } catch (_: Throwable) {}
         }
+    }
+
+    private val answerBuffer = StringBuilder()
+
+    private fun answerAppend(answer: StringBuilder, chunk: String) {
+        answer.append(chunk)
     }
 
     @ReactMethod
