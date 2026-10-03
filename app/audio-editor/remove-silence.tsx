@@ -62,7 +62,7 @@ export default function RemoveSilenceScreen() {
       setOutput({ path: result.outputPath, uri: `file://${result.outputPath}`, removedSilenceMs: result.removedSilenceMs });
       setMessage(`Generated and saved. Removed ${formatTime(result.removedSilenceMs)} of quiet gaps.`);
     } catch (error) {
-      setMessage(getUserFriendlyMessage(error, 'Unable to remove silence from this audio.'));
+      setMessage(getUserFriendlyMessage(error, 'We could not remove silence from this audio. Please try again.'));
     } finally {
       setWorking(false);
     }
