@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { askAira, getAiraHabitRecommendations } from '@/features/era-ai/eraAiService';
 import { type EraLanguage, type EraRecommendation } from '@/features/era-ai/eraAiTypes';
-import { scheduleEraRecommendationReminder } from '@/features/era-ai/eraAiReminder';
+import { scheduleAiraRecommendationReminder } from '@/features/era-ai/eraAiReminder';
 
 export default function EraAIScreen() {
   const colors = useColors();
