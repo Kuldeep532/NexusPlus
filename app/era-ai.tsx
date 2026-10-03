@@ -8,7 +8,7 @@ import { askAira, getAiraHabitRecommendations } from '@/features/era-ai/eraAiSer
 import { type EraLanguage, type EraRecommendation } from '@/features/era-ai/eraAiTypes';
 import { scheduleAiraRecommendationReminder } from '@/features/era-ai/eraAiReminder';
 
-export default function EraAIScreen() {
+export default function AiraScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [language, setLanguage] = useState<EraLanguage>('hi');
