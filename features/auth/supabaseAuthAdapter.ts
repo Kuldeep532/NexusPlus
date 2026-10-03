@@ -1,7 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
-import { SUPABASE_URL, SUPABASE_GOOGLE_REDIRECT_URI, assertSupabaseProductionUrl } from './authConfig';
+import { SUPABASE_URL, SUPABASE_GOOGLE_REDIRECT_URI, SUPABASE_PASSWORD_RESET_REDIRECT_URI, assertSupabaseProductionUrl } from './authConfig';
 import type { AuthUserProfile, EmailPasswordInput } from './authTypes';
 import type { SupabaseAuthAdapter } from './authRepository';
 
@@ -243,7 +243,7 @@ export const supabaseAuthAdapter: SupabaseAuthAdapter = {
     const response = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ email: email.trim() }),
+      body: JSON.stringify({ email: email.trim(), redirect_to: SUPABASE_PASSWORD_RESET_REDIRECT_URI }),
     });
     if (!response.ok) return parseError(response);
   },
