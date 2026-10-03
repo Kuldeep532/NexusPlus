@@ -39,7 +39,7 @@ export default function FlattenPdfScreen() {
     }
     setBusy(true);
     setResult(null);
-    setStatus('Flattening PDF with the existing Gotenberg PDF Engine…');
+    setStatus('Flattening PDF fields and annotations…');
     try {
       const outputName = `${safeBaseName(file.name)}-flattened.pdf`;
       const uri = await flattenPdfWithGotenberg(file.uri, outputName);
@@ -73,7 +73,7 @@ export default function FlattenPdfScreen() {
             <View style={[styles.icon, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="layers-triple-outline" size={29} color={colors.primary} /></View>
             <View style={styles.copy}>
               <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Flatten PDF</Text>
-              <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Flatten interactive form fields and annotations using the existing Gotenberg PDF Engine.</Text>
+              <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Flatten interactive form fields and annotations.</Text>
             </View>
           </View>
 
