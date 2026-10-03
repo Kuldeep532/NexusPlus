@@ -284,8 +284,22 @@ export const supabaseAuthAdapter: SupabaseAuthAdapter = {
       throw new Error('ACCOUNT_CREATED_CHECK_EMAIL');
     }
 
+    const session = mapSession(response, 'password');
+    try {
+      const { verifyAuthSessionSecurity } = await import('./secureAuthGate');
+      await verifyAuthSessionSecurity(session);
+    } catch (error) {
+      try {
+        await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
+          method: 'POST',
+          headers: headers(response.access_token),
+        });
+      } catch {}
+      throw error;
+    }
+
     await persistSession(response);
-    return mapSession(response, 'password');
+    return session;
   },
 
   async upsertProfile(_profile: AuthUserProfile) {
