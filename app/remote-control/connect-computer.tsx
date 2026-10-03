@@ -6,11 +6,11 @@ import { createRemoteConnection, getDefaultCapabilities, saveRemoteConnection, t
 
 export default function ConnectComputerScreen(){
  const colors=useColors(); const router=useRouter(); const [name,setName]=useState(''); const [code,setCode]=useState(''); const [transport,setTransport]=useState<RemoteTransport>('wifi');
- const pair=async()=>{ Alert.alert('Computer Remote', 'Computer Remote is Coming Soon. The Nexus PC receiver is currently discontinued.'); };
+ const pair=async()=>{ Alert.alert('Computer Remote', 'Computer control is not available yet.'); };
  return <View style={[styles.root,{backgroundColor:colors.background}]}>
    <Stack.Screen options={{title:'Connect to Computer'}}/>
    <Text style={[styles.title,{color:colors.foreground}]}>Connect to Computer</Text>
-   <Text style={[styles.sub,{color:colors.mutedForeground}]}>Supports the Nexus desktop receiver over Wi‑Fi. Bluetooth is kept as a transport option for compatible receivers; live commands require the receiver to be installed.</Text>
+   <Text style={[styles.sub,{color:colors.mutedForeground}]}>Computer control works only when a compatible receiver is available. Wi‑Fi and Bluetooth options are shown for supported receivers.</Text>
    <View style={styles.row}><Pressable onPress={()=>setTransport('wifi')} style={[styles.choice,{borderColor:transport==='wifi'?colors.primary:colors.border}]}><Text style={{color:colors.foreground}}>Wi-Fi</Text></Pressable><Pressable onPress={()=>setTransport('bluetooth')} style={[styles.choice,{borderColor:transport==='bluetooth'?colors.primary:colors.border}]}><Text style={{color:colors.foreground}}>Bluetooth</Text></Pressable></View>
    <TextInput accessibilityLabel="Computer name" placeholder="Computer name" placeholderTextColor={colors.mutedForeground} value={name} onChangeText={setName} style={[styles.input,{color:colors.foreground,borderColor:colors.border,backgroundColor:colors.card}]}/>
    <TextInput accessibilityLabel="Computer pairing code" placeholder="6-digit pairing code" placeholderTextColor={colors.mutedForeground} keyboardType="number-pad" maxLength={6} value={code} onChangeText={v=>setCode(v.replace(/\D/g,''))} style={[styles.input,{color:colors.foreground,borderColor:colors.border,backgroundColor:colors.card}]}/>
