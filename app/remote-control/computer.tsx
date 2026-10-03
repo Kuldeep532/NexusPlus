@@ -11,8 +11,8 @@ export default function ComputerRemoteScreen(){
  return <View style={[styles.root,{backgroundColor:colors.background}]}>
   <Stack.Screen options={{title:'Computer Remote'}}/>
   <Text accessibilityRole="header" style={[styles.title,{color:colors.foreground}]}>Computer Remote</Text>
-  <Text accessibilityLiveRegion="polite" style={{color:colors.mutedForeground}}>Coming Soon</Text>
-  <Text style={{color:colors.mutedForeground}}>The Nexus PC receiver is currently discontinued. The existing TV/Wi-Fi/Bluetooth Remote Control remains separate.</Text>
+  <Text accessibilityLiveRegion="polite" style={{color:colors.mutedForeground}}>Not available yet</Text>
+  <Text style={{color:colors.mutedForeground}}>Computer control is currently unavailable. TV remote control remains available separately.</Text>
   <Pressable accessibilityRole="button" onPress={()=>router.replace('/remote-control')} style={[styles.action,{borderColor:colors.border,backgroundColor:colors.card}]}><Text style={{color:colors.foreground,textAlign:'center'}}>Back to Remote Control</Text></Pressable>
  </View>
 }
