@@ -61,7 +61,7 @@ function createEngine(): LocalInferenceEngine {
     },
     async unloadModel() {},
     async stream(messages, options, onChunk) {
-      if (!nativeLocalAi) throw new Error('Local AI runtime is not available in this build.');
+      if (!nativeLocalAi) throw new Error('The offline assistant is not available right now.');
       onChunk({ type: 'status', text: 'Preparing your answer on this device…' });
       let text: string;
       try {
