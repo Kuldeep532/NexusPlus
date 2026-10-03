@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useColors } from '@/hooks/useColors';
 import { useCctvCameras } from '@/features/cctv/useCctvCameras';
@@ -52,6 +52,11 @@ export default function CctvLiveViewScreen() {
       setMessage(error instanceof CctvBackendError ? getUserFriendlyMessage(error, 'We could not control the camera. Please try again.') : getUserFriendlyMessage(error, 'We could not control the camera. Please try again.'));
     }
   };
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { router.back(); return true; });
+    return () => subscription.remove();
+  }, [router]);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
