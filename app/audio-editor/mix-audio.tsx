@@ -94,7 +94,7 @@ export default function MixAudioScreen() {
       setLibrary(result.audio);
       setMessage(result.permissionGranted ? `${result.audio.length} audio file${result.audio.length === 1 ? '' : 's'} found.` : 'Music and audio permission is required to scan local audio.');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to scan local audio.');
+      setMessage(getUserFriendlyMessage(error, 'We could not scan your audio library. Please check media access and try again.'));
     } finally {
       setLoading(false);
     }
@@ -113,13 +113,13 @@ export default function MixAudioScreen() {
   const exportMix = useCallback(async () => {
     if (!base || activeOverlays.length === 0 || loading) return;
     setLoading(true);
-    setMessage('Mixing all tracks natively…');
+    setMessage('Mixing your audio tracks…');
     try {
       const outputPath = await createAudioEditorOutputPath('Audio Mixes', base.source.name, 'mixed', 'wav');
       const result = await mixAudioProject({ base, overlays: activeOverlays }, outputPath);
       setMessage(`Mix complete: ${result.outputPath}`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to mix these audio files.');
+      setMessage(getUserFriendlyMessage(error, 'We could not mix these audio files. Please try again.'));
     } finally {
       setLoading(false);
     }
