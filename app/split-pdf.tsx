@@ -62,7 +62,7 @@ export default function SplitPdfScreen() {
 
   function reset() { setPdf(null); setRanges(''); setOutputs([]); setStatus(''); }
   useFocusEffect(useCallback(() => {
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => { if (!pdf && !outputs.length && !ranges && !busy) return false; reset(); return false; });
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { if (!pdf && !outputs.length && !ranges && !busy) return false; reset(); return true; });
     return () => sub.remove();
   }, [busy, outputs.length, pdf, ranges]));
 
