@@ -112,7 +112,11 @@ async function createVerifier(): Promise<string> {
 }
 
 async function createChallenge(verifier: string): Promise<string> {
-  const digest = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, verifier);
+  const digest = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    verifier,
+    { encoding: Crypto.CryptoEncoding.BASE64 },
+  );
   return digest.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
@@ -207,9 +211,12 @@ export const supabaseAuthAdapter: SupabaseAuthAdapter = {
         headers: {
           apikey: ANON_KEY,
           Authorization: `Bearer ${ANON_KEY}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: new URLSearchParams({ auth_code: code, code_verifier: storedVerifier }).toString(),
+        body: JSON.stringify({
+          auth_code: code,
+          code_verifier: storedVerifier,
+        }),
       });
       if (!response.ok) return parseError(response);
       const session = await response.json() as SupabaseSessionResponse;
