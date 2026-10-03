@@ -21,7 +21,7 @@ function normalizeUrl(value: string): string {
     throw new Error('Enter a valid web link.');
   }
   if (!['http:', 'https:'].includes(parsed.protocol)) {
-    throw new Error('Only HTTP and HTTPS links are supported.');
+    throw new Error('Please enter a web link starting with http:// or https://.');
   }
   return parsed.toString();
 }
@@ -40,7 +40,7 @@ export async function listLinkShortcuts(): Promise<LinkShortcut[]> {
 
 export async function addLinkShortcut(title: string, url: string): Promise<LinkShortcut> {
   const cleanTitle = title.trim();
-  if (!cleanTitle) throw new Error('Shortcut name is required.');
+  if (!cleanTitle) throw new Error('Enter a name for the link.');
   const normalizedUrl = normalizeUrl(url);
   const now = Date.now();
   const shortcut: LinkShortcut = { id: `${now}-${Math.random().toString(36).slice(2, 8)}`, title: cleanTitle, url: normalizedUrl, createdAt: now, updatedAt: now };
