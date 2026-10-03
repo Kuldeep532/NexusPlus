@@ -39,7 +39,7 @@ export default function VocalRemoverScreen() {
       const item = await pickAudioFromFileManager();
       if (item) await load(item);
     } catch (error) {
-      setStatus(getUserFriendlyMessage(error, 'Unable to select audio.'));
+      setStatus(getUserFriendlyMessage(error, 'We could not select that audio file. Please try again.'));
     }
   }, [load]);
 
