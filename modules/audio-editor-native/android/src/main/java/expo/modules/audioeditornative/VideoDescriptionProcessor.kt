@@ -6,7 +6,7 @@ import java.util.Locale
 
 object VideoDescriptionProcessor {
   fun describeFrame(context: Context?, videoUri: String, timestampMs: Double, language: String): Map<String, Any?>? {
-    val safeContext = requireNotNull(context) { "Video description context is unavailable." }
+    val safeContext = requireNotNull(context) { "Video description is not available right now." }
     val retriever = MediaMetadataRetriever()
     try {
       val uri = android.net.Uri.parse(videoUri)
