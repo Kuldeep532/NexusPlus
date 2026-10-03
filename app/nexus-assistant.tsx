@@ -364,7 +364,7 @@ export default function NexusAssistantScreen() {
       if (!engineReady) {
         const fallback = context.prompt
           ? 'Nexus Assistant could not reach an inference provider. Your selected context stays on this device.'
-          : 'Nexus Assistant could not reach the selected chat provider and local inference is not available in this build. Your message is stored locally on this device.';
+          : 'Nexus Assistant could not reach the selected chat provider. Your message remains safely stored on this device.';
         await addMessage(SESSION_ID, 'assistant', fallback);
         await refreshMessages();
         setStatus('No online model is available right now. Your message stays on this device.');
@@ -373,7 +373,7 @@ export default function NexusAssistantScreen() {
       }
 
       const model = ASSISTANT_MODELS.find((item) => item.id === NEXUS_CORE_MODEL_ID) ?? ASSISTANT_MODELS.find((item) => item.kind === 'chat');
-      if (!model) throw new Error('NEXUS_CORE_MODEL_UNAVAILABLE');
+      if (!model) throw new Error('The on-device assistant is not available right now.');
       if (getAssetStatus(model.id) !== 'ready') setStatus('Your on-device assistant is still getting ready.');
 
       const base = calculatorContext
