@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
+import { useCallback, useState , useEffect} from 'react';
+import { BackHandler, ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
@@ -16,6 +16,7 @@ function formatTime(ms: number): string {
 }
 
 export default function VocalRemoverScreen() {
+  const router = useRouter();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [source, setSource] = useState<AudioEditorSource | null>(null);
@@ -82,6 +83,11 @@ export default function VocalRemoverScreen() {
       setBusy(false);
     }
   }, [busy, mode, preserveBass, preserveStereo, quality, source]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { router.replace('/audio-editor'); return true; });
+    return () => subscription.remove();
+  }, [router]);
 
   return (
     <ScrollView
