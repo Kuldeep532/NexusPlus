@@ -88,6 +88,13 @@ export function useAuth() {
     setBusy(true);
     try {
       const next = await action();
+      try {
+        const { verifyAuthSessionSecurity } = await import('./secureAuthGate');
+        await verifyAuthSessionSecurity(next);
+      } catch (securityError) {
+        setSharedSession(null);
+        throw securityError;
+      }
       setSharedSession(next);
       return next;
     } catch (err) {
