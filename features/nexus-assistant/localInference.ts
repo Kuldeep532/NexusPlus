@@ -56,18 +56,18 @@ function createEngine(): LocalInferenceEngine {
       }
     },
     async loadModel(modelPath, modelId) {
-      if (!nativeLocalAi) throw new Error('Local AI runtime is not available in this build.');
+      if (!nativeLocalAi) throw new Error('This offline assistant is not available right now.');
       await nativeLocalAi.load(modelId, modelPath);
     },
     async unloadModel() {},
     async stream(messages, options, onChunk) {
       if (!nativeLocalAi) throw new Error('Local AI runtime is not available in this build.');
-      onChunk({ type: 'status', text: 'Running local AI on this device…' });
+      onChunk({ type: 'status', text: 'Preparing your answer on this device…' });
       let text: string;
       try {
         text = (await nativeLocalAi.generate(options.modelId, messages, options)).trim();
       } catch (error) {
-        throw error instanceof Error ? error : new Error('Local AI could not generate a response.');
+        throw new Error('We could not prepare an offline answer right now. Please try again.');
       }
       if (text) onChunk({ type: 'token', text });
       onChunk({ type: 'done' });
