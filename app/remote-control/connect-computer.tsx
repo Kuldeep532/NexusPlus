@@ -10,7 +10,7 @@ export default function ConnectComputerScreen(){
  return <View style={[styles.root,{backgroundColor:colors.background}]}>
    <Stack.Screen options={{title:'Connect to Computer'}}/>
    <Text style={[styles.title,{color:colors.foreground}]}>Connect to Computer</Text>
-   <Text style={[styles.sub,{color:colors.mutedForeground}]}>Computer control works only when a compatible receiver is available. Wi‑Fi and Bluetooth options are shown for supported receivers.</Text>
+   <Text style={[styles.sub,{color:colors.mutedForeground}]}>Computer control works only with a compatible connection. Wi‑Fi and Bluetooth are available on supported setups.</Text>
    <View style={styles.row}><Pressable onPress={()=>setTransport('wifi')} style={[styles.choice,{borderColor:transport==='wifi'?colors.primary:colors.border}]}><Text style={{color:colors.foreground}}>Wi-Fi</Text></Pressable><Pressable onPress={()=>setTransport('bluetooth')} style={[styles.choice,{borderColor:transport==='bluetooth'?colors.primary:colors.border}]}><Text style={{color:colors.foreground}}>Bluetooth</Text></Pressable></View>
    <TextInput accessibilityLabel="Computer name" placeholder="Computer name" placeholderTextColor={colors.mutedForeground} value={name} onChangeText={setName} style={[styles.input,{color:colors.foreground,borderColor:colors.border,backgroundColor:colors.card}]}/>
    <TextInput accessibilityLabel="Computer pairing code" placeholder="6-digit pairing code" placeholderTextColor={colors.mutedForeground} keyboardType="number-pad" maxLength={6} value={code} onChangeText={v=>setCode(v.replace(/\D/g,''))} style={[styles.input,{color:colors.foreground,borderColor:colors.border,backgroundColor:colors.card}]}/>
