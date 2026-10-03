@@ -257,6 +257,7 @@ jobs:
 
           printf "\n=== Aira / local-model consistency checks ===\n" | tee -a "$errors_file"
           grep -RIn --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=android "scheduleEraRecommendationReminder" app features components hooks modules 2>/dev/null | tee -a "$errors_file"
+          grep -RIn --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=android "scheduleAiraRecommendationReminder" app features components hooks modules 2>/dev/null | tee -a "$errors_file"
           grep -RIn --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=android "title: 'Era AI'\|>Era AI<\|ERA AI\|Era AI •" app features components hooks modules 2>/dev/null | tee -a "$errors_file"
           grep -RIn --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=android "Radha and Krishna devotional logo with Nexus Wave Technologies wordmark" app features components hooks modules 2>/dev/null | tee -a "$errors_file"
           grep -RIn --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=android "Sign in with Google through Supabase or use your Nexus Plus email account" app features components hooks modules 2>/dev/null | tee -a "$errors_file"
