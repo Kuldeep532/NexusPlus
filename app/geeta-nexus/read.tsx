@@ -10,7 +10,7 @@ import { saveReadingProgress } from '@/features/geeta-nexus/geetaReadingProgress
 import { KRISHNA_MANTRAS } from '@/features/spiritual/krishnaMantraCatalog';
 import { ensureGitaChapterCached, getCachedChapterVerses } from '@/features/geeta-nexus/gitaChapterDownloadQueue';
 import { loadChapterVersesFromRemote } from '@/features/geeta-nexus/gitaRemoteSource';
-import { askEraAI } from '@/features/era-ai/eraAiService';
+import { askAira } from '@/features/era-ai/eraAiService';
 
 type NativeTranslation = { downloadModel:(source:string,target:string)=>Promise<void>; translate:(text:string,source:string,target:string)=>Promise<string> };
 function translationBridge(): NativeTranslation | undefined { return (globalThis as typeof globalThis & { NexusTranslation?: NativeTranslation }).NexusTranslation; }
@@ -37,9 +37,9 @@ export default function GeetaNexusReader() {
   const [missing, setMissing] = useState(false);
   const [mantraPlaying, setMantraPlaying] = useState(false);
   const [mantraIndex, setMantraIndex] = useState(0);
-  const [eraLanguage, setEraLanguage] = useState<'hi' | 'en'>('hi');
-  const [eraBusy, setEraBusy] = useState(false);
-  const [eraAnswer, setEraAnswer] = useState('');
+  const [airaLanguage, setEraLanguage] = useState<'hi' | 'en'>('hi');
+  const [airaBusy, setEraBusy] = useState(false);
+  const [airaAnswer, setEraAnswer] = useState('');
   const [autoHindi, setAutoHindi] = useState('');
   const [translationBusy, setTranslationBusy] = useState(false);
 
@@ -94,20 +94,20 @@ export default function GeetaNexusReader() {
 
   const goToChapter = (chapter: number) => router.replace('/geeta-nexus/read?chapter=' + chapter + '&verse=1' as never);
   const currentMantra = KRISHNA_MANTRAS[mantraIndex];
-  const askEraForVerse = async () => {
-    if (!current || eraBusy) return;
+  const askAiraForVerse = async () => {
+    if (!current || airaBusy) return;
     setEraBusy(true);
     try {
-      const result = await askEraAI({
-        message: eraLanguage === 'hi'
+      const result = await askAira({
+        message: airaLanguage === 'hi'
           ? 'इस श्लोक का सरल हिंदी अर्थ और मेरे जीवन में इसका व्यावहारिक उपयोग समझाइए।'
           : 'Explain this verse in simple English and how I can apply it in daily life.',
-        language: eraLanguage,
+        language: airaLanguage,
         gitaContext: { chapter: current.chapter, verse: current.verse, text: current.translationHindi || current.meaningHindi || current.sanskrit },
       });
       setEraAnswer(result.text);
     } catch {
-      setEraAnswer(eraLanguage === 'hi' ? 'अभी Era AI उत्तर नहीं दे पाया।' : 'Era AI could not answer right now.');
+      setEraAnswer(airaLanguage === 'hi' ? 'अभी Aira उत्तर नहीं दे पाया।' : 'Aira could not answer right now.');
     } finally {
       setEraBusy(false);
     }
@@ -181,16 +181,16 @@ export default function GeetaNexusReader() {
             <View style={[styles.eraCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.eraHeader}>
                 <View style={styles.mantraCopy}>
-                  <Text style={[styles.blockLabel, { color: colors.primary }]}>ERA AI</Text>
-                  <Text style={[styles.eraText, { color: colors.mutedForeground }]}>Ask Era AI about this shloka in Hindi or English.</Text>
+                  <Text style={[styles.blockLabel, { color: colors.primary }]}>AIRA</Text>
+                  <Text style={[styles.eraText, { color: colors.mutedForeground }]}>Ask Aira about this shloka in Hindi or English.</Text>
                 </View>
                 <View style={styles.eraActions}>
-                  <Pressable accessibilityRole="button" accessibilityLabel="Era AI Hindi" onPress={() => setEraLanguage('hi')} style={[styles.languageChip, { backgroundColor: eraLanguage === 'hi' ? colors.secondary : colors.background, borderColor: colors.border }]}><Text style={[styles.languageChipText, { color: colors.foreground }]}>हिं</Text></Pressable>
-                  <Pressable accessibilityRole="button" accessibilityLabel="Era AI English" onPress={() => setEraLanguage('en')} style={[styles.languageChip, { backgroundColor: eraLanguage === 'en' ? colors.secondary : colors.background, borderColor: colors.border }]}><Text style={[styles.languageChipText, { color: colors.foreground }]}>EN</Text></Pressable>
-                  <Pressable accessibilityRole="button" accessibilityLabel="Ask Era AI about this shloka" onPress={() => void askEraForVerse()} style={[styles.mantraButton, { backgroundColor: colors.primary }]}><Feather name="heart" size={16} color={colors.primaryForeground} /></Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Aira Hindi" onPress={() => setEraLanguage('hi')} style={[styles.languageChip, { backgroundColor: airaLanguage === 'hi' ? colors.secondary : colors.background, borderColor: colors.border }]}><Text style={[styles.languageChipText, { color: colors.foreground }]}>हिं</Text></Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Aira English" onPress={() => setEraLanguage('en')} style={[styles.languageChip, { backgroundColor: airaLanguage === 'en' ? colors.secondary : colors.background, borderColor: colors.border }]}><Text style={[styles.languageChipText, { color: colors.foreground }]}>EN</Text></Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Ask Aira about this shloka" onPress={() => void askAiraForVerse()} style={[styles.mantraButton, { backgroundColor: colors.primary }]}><Feather name="heart" size={16} color={colors.primaryForeground} /></Pressable>
                 </View>
               </View>
-              {eraAnswer ? <Text selectable style={[styles.eraAnswer, { color: colors.foreground }]}>{eraBusy ? '…' : eraAnswer}</Text> : null}
+              {airaAnswer ? <Text selectable style={[styles.airaAnswer, { color: colors.foreground }]}>{airaBusy ? '…' : airaAnswer}</Text> : null}
             </View>
 
             <View style={[styles.mantraCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
   languageChip: { width: 38, height: 38, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   languageChipText: { fontSize: 10, fontFamily: 'Inter_700Bold' },
   eraText: { fontSize: 10.5, lineHeight: 16 },
-  eraAnswer: { fontSize: 11.5, lineHeight: 18, marginTop: 10, paddingTop: 10 },
+  airaAnswer: { fontSize: 11.5, lineHeight: 18, marginTop: 10, paddingTop: 10 },
   mantraCard: { borderWidth: 1, borderRadius: 18, padding: 13, marginTop: 12, flexDirection: 'row', alignItems: 'center' },
   mantraCopy: { flex: 1, paddingRight: 10 },
   mantraText: { fontSize: 13, lineHeight: 21, fontFamily: 'Inter_600SemiBold' },
