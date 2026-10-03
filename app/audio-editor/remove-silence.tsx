@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState , useEffect} from 'react';
+import { BackHandler, ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
@@ -27,6 +27,7 @@ function formatTime(ms: number): string {
 }
 
 export default function RemoveSilenceScreen() {
+  const router = useRouter();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [source, setSource] = useState<AudioEditorSource | null>(null);
@@ -78,6 +79,11 @@ export default function RemoveSilenceScreen() {
     setOutput(null);
     setMessage('Silence detection settings reset to default.');
   };
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { router.replace('/audio-editor'); return true; });
+    return () => subscription.remove();
+  }, [router]);
 
   return (
     <ScrollView
