@@ -96,7 +96,7 @@ export default function PdfImageScreen() {
   async function convertPdfToImages() {
     if (!pdf || selectedPages.length === 0) { setStatus('Select at least one valid page within the PDF.'); return; }
     const parsedDpi = Math.min(600, Math.max(72, Number(dpi) || 300));
-    setBusy(true); setResult(null); setStatus('Rendering PDF pages with the native PDF engine…');
+    setBusy(true); setResult(null); setStatus('Preparing PDF pages…');
     try {
       const outputDir = `${FileSystem.cacheDirectory}nexus-pdf-images-${Date.now()}/`;
       await FileSystem.makeDirectoryAsync(outputDir, { intermediates: true });
@@ -135,7 +135,7 @@ export default function PdfImageScreen() {
 
   async function convertImagesToPdf() {
     if (!images.length) { setStatus('Select at least one image.'); return; }
-    setBusy(true); setResult(null); setStatus(`Creating a ${images.length}-page PDF with the native PDF engine…`);
+    setBusy(true); setResult(null); setStatus(`Creating your ${images.length}-page PDF…`);
     try {
       const source = baseName(images[0]?.name || 'images');
       const output = await preparePdfOutputPath('Images to PDF', images.length === 1 ? `${source}.pdf` : `${source}-images-to-pdf.pdf`);
@@ -154,7 +154,7 @@ export default function PdfImageScreen() {
         <View style={styles.loading}><ActivityIndicator size="large" color={colors.primary} /><Text accessibilityRole="header" style={[styles.loadingTitle, { color: colors.foreground }]}>Processing</Text><Text accessibilityLiveRegion="polite" style={[styles.loadingText, { color: colors.mutedForeground }]}>{status}</Text></View>
       ) : (
         <ScrollView contentContainerStyle={{ paddingTop: insets.top + 18, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
-          <View style={styles.header}><View style={[styles.icon, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="file-swap-outline" size={28} color={colors.primary} /></View><View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>PDF ⇄ Image</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Convert PDFs to images or turn images into a PDF using the native engine.</Text></View></View>
+          <View style={styles.header}><View style={[styles.icon, { backgroundColor: colors.secondary }]}><MaterialCommunityIcons name="file-swap-outline" size={28} color={colors.primary} /></View><View style={styles.copy}><Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>PDF ⇄ Image</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Convert PDFs to images or turn images into a PDF.</Text></View></View>
           <View style={styles.tabs}>
             <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === 'pdf-to-image' }} onPress={() => switchMode('pdf-to-image')} style={[styles.tab, { backgroundColor: mode === 'pdf-to-image' ? colors.primary : colors.card, borderColor: colors.border }]}><Text style={[styles.tabText, { color: mode === 'pdf-to-image' ? colors.primaryForeground : colors.foreground }]}>PDF to Images</Text></Pressable>
             <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === 'image-to-pdf' }} onPress={() => switchMode('image-to-pdf')} style={[styles.tab, { backgroundColor: mode === 'image-to-pdf' ? colors.primary : colors.card, borderColor: colors.border }]}><Text style={[styles.tabText, { color: mode === 'image-to-pdf' ? colors.primaryForeground : colors.foreground }]}>Images to PDF</Text></Pressable>
