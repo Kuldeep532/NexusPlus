@@ -1,11 +1,12 @@
 import { Stack, useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useEffect, useState } from 'react';
 import { getRemoteConnections, saveRemoteConnection, type RemoteConnection } from '@/features/remote-control/remoteControlStore';
 
 export default function ComputerRemoteSettings(){
- const colors=useColors(); const router=useRouter(); const [screenOnMobile,setScreenOnMobile]=useState(false); const [device,setDevice]=useState<RemoteConnection | null>(null);
+ const colors=useColors(); const router=useRouter();
+ useEffect(()=>{ const subscription=BackHandler.addEventListener('hardwareBackPress',()=>{ router.replace('/remote-control/computer'); return true; }); return()=>subscription.remove(); },[router]); const [screenOnMobile,setScreenOnMobile]=useState(false); const [device,setDevice]=useState<RemoteConnection | null>(null);
  useEffect(()=>{ void getRemoteConnections().then(items=>{const d=items.find(item=>item.type==='computer'&&item.paired)??null;setDevice(d);setScreenOnMobile(Boolean(d?.capabilities.screen));}); },[]);
  const toggle=async()=>{const next=!screenOnMobile;setScreenOnMobile(next);if(device){const updated={...device,capabilities:{...device.capabilities,screen:next}};setDevice(updated);await saveRemoteConnection(updated);}};
  return <View style={[styles.root,{backgroundColor:colors.background}]}>
