@@ -24,7 +24,7 @@ export async function streamAssistantReply(params: {
 }): Promise<NexusAssistantReply> {
   const existing = await listMessages(params.sessionId);
   const inference = await getLocalInferenceEngine();
-  if (!(await inference.isAvailable())) throw new Error('Local AI is not available on this device.');
+  if (!(await inference.isAvailable())) throw new Error('The offline assistant is not available right now.');
 
   const prompt: ChatMessage[] = [
     { id: -1, sessionId: params.sessionId, role: 'system', content: DEFAULT_SYSTEM_PROMPT, createdAt: 0 },
@@ -48,7 +48,7 @@ export async function streamAssistantReply(params: {
   }
 
   const text = output.trim();
-  if (!text) throw new Error('The local assistant returned no answer.');
+  if (!text) throw new Error('We could not prepare an answer right now. Please try again.');
   await addMessage(params.sessionId, 'assistant', text);
   const saved = await listMessages(params.sessionId);
   return { messageId: saved.at(-1)?.id ?? null, text };
