@@ -95,7 +95,7 @@ export default function AudioEffectsScreen() {
       const picked = await pickAudioFromFileManager();
       if (picked) await loadSource(picked);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to choose an audio file.');
+      setMessage(getUserFriendlyMessage(error, 'We could not choose that audio file. Please try again.'));
     }
   }, [loadSource]);
 
@@ -111,7 +111,7 @@ export default function AudioEffectsScreen() {
           : 'Music and audio permission is required to scan local audio.',
       );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to scan local audio.');
+      setMessage(getUserFriendlyMessage(error, 'We could not scan your audio library. Please check media access and try again.'));
     } finally {
       setLoading(false);
     }
@@ -183,7 +183,7 @@ export default function AudioEffectsScreen() {
       const result = await assertAudioEffectsNative().apply(input);
       setMessage(`Audio effect applied and saved successfully to ${result.outputPath}`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to apply this audio effect.');
+      setMessage(getUserFriendlyMessage(error, 'We could not apply this audio effect. Please try again.'));
     } finally {
       setLoading(false);
     }
