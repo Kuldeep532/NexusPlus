@@ -35,6 +35,7 @@ export async function verifyAuthSessionSecurity(session: AuthSession): Promise<v
         ACCOUNT_ALREADY_LINKED: 'ACCOUNT_ALREADY_LINKED',
         ACCOUNT_BLOCKED: 'ACCOUNT_BLOCKED',
         DELETION_COOLDOWN: 'DELETION_COOLDOWN',
+        EMAIL_ALREADY_EXISTS: 'EMAIL_ALREADY_EXISTS',
       };
       throw new SecureAuthGateError(map[error.code] ?? 'AUTH_UNKNOWN');
     }
