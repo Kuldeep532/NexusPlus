@@ -1,7 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
-import { SUPABASE_URL, SUPABASE_GOOGLE_REDIRECT_URI } from './authConfig';
+import { SUPABASE_URL, SUPABASE_GOOGLE_REDIRECT_URI, assertSupabaseProductionUrl } from './authConfig';
 import type { AuthUserProfile, EmailPasswordInput } from './authTypes';
 import type { SupabaseAuthAdapter } from './authRepository';
 
@@ -25,7 +25,8 @@ type SupabaseSessionResponse = {
 };
 
 function assertConfigured(): void {
-  if (!SUPABASE_URL || !ANON_KEY) throw new Error('SUPABASE_AUTH_NOT_CONFIGURED');
+  assertSupabaseProductionUrl();
+  if (!ANON_KEY) throw new Error('SUPABASE_AUTH_NOT_CONFIGURED');
 }
 
 function headers(accessToken?: string): Record<string, string> {
