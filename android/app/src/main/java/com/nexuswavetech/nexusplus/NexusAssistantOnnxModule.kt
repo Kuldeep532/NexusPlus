@@ -89,7 +89,8 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
             val activeGenerator = Generator(activeModel, generatorParams)
             generator = activeGenerator
 
-            val promptTokens = activeTokenizer.encode(prompt)
+            val promptSequences = activeTokenizer.encode(prompt)
+            val promptTokens = promptSequences.getSequence(0)
             activeGenerator.appendTokens(promptTokens)
 
             val tokenizerStream = activeTokenizer.createStream()
