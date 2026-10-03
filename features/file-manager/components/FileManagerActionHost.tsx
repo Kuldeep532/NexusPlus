@@ -1,6 +1,5 @@
 import { Alert } from 'react-native';
 import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
-import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { useState } from 'react';
 import type { FileManagerEntry, FileManagerSelectionAction } from '../FileManagerTypes';
 import { FileManagerActionSheet } from './FileManagerActionSheet';
