@@ -6,7 +6,7 @@ const en = [
   { title: '3. Lawful and authorized use', body: 'Use Nexus Plus only for lawful purposes and only with accounts, files, devices, networks, cameras, TVs and services that you own or are authorized to access. Do not use the app for unauthorized access, surveillance, credential theft, privacy invasion, security bypass or unlawful monitoring.' },
   { title: '4. Your content and responsibility', body: 'You remain responsible for the content you create, upload, record, capture, transmit or process through Nexus Plus. You must have the necessary rights and permissions to use that content.' },
   { title: '5. Secure Vault and Password Manager', body: 'You are responsible for the secrets and credentials you choose to save, and for protecting your device and account credentials. Security features reduce risk but cannot make a compromised device completely safe.' },
-  { title: '6. Payments, Premium and UPI', body: 'Nexus Plus may offer Premium memberships, AI credits or other paid digital services. The available payment method is shown in the app. The a supported payment option may be shown in the app. Payment is completed only through the payment flow shown to you. Nexus Plus does not require you to share your UPI PIN, bank password or OTP. Paid access is activated only after the payment is successfully verified through the configured verification process.' },
+  { title: '6. Payments, Premium and UPI', body: 'Nexus Plus may offer Premium memberships, AI credits or other paid digital services. The available payment method is shown in the app. Payment is completed only through the payment flow shown to you. Nexus Plus does not require you to share your UPI PIN, bank password or OTP. Paid access is activated only after the payment is successfully verified through the configured verification process.' },
   { title: '7. Fees and refund policy', body: 'Unless applicable law requires otherwise, fees paid for Premium memberships, AI credits or other paid digital services are non-refundable after purchase. Please confirm the selected plan, price, duration and benefits before making payment. Failed or duplicated transactions may be reviewed and corrected where appropriate. Any legally required refund will be handled according to applicable law and the relevant payment provider process.' },
   { title: '8. Google Drive', body: 'Google Drive backup and sync are optional. When enabled, Nexus Plus can use app-specific Google Drive storage for supported backups. Google’s own terms and privacy policies apply to Google services.' },
   { title: '9. Geeta Nexus', body: 'Geeta Nexus is integrated into Nexus Plus for spiritual reading and related features. Available content is subject to the version of the app and the verified content library included with it.' },
@@ -48,7 +48,7 @@ export default function TermsAndConditionsScreen() {
   return (
     <LegalDocumentScreen
       title="Terms & Conditions"
-      subtitle="These Terms and Conditions explain how Nexus Plus can be used, including its features, accounts and paid services."
+      subtitle="These Terms and Conditions explain how to use Nexus Plus, including accounts, features and paid services."
       sections={{ en, hi }}
     />
   );
