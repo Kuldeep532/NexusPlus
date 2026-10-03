@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { useCctvCameras } from '@/features/cctv/useCctvCameras';
@@ -9,6 +9,11 @@ import { loadCctvPlaybackPage } from '@/features/cctv/cctvPlayback';
 import type { CctvRecordingItem } from '@/features/cctv/cctvBackend';
 
 function formatTime(value: number): string {
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { router.back(); return true; });
+    return () => subscription.remove();
+  }, [router]);
+
   return new Date(value).toLocaleString();
 }
 
