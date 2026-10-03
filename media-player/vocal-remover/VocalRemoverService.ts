@@ -33,7 +33,7 @@ export class VocalRemoverService {
     onJobUpdate?: (job: VocalRemovalJob) => void,
   ): Promise<VocalRemovalResult> {
     if (source.kind !== 'audio') {
-      throw new Error('Vocal removal is available for audio tracks only.');
+      throw new Error('Vocal removal works with audio files only.');
     }
 
     const merged = { ...DEFAULT_OPTIONS, ...options };
@@ -46,10 +46,10 @@ export class VocalRemoverService {
     };
     onJobUpdate?.(job);
 
-    if (Platform.OS !== 'android') throw new Error('Vocal removal is supported only on Android.');
+    if (Platform.OS !== 'android') throw new Error('Vocal removal is available on Android devices.');
 
     const available = await this.getAvailableEngines();
-    if (!available.length) throw new Error('No vocal-removal engine is available.');
+    if (!available.length) throw new Error('Vocal removal is not available right now.');
 
     // Prefer the AI engine. The fallback remains available for builds without
     // the native ML runtime.
