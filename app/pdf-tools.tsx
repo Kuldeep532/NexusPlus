@@ -16,11 +16,11 @@ const tools: Tool[] = [
   { key: 'reorder-pdf', title: 'Reorder PDF', description: 'Change the order of pages and save a new PDF.', icon: 'swap-vertical', route: '/reorder-pdf' },
   { key: 'delete-pages', title: 'Delete PDF Pages', description: 'Remove unwanted pages from a PDF.', icon: 'file-remove-outline', route: '/delete-pdf-pages' },
   { key: 'extract-pages', title: 'Cut & Extract Pages', description: 'Cut selected pages and save them as a new PDF.', icon: 'file-export-outline', route: '/extract-pdf-pages' },
-  { key: 'add-watermark', title: 'Add PDF Watermark', description: 'Add a text watermark using the existing Gotenberg PDF Engines watermark API.', icon: 'water-outline', route: '/remove-pdf-watermark' },
-  { key: 'flatten-pdf', title: 'Flatten PDF', description: 'Flatten interactive form fields and annotations using the existing Gotenberg PDF Engine.', icon: 'layers-triple-outline', route: '/flatten-pdf' },
-  { key: 'pdf-a', title: 'PDF/A Converter', description: 'Convert a PDF into an archival PDF/A document using the existing Gotenberg PDF Engine.', icon: 'archive-arrow-down-outline', route: '/pdf-a' },
-  { key: 'pdf-metadata', title: 'PDF Metadata', description: 'Read and edit PDF metadata using the existing Gotenberg PDF Engine.', icon: 'file-document-edit-outline', route: '/pdf-metadata' },
-  { key: 'pdf-preflight', title: 'PDF Preflight & Optimize', description: 'Run a single Gotenberg PDF-engine workflow to normalize and optimize PDF output.', icon: 'tune-variant', route: '/pdf-preflight' },
+  { key: 'add-watermark', title: 'Add PDF Watermark', description: 'Add a text watermark to your PDF.', icon: 'water-outline', route: '/remove-pdf-watermark' },
+  { key: 'flatten-pdf', title: 'Flatten PDF', description: 'Flatten PDF form fields and annotations.', icon: 'layers-triple-outline', route: '/flatten-pdf' },
+  { key: 'pdf-a', title: 'PDF/A Converter', description: 'Convert a PDF into an archival PDF/A document.', icon: 'archive-arrow-down-outline', route: '/pdf-a' },
+  { key: 'pdf-metadata', title: 'PDF Metadata', description: 'Read and edit PDF information.', icon: 'file-document-edit-outline', route: '/pdf-metadata' },
+  { key: 'pdf-preflight', title: 'PDF Preflight & Optimize', description: 'Check and optimize PDF output in one step.', icon: 'tune-variant', route: '/pdf-preflight' },
 ];
 
 export const PDF_TOOL_COUNT = tools.length;
