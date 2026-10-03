@@ -22,7 +22,7 @@ async function getPyttsAdapter(): Promise<PaymentAnnouncerTtsAdapter | null> {
   return {
     isAvailable: async () => Boolean(installed.modelPath && installed.configPath),
     speak: async () => {
-      throw new Error('Verified local voice engine adapter is required.');
+      throw new Error('A local voice option is not available right now.');
     },
     stop: async () => undefined,
   };
@@ -34,7 +34,7 @@ async function getAndroidDefaultAdapter(): Promise<PaymentAnnouncerTtsAdapter | 
   return {
     isAvailable: async () => false,
     speak: async () => {
-      throw new Error('Verified Android TTS adapter is required.');
+      throw new Error('Android voice playback is not available right now.');
     },
     stop: async () => undefined,
   };
