@@ -77,7 +77,7 @@ export default function AudioTrimmerScreen() {
     try {
       const result = await discoverLocalAudio(query);
       setLibrary(result.audio);
-      if (!result.permissionGranted) setMessage('Music and audio permission is required to scan local audio.');
+      if (!result.permissionGranted) setMessage('Allow media access to scan audio on your device.');
       else setMessage(`${result.audio.length} audio file${result.audio.length === 1 ? '' : 's'} found.`);
     } catch (error) {
       setMessage(getUserFriendlyMessage(error, 'We could not scan your audio library. Please check media access and try again.'));
