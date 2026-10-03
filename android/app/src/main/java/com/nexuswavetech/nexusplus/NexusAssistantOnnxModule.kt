@@ -4,7 +4,6 @@ import ai.onnxruntime.genai.Config
 import ai.onnxruntime.genai.Generator
 import ai.onnxruntime.genai.GeneratorParams
 import ai.onnxruntime.genai.Model
-import ai.onnxruntime.genai.Sequences
 import ai.onnxruntime.genai.Tokenizer
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -78,10 +77,6 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
             val generatorParams = GeneratorParams(activeModel)
             params = generatorParams
 
-            firstString(options, "seed")?.toDoubleOrNull()?.let {
-                generatorParams.setSearchOption("random_seed", it)
-            }
-
             val maxTokens = if (options.hasKey("maxTokens") && !options.isNull("maxTokens")) {
                 options.getInt("maxTokens").coerceIn(32, 192)
             } else {
@@ -94,8 +89,8 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
             val activeGenerator = Generator(activeModel, generatorParams)
             generator = activeGenerator
 
-            val promptTokens: Sequences = activeTokenizer.encode(prompt)
-            activeGenerator.appendTokens(promptTokens)
+            val promptTokens = activeTokenizer.encode(prompt)
+            activeGenerator.appendTokens(promptTokens.toArray())
 
             val tokenizerStream = activeTokenizer.createStream()
             stream = tokenizerStream
@@ -103,7 +98,8 @@ class NexusAssistantOnnxModule(private val context: ReactApplicationContext) : R
             val answerBuffer = StringBuilder()
             while (!activeGenerator.isDone()) {
                 activeGenerator.generateNextToken()
-                val generatedTokens = activeGenerator.getSequence(0)
+                val generatedSequence = activeGenerator.getSequence(0)
+                val generatedTokens = generatedSequence.toArray()
                 if (generatedTokens.isNotEmpty()) {
                     val nextToken = generatedTokens[generatedTokens.lastIndex]
                     val chunk = tokenizerStream.decode(nextToken)
