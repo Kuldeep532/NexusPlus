@@ -1,11 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { callGateway, discoverGatewayEndpoints } from '@/features/api-gateway/apiGatewayClient';
+import { loadCachedVerseBundle } from '@/features/geeta-nexus/geetaStage5Repository';
+import { searchGitaVerses } from '@/features/geeta-nexus/geetaStage5Search';
 import { eraSystemPrompt, isSpiritualAiraQuestion } from './eraAiGuard';
 import { generateAiraLocally } from './airaLocalProvider';
 import type { EraLanguage, EraResponse, EraHabitSignal, EraRecommendation } from './eraAiTypes';
 
 const HABIT_KEY = '@nexus-plus/era-ai/habits.v1';
 const HISTORY_KEY = '@nexus-plus/era-ai/history.v1';
+const SPIRITUAL_REFERENCE_URL = 'https://www.gitasupersite.iitk.ac.in/';
+
 const QA_ASSET_HINTS = [
   'life', 'problem', 'trouble', 'stress', 'anxiety', 'anger', 'purpose', 'career',
   'relationship', 'family', 'parent', 'student', 'failure', 'success', 'grief',
@@ -108,12 +112,19 @@ export async function askAira(input: {
     return { text, language: input.language, allowed: true };
   }
   const habits = await updateHabits(input.message);
+  const gitaBundle = await loadCachedVerseBundle();
+  const gitaResults = gitaBundle?.verses?.length ? searchGitaVerses(gitaBundle.verses, input.message, 4) : [];
+  const sourceContext = [
+    `Reference: ${SPIRITUAL_REFERENCE_URL}`,
+    gitaResults.map((verse) => `Bhagavad Gita ${verse.chapter}.${verse.verse}: ${verse.translationHindi || verse.translationEnglish || verse.meaningHindi || verse.sanskrit}`).join('\n'),
+  ].filter(Boolean).join('\n');
   let text = await generateAiraLocally({
     message: input.message,
     language: input.language,
     gitaContext: input.gitaContext
       ? `Bhagavad Gita chapter ${input.gitaContext.chapter}, verse ${input.gitaContext.verse}: ${input.gitaContext.text || ''}`
       : undefined,
+    sourceContext,
   });
   if (!text) {
     text = await callEraProvider(
