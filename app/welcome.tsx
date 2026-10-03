@@ -27,7 +27,7 @@ export default function WelcomeScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <RadhaKrishnaWelcomeArt width={300} height={300} showWordmark={true} />
+        <RadhaKrishnaWelcomeArt width={300} height={300} />
         <Text style={[styles.greeting, { color: colors.primary }]}>जय श्री कृष्ण</Text>
         <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Welcome to Nexus Plus</Text>
         <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
