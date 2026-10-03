@@ -46,7 +46,7 @@ function makeRecommendations(habits: EraHabitSignal[]): EraRecommendation[] {
   if (top.id === 'stress') return [{ id: 'stress-gita', title: 'शांति के लिए गीता', body: 'आज कुछ मिनट शांत होकर गीता का एक श्लोक पढ़ें।', action: 'open-gita', chapter: 2, verse: 47 }];
   if (top.id === 'anger') return [{ id: 'anger-gita', title: 'क्रोध पर चिंतन', body: 'अध्याय 2 का एक संबंधित श्लोक पढ़कर प्रतिक्रिया से पहले ठहरें।', action: 'open-gita', chapter: 2, verse: 63 }];
   if (top.id === 'consistency') return [{ id: 'consistency-reminder', title: 'दैनिक साधना', body: 'आज 5 मिनट का छोटा आध्यात्मिक अभ्यास तय करें।', action: 'reminder', reminderText: 'Aira: 5 मिनट शांत ध्यान या गीता पाठ का समय।' }];
-  return [{ id: 'reflection', title: 'आज का चिंतन', body: 'कुछ मिनट मौन में बैठकर अपने विचारों को देखें।', action: 'reminder', reminderText: 'Era AI: आज कुछ मिनट आत्म-चिंतन के लिए रुकें।' }];
+  return [{ id: 'reflection', title: 'आज का चिंतन', body: 'कुछ मिनट मौन में बैठकर अपने विचारों को देखें।', action: 'reminder', reminderText: 'Aira: आज कुछ मिनट आत्म-चिंतन के लिए रुकें।' }];
 }
 
 async function callEraProvider(message: string, language: EraLanguage, context?: string): Promise<string | null> {
@@ -100,7 +100,7 @@ export async function askAira(input: {
   language: EraLanguage;
   gitaContext?: { chapter: number; verse: number; text?: string };
 }): Promise<EraResponse> {
-  if (!isSpiritualEraQuestion(input.message)) {
+  if (!isSpiritualAiraQuestion(input.message)) {
     const text = input.language === 'hi'
       ? 'मैं केवल आध्यात्मिक, गीता, ध्यान, जीवन-चिंतन और आदत सुधार से जुड़े प्रश्नों में सहायता करता हूँ। सामान्य काम के लिए Nexus Assistant का उपयोग करें।'
       : 'I only help with spiritual, Bhagavad Gita, meditation, reflective life-guidance, and habit-improvement questions. Use Nexus Assistant for general tasks.';
