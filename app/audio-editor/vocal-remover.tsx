@@ -49,7 +49,7 @@ export default function VocalRemoverScreen() {
       setLibrary(found.audio);
       setStatus(found.permissionGranted ? `${found.audio.length} local audio files found.` : 'Music permission is required to scan local audio.');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Unable to scan local audio.');
+      setStatus(getUserFriendlyMessage(error, 'We could not scan your audio library. Please check media access and try again.'));
     }
   }, []);
 
@@ -77,7 +77,7 @@ export default function VocalRemoverScreen() {
       setResult(next);
       setStatus('Vocal separation completed and saved to Nexus Plus.');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Vocal separation failed.');
+      setStatus(getUserFriendlyMessage(error, 'We could not separate the vocals. Please try again.'));
     } finally {
       setBusy(false);
     }
@@ -96,7 +96,7 @@ export default function VocalRemoverScreen() {
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Vocal Remover</Text>
           <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-            Android-native center-channel separation for local stereo audio.
+            Separate vocals from local stereo audio on this device.
           </Text>
         </View>
       </View>
