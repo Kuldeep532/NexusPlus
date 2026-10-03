@@ -52,7 +52,7 @@ export default function TvRemoteScreen(){
     <Text style={[styles.section,{color:colors.foreground}]}>Apps</Text>
     <View style={styles.grid}>{defaults.map(k=><Pressable key={k} accessibilityRole="button" accessibilityLabel={k} onPress={()=>{ void remoteHaptic('press'); if(k==='All Apps') router.push('/remote-control/tv-all-apps'); else Alert.alert(k,'This TV app cannot be opened through the current connection.'); }} style={[styles.key,{backgroundColor:colors.card,borderColor:colors.border}]}><Text style={{color:colors.foreground}}>{k}</Text></Pressable>)}</View>
     <Pressable accessibilityRole="button" onPress={()=>router.push('/remote-control/tv-all-apps')} style={[styles.all,{backgroundColor:colors.primary}]}><Text style={{color:colors.primaryForeground,fontFamily:'Inter_700Bold'}}>All Apps</Text></Pressable>
-    <Text style={[styles.sub,{color:colors.mutedForeground}]}>{getComingSoonLabel('TV receiver-dependent screen/accessibility sync')}</Text>
+    <Text style={[styles.sub,{color:colors.mutedForeground}]}>{getComingSoonLabel('Advanced TV screen and accessibility controls are not available with this connection yet')}</Text>
     <Pressable accessibilityRole="button" onPress={()=>router.replace('/remote-control')}><Text style={{color:colors.foreground,textAlign:'center'}}>Back</Text></Pressable>
    </ScrollView>
  </View>
