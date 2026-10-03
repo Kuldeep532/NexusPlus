@@ -49,7 +49,7 @@ export default function AudioCompressorScreen() {
       setProbe(metadata);
       setMessage('Audio loaded. Choose a compression preset.');
     } catch (error) {
-      setMessage(getUserFriendlyMessage(error, 'Unable to inspect this audio file.'));
+      setMessage(getUserFriendlyMessage(error, 'We could not inspect this audio file. Please try again.'));
     } finally {
       setLoading(false);
     }
