@@ -19,11 +19,6 @@ export default function WelcomeScreen() {
     router.replace('/login-plus-register');
   };
 
-  const openGoogleLogin = async () => {
-    if (!accepted) return;
-    await continueToLogin();
-  };
-
   return (
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -64,26 +59,13 @@ export default function WelcomeScreen() {
         <View style={styles.actions}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Get started"
+            accessibilityLabel="Continue to account sign in"
             accessibilityState={{ disabled: !accepted }}
             disabled={!accepted}
             onPress={() => void continueToLogin()}
             style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: accepted ? 1 : 0.45 }]}
           >
-            <Text style={[styles.primaryText, { color: colors.primaryForeground }]}>Get Started</Text>
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Login with Google"
-            accessibilityHint="Continue to Google login"
-            accessibilityState={{ disabled: !accepted }}
-            disabled={!accepted}
-            onPress={() => void openGoogleLogin()}
-            style={[styles.googleButton, { backgroundColor: colors.card, borderColor: colors.border, opacity: accepted ? 1 : 0.45 }]}
-          >
-            <Feather name="globe" size={17} color={colors.foreground} />
-            <Text style={[styles.googleText, { color: colors.foreground }]}>Login with Google</Text>
+            <Text style={[styles.primaryText, { color: colors.primaryForeground }]}>Continue</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -106,6 +88,4 @@ const styles = StyleSheet.create({
   actions: { width: '100%', maxWidth: 360, gap: 10, marginTop: 12 },
   primaryButton: { minHeight: 52, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   primaryText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
-  googleButton: { minHeight: 52, borderRadius: 15, borderWidth: 1, flexDirection: 'row', gap: 9, alignItems: 'center', justifyContent: 'center' },
-  googleText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
 });
