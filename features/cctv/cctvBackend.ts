@@ -53,7 +53,7 @@ export class OnvifCctvProtocolAdapter implements CctvProtocolAdapter {
     if (!camera.securityProfile?.secureTransport) throw new CctvBackendError({ code: 'AUTH_FAILED', message: 'Secure camera transport is required.', retryable: false });
     if (Platform.OS !== 'android' || !this.native) throw new CctvBackendError({ code: 'NOT_IMPLEMENTED', message: 'Camera control is currently available on supported Android devices.', retryable: false });
     const credentials = await cctvCredentialStore.read(camera.id);
-    if (!credentials) throw new CctvBackendError({ code: 'AUTH_REQUIRED', message: 'Camera authorization is required.', retryable: false });
+    if (!credentials) throw new CctvBackendError({ code: 'AUTH_REQUIRED', message: 'Camera sign-in is required.', retryable: false });
     if (!camera.host || !camera.port) throw new CctvBackendError({ code: 'NETWORK_UNAVAILABLE', message: 'Camera endpoint is unavailable.', retryable: true });
     const session = createSession(camera.id);
     try {
