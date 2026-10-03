@@ -73,7 +73,7 @@ export default function AudioCompressorScreen() {
       setMessage(
         result.permissionGranted
           ? `${result.audio.length} audio file${result.audio.length === 1 ? '' : 's'} found.`
-          : 'Music and audio permission is required to scan local audio.',
+          : 'Allow media access to scan audio on your device.',
       );
     } catch (error) {
       setMessage(getUserFriendlyMessage(error, 'We could not scan your audio library. Please check media access and try again.'));
