@@ -1,7 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
-import { SUPABASE_URL } from './authConfig';
+import { SUPABASE_URL, SUPABASE_GOOGLE_REDIRECT_URI } from './authConfig';
 import type { AuthUserProfile, EmailPasswordInput } from './authTypes';
 import type { SupabaseAuthAdapter } from './authRepository';
 
@@ -9,7 +9,6 @@ const ANON_KEY = (process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.en
 const SESSION_KEY = 'nexus-plus.supabase.session.v1';
 const PKCE_VERIFIER_KEY = 'nexus-plus.supabase.google.pkce.v1';
 const PKCE_STATE_KEY = 'nexus-plus.supabase.google.state.v1';
-const REDIRECT_URI = 'nexus-plus://auth/callback';
 
 type SupabaseUser = {
   id: string;
@@ -43,9 +42,7 @@ async function parseError(response: Response): Promise<never> {
   try {
     const payload = await response.json();
     message = String(payload?.msg ?? payload?.message ?? payload?.error_description ?? payload?.error ?? message);
-  } catch {
-    // Keep stable status-based error.
-  }
+  } catch {}
   throw new Error(message);
 }
 
@@ -94,7 +91,6 @@ async function readStoredSession(): Promise<SupabaseSessionResponse | null> {
 
 async function refreshStoredSession(stored: SupabaseSessionResponse): Promise<SupabaseSessionResponse | null> {
   if (!stored.refresh_token) return null;
-
   try {
     const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
       method: 'POST',
@@ -173,7 +169,7 @@ export const supabaseAuthAdapter: SupabaseAuthAdapter = {
 
     const params = new URLSearchParams({
       provider: 'google',
-      redirect_to: REDIRECT_URI,
+      redirect_to: SUPABASE_GOOGLE_REDIRECT_URI,
       response_type: 'code',
       code_challenge: challenge,
       code_challenge_method: 's256',
@@ -182,7 +178,7 @@ export const supabaseAuthAdapter: SupabaseAuthAdapter = {
 
     const result = await WebBrowser.openAuthSessionAsync(
       `${SUPABASE_URL}/auth/v1/authorize?${params.toString()}`,
-      REDIRECT_URI,
+      SUPABASE_GOOGLE_REDIRECT_URI,
     );
 
     if (result.type !== 'success' || !result.url) {
@@ -261,9 +257,7 @@ export const supabaseAuthAdapter: SupabaseAuthAdapter = {
           method: 'POST',
           headers: headers(token),
         });
-      } catch {
-        // Local session is still cleared when offline.
-      }
+      } catch {}
     }
     await SecureStore.deleteItemAsync(SESSION_KEY);
   },
