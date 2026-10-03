@@ -99,7 +99,7 @@ function RootLayoutContent() {
   useEffect(() => {
     if (auth.loading) return;
     const firstSegment = segments[0];
-    const inAuth = firstSegment === 'login-plus-register';
+    const inAuth = firstSegment === 'login-plus-register' || firstSegment === 'forgot-password';
     const inWelcome = firstSegment === 'welcome';
     const inTabs = firstSegment === '(tabs)';
     const inHome = firstSegment === 'home';
