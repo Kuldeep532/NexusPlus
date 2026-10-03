@@ -26,7 +26,7 @@ export class NativeAiVocalRemovalEngine implements VocalRemovalEngine {
 
   async separate(inputUri: string, options: VocalRemovalOptions, onProgress?: (p: VocalRemovalProgress) => void) {
     if (AudioEditorNative?.vocalRemove) {
-      onProgress?.({ stage: 'preparing', progress: 0.03, message: 'Preparing Android audio decoder' });
+      onProgress?.({ stage: 'preparing', progress: 0.03, message: 'Preparing audio…' });
       const outputUri = await createAudioEditorOutputPath(
         'Vocal Remover',
         inputUri.split('/').pop() || 'audio',
@@ -41,11 +41,11 @@ export class NativeAiVocalRemovalEngine implements VocalRemovalEngine {
         options.preserveBass,
         options.preserveStereo,
       );
-      onProgress?.({ stage: 'separating', progress: 0.8, message: 'Applying native center-channel separation' });
+      onProgress?.({ stage: 'separating', progress: 0.8, message: 'Separating vocals…' });
       onProgress?.({ stage: 'complete', progress: 1, message: 'Vocal separation complete' });
       return { outputUri: result.outputPath, durationMs: result.durationMs };
     }
-    throw new Error('Android Audio Editor native vocal-removal module is unavailable. Rebuild the Android app.');
+    throw new Error('Vocal removal is not available on this device right now.');
   }
 
   async cancel(): Promise<void> {}
@@ -63,7 +63,7 @@ export class PhaseCancelVocalRemovalEngine implements VocalRemovalEngine {
   }
 
   async separate(): Promise<{ outputUri: string }> {
-    throw new Error('The compatibility phase-cancel engine is disabled because it previously returned a URI without processing audio.');
+    throw new Error('This vocal removal option is not available right now.');
   }
 
   async cancel(): Promise<void> {}
