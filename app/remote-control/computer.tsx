@@ -1,5 +1,5 @@
 import { Stack, useRouter } from 'expo-router';
-import { Alert, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Alert, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useEffect, useMemo, useState } from 'react';
 import { getRemoteConnections, type RemoteConnection } from '@/features/remote-control/remoteControlStore';
@@ -8,6 +8,7 @@ import { remoteHaptic } from '@/features/remote-control/remoteFeedback';
 
 export default function ComputerRemoteScreen(){
  const colors=useColors(); const router=useRouter();
+ useEffect(()=>{ const subscription=BackHandler.addEventListener('hardwareBackPress',()=>{ router.replace('/remote-control'); return true; }); return()=>subscription.remove(); },[router]);
  return <View style={[styles.root,{backgroundColor:colors.background}]}>
   <Stack.Screen options={{title:'Computer Remote'}}/>
   <Text accessibilityRole="header" style={[styles.title,{color:colors.foreground}]}>Computer Remote</Text>
