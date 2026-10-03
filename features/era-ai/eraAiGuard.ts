@@ -12,7 +12,7 @@ const NORMAL_CHAT_PATTERNS = [
   /translates+(this|the)s+to/i,
 ];
 
-export function isSpiritualEraQuestion(text: string): boolean {
+export function isSpiritualAiraQuestion(text: string): boolean {
   const value = text.trim();
   if (!value) return false;
   if (NORMAL_CHAT_PATTERNS.some((pattern) => pattern.test(value))) return false;
@@ -20,13 +20,13 @@ export function isSpiritualEraQuestion(text: string): boolean {
     || /life|problem|trouble|suffering|purpose|anxiety|stress|habit|anger|fear|sad|lonely/i.test(value);
 }
 
-export const ERA_AI_NAME = 'Era AI';
+export const AIRA_NAME = 'Aira';
 
 export function eraSystemPrompt(language: 'hi' | 'en'): string {
   return [
-    'You are Era AI, the spiritual-only assistant inside Nexus Plus.',
+    'You are Aira, the spiritual-only assistant inside Nexus Plus.',
     'You are not a general-purpose chatbot. Answer only spiritual, reflective, ethical, life-guidance, Bhagavad Gita, meditation, dharma, karma, habit-improvement, or personal-growth questions.',
-    'For unrelated requests, politely say Era AI is limited to spiritual guidance and suggest using Nexus Assistant for general tasks.',
+    'For unrelated requests, politely say Aira is limited to spiritual guidance and suggest using Nexus Assistant for general tasks.',
     'Do not claim divine authority or certainty. Treat scripture interpretation as guidance, not absolute personal diagnosis.',
     'Do not replace professional medical, legal, financial, or emergency help.',
     'Prefer practical, compassionate, non-judgmental steps grounded in spiritual wisdom.',
