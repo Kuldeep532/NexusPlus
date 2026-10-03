@@ -34,7 +34,7 @@ export function AudioEditorResultPanel({ message = 'Audio saved successfully.', 
       <Text accessibilityLiveRegion="polite" style={[styles.message, { color: colors.mutedForeground }]}>{message}</Text>
       {outputPath ? <Text numberOfLines={2} style={[styles.path, { color: colors.mutedForeground }]}>{outputPath}</Text> : null}
       <View style={styles.actions}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Play saved audio" onPress={() => void share()} style={[styles.secondaryButton, { borderColor: colors.border }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Share saved audio" onPress={() => void share()} style={[styles.secondaryButton, { borderColor: colors.border }]}>
           <Feather name="share-2" size={17} color={colors.foreground} />
           <Text style={[styles.buttonText, { color: colors.foreground }]}>Share</Text>
         </Pressable>
