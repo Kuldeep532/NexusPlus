@@ -23,7 +23,7 @@ export default function TvRemoteScreen(){
       setStatus(`Sent: ${label}`);
     } catch {
       void remoteHaptic('error');
-      setStatus('Universal TV transmitter is not available on this phone');
+      setStatus('TV control is not available on this phone');
     }
   }, []);
 
@@ -50,7 +50,7 @@ export default function TvRemoteScreen(){
     </View>
     <View style={styles.grid}>{keys.map(k=><Pressable key={k} accessibilityRole="button" accessibilityLabel={k.replaceAll('_',' ')} onPress={()=>void send(k)} style={[styles.key,{backgroundColor:colors.card,borderColor:colors.border}]}><Text style={{color:colors.foreground,textAlign:'center'}}>{k.replaceAll('_',' ')}</Text></Pressable>)}</View>
     <Text style={[styles.section,{color:colors.foreground}]}>Apps</Text>
-    <View style={styles.grid}>{defaults.map(k=><Pressable key={k} accessibilityRole="button" accessibilityLabel={k} onPress={()=>{ void remoteHaptic('press'); if(k==='All Apps') router.push('/remote-control/tv-all-apps'); else Alert.alert(k,'This shortcut needs a compatible TV transport. Dynamic TV app launch remains receiver-ready.'); }} style={[styles.key,{backgroundColor:colors.card,borderColor:colors.border}]}><Text style={{color:colors.foreground}}>{k}</Text></Pressable>)}</View>
+    <View style={styles.grid}>{defaults.map(k=><Pressable key={k} accessibilityRole="button" accessibilityLabel={k} onPress={()=>{ void remoteHaptic('press'); if(k==='All Apps') router.push('/remote-control/tv-all-apps'); else Alert.alert(k,'This TV app cannot be opened through the current connection.'); }} style={[styles.key,{backgroundColor:colors.card,borderColor:colors.border}]}><Text style={{color:colors.foreground}}>{k}</Text></Pressable>)}</View>
     <Pressable accessibilityRole="button" onPress={()=>router.push('/remote-control/tv-all-apps')} style={[styles.all,{backgroundColor:colors.primary}]}><Text style={{color:colors.primaryForeground,fontFamily:'Inter_700Bold'}}>All Apps</Text></Pressable>
     <Text style={[styles.sub,{color:colors.mutedForeground}]}>{getComingSoonLabel('TV receiver-dependent screen/accessibility sync')}</Text>
     <Pressable accessibilityRole="button" onPress={()=>router.replace('/remote-control')}><Text style={{color:colors.foreground,textAlign:'center'}}>Back</Text></Pressable>
