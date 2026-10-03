@@ -60,7 +60,7 @@ export default function AudioCompressorScreen() {
       const picked = await pickAudioFromFileManager();
       if (picked) await loadSource(picked);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to choose an audio file.');
+      setMessage(getUserFriendlyMessage(error, 'We could not choose that audio file. Please try again.'));
     }
   }, [loadSource]);
 
@@ -76,7 +76,7 @@ export default function AudioCompressorScreen() {
           : 'Music and audio permission is required to scan local audio.',
       );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to scan local audio.');
+      setMessage(getUserFriendlyMessage(error, 'We could not scan your audio library. Please check media access and try again.'));
     } finally {
       setLoading(false);
     }
@@ -100,9 +100,9 @@ export default function AudioCompressorScreen() {
         inputSizeBytes: Number(result.inputSizeBytes ?? 0),
         outputSizeBytes: Number(result.outputSizeBytes ?? 0),
       });
-      setMessage('Audio compressed and saved successfully to Nexus Plus // audio // audio compress');
+      setMessage('Audio compressed and saved successfully.');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to compress this audio file.');
+      setMessage(getUserFriendlyMessage(error, 'We could not compress this audio file. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -131,7 +131,7 @@ export default function AudioCompressorScreen() {
         <View style={styles.headerCopy}>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Audio Compressor</Text>
           <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-            Reduce audio size with real native AAC re-encoding while keeping the original source untouched.
+            Reduce the audio file size while keeping your original recording unchanged.
           </Text>
         </View>
       </View>
