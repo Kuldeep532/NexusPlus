@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AuthSession, EmailPasswordInput } from './authTypes';
-import { bindCloudSyncAccount } from '@/features/cloud-sync/cloudSyncBinding';
 import {
   getStoredAuthSession,
   supabaseAuthAdapter,
@@ -43,12 +42,6 @@ async function initializeSharedAuth(): Promise<void> {
 function subscribe(listener: AuthListener): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
-}
-
-async function bindSessionToCloudOwner(value: AuthSession): Promise<void> {
-  const email = value.user.email?.trim();
-  if (!email) throw new Error('CLOUD_SYNC_ACCOUNT_EMAIL_REQUIRED');
-  await bindCloudSyncAccount({ ownerEmail: email, ownerUserId: value.user.uid, provider: 'google-drive', boundAt: Date.now(), driveFolderId: null });
 }
 
 function setSharedSession(value: AuthSession | null): void {
@@ -95,11 +88,10 @@ export function useAuth() {
     setBusy(true);
     try {
       const next = await action();
-      await bindSessionToCloudOwner(next);
       setSharedSession(next);
       return next;
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Authentication failed.';
+      const message = err instanceof Error ? err.message : 'AUTHENTICATION_FAILED';
       setError(message);
       throw err;
     } finally {
@@ -119,17 +111,8 @@ export function useAuth() {
 
   const register = useCallback((input: EmailPasswordInput) => run(async () => {
     validateEmailPasswordInput(input);
-    try {
-      const value = await supabaseAuthAdapter.registerWithEmailPassword(input) as any;
-      return normalizeSession(value, 'password');
-    } catch (err) {
-      if (err instanceof Error && err.message === 'ACCOUNT_CREATED_CHECK_EMAIL') {
-        // Signup succeeded but Supabase requires email confirmation before a session exists.
-        // Do not route the user to Home without an authenticated session.
-        throw err;
-      }
-      throw err;
-    }
+    const value = await supabaseAuthAdapter.registerWithEmailPassword(input) as any;
+    return normalizeSession(value, 'password');
   }), [run]);
 
   const signOut = useCallback(async () => {
@@ -139,7 +122,7 @@ export function useAuth() {
       await supabaseAuthAdapter.signOut();
       setSharedSession(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not sign out.');
+      setError(err instanceof Error ? err.message : 'SIGN_OUT_FAILED');
     } finally {
       setBusy(false);
     }
