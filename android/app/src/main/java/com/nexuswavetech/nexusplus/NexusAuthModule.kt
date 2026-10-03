@@ -6,16 +6,16 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 
 /**
- * Stable native authentication boundary.
- * A real Google credential provider can be wired behind this contract later;
- * this module never fabricates an authenticated user or token.
+ * Compatibility boundary retained for older callers.
+ * Authentication is handled by the Supabase web/PKCE flow used by the React layer.
+ * This module does not claim to provide an independent Google credential flow.
  */
 class NexusAuthModule(private val reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
     override fun getName(): String = "NexusAuth"
 
     @ReactMethod
     fun signInWithGoogle(promise: Promise) {
-        promise.reject("AUTH_PROVIDER_UNAVAILABLE", "Google sign-in is not configured in this Android build.")
+        promise.reject("AUTH_USE_SUPABASE_FLOW", "Google sign-in is handled by the account sign-in screen.")
     }
 
     @ReactMethod
