@@ -1,5 +1,5 @@
 const FRIENDLY_MESSAGES: Record<string, string> = {
-  SUPABASE_AUTH_NOT_CONFIGURED: 'We could not connect to your account service. Please check your internet connection and try again.',
+  SUPABASE_AUTH_NOT_CONFIGURED: 'Sign-in is unavailable right now. Please try again.',
   AUTH_SESSION_NOT_CREATED: 'We could not complete your sign-in. Please try again.',
   ACCOUNT_CREATED_CHECK_EMAIL: 'Your account was created. Please check your email to verify it.',
   GOOGLE_SIGN_IN_CANCELLED: 'Sign-in was cancelled.',
