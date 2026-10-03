@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
+import { useCallback, useState , useEffect} from 'react';
+import { BackHandler, ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
@@ -15,6 +15,7 @@ const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const PITCHES = [-8, -6, -4, -2, 0, 2, 4, 6, 8];
 
 export default function SpeedPitchScreen() {
+  const router = useRouter();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [source, setSource] = useState<AudioEditorSource | null>(null);
@@ -70,6 +71,11 @@ export default function SpeedPitchScreen() {
       </ScrollView>
     );
   }
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { router.replace('/audio-editor'); return true; });
+    return () => subscription.remove();
+  }, [router]);
 
   return (
     <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 18, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 32 }}>
