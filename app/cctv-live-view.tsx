@@ -49,7 +49,7 @@ export default function CctvLiveViewScreen() {
       if (control === 'stop') { setRunning(false); setStreamUri(null); }
       if (control === 'playback') router.push({ pathname: '/cctv-playback', params: { cameraId: camera.id } });
     } catch (error) {
-      setMessage(error instanceof CctvBackendError ? getUserFriendlyMessage(error, 'Camera control failed.') : getUserFriendlyMessage(error, 'Camera control failed.'));
+      setMessage(error instanceof CctvBackendError ? getUserFriendlyMessage(error, 'We could not control the camera. Please try again.') : getUserFriendlyMessage(error, 'We could not control the camera. Please try again.'));
     }
   };
 
@@ -57,7 +57,7 @@ export default function CctvLiveViewScreen() {
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <Stack.Screen options={{ title: camera.name }} />
       <ScrollView contentContainerStyle={styles.content}>
-        <View accessible accessibilityRole="image" accessibilityLabel={running ? `Authorized live camera stream for ${camera.name}.` : `Live view inactive for ${camera.name}.`} style={[styles.feed, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View accessible accessibilityRole="image" accessibilityLabel={running ? `Live camera view for ${camera.name}.` : `Live view is off for ${camera.name}.`} style={[styles.feed, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {running && streamUri ? (
             <VideoView player={player} style={styles.video} contentFit="contain" nativeControls allowsFullscreen />
           ) : (
