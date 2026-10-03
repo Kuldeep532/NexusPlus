@@ -115,6 +115,20 @@ export function useAuth() {
     return normalizeSession(value, 'password');
   }), [run]);
 
+  const resetPassword = useCallback(async (email: string) => {
+    setError(null);
+    setBusy(true);
+    try {
+      await supabaseAuthAdapter.sendPasswordResetEmail(email);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'PASSWORD_RESET_FAILED';
+      setError(message);
+      throw err;
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     setBusy(true);
     setError(null);
@@ -128,5 +142,5 @@ export function useAuth() {
     }
   }, []);
 
-  return { session, loading, busy, error, google, emailSignIn, register, signOut };
+  return { session, loading, busy, error, google, emailSignIn, register, resetPassword, signOut };
 }
