@@ -11,9 +11,9 @@ export default function ComputerRemoteSettings(){
  return <View style={[styles.root,{backgroundColor:colors.background}]}>
   <Stack.Screen options={{title:'Computer Remote Settings'}}/>
   <Text accessibilityRole="header" style={[styles.title,{color:colors.foreground}]}>Computer Remote Settings</Text>
-  <Text style={[styles.sub,{color:colors.mutedForeground}]}>Screen viewing is prepared but the live screen-stream receiver is not part of the current remote transport.</Text>
+  <Text style={[styles.sub,{color:colors.mutedForeground}]}>Screen viewing is not available on this connection yet.</Text>
   <Pressable accessibilityRole="switch" accessibilityState={{checked:screenOnMobile}} onPress={()=>void toggle()} style={[styles.toggle,{backgroundColor:screenOnMobile?colors.primary:colors.secondary}]}><Text style={{color:screenOnMobile?colors.primaryForeground:colors.foreground,fontFamily:'Inter_700Bold'}}>{screenOnMobile?'View Computer Screen on Mobile: ON':'View Computer Screen on Mobile: OFF'}</Text></Pressable>
-  <Text style={[styles.sub,{color:colors.mutedForeground}]}>Coming Soon: Nexus PC receiver screen streaming and View Mobile Screen on PC.</Text>
+  <Text style={[styles.sub,{color:colors.mutedForeground}]}>Screen sharing will appear here when a compatible receiver is connected.</Text>
   <Pressable accessibilityRole="button" onPress={()=>router.replace('/remote-control/computer')}><Text style={{color:colors.foreground,textAlign:'center'}}>Back</Text></Pressable>
  </View>
 }
