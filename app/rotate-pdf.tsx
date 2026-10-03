@@ -82,7 +82,7 @@ export default function RotatePdfScreen() {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (!pdf && !result && !selection && !busy) return false;
       resetTool();
-      return false;
+      return true;
     });
     return () => subscription.remove();
   }, [busy, pdf, result, selection]));
