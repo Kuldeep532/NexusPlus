@@ -72,9 +72,9 @@ export default function LoginPlusRegisterScreen() {
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <Text style={[styles.kicker, { color: colors.primary }]}>NEXUS PLUS ACCOUNT</Text>
-        <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Login & Register</Text>
-        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Sign in with Google through Supabase or use your Nexus Plus email account.</Text>
+        <Text style={[styles.kicker, { color: colors.primary }]}>NEXUS PLUS</Text>
+        <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>Sign in to Nexus Plus</Text>
+        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Choose how you want to sign in.</Text>
       </View>
 
       {showModeChoice && <View accessibilityRole="dialog" style={[styles.modeCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -94,13 +94,13 @@ export default function LoginPlusRegisterScreen() {
       {!showModeChoice && displayError ? <View accessible accessibilityRole="alert" style={[styles.errorBox, { backgroundColor: colors.destructive + '18', borderColor: colors.destructive }]}><Text style={[styles.errorText, { color: colors.destructive }]}>{displayError}</Text></View> : null}
 
       {!showModeChoice && mode === 'chooser' && <View style={styles.stack}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Login with Google" accessibilityHint="Opens Google sign-in through Supabase" disabled={auth.busy} onPress={() => void signInGoogle()} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: auth.busy ? 0.55 : 1 }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Sign in with Google" accessibilityHint="Opens Google sign-in through Supabase" disabled={auth.busy} onPress={() => void signInGoogle()} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: auth.busy ? 0.55 : 1 }]}>
           <Feather name="globe" size={18} color={colors.primaryForeground} />
           <Text style={[styles.primaryText, { color: colors.primaryForeground }]}>Login with Google</Text>
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Login with email and password" onPress={() => setMode('login')} style={[styles.secondaryButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Feather name="mail" size={18} color={colors.foreground} />
-          <Text style={[styles.secondaryText, { color: colors.foreground }]}>Login with Email + Password</Text>
+          <Text style={[styles.secondaryText, { color: colors.foreground }]}>Use Email</Text>
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Create a new account" onPress={() => setMode('register')} style={[styles.secondaryButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Feather name="user-plus" size={18} color={colors.foreground} />
