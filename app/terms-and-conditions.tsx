@@ -48,7 +48,7 @@ export default function TermsAndConditionsScreen() {
   return (
     <LegalDocumentScreen
       title="Terms & Conditions"
-      subtitle="Simple, clear terms for using Nexus Plus, its features and paid services."
+      subtitle="These Terms and Conditions explain how Nexus Plus can be used, including its features, accounts and paid services."
       sections={{ en, hi }}
     />
   );
