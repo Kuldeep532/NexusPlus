@@ -17,7 +17,7 @@ export default function RemoteHomeScreen() {
     </Pressable>)}
     <Pressable accessibilityRole="button" onPress={()=>router.push('/remote-control/connect-computer')} style={[styles.device,{backgroundColor:colors.card,borderColor:colors.border}]}>
       <Text style={[styles.name,{color:colors.foreground}]}>Computer Remote</Text>
-      <Text style={[styles.meta,{color:colors.mutedForeground}]}>Coming Soon · Nexus PC receiver</Text>
+      <Text style={[styles.meta,{color:colors.mutedForeground}]}>Computer control is not available yet</Text>
     </Pressable>
     <Pressable accessibilityRole="button" onPress={()=>router.push('/remote-control/add-new-connection')} style={[styles.add,{backgroundColor:colors.primary}]}>
       <Text style={{color:colors.primaryForeground,fontFamily:'Inter_700Bold'}}>Add New Connection</Text>
