@@ -256,7 +256,7 @@ export const supabaseAuthAdapter: SupabaseAuthAdapter = {
 
   async signInWithEmailPassword(email: string, password: string) {
     const response = await requestSession('/auth/v1/token?grant_type=password', {
-      email: email.trim(),
+      email: email.trim().toLowerCase(),
       password,
     });
     await persistSession(response);
@@ -275,7 +275,7 @@ export const supabaseAuthAdapter: SupabaseAuthAdapter = {
 
   async registerWithEmailPassword(input: EmailPasswordInput) {
     const response = await requestSession('/auth/v1/signup', {
-      email: input.email.trim(),
+      email: input.email.trim().toLowerCase(),
       password: input.password,
       data: { full_name: input.name.trim() },
     });
