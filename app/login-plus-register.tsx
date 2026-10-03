@@ -13,7 +13,7 @@ function friendlyAuthError(error: string | null): string | null {
   if (!error) return null;
   if (error === 'ACCOUNT_CREATED_CHECK_EMAIL') return 'Your account was created. Please verify your email, then log in.';
   if (error === 'AUTH_SESSION_NOT_CREATED') return 'We could not finish signing you in. Please try again.';
-  if (error === 'SUPABASE_AUTH_NOT_CONFIGURED') return 'Sign-in is temporarily unavailable. Please check your connection and try again.';
+  if (error === 'SUPABASE_AUTH_NOT_CONFIGURED') return 'Sign-in is unavailable right now. Please try again.';
   if (error === 'GOOGLE_SIGN_IN_CANCELLED') return 'Google sign-in was cancelled.';
   if (/GOOGLE_SIGN_IN_STATE_MISMATCH|GOOGLE_SIGN_IN_VERIFIER_MISSING|GOOGLE_SIGN_IN_CODE_MISSING/i.test(error)) return 'We could not verify the Google sign-in. Please try again.';
   if (/INVALID_LOGIN_CREDENTIALS|invalid login credentials|invalid_credentials/i.test(error)) return 'The email or password is incorrect.';
