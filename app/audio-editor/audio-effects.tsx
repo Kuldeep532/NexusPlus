@@ -84,7 +84,7 @@ export default function AudioEffectsScreen() {
       setEndText(formatTime(metadata.durationMs));
       setMessage('Audio loaded. Choose an effect and range.');
     } catch (error) {
-      setMessage(getUserFriendlyMessage(error, 'Unable to inspect this audio file.'));
+      setMessage(getUserFriendlyMessage(error, 'We could not inspect this audio file. Please try again.'));
     } finally {
       setLoading(false);
     }
