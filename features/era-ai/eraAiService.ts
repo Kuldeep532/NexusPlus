@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { callGateway, discoverGatewayEndpoints } from '@/features/api-gateway/apiGatewayClient';
-import { eraSystemPrompt, isSpiritualEraQuestion } from './eraAiGuard';
+import { eraSystemPrompt, isSpiritualAiraQuestion } from './eraAiGuard';
 import type { EraLanguage, EraResponse, EraHabitSignal, EraRecommendation } from './eraAiTypes';
 
 const HABIT_KEY = '@nexus-plus/era-ai/habits.v1';
@@ -45,7 +45,7 @@ function makeRecommendations(habits: EraHabitSignal[]): EraRecommendation[] {
   if (!top) return [];
   if (top.id === 'stress') return [{ id: 'stress-gita', title: 'शांति के लिए गीता', body: 'आज कुछ मिनट शांत होकर गीता का एक श्लोक पढ़ें।', action: 'open-gita', chapter: 2, verse: 47 }];
   if (top.id === 'anger') return [{ id: 'anger-gita', title: 'क्रोध पर चिंतन', body: 'अध्याय 2 का एक संबंधित श्लोक पढ़कर प्रतिक्रिया से पहले ठहरें।', action: 'open-gita', chapter: 2, verse: 63 }];
-  if (top.id === 'consistency') return [{ id: 'consistency-reminder', title: 'दैनिक साधना', body: 'आज 5 मिनट का छोटा आध्यात्मिक अभ्यास तय करें।', action: 'reminder', reminderText: 'Era AI: 5 मिनट शांत ध्यान या गीता पाठ का समय।' }];
+  if (top.id === 'consistency') return [{ id: 'consistency-reminder', title: 'दैनिक साधना', body: 'आज 5 मिनट का छोटा आध्यात्मिक अभ्यास तय करें।', action: 'reminder', reminderText: 'Aira: 5 मिनट शांत ध्यान या गीता पाठ का समय।' }];
   return [{ id: 'reflection', title: 'आज का चिंतन', body: 'कुछ मिनट मौन में बैठकर अपने विचारों को देखें।', action: 'reminder', reminderText: 'Era AI: आज कुछ मिनट आत्म-चिंतन के लिए रुकें।' }];
 }
 
@@ -95,7 +95,7 @@ async function callEraProvider(message: string, language: EraLanguage, context?:
   return typeof text === 'string' && text.trim() ? text.trim() : null;
 }
 
-export async function askEraAI(input: {
+export async function askAira(input: {
   message: string;
   language: EraLanguage;
   gitaContext?: { chapter: number; verse: number; text?: string };
@@ -121,7 +121,7 @@ export async function askEraAI(input: {
   return { text, language: input.language, allowed: true, suggestions: makeRecommendations(habits) };
 }
 
-export async function getEraHabitRecommendations(): Promise<EraRecommendation[]> {
+export async function getAiraHabitRecommendations(): Promise<EraRecommendation[]> {
   try {
     const habits = JSON.parse(await AsyncStorage.getItem(HABIT_KEY) || '[]') as EraHabitSignal[];
     return makeRecommendations(habits);
