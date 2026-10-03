@@ -22,16 +22,16 @@ type UniversalTvNative = {
 const native = NativeModules.NexusTvRemote as UniversalTvNative | undefined;
 
 export async function getUniversalTvReceiverStatus() {
-  if (!native?.getReceiverStatus) return { available: false, reason: 'TV receiver is not installed.' };
+  if (!native?.getReceiverStatus) return { available: false, reason: 'A compatible TV connection is not set up.' };
   try {
     return await native.getReceiverStatus();
   } catch {
-    return { available: false, reason: 'TV receiver is not available.' };
+    return { available: false, reason: 'A compatible TV connection is not available.' };
   }
 }
 
 export async function sendUniversalTvKey(key: UniversalTvKey): Promise<boolean> {
-  if (!native?.sendIrKey) throw new Error('Universal TV key transport is not available on this device.');
+  if (!native?.sendIrKey) throw new Error('TV controls are not available on this device.');
   return native.sendIrKey(key);
 }
 
