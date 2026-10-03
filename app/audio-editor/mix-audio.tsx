@@ -75,7 +75,7 @@ export default function MixAudioScreen() {
         setMessage(`Track added: ${source.name}.`);
       }
     } catch (error) {
-      setMessage(getUserFriendlyMessage(error, 'Unable to inspect this audio file.'));
+      setMessage(getUserFriendlyMessage(error, 'We could not inspect this audio file. Please try again.'));
     } finally {
       setLoading(false);
     }
