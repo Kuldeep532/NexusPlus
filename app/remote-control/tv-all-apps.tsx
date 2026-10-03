@@ -44,7 +44,7 @@ export default function TvAllAppsScreen() {
     void remoteHaptic('press');
     if (!app.packageHints.length) {
       void remoteHaptic('error');
-      Alert.alert(app.name, 'This TV app cannot be checked without a TV connection. The app is not installed or not available through the current remote transport.');
+      Alert.alert(app.name, 'This app cannot be checked until a TV connection is active.');
       return;
     }
     try {
@@ -52,7 +52,7 @@ export default function TvAllAppsScreen() {
     } catch (error) {
       if (error instanceof Error && error.message === 'APP_NOT_INSTALLED') {
         void remoteHaptic('error');
-        Alert.alert(app.name, 'The app is not installed or this TV does not expose that app through the current remote transport.');
+        Alert.alert(app.name, 'The app is not installed or is not available through this TV connection.');
       } else {
         void remoteHaptic('error');
         Alert.alert(app.name, 'The app could not be opened on this device.');
@@ -65,7 +65,7 @@ export default function TvAllAppsScreen() {
     <ScrollView contentContainerStyle={styles.content}>
       <Text accessibilityRole="header" style={[styles.title,{color:colors.foreground}]}>All Apps</Text>
       <Text style={[styles.sub,{color:colors.mutedForeground}]}>
-        Installed-app launch uses the local Android app registry where supported. Dynamic TV installed-app discovery remains receiver-ready.
+        Available apps depend on the connected TV and its supported controls.
       </Text>
       {['Video','India','Music','Media','Social','Education','Utility','System','TV'].map((category) => {
         const apps = GENERIC_TV_APPS.filter((app) => app.category === category);
