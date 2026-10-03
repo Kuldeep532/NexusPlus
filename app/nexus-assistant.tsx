@@ -3,8 +3,9 @@ import * as DocumentPicker from 'expo-document-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { getAssistantModelPreference, setAssistantModelPreference, type AssistantModelId } from '@/features/nexus-assistant/aiModelPreferences';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { BackHandler, ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { ASSISTANT_LIMITS, ASSISTANT_MODELS, ASSISTANT_VOICES, NEXUS_CORE_MODEL_ID } from '@/features/nexus-assistant/assistantConfig';
@@ -38,10 +39,16 @@ function redactedAssistantUserText(text: string): string {
   const command = parseAssistantPdfCommand(text);
   if (!command) return text;
   if (command.kind === 'lock' || command.kind === 'unlock') return '/' + command.kind + ' [password redacted]';
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { router.back(); return true; });
+    return () => subscription.remove();
+  }, [router]);
+
   return text;
 }
 
 export default function NexusAssistantScreen() {
+  const router = useRouter();
   const colors = useColors();
   const auth = useAuth();
   const insets = useSafeAreaInsets();
