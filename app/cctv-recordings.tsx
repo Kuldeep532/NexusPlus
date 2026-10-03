@@ -36,7 +36,7 @@ export default function CctvRecordingsScreen() {
       setItems(page.items);
     } catch (cause: unknown) {
       setItems([]);
-      setError(getUserFriendlyMessage(cause, 'Recording service is unavailable.'));
+      setError(getUserFriendlyMessage(cause, 'Recordings are temporarily unavailable.'));
     } finally {
       setLoading(false);
     }
@@ -65,7 +65,7 @@ export default function CctvRecordingsScreen() {
           <Pressable accessibilityRole="button" accessibilityLabel="Retry loading recordings" onPress={() => setRefreshKey((value) => value + 1)} style={[styles.retry, { backgroundColor: colors.primary }]}><Text style={[styles.retryText, { color: colors.primaryForeground }]}>Retry</Text></Pressable>
         </View>
       ) : items.length === 0 ? (
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.cardTitle, { color: colors.foreground }]}>No recordings available</Text><Text style={[styles.text, { color: colors.mutedForeground }]}>The verified camera adapter returned no recording items for the selected period.</Text></View>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.cardTitle, { color: colors.foreground }]}>No recordings available</Text><Text style={[styles.text, { color: colors.mutedForeground }]}>No recordings were found for the selected period.</Text></View>
       ) : items.map((item) => (
         <View key={item.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>{item.label ?? 'Recording'}</Text>
