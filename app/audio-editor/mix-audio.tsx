@@ -117,7 +117,7 @@ export default function MixAudioScreen() {
     try {
       const outputPath = await createAudioEditorOutputPath('Audio Mixes', base.source.name, 'mixed', 'wav');
       const result = await mixAudioProject({ base, overlays: activeOverlays }, outputPath);
-      setMessage(`Mix complete: ${result.outputPath}`);
+      setMessage('Audio mix completed and saved successfully.');
     } catch (error) {
       setMessage(getUserFriendlyMessage(error, 'We could not mix these audio files. Please try again.'));
     } finally {
