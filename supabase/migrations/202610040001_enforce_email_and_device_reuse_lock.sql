@@ -1,6 +1,3 @@
--- Enforce one normalized email per Nexus Plus account and preserve device lock during deletion cooldown.
--- The existing device/account binding remains server-authoritative.
-
 create or replace function public.claim_device_for_user(
   p_device_hash text,
   p_integrity_verdict text
@@ -9,12 +6,11 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = pg_catalog, public
-as $
+as $$
 declare
   v_user_id uuid := auth.uid();
   v_existing_user uuid;
   v_binding record;
-  v_email text;
 begin
   if v_user_id is null then
     raise exception using errcode = '28000', message = 'Authentication is required.';
@@ -28,14 +24,11 @@ begin
     raise exception using errcode = '22023', message = 'Device integrity verification is required.';
   end if;
 
-  select lower(trim(email)) into v_email
-  from auth.users
-  where id = v_user_id;
-
-  if v_email is not null and exists (
+  -- Supabase Auth already treats email as the account identity; this extra normalized check prevents case-variant duplicates.
+  if exists (
     select 1
     from auth.users u
-    where lower(trim(u.email)) = v_email
+    where lower(trim(u.email)) = lower(trim((select email from auth.users where id = v_user_id)))
       and u.id <> v_user_id
   ) then
     raise exception using errcode = '23505', message = 'An account with this email already exists.';
@@ -89,6 +82,5 @@ begin
 end;
 $$;
 
-
-
-
+revoke all on function public.claim_device_for_user(text, text) from public, anon;
+grant execute on function public.claim_device_for_user(text, text) to authenticated;
