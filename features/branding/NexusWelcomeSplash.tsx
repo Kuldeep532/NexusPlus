@@ -26,13 +26,13 @@ export function NexusWelcomeSplash({ onFinished }: { onFinished: () => void }) {
   }, [onFinished]);
 
   return (
-    <View style={styles.root} accessibilityRole="summary" accessibilityLabel="Jai Shri Krishna. Nexus Plus welcome screen." accessible>
+    <View style={styles.root} accessibilityRole="summary" accessibilityLabel="Nexus Plus" accessible>
       <View style={styles.pattern}><NexusWelcomePattern /></View>
       <View style={styles.content}>
         <RadhaKrishnaWelcomeArt width={330} height={270} />
         <Text accessibilityRole="header" style={styles.greeting}>जय श्रीकृष्ण</Text>
         <Text style={styles.subtitle}>Nexus Plus</Text>
-        <Text accessibilityLiveRegion="polite" style={styles.hint}>Welcome</Text>
+        
       </View>
     </View>
   );
