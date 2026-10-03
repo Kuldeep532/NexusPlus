@@ -1,6 +1,6 @@
 import { scheduleReminder } from '@/features/reminders/reminderScheduler';
 
-export async function scheduleEraRecommendationReminder(text: string): Promise<string> {
+export async function scheduleAiraRecommendationReminder(text: string): Promise<string> {
   const reminder = await scheduleReminder({
     title: 'Aira • Spiritual Reminder',
     body: text,
