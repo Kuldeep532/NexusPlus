@@ -12,5 +12,5 @@ export const COMING_SOON_PC_FEATURES = [
 ];
 
 export function getComingSoonLabel(feature: string): string {
-  return feature + ' — Coming Soon';
+  return feature + ' — Not available yet';
 }
