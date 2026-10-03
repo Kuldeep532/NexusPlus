@@ -23,16 +23,6 @@ export function RadhaKrishnaWelcomeArt({ width = 320, height = 260, showWordmark
       <Path d="M218 172c13-14 24-21 39-27 3 13 10 24 19 34-20 2-38 0-58-7Z" fill="#7C3AED" opacity={0.76} />
       <Circle cx="275" cy="53" r="3" fill="#FDE68A" />
       <Circle cx="55" cy="68" r="4" fill="#FDE68A" />
-      {showWordmark && (
-        <>
-          <Path d="M62 236h196" stroke="#F59E0B" strokeWidth="1.5" strokeLinecap="round" opacity="0.65" />
-          <Path d="M94 246c10-8 19-12 29-12 10 0 19 4 29 12" fill="none" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" />
-          <Path d="M168 246c10-8 19-12 29-12 10 0 19 4 29 12" fill="none" stroke="#EC4899" strokeWidth="2" strokeLinecap="round" />
-          <Text x="160" y="272" textAnchor="middle" fontSize="13" fontWeight="700" fill="#1F2937">
-            Nexus Wave Technologies
-          </Text>
-        </>
-      )}
     </Svg>
   );
 }
