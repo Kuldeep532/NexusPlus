@@ -56,7 +56,7 @@ export default function SpeedPitchScreen() {
       setOutput({ path: result.outputPath, uri: `file://${result.outputPath}` });
       setMessage(`Done. Speed ${result.speed}× • Pitch ${result.pitchSemitones >= 0 ? '+' : ''}${result.pitchSemitones} semitones.`);
     } catch (error) {
-      setMessage(getUserFriendlyMessage(error, 'Unable to process this audio.'));
+      setMessage(getUserFriendlyMessage(error, 'We could not process this audio. Please try again.'));
     } finally {
       setWorking(false);
     }
