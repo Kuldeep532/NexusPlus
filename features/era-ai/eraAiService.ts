@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { callGateway, discoverGatewayEndpoints } from '@/features/api-gateway/apiGatewayClient';
 import { eraSystemPrompt, isSpiritualAiraQuestion } from './eraAiGuard';
+import { generateAiraLocally } from './airaLocalProvider';
 import type { EraLanguage, EraResponse, EraHabitSignal, EraRecommendation } from './eraAiTypes';
 
 const HABIT_KEY = '@nexus-plus/era-ai/habits.v1';
@@ -107,11 +108,20 @@ export async function askAira(input: {
     return { text, language: input.language, allowed: true };
   }
   const habits = await updateHabits(input.message);
-  let text = await callEraProvider(
-    input.message,
-    input.language,
-    input.gitaContext ? `Bhagavad Gita chapter ${input.gitaContext.chapter}, verse ${input.gitaContext.verse}: ${input.gitaContext.text || ''}` : undefined,
-  );
+  let text = await generateAiraLocally({
+    message: input.message,
+    language: input.language,
+    gitaContext: input.gitaContext
+      ? `Bhagavad Gita chapter ${input.gitaContext.chapter}, verse ${input.gitaContext.verse}: ${input.gitaContext.text || ''}`
+      : undefined,
+  });
+  if (!text) {
+    text = await callEraProvider(
+      input.message,
+      input.language,
+      input.gitaContext ? `Bhagavad Gita chapter ${input.gitaContext.chapter}, verse ${input.gitaContext.verse}: ${input.gitaContext.text || ''}` : undefined,
+    );
+  }
   if (!text) {
     text = input.language === 'hi'
       ? 'पहले मन को थोड़ा शांत करें और अपने नियंत्रण में आने वाले एक छोटे कर्म से शुरुआत करें। आज केवल एक स्पष्ट कदम चुनें और उसे बिना परिणाम की चिंता के पूरा करने पर ध्यान दें।'
