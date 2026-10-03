@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
+import { useCallback, useState , useEffect} from 'react';
+import { BackHandler, ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
@@ -18,6 +18,7 @@ const TARGETS: Array<{ id: AudioNormalizationTarget; title: string; description:
 ];
 
 export default function AudioNormalizerScreen() {
+  const router = useRouter();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [source, setSource] = useState<AudioEditorSource | null>(null);
@@ -58,6 +59,11 @@ export default function AudioNormalizerScreen() {
     setTarget(0.85);
     setMessage('Choose audio to normalize its peak level.');
   }, []);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { router.replace('/audio-editor'); return true; });
+    return () => subscription.remove();
+  }, [router]);
 
   return (
     <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 18, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 34 }}>
