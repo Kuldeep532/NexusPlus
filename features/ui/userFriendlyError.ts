@@ -18,7 +18,7 @@ const FRIENDLY_MESSAGES: Record<string, string> = {
   APP_VERIFICATION_REQUIRED: 'This app installation could not be verified. Please install the official Nexus Plus build and try again.',
   FEEDBACK_SUBMIT_FAILED: 'We could not send your feedback. Please try again.',
   FEEDBACK_SUBMIT_FAILED_5: 'We could not send your feedback right now. Please try again later.',
-  STORE_NOT_AVAILABLE: 'The app store is not available on this device.' ,
+  STORE_NOT_AVAILABLE: 'The app store is not available on this device.',
 };
 
 export function getUserFriendlyMessage(
@@ -37,15 +37,15 @@ export function getUserFriendlyMessage(
   if (/^GATEWAY_DISCOVERY_FAILED_/i.test(normalized)) {
     return 'We could not reach the service right now. Please try again later.';
   }
-  if (/^SUPABASE_PREMIUM_REQUEST_5\\d\\d$/i.test(normalized)) {
+  if (/^SUPABASE_PREMIUM_REQUEST_5\d\d$/i.test(normalized)) {
     return 'The account service is temporarily unavailable. Please try again later.';
   }
 
   // Never expose raw technical diagnostics, stack traces, internal codes, URLs, or
   // infrastructure details in user-facing messages.
   if (
-    /stack trace|referenceerror|typeerror|syntaxerror|exception|fatal|undefined is not|cannot read propert|cannot access|is not a function|node_modules|webpack|metro|gradle|kotlin|java\.lang|supabase|firebase|grpc|http[s]?:\\/\\/|\\b5\\d\\d\\b|\\b4\\d\\d\\b|eas build|native module|jni|hermes/i.test(normalized)
-    || normalized.includes('\\n')
+    /stack trace|referenceerror|typeerror|syntaxerror|exception|fatal|undefined is not|cannot read propert(?:y|ies)|cannot access|is not a function|node_modules|webpack|metro|gradle|kotlin|java\.lang|supabase|firebase|grpc|https?:\/\/|\b5\d\d\b|\b4\d\d\b|eas build|native module|jni|hermes/i.test(normalized)
+    || normalized.includes('\n')
   ) {
     return fallback;
   }
