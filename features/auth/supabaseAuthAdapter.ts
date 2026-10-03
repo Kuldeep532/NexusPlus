@@ -238,6 +238,16 @@ export const supabaseAuthAdapter: SupabaseAuthAdapter = {
     return mapSession(response, 'password');
   },
 
+  async sendPasswordResetEmail(email: string) {
+    assertConfigured();
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ email: email.trim() }),
+    });
+    if (!response.ok) return parseError(response);
+  },
+
   async registerWithEmailPassword(input: EmailPasswordInput) {
     const response = await requestSession('/auth/v1/signup', {
       email: input.email.trim(),
