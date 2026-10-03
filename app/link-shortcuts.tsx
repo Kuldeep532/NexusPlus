@@ -28,7 +28,7 @@ export default function LinkShortcutsScreen() {
       setUrl('');
       await load();
     } catch (error) {
-      Alert.alert('Could not save shortcut', getUserFriendlyMessage(error, 'Please check the shortcut details.'));
+      Alert.alert('Could not save link', getUserFriendlyMessage(error, 'Please check the link name and address.'));
     } finally {
       setSaving(false);
     }
@@ -38,7 +38,7 @@ export default function LinkShortcutsScreen() {
     try {
       await WebBrowser.openBrowserAsync(shortcut.url);
     } catch {
-      Alert.alert('Could not open link', 'The saved link could not be opened on this device.');
+      Alert.alert('Could not open link', 'This link could not be opened on this device.');
     }
   };
 
