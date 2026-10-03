@@ -1,18 +1,29 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useState } from 'react';
+import React, { useState } from 'react';
+import { BackHandler } from 'react-native';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
+import { useRouter } from 'expo-router';
 import { getUserFriendlyMessage } from '@/features/ui/userFriendlyError';
 import { FileEncryptionNative } from '@/features/file-encryption/FileEncryptionNative';
 
 export default function FileEncryptionScreen() {
   const colors = useColors();
+  const router = useRouter();
   const [tab, setTab] = useState<'lock' | 'unlock'>('lock');
   const [file, setFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+
+  React.useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      router.back();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [router]);
 
   const chooseFile = async () => {
     const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false });
@@ -22,7 +33,7 @@ export default function FileEncryptionScreen() {
   const run = async () => {
     if (!file) return Alert.alert('Select a file', 'Choose a file before continuing.');
     if (password.length < 8) return Alert.alert('Password too short', 'Use at least 8 characters.');
-    if (!FileEncryptionNative.isAvailable()) return Alert.alert('Unavailable', 'The native encryption engine is not available in this development build.');
+    if (!FileEncryptionNative.isAvailable()) return Alert.alert('Unavailable', 'File encryption is not available right now. Please try again later.');
 
     setBusy(true);
     try {
