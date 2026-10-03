@@ -268,7 +268,7 @@ export const supabaseAuthAdapter: SupabaseAuthAdapter = {
     const response = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ email: email.trim(), redirect_to: SUPABASE_PASSWORD_RESET_REDIRECT_URI }),
+      body: JSON.stringify({ email: email.trim().toLowerCase(), redirect_to: SUPABASE_PASSWORD_RESET_REDIRECT_URI }),
     });
     if (!response.ok) return parseError(response);
   },
