@@ -144,6 +144,31 @@ export async function getStoredAuthSession() {
   return mapSession(active, provider);
 }
 
+let recoveryAccessToken: string | null = null;
+
+export async function updatePasswordFromRecoveryUrl(url: string | null, password?: string): Promise<boolean> {
+  if (url) {
+    const parsed = new URL(url);
+    const accessToken = parsed.searchParams.get('access_token') ?? new URLSearchParams(parsed.hash.replace(/^#/, '')).get('access_token');
+    if (accessToken) recoveryAccessToken = accessToken;
+  }
+  if (!password) return recoveryAccessToken !== null;
+
+  if (!recoveryAccessToken) throw new Error('PASSWORD_RECOVERY_SESSION_MISSING');
+
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    method: 'PUT',
+    headers: {
+      ...headers(recoveryAccessToken),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ password }),
+  });
+  if (!response.ok) return parseError(response);
+  recoveryAccessToken = null;
+  return true;
+}
+
 export async function getSupabaseAccessToken(): Promise<string | null> {
   const stored = await readStoredSession();
   if (!stored?.access_token) return null;
