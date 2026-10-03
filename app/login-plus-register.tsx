@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/features/auth/useAuth';
 
-type Mode = 'login' | 'register';
+type Mode = 'choices' | 'login' | 'register' | 'forgot';
 
 function friendlyAuthError(error: string | null): string | null {
   if (!error) return null;
@@ -23,7 +23,6 @@ function friendlyAuthError(error: string | null): string | null {
   if (/DELETION_COOLDOWN/i.test(error)) return 'This phone is still reserved for the deleted account. Please wait until the security period ends.';
   if (/RATE_LIMIT|too many requests/i.test(error)) return 'Too many sign-in attempts. Please wait a moment and try again.';
   if (/SUPABASE_AUTH_ERROR_5\d\d/i.test(error)) return 'The account service is temporarily unavailable. Please try again later.';
-  if (/PASSWORD_RESET_SENT/i.test(error)) return 'We sent a password reset link to your email.';
   if (/INVALID_EMAIL/i.test(error)) return 'Please enter a valid email address.';
   return 'We could not complete your request. Please try again.';
 }
@@ -34,31 +33,43 @@ export default function LoginPlusRegisterScreen() {
   const router = useRouter();
   const auth = useAuth();
 
-  const [mode, setMode] = useState<Mode>('login');
+  const [mode, setMode] = useState<Mode>('choices');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
-  const [forgotBusy, setForgotBusy] = useState(false);
   const [forgotMessage, setForgotMessage] = useState<string | null>(null);
+  const [forgotBusy, setForgotBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const displayError = useMemo(() => friendlyAuthError(localError ?? auth.error), [localError, auth.error]);
 
   useEffect(() => {
     const handleBack = () => {
-      if (showForgot) {
-        setShowForgot(false);
-        setForgotMessage(null);
+      if (mode === 'choices') {
+        router.replace('/welcome');
         return true;
       }
-      return false;
+      setLocalError(null);
+      setForgotMessage(null);
+      setMode('choices');
+      return true;
     };
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', handleBack);
     return () => subscription.remove();
-  }, [showForgot]);
+  }, [mode, router]);
+
+  const resetAndGoHome = () => {
+    setLocalError(null);
+    setForgotMessage(null);
+    setMode('choices');
+    setName('');
+    setEmail('');
+    setPassword('');
+    setForgotEmail('');
+    router.replace('/welcome');
+  };
 
   const signInGoogle = async () => {
     setLocalError(null);
@@ -105,30 +116,78 @@ export default function LoginPlusRegisterScreen() {
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
 
       <ScrollView
+        key={mode}
         contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 22) }]}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
           <Text style={[styles.kicker, { color: colors.primary }]}>NEXUS PLUS</Text>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>
-            {showForgot ? 'Reset your password' : mode === 'login' ? 'Welcome back' : 'Create your account'}
+            {mode === 'choices'
+              ? 'Welcome to Nexus Plus'
+              : mode === 'login'
+                ? 'Login'
+                : mode === 'register'
+                  ? 'Create New Account'
+                  : 'Forgot Password'}
           </Text>
           <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-            {showForgot
-              ? 'Enter your email and we will send you a secure password reset link.'
+            {mode === 'choices'
+              ? 'Choose how you want to access your account.'
               : mode === 'login'
-                ? 'Sign in with your email or continue with Google.'
-                : 'Create your Nexus Plus account with one simple form.'}
+                ? 'Enter your email and password to continue.'
+                : mode === 'register'
+                  ? 'Create one Nexus Plus account for this phone.'
+                  : 'Enter your email to receive a secure password reset link.'}
           </Text>
         </View>
 
-        {displayError && !forgotMessage ? (
+        {displayError ? (
           <View accessible accessibilityRole="alert" style={[styles.errorBox, { backgroundColor: colors.destructive + '18', borderColor: colors.destructive }]}>
             <Text style={[styles.errorText, { color: colors.destructive }]}>{displayError}</Text>
           </View>
         ) : null}
 
-        {showForgot ? (
+        {mode === 'choices' ? (
+          <View style={styles.stack}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Login with Google"
+              disabled={auth.busy}
+              onPress={() => void signInGoogle()}
+              style={[styles.googleButton, { backgroundColor: colors.card, borderColor: colors.border, opacity: auth.busy ? 0.55 : 1 }]}
+            >
+              <Feather name="globe" size={19} color={colors.foreground} />
+              <Text style={[styles.choiceText, { color: colors.foreground }]}>Login with Google</Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Login with email and password"
+              onPress={() => { setLocalError(null); setMode('login'); }}
+              style={[styles.primaryButton, { backgroundColor: colors.primary }]}
+            >
+              <Feather name="mail" size={19} color={colors.primaryForeground} />
+              <Text style={[styles.primaryText, { color: colors.primaryForeground }]}>Login with Email & Password</Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Create new account"
+              onPress={() => { setLocalError(null); setMode('register'); }}
+              style={[styles.secondaryButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+            >
+              <Feather name="user-plus" size={19} color={colors.foreground} />
+              <Text style={[styles.choiceText, { color: colors.foreground }]}>Create New Account</Text>
+            </Pressable>
+
+            <Pressable accessibilityRole="button" accessibilityLabel="Back to welcome screen" onPress={resetAndGoHome} style={styles.backLink}>
+              <Feather name="arrow-left" size={16} color={colors.primary} />
+              <Text style={[styles.backLinkText, { color: colors.primary }]}>Back to Welcome</Text>
+            </Pressable>
+          </View>
+        ) : mode === 'forgot' ? (
           <View style={styles.stack}>
             <View>
               <Text style={[styles.label, { color: colors.foreground }]}>Email</Text>
@@ -162,16 +221,9 @@ export default function LoginPlusRegisterScreen() {
               <Text style={[styles.primaryText, { color: colors.primaryForeground }]}>Send Reset Link</Text>
             </Pressable>
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Return to login"
-              onPress={() => {
-                setShowForgot(false);
-                setForgotMessage(null);
-              }}
-              style={styles.textButton}
-            >
-              <Text style={[styles.textButtonLabel, { color: colors.primary }]}>Back to Login</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Back to login options" onPress={() => { setForgotMessage(null); setMode('login'); }} style={styles.backLink}>
+              <Feather name="arrow-left" size={16} color={colors.primary} />
+              <Text style={[styles.backLinkText, { color: colors.primary }]}>Back to Login</Text>
             </Pressable>
           </View>
         ) : (
@@ -222,17 +274,8 @@ export default function LoginPlusRegisterScreen() {
             </View>
 
             {mode === 'login' ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Forgot password"
-                onPress={() => {
-                  setForgotEmail(email);
-                  setShowForgot(true);
-                  setLocalError(null);
-                }}
-                style={styles.textButton}
-              >
-                <Text style={[styles.textButtonLabel, { color: colors.primary }]}>Forgot Password?</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Forgot password" onPress={() => { setForgotEmail(email); setForgotMessage(null); setMode('forgot'); }} style={styles.backLink}>
+                <Text style={[styles.backLinkText, { color: colors.primary }]}>Forgot Password?</Text>
               </Pressable>
             ) : null}
 
@@ -249,35 +292,14 @@ export default function LoginPlusRegisterScreen() {
               </Text>
             </Pressable>
 
-            <View style={styles.dividerRow}>
-              <View style={[styles.divider, { backgroundColor: colors.border }]} />
-              <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>or</Text>
-              <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            </View>
-
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Sign in with Google"
-              disabled={auth.busy}
-              onPress={() => void signInGoogle()}
-              style={[styles.googleButton, { backgroundColor: colors.card, borderColor: colors.border, opacity: auth.busy ? 0.55 : 1 }]}
+              accessibilityLabel="Back to login choices"
+              onPress={() => { setLocalError(null); setMode('choices'); }}
+              style={styles.backLink}
             >
-              <Feather name="globe" size={18} color={colors.foreground} />
-              <Text style={[styles.secondaryText, { color: colors.foreground }]}>Continue with Google</Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={mode === 'login' ? 'Create a new account' : 'Already have an account'}
-              onPress={() => {
-                setMode(mode === 'login' ? 'register' : 'login');
-                setLocalError(null);
-              }}
-              style={styles.textButton}
-            >
-              <Text style={[styles.textButtonLabel, { color: colors.primary }]}>
-                {mode === 'login' ? 'Create a new account' : 'Already have an account? Login'}
-              </Text>
+              <Feather name="arrow-left" size={16} color={colors.primary} />
+              <Text style={[styles.backLinkText, { color: colors.primary }]}>Back to Options</Text>
             </Pressable>
           </View>
         )}
@@ -296,15 +318,13 @@ const styles = StyleSheet.create({
   stack: { gap: 12 },
   label: { fontSize: 11, fontFamily: 'Inter_700Bold', marginBottom: 6 },
   input: { minHeight: 48, borderWidth: 1, borderRadius: 13, paddingHorizontal: 13, fontSize: 12 },
-  primaryButton: { minHeight: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
-  primaryText: { fontSize: 12, fontFamily: 'Inter_700Bold' },
-  googleButton: { minHeight: 50, borderRadius: 14, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
-  secondaryText: { fontSize: 12, fontFamily: 'Inter_700Bold' },
-  textButton: { minHeight: 34, alignItems: 'center', justifyContent: 'center' },
-  textButtonLabel: { fontSize: 11, fontFamily: 'Inter_700Bold' },
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 2 },
-  divider: { flex: 1, height: 1 },
-  dividerText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  primaryButton: { minHeight: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  secondaryButton: { minHeight: 52, borderRadius: 14, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  googleButton: { minHeight: 52, borderRadius: 14, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  choiceText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
+  primaryText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
+  backLink: { minHeight: 36, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 },
+  backLinkText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
   errorBox: { borderWidth: 1, borderRadius: 13, padding: 12, marginBottom: 14 },
   errorText: { fontSize: 11, lineHeight: 16 },
   messageBox: { borderWidth: 1, borderRadius: 13, padding: 12 },
