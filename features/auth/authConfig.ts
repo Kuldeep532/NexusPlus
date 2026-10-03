@@ -9,6 +9,7 @@ export function assertAppApiConfigured(): void {
 export const SUPABASE_URL = (process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() || 'https://cpbwiarqlvtlnwbkmpws.supabase.co').replace(/\/$/, '');
 
 export const SUPABASE_GOOGLE_REDIRECT_URI = 'nexus-plus://auth/callback';
+export const SUPABASE_PASSWORD_RESET_REDIRECT_URI = SUPABASE_GOOGLE_REDIRECT_URI;
 export const AUTH_PROFILE_SCHEMA_VERSION = 1 as const;
 
 export function assertSupabaseProductionUrl(): void {
