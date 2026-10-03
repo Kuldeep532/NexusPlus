@@ -38,7 +38,7 @@ export default function MergePdfScreen() {
 
   function reset() { setItems([]); setResult(null); setStatus(''); }
   useFocusEffect(useCallback(() => {
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => { if (!items.length && !result && !busy) return false; reset(); return false; });
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { if (!items.length && !result && !busy) return false; reset(); return true; });
     return () => sub.remove();
   }, [busy, items.length, result]));
 
