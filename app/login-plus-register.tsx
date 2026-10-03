@@ -96,7 +96,7 @@ export default function LoginPlusRegisterScreen() {
       {!showModeChoice && mode === 'chooser' && <View style={styles.stack}>
         <Pressable accessibilityRole="button" accessibilityLabel="Sign in with Google" accessibilityHint="Opens Google sign-in through Supabase" disabled={auth.busy} onPress={() => void signInGoogle()} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: auth.busy ? 0.55 : 1 }]}>
           <Feather name="globe" size={18} color={colors.primaryForeground} />
-          <Text style={[styles.primaryText, { color: colors.primaryForeground }]}>Login with Google</Text>
+          <Text style={[styles.primaryText, { color: colors.primaryForeground }]}>Sign in with Google</Text>
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Login with email and password" onPress={() => setMode('login')} style={[styles.secondaryButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Feather name="mail" size={18} color={colors.foreground} />
